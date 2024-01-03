@@ -19,13 +19,12 @@ module;
 #include <regex>
 #include <string>
 
-import base_entry;
 import config;
 import stl;
 import buffer_manager;
 import default_values;
 import wal_manager;
-import new_catalog;
+import catalog;
 import txn_manager;
 import builtin_functions;
 import local_file_system;
@@ -127,10 +126,9 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
 }
 
 void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
-    BaseEntry* base_entry{nullptr};
     Txn *new_txn = txn_mgr->CreateTxn();
     new_txn->Begin();
-    Status status = new_txn->CreateDatabase("default", ConflictType::kError, base_entry);
+    Status status = new_txn->CreateDatabase("default", ConflictType::kError);
     if(status.ok()) {
         txn_mgr->CommitTxn(new_txn);
     } else {

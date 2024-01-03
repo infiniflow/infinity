@@ -14,26 +14,29 @@
 
 module;
 
+export module catalog:block_entry;
+
+import :block_column_entry;
+import :base_entry;
+
 import stl;
 import default_values;
-import base_entry;
 import third_party;
-import block_column_entry;
 import parser;
 import local_file_system;
 
-export module block_entry;
-
 namespace infinity {
+
+
 
 class BufferManager;
 class Txn;
-class SegmentEntry;
+struct SegmentEntry;
 class DataBlock;
 
 #pragma pack(4)
 struct CreateField {
-//    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
+    //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
 
     TxnTimeStamp create_ts_{};
     i32 row_count_{};
@@ -47,7 +50,7 @@ struct CreateField {
 export struct BlockVersion {
     constexpr static String PATH = "version";
 
-    BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
+    explicit BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
     bool operator==(const BlockVersion &rhs) const;
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
     i32 GetRowCount(TxnTimeStamp begin_ts);
@@ -59,7 +62,10 @@ export struct BlockVersion {
     Vector<TxnTimeStamp> deleted_{};
 };
 
-export struct BlockEntry : public BaseEntry {
+struct BlockEntry : public BaseEntry {
+    friend struct TableEntry;
+    friend struct SegmentEntry;
+
 public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
@@ -76,6 +82,70 @@ public:
                         i16 min_row_ts_,
                         i16 max_row_ts_);
 
+public:
+    // Used in physical import
+    void FlushData(i64 checkpoint_row_count);
+
+    // Used in block iterator
+    inline BlockColumnEntry *GetColumnDataByID(u64 column_id) const { return this->columns_[column_id].get(); }
+
+    static Json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
+
+    static UniquePtr<BlockEntry> Deserialize(const Json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
+
+    void MergeFrom(BaseEntry &other) override;
+
+protected:
+    u16 AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
+
+    void DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
+
+    void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts);
+
+    void CommitDelete(u64 txn_id, TxnTimeStamp commit_ts);
+
+    void Flush(TxnTimeStamp checkpoint_ts);
+
+    void FlushVersion(BlockVersion &checkpoint_version);
+
+    static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);
+
+public:
+    // Getter
+    inline SizeT row_count() const { return row_count_; }
+
+    inline SizeT row_capacity() const { return row_capacity_; }
+
+    inline TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+
+    inline TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+
+    inline TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
+
+    inline u16 block_id() const { return block_id_; }
+
+    u32 segment_id() const;
+
+    const SharedPtr<String> &base_dir() const { return base_dir_; }
+
+    BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
+
+    // Get visible range of the BlockEntry since the given row number for a txn
+    Pair<u16, u16> GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin = 0) const;
+
+    i32 GetAvailableCapacity();
+
+    const String &DirPath() { return *base_dir_; }
+
+    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH); }
+
+    const SharedPtr<DataType> GetColumnType(u64 column_id) const;
+
+public:
+    // Setter
+    inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
+
+protected:
     RWMutex rw_locker_{};
 
     const SegmentEntry *segment_entry_{};
@@ -94,50 +164,10 @@ public:
     TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
     TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
-    Txn *txn_ptr_{nullptr};
+    u64 using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
     BufferManager *buffer_{nullptr};
 
     // checkpoint state
     u16 checkpoint_row_count_{0};
-
-public:
-    // Get visible range of the BlockEntry since the given row number for a txn
-    static Pair<u16, u16> VisibleRange(BlockEntry *block_entry, TxnTimeStamp begin_ts, u16 block_offset_begin = 0);
-
-    static u16 AppendData(BlockEntry *block_entry,
-                          Txn *txn_ptr,
-                          DataBlock *input_data_block,
-                          u16 input_block_offset,
-                          u16 append_rows,
-                          BufferManager *buffer_mgr);
-
-    static void DeleteData(BlockEntry *block_entry, Txn *txn_ptr, const Vector<RowID> &rows);
-
-    static void CommitAppend(BlockEntry *block_entry, Txn *txn_ptr);
-
-    static void CommitDelete(BlockEntry *block_entry, Txn *txn_ptr);
-
-    static void Flush(BlockEntry *block_entry, TxnTimeStamp checkpoint_ts);
-
-    static void FlushData(BlockEntry *block_entry, i64 checkpoint_row_count);
-
-    static void FlushVersion(BlockEntry *block_entry, BlockVersion &checkpoint_version);
-
-    inline static BlockColumnEntry *GetColumnDataByID(const BlockEntry *block_entry, u64 column_id) { return block_entry->columns_[column_id].get(); }
-
-    static Json Serialize(BlockEntry *segment_entry, TxnTimeStamp max_commit_ts);
-
-    static UniquePtr<BlockEntry> Deserialize(const Json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
-
-    static i32 Room(BlockEntry *block_entry);
-
-    void MergeFrom(BaseEntry &other) override;
-
-    const String &DirPath() { return *base_dir_; }
-
-    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH); }
-
-private:
-    static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);
 };
 } // namespace infinity

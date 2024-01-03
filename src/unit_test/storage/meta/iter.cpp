@@ -21,14 +21,10 @@ import buffer_handle;
 import parser;
 import file_worker;
 
-import block_column_entry;
 import block_column_iter;
-import block_entry;
 import block_iter;
-import segment_entry;
 import segment_iter;
-import table_collection_entry;
-import table_iter;
+import catalog;
 
 using namespace infinity;
 
@@ -76,9 +72,9 @@ public:
         MockSegmentEntry(std::vector<std::shared_ptr<BlockEntry>> blocks) : SegmentEntry(nullptr) { block_entries_ = std::move(blocks); }
     };
 
-    class MockTableEntry : public TableCollectionEntry {
+    class MockTableEntry : public TableEntry {
     public:
-        MockTableEntry(std::map<uint32_t, std::shared_ptr<SegmentEntry>> segments, SegmentEntry *unsealed) : TableCollectionEntry() {
+        MockTableEntry(std::map<uint32_t, std::shared_ptr<SegmentEntry>> segments, SegmentEntry *unsealed) : TableEntry() {
             segment_map_ = std::move(segments);
             unsealed_segment_ = unsealed;
         }
@@ -293,17 +289,4 @@ TEST_F(IteratorTest, table_iter_test) {
     segments.emplace(1, segment2);
 
     MockTableEntry entry(segments, unsealed_segment.get());
-
-    //------------------------------------------
-
-    TableIter iter = TableIter::Make(&entry, std::make_shared<std::vector<size_t>>(std::vector<size_t>{0, 1}));
-    for (size_t i = 0; i < row_cnt; ++i) {
-        auto ret = iter.Next();
-        ASSERT_TRUE(ret.has_value());
-        auto a = *reinterpret_cast<const int *>(ret.value()[0]);
-        auto b = *reinterpret_cast<const double *>(ret.value()[1]);
-        ASSERT_EQ(a, i);
-        ASSERT_EQ(b, (double)i + 0.5);
-    }
-    ASSERT_FALSE(iter.Next().has_value());
 }

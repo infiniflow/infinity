@@ -20,7 +20,6 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
 import base_expression;
 import fusion_expression;
 import load_meta;

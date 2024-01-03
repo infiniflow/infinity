@@ -27,7 +27,7 @@ namespace infinity {
 class BaseExpression;
 class KnnExpression;
 class BaseTableRef;
-class TableCollectionEntry;
+struct TableEntry;
 
 export class LogicalKnnScan : public LogicalNode {
 public:
@@ -39,7 +39,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
+    [[nodiscard]] TableEntry *table_collection_ptr() const;
 
     [[nodiscard]] String TableAlias() const;
 

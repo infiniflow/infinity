@@ -17,7 +17,7 @@ module;
 import stl;
 import parser;
 import block_index;
-import table_collection_entry;
+import catalog;
 
 import infinity_exception;
 
@@ -51,7 +51,7 @@ SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
 SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
                                         const String &binding_alias,
                                         u64 table_index,
-                                        TableCollectionEntry *table_ptr,
+                                        TableEntry *table_ptr,
                                         SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                         SharedPtr<Vector<String>> column_names,
                                         SharedPtr<BlockIndex> block_index) {

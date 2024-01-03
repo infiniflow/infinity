@@ -14,23 +14,26 @@
 
 module;
 
+export module catalog:table_index_entry;
+
+import :column_index_entry;
+import :segment_column_index_entry;
+import :irs_index_entry;
+import :base_entry;
+
 import stl;
 import index_def;
-import base_entry;
 import third_party;
-import column_index_entry;
-import segment_column_index_entry;
-import irs_index_entry;
-
-export module table_index_entry;
 
 namespace infinity {
 
 class TableIndexMeta;
 class BufferManager;
-class TableCollectionEntry;
+struct TableEntry;
 
-export class TableIndexEntry : public BaseEntry {
+struct TableIndexEntry : public BaseEntry {
+
+    friend struct TableEntry;
 
 public:
     TableIndexEntry(const SharedPtr<IndexDef> &index_def,
@@ -47,24 +50,31 @@ public:
 
     static UniquePtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static void CommitCreateIndex(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry);
-    static void CommitCreateIndex(TableIndexEntry *table_index_entry, SharedPtr<IrsIndexEntry> irs_index_entry);
-
     static Json Serialize(TableIndexEntry *table_index_entry, TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexEntry>
-    Deserialize(const Json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableCollectionEntry *table_entry);
+    Deserialize(const Json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableEntry *table_entry);
+
+public:
+    // Getter
+    inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
+    inline const IndexDef *index_def() const { return index_def_.get(); }
+    const SharedPtr<IrsIndexEntry> &irs_index_entry() const { return irs_index_entry_; }
+    HashMap<u64, UniquePtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
-public:
+    void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry);
+    void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
+
+private:
     RWMutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
     const SharedPtr<IndexDef> index_def_{};
     SharedPtr<String> index_dir_{};
 
-    HashMap<u64, SharedPtr<ColumnIndexEntry>> column_index_map_{};
+    HashMap<u64, UniquePtr<ColumnIndexEntry>> column_index_map_{};
 
     SharedPtr<IrsIndexEntry> irs_index_entry_{};
 };

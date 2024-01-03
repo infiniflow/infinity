@@ -19,7 +19,7 @@ import parser;
 import logical_node;
 import logical_node_type;
 import column_binding;
-import table_collection_entry;
+import catalog;
 
 export module logical_delete;
 
@@ -28,7 +28,7 @@ namespace infinity {
 export class LogicalDelete final : public LogicalNode {
 
 public:
-    LogicalDelete(u64 node_id, TableCollectionEntry *table_entry_ptr)
+    LogicalDelete(u64 node_id, TableEntry *table_entry_ptr)
         : LogicalNode(node_id, LogicalNodeType::kDelete), table_entry_ptr_(table_entry_ptr) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
@@ -41,7 +41,7 @@ public:
 
     inline String name() final { return "LogicalDelete"; }
 
-    TableCollectionEntry *table_entry_ptr_{};
+    TableEntry *table_entry_ptr_{};
 };
 
 } // namespace infinity

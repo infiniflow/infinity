@@ -19,25 +19,23 @@ module;
 import stl;
 import third_party;
 import parser;
-import table_collection_entry;
-import table_collection_meta;
 
 import infinity_exception;
-import segment_entry;
 import data_block;
 import logger;
 import data_access_state;
 import txn;
-import segment_column_index_entry;
-import table_index_entry;
 import default_values;
+import catalog;
 
 module txn_store;
 
 namespace infinity {
 
+TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
+
 UniquePtr<String> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
-    SizeT column_count = table_entry_->columns_.size();
+    SizeT column_count = table_entry_->ColumnCount();
     if (input_block->column_count() != column_count) {
         String err_msg = Format("Attempt to insert different column count data block into transaction table store");
         LOG_ERROR(err_msg);
@@ -46,7 +44,7 @@ UniquePtr<String> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block)
 
     Vector<SharedPtr<DataType>> column_types;
     for (SizeT col_id = 0; col_id < column_count; ++col_id) {
-        column_types.emplace_back(table_entry_->columns_[col_id]->type());
+        column_types.emplace_back(table_entry_->GetColumnDefByID(col_id)->type());
         if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
             String err_msg = Format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
@@ -86,8 +84,9 @@ UniquePtr<String> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) 
     return nullptr;
 }
 
-UniquePtr<String> TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
-    const String &index_name = *table_index_entry->index_def_->index_name_;
+UniquePtr<String>
+TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
+    const String &index_name = *table_index_entry->index_def()->index_name_;
     if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
         TxnIndexStore *txn_index_store = &(column_index_iter->second);
         if (auto segment_column_index_iter = txn_index_store->index_entry_map_.find(column_id);
@@ -134,9 +133,8 @@ void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 void TxnTableStore::Rollback() {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
-        TableCollectionEntry::RollbackAppend(table_entry_, txn_, this);
-        TableCollectionMeta *table_meta = (TableCollectionMeta *)TableCollectionEntry::GetTableMeta(table_entry_);
-        LOG_TRACE(Format("Rollback prepare appended data in table: {}", *table_meta->table_collection_name_));
+        NewCatalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
+        LOG_TRACE(Format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
 
     blocks_.clear();
@@ -147,30 +145,29 @@ void TxnTableStore::PrepareCommit() {
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
-    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->table_collection_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
     Txn *txn_ptr = (Txn *)txn_;
-    TableCollectionEntry::Append(table_entry_, txn_, this, txn_ptr->GetBufferMgr());
+    NewCatalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
         const auto &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
-        TableCollectionEntry::ImportSegment(table_entry_, txn_, uncommitted);
+        NewCatalog::ImportSegment(table_entry_, txn_->CommitTS(), uncommitted);
     }
 
-    TableCollectionEntry::Delete(table_entry_, txn_, delete_state_);
+    NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    NewCatalog::CommitCreateIndex(txn_indexes_store_);
 
-    TableCollectionEntry::CommitCreateIndex(table_entry_, txn_indexes_store_);
-
-    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->table_collection_name_));
+    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
 
 /**
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit() const {
-    TableCollectionEntry::CommitAppend(table_entry_, txn_, append_state_.get());
-    TableCollectionEntry::CommitDelete(table_entry_, txn_, delete_state_);
+    NewCatalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
+    NewCatalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
 }
 
 } // namespace infinity

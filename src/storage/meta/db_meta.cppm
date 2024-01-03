@@ -14,31 +14,24 @@
 
 module;
 
+export module catalog:db_meta;
+import :db_entry;
+import :base_entry;
+
 import stl;
 import parser;
-import base_entry;
-import txn_manager;
 import buffer_manager;
 import third_party;
 import status;
 
-export module db_meta;
-
 namespace infinity {
 
 export struct DBMeta {
+
+friend struct NewCatalog;
+
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(Move(name)), data_dir_(data_dir) {}
-
-public:
-    // Reserved
-    static Status CreateNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry, ConflictType conflict_type = ConflictType::kError);
-
-    static Status DropNewEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
-
-    static void DeleteNewEntry(DBMeta *db_meta, u64 txn_id, TxnManager *txn_mgr);
-
-    static Status GetEntry(DBMeta *db_meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
 
     static SharedPtr<String> ToString(DBMeta *db_meta);
 
@@ -46,26 +39,29 @@ public:
 
     static UniquePtr<DBMeta> Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr);
 
+    void MergeFrom(DBMeta &other);
+
+    SharedPtr<String> db_name() const { return db_name_; }
+
+    SharedPtr<String> data_dir() const { return data_dir_; }
+
+private:
+    Tuple<DBEntry *, Status>
+    CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+
+    Tuple<DBEntry *, Status> DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+
+    void DeleteNewEntry(u64 txn_id, TxnManager *txn_mgr);
+
+    Tuple<DBEntry *, Status> GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+
+    // Thread-unsafe
+    List<UniquePtr<BaseEntry>> &entry_list() { return entry_list_; }
+
     // Used in initialization phase
     static void AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry);
 
-    void MergeFrom(DBMeta &other);
-
-    SharedPtr<String> db_name() const {
-        return db_name_;
-    }
-
-    SharedPtr<String> data_dir() const {
-        return data_dir_;
-    }
-
-    // Thread-unsafe
-    List<UniquePtr<BaseEntry>>& entry_list() {
-        return entry_list_;
-    }
-
 private:
-
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 

@@ -16,14 +16,15 @@ module;
 
 #include <vector>
 
-import base_entry;
-import table_collection_type;
+module catalog;
+
+import :base_entry;
+
+import table_entry_type;
 import stl;
 import parser;
 import txn_manager;
-import table_collection_entry;
-import table_collection_detail;
-import table_collection_meta;
+import table_detail;
 import buffer_manager;
 import default_values;
 import block_index;
@@ -32,97 +33,80 @@ import third_party;
 import infinity_exception;
 import status;
 
-module db_entry;
-
 namespace infinity {
 
-Status DBEntry::CreateTableCollection(DBEntry *db_entry,
-                                      TableCollectionType table_collection_type,
-                                      const SharedPtr<String> &table_collection_name,
-                                      const Vector<SharedPtr<ColumnDef>> &columns,
-                                      u64 txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnManager *txn_mgr,
-                                      BaseEntry *&base_entry) {
+Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
+                                                 const SharedPtr<String> &table_collection_name,
+                                                 const Vector<SharedPtr<ColumnDef>> &columns,
+                                                 u64 txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr) {
     const String &table_name = *table_collection_name;
 
     // Check if there is table_meta with the table_name
-    TableCollectionMeta *table_meta{nullptr};
-    db_entry->rw_locker_.lock_shared();
-    auto table_iter = db_entry->tables_.find(table_name);
-    if (table_iter != db_entry->tables_.end()) {
+    TableMeta *table_meta{nullptr};
+    this->rw_locker_.lock_shared();
+    auto table_iter = this->tables_.find(table_name);
+    if (table_iter != this->tables_.end()) {
         table_meta = table_iter->second.get();
-        db_entry->rw_locker_.unlock_shared();
+        this->rw_locker_.unlock_shared();
 
-        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *db_entry->db_entry_dir_));
+        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *this->db_entry_dir_));
 
     } else {
-        db_entry->rw_locker_.unlock_shared();
+        this->rw_locker_.unlock_shared();
 
         LOG_TRACE(Format("Create new table/collection: {}", table_name));
-        UniquePtr<TableCollectionMeta> new_table_meta = MakeUnique<TableCollectionMeta>(db_entry->db_entry_dir_, table_collection_name, db_entry);
+        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(this->db_entry_dir_, table_collection_name, this);
         table_meta = new_table_meta.get();
 
-        db_entry->rw_locker_.lock();
-        auto table_iter2 = db_entry->tables_.find(table_name);
-        if (table_iter2 != db_entry->tables_.end()) {
+        this->rw_locker_.lock();
+        auto table_iter2 = this->tables_.find(table_name);
+        if (table_iter2 != this->tables_.end()) {
             table_meta = table_iter2->second.get();
         } else {
-            db_entry->tables_[table_name] = Move(new_table_meta);
+            this->tables_[table_name] = Move(new_table_meta);
         }
-        db_entry->rw_locker_.unlock();
+        this->rw_locker_.unlock();
 
-        LOG_TRACE(Format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *db_entry->db_entry_dir_));
+        LOG_TRACE(Format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
     }
 
-    return TableCollectionMeta::CreateNewEntry(table_meta,
-                                               table_collection_type,
-                                               table_collection_name,
-                                               columns,
-                                               txn_id,
-                                               begin_ts,
-                                               txn_mgr,
-                                               base_entry);
+    return table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
 }
 
-Status DBEntry::DropTableCollection(DBEntry *db_entry,
-                                    const String &table_collection_name,
-                                    ConflictType conflict_type,
-                                    u64 txn_id,
-                                    TxnTimeStamp begin_ts,
-                                    TxnManager *txn_mgr,
-                                    BaseEntry *&base_entry) {
-    db_entry->rw_locker_.lock_shared();
+Tuple<TableEntry *, Status>
+DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+    this->rw_locker_.lock_shared();
 
-    TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_collection_name].get();
+    TableMeta *table_meta{nullptr};
+    if (this->tables_.find(table_collection_name) != this->tables_.end()) {
+        table_meta = this->tables_[table_collection_name].get();
     }
-    db_entry->rw_locker_.unlock_shared();
+    this->rw_locker_.unlock_shared();
     if (table_meta == nullptr) {
         if (conflict_type == ConflictType::kIgnore) {
             LOG_TRACE(Format("Ignore drop a not existed table/collection entry {}", table_collection_name));
-            return Status::OK();
+            return {nullptr, Status::OK()};
         }
 
         UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed table/collection entry {}", table_collection_name));
         LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
     LOG_TRACE(Format("Drop a table/collection entry {}", table_collection_name));
-    return TableCollectionMeta::DropNewEntry(table_meta, txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type, base_entry);
+    return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
-Tuple<BaseEntry*, Status>
-DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts) {
-    db_entry->rw_locker_.lock_shared();
+Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts) {
+    this->rw_locker_.lock_shared();
 
-    TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_collection_name].get();
+    TableMeta *table_meta{nullptr};
+    if (this->tables_.find(table_collection_name) != this->tables_.end()) {
+        table_meta = this->tables_[table_collection_name].get();
     }
-    db_entry->rw_locker_.unlock_shared();
+    this->rw_locker_.unlock_shared();
 
     //    LOG_TRACE("Get a table entry {}", table_name);
     if (table_meta == nullptr) {
@@ -130,59 +114,59 @@ DBEntry::GetTableCollection(DBEntry *db_entry, const String &table_collection_na
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
-    return TableCollectionMeta::GetEntry(table_meta, txn_id, begin_ts);
+    return table_meta->GetEntry(txn_id, begin_ts);
 }
 
-void DBEntry::RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr) {
-    db_entry->rw_locker_.lock_shared();
+void DBEntry::RemoveTableEntry(const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr) {
+    this->rw_locker_.lock_shared();
 
-    TableCollectionMeta *table_meta{nullptr};
-    if (db_entry->tables_.find(table_collection_name) != db_entry->tables_.end()) {
-        table_meta = db_entry->tables_[table_collection_name].get();
+    TableMeta *table_meta{nullptr};
+    if (this->tables_.find(table_collection_name) != this->tables_.end()) {
+        table_meta = this->tables_[table_collection_name].get();
     }
-    db_entry->rw_locker_.unlock_shared();
+    this->rw_locker_.unlock_shared();
 
     LOG_TRACE(Format("Remove a table/collection entry: {}", table_collection_name));
-    TableCollectionMeta::DeleteNewEntry(table_meta, txn_id, txn_mgr);
+    table_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
-Vector<TableCollectionEntry *> DBEntry::TableCollections(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts) {
-    Vector<TableCollectionEntry *> results;
+Vector<TableEntry *> DBEntry::TableCollections(u64 txn_id, TxnTimeStamp begin_ts) {
+    Vector<TableEntry *> results;
 
-    db_entry->rw_locker_.lock_shared();
+    this->rw_locker_.lock_shared();
 
-    results.reserve(db_entry->tables_.size());
-    for (auto &table_collection_meta_pair : db_entry->tables_) {
-        TableCollectionMeta *table_collection_meta = table_collection_meta_pair.second.get();
-        auto [table_collection_entry, status] = TableCollectionMeta::GetEntry(table_collection_meta, txn_id, begin_ts);
+    results.reserve(this->tables_.size());
+    for (auto &table_collection_meta_pair : this->tables_) {
+        TableMeta *table_meta = table_collection_meta_pair.second.get();
+        auto [table_entry, status] = table_meta->GetEntry(txn_id, begin_ts);
         if (!status.ok()) {
             LOG_TRACE(Format("error when get table/collection entry: {}", status.message()));
         } else {
-            results.emplace_back((TableCollectionEntry *)table_collection_entry);
+            results.emplace_back((TableEntry *)table_entry);
         }
     }
-    db_entry->rw_locker_.unlock_shared();
+    this->rw_locker_.unlock_shared();
 
     return results;
 }
 
-Status DBEntry::GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts, Vector<TableCollectionDetail> &output_table_array) {
-    Vector<TableCollectionEntry *> table_collection_entries = DBEntry::TableCollections(db_entry, txn_id, begin_ts);
+Status DBEntry::GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array) {
+    Vector<TableEntry *> table_collection_entries = this->TableCollections(txn_id, begin_ts);
     output_table_array.reserve(table_collection_entries.size());
-    for (TableCollectionEntry *table_collection_entry : table_collection_entries) {
-        TableCollectionDetail table_collection_detail;
-        table_collection_detail.db_name_ = db_entry->db_name_;
-        table_collection_detail.table_collection_name_ = table_collection_entry->table_collection_name_;
-        table_collection_detail.table_collection_type_ = table_collection_entry->table_collection_type_;
-        table_collection_detail.column_count_ = table_collection_entry->columns_.size();
-        table_collection_detail.row_count_ = table_collection_entry->row_count_;
-        table_collection_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+    for (TableEntry *table_entry : table_collection_entries) {
+        TableDetail table_detail;
+        table_detail.db_name_ = this->db_name_;
+        table_detail.table_name_ = table_entry->GetTableName();
+        table_detail.table_entry_type_ = table_entry->EntryType();
+        table_detail.column_count_ = table_entry->ColumnCount();
+        table_detail.row_count_ = table_entry->RowCount();
+        table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
 
-        SharedPtr<BlockIndex> segment_index = TableCollectionEntry::GetBlockIndex(table_collection_entry, txn_id, begin_ts);
+        SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(txn_id, begin_ts);
 
-        table_collection_detail.segment_count_ = segment_index->SegmentCount();
-        table_collection_detail.block_count_ = segment_index->BlockCount();
-        output_table_array.emplace_back(table_collection_detail);
+        table_detail.segment_count_ = segment_index->SegmentCount();
+        table_detail.block_count_ = segment_index->BlockCount();
+        output_table_array.emplace_back(table_detail);
     }
     return Status::OK();
 }
@@ -197,7 +181,7 @@ SharedPtr<String> DBEntry::ToString(DBEntry *db_entry) {
 Json DBEntry::Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Json json_res;
 
-    Vector<TableCollectionMeta *> table_metas;
+    Vector<TableMeta *> table_metas;
     {
         SharedLock<RWMutex> lck(db_entry->rw_locker_);
         json_res["db_entry_dir"] = *db_entry->db_entry_dir_;
@@ -212,8 +196,8 @@ Json DBEntry::Serialize(DBEntry *db_entry, TxnTimeStamp max_commit_ts, bool is_f
             table_metas.push_back(table_meta_pair.second.get());
         }
     }
-    for (TableCollectionMeta *table_meta : table_metas) {
-        json_res["tables"].emplace_back(TableCollectionMeta::Serialize(table_meta, max_commit_ts, is_full_checkpoint));
+    for (TableMeta *table_meta : table_metas) {
+        json_res["tables"].emplace_back(TableMeta::Serialize(table_meta, max_commit_ts, is_full_checkpoint));
     }
     return json_res;
 }
@@ -237,8 +221,8 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
-            UniquePtr<TableCollectionMeta> table_meta = TableCollectionMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-            res->tables_.emplace(*table_meta->table_collection_name_, Move(table_meta));
+            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
+            res->tables_.emplace(*table_meta->table_name_, Move(table_meta));
         }
     }
 

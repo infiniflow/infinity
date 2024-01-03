@@ -14,23 +14,29 @@
 
 module;
 
+export module catalog:column_index_entry;
+
+import :base_entry;
+import :segment_column_index_entry;
+
 import stl;
 import parser;
 import index_base;
-import base_entry;
 import third_party;
-import segment_column_index_entry;
 import index_base;
-
-export module column_index_entry;
+import index_file_worker;
 
 namespace infinity {
 
-class BufferManager;
-class TableCollectionEntry;
-class TableIndexEntry;
+export struct TableIndexEntry;
 
-export struct ColumnIndexEntry : public BaseEntry {
+class BufferManager;
+struct TableEntry;
+
+struct ColumnIndexEntry : public BaseEntry {
+    friend struct TableEntry;
+    friend struct TableIndexEntry;
+
 public:
     ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                      TableIndexEntry *table_index_entry,
@@ -39,32 +45,41 @@ public:
                      u64 txn_id,
                      TxnTimeStamp begin_ts);
 
-    static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
+    static UniquePtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
                                                            u64 txn_id,
                                                            SharedPtr<String> index_dir,
                                                            TxnTimeStamp begin_ts);
 
-    static void CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry);
-
     static Json Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<ColumnIndexEntry> Deserialize(const Json &column_index_entry_json,
-                                                   TableIndexEntry *table_index_entry,
-                                                   BufferManager *buffer_mgr,
-                                                   TableCollectionEntry *table_collection_entry);
+    static UniquePtr<ColumnIndexEntry>
+    Deserialize(const Json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
+
+public:
+    // Getter
+    const SharedPtr<String> &index_dir() const { return index_dir_; }
+    u64 column_id() const { return column_id_; }
+    const IndexBase *index_base_ptr() const { return index_base_.get(); }
+    TableIndexEntry *table_index_entry() const { return table_index_entry_; }
+    const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>& index_by_segment() const { return index_by_segment_; }
+
+    // Used in segment column index entry
+    UniquePtr<IndexFileWorker> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
+    void CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry);
+    static String IndexFileName(const String &index_name, u32 segment_id);
 
-public:
+private:
     RWMutex rw_locker_{};
 
     TableIndexEntry *table_index_entry_{};
     u64 column_id_{};
     SharedPtr<String> index_dir_{};
     const SharedPtr<IndexBase> index_base_{};
-    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment{};
+    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};
 };
 } // namespace infinity

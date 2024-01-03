@@ -19,7 +19,7 @@ import txn;
 import config;
 import options;
 import profiler;
-import new_catalog;
+import catalog;
 
 export module session;
 

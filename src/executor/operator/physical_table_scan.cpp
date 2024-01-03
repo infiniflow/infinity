@@ -26,12 +26,10 @@ import operator_state;
 import global_block_id;
 import data_block;
 import table_scan_function_data;
-import block_entry;
 import base_table_ref;
 import column_buffer;
-import block_column_entry;
 import block_index;
-import table_collection_entry;
+import catalog;
 import default_values;
 import infinity_exception;
 import infinity_exception;
@@ -74,7 +72,7 @@ String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; 
 
 u64 PhysicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
 
-TableCollectionEntry *PhysicalTableScan::TableEntry() const { return base_table_ref_->table_entry_ptr_; }
+TableEntry *PhysicalTableScan::TableEntry() const { return base_table_ref_->table_entry_ptr_; }
 
 SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
@@ -143,7 +141,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
-        auto [row_begin, row_end] = BlockEntry::VisibleRange(current_block_entry, begin_ts, read_offset);
+        auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
         auto write_size = Min(write_capacity, SizeT(row_end - row_begin));
 
         if (write_size > 0) {
@@ -155,7 +153,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
                 } else {
                     ColumnBuffer column_buffer =
-                        BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
+                        current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
                     output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
                 }
             }

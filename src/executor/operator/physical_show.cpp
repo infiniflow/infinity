@@ -28,21 +28,17 @@ import operator_state;
 import data_block;
 
 import infinity_exception;
-import table_collection_type;
+import table_entry_type;
 import value_expression;
 import logical_show;
-import table_collection_detail;
-import view_entry;
-import base_entry;
+import table_detail;
+import catalog;
 import value;
-import table_collection_entry;
 import table_def;
 import data_table;
 import third_party;
 import index_def;
 import index_ivfflat;
-import table_index_meta;
-import table_index_entry;
 import index_base;
 import index_hnsw;
 import index_full_text;
@@ -53,12 +49,10 @@ import config;
 import session;
 import options;
 import status;
-import block_column_entry;
 import local_file_system;
 import utility;
 import buffer_manager;
 import session_manager;
-import column_index_entry;
 
 module physical_show;
 
@@ -325,8 +319,8 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    Vector<TableCollectionDetail> table_collections_detail;
-    Status status = txn->GetTableCollections(db_name_, table_collections_detail);
+    Vector<TableDetail> table_collections_detail;
+    Status status = txn->GetTables(db_name_, table_collections_detail);
     if (!status.ok()) {
         Error<ExecutorException>(status.message());
     }
@@ -338,12 +332,12 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
     output_block_ptr->Init(column_types);
 
-    for (auto &table_collection_detail : table_collections_detail) {
+    for (auto &table_detail : table_collections_detail) {
 
         SizeT column_id = 0;
         {
             // Append schema name to the 0 column
-            const String *db_name = table_collection_detail.db_name_.get();
+            const String *db_name = table_detail.db_name_.get();
             Value value = Value::MakeVarchar(*db_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -352,14 +346,14 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         ++column_id;
         {
             // Append table name to the 1 column
-            const String *table_name = table_collection_detail.table_collection_name_.get();
+            const String *table_name = table_detail.table_name_.get();
             Value value = Value::MakeVarchar(*table_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
-        TableCollectionType table_type = table_collection_detail.table_collection_type_;
+        TableEntryType table_type = table_detail.table_entry_type_;
         {
             // Append base table type to the 2 column
             const String &base_table_type_str = ToString(table_type);
@@ -372,13 +366,13 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             // Append column count the 3 column
             switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.column_count_));
+                case TableEntryType::kTableEntry: {
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.column_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
-                case TableCollectionType::kCollectionEntry: {
+                case TableEntryType::kCollectionEntry: {
                     // TODO: column count need to be given for table.
                     Value value = Value::MakeBigInt(static_cast<i64>(0));
                     ValueExpression value_expr(value);
@@ -392,13 +386,13 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             // Append row count the 4 column
             switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.row_count_));
+                case TableEntryType::kTableEntry: {
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.row_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
-                case TableCollectionType::kCollectionEntry: {
+                case TableEntryType::kCollectionEntry: {
                     // TODO: row count need to be given for collection.
                     Value value = Value::MakeBigInt(static_cast<i64>(0));
                     ValueExpression value_expr(value);
@@ -415,13 +409,13 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             // Append segment count the 5 column
             switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.segment_count_));
+                case TableEntryType::kTableEntry: {
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.segment_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
-                case TableCollectionType::kCollectionEntry: {
+                case TableEntryType::kCollectionEntry: {
                     // TODO: segment count need to be given for collection.
                     Value value = Value::MakeBigInt(static_cast<i64>(0));
                     ValueExpression value_expr(value);
@@ -438,13 +432,13 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         {
             // Append segment count the 5 column
             switch (table_type) {
-                case TableCollectionType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_collection_detail.block_count_));
+                case TableEntryType::kTableEntry: {
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
-                case TableCollectionType::kCollectionEntry: {
+                case TableEntryType::kCollectionEntry: {
                     // TODO: segment count need to be given for collection.
                     Value value = Value::MakeBigInt(static_cast<i64>(0));
                     ValueExpression value_expr(value);
@@ -460,7 +454,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         ++column_id;
         {
             // Append block limit the 6 column
-            SizeT default_row_size = table_collection_detail.segment_capacity_;
+            SizeT default_row_size = table_detail.segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -598,14 +592,12 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [base_table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
         Error<ExecutorException>(Format("{} isn't found", object_name_));
         return;
     }
-
-    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
@@ -627,16 +619,19 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
     output_block_ptr->Init(column_types);
 
-    for (auto &column : table_collection_entry->columns_) {
-        SizeT column_id = 0;
+    SizeT column_count = table_entry->ColumnCount();
+    for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
+        const ColumnDef *column = table_entry->GetColumnDefByID(input_column_id);
+
+        SizeT output_column_idx = 0;
         {
             // Append column name to the first column
             Value value = Value::MakeVarchar(column->name());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
 
-        ++column_id;
+        ++output_column_idx;
         {
             // Append column type to the second column, if the column type is embedded type, append the embedded type
             String column_type;
@@ -650,10 +645,10 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             }
             Value value = Value::MakeVarchar(column_type);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
 
-        ++column_id;
+        ++output_column_idx;
         {
             // Append column constraint to the third column
             String column_constraint;
@@ -663,7 +658,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
             Value value = Value::MakeVarchar(column_constraint);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[output_column_idx]);
         }
     }
     output_block_ptr->Finalize();
@@ -674,14 +669,13 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [base_table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
         Error<ExecutorException>(Format("{} isn't found", object_name_));
         return;
     }
 
-    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     Vector<SharedPtr<ColumnDef>> column_defs = {
@@ -713,34 +707,39 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
 
     if (segment_id_.has_value() && block_id_.has_value()) {
-        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+        auto iter = table_entry->segment_map().find(*segment_id_);
 
-        if (iter != table_collection_entry->segment_map_.end() && iter->second->block_entries_.size() > *block_id_) {
-            auto block = iter->second->block_entries_[*block_id_];
+        const auto &block_entries = iter->second->block_entries();
+
+        if (iter != table_entry->segment_map().end() && block_entries.size() > *block_id_) {
+            auto block = block_entries[*block_id_];
             auto version_path = block->VersionFilePath();
 
             chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
-            for (auto &column : block->columns_) {
-                auto col_file_path = column->FilePath();
+            SizeT column_count = table_entry->ColumnCount();
+            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                auto block_column_entry = block->GetColumnBlockEntry(column_id);
+                auto col_file_path = block_column_entry->FilePath();
 
                 chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
-                for (auto &outline : column->OutlinePaths()) {
+                for (auto &outline : block_column_entry->OutlinePaths()) {
                     chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
                 }
             }
         }
     } else if (segment_id_.has_value()) {
-        auto iter = table_collection_entry->segment_map_.find(*segment_id_);
+        auto iter = table_entry->segment_map().find(*segment_id_);
+        const auto &block_entries = iter->second->block_entries();
 
-        if (iter != table_collection_entry->segment_map_.end()) {
-            for (auto &entry : iter->second->block_entries_) {
+        if (iter != table_entry->segment_map().end()) {
+            for (auto &entry : block_entries) {
                 auto dir_path = entry->DirPath();
 
                 chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
             }
         }
     } else {
-        for (auto &[_, segment] : table_collection_entry->segment_map_) {
+        for (auto &[_, segment] : table_entry->segment_map()) {
             auto dir_path = segment->DirPath();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
@@ -1288,14 +1287,12 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [base_table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
+    auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = Move(table_status.msg_);
         //        Error<ExecutorException>(table_status.message());
         return;
     }
-
-    auto table_collection_entry = static_cast<TableCollectionEntry *>(base_table_entry);
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -1313,19 +1310,17 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
-    for (const auto &[index_name, index_def_meta] : table_collection_entry->index_meta_map_) {
-        BaseEntry *base_entry{nullptr};
-        Status status = TableIndexMeta::GetEntry(index_def_meta.get(), txn->TxnID(), txn->BeginTS(), base_entry);
+    for (const auto &[index_name, index_def_meta] : table_entry->index_meta_map()) {
+        auto [table_index_entry, status] = index_def_meta->GetEntry(txn->TxnID(), txn->BeginTS());
         if (!status.ok()) {
             // Index isn't found.
             continue;
         }
-        auto table_index_entry = static_cast<TableIndexEntry *>(base_entry);
 
-        for (const auto &column_index_entry_pair : table_index_entry->column_index_map_) {
+        for (const auto &column_index_entry_pair : table_index_entry->column_index_map()) {
             u64 index_column_id = column_index_entry_pair.first;
-            ColumnIndexEntry* column_index_entry = column_index_entry_pair.second.get();
-            const IndexBase* index_base = column_index_entry->index_base_.get();
+            ColumnIndexEntry *column_index_entry = column_index_entry_pair.second.get();
+            const IndexBase *index_base = column_index_entry->index_base_ptr();
             SizeT column_id = 0;
             {
                 // Append index name to the first column
@@ -1366,15 +1361,15 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index path
-                Value value = Value::MakeVarchar(*column_index_entry->index_dir_);
+                Value value = Value::MakeVarchar(*column_index_entry->index_dir());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append Index segment
-                SizeT segment_count = table_collection_entry->segment_map_.size();
-                SizeT index_segment_count = column_index_entry->index_by_segment.size();
+                SizeT segment_count = table_entry->segment_map().size();
+                SizeT index_segment_count = column_index_entry->index_by_segment().size();
                 String result_value = Format("{}/{}", index_segment_count, segment_count);
                 Value value = Value::MakeVarchar(result_value);
                 ValueExpression value_expr(value);

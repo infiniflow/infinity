@@ -14,25 +14,18 @@
 
 module;
 
+module catalog;
+
 import stl;
-import base_entry;
-// import segment_entry;
 import buffer_manager;
 import buffer_handle;
 import buffer_obj;
 import logger;
 import third_party;
-import parser;
 import infinity_exception;
 
 import index_file_worker;
-import annivfflat_index_file_worker;
-import hnsw_file_worker;
-import column_index_entry;
-import table_collection_entry;
-import segment_entry;
-
-module segment_column_index_entry;
+import status;
 
 namespace infinity {
 SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferObj *buffer)
@@ -44,7 +37,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
                                                                           BufferManager *buffer_manager,
                                                                           CreateIndexParam *param) {
     // FIXME: estimate index size.
-    UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param, segment_id);
+    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
     auto buffer = buffer_manager->Allocate(Move(file_worker));
     auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
     segment_column_index_entry->min_ts_ = create_ts;
@@ -56,42 +49,37 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
                                                                            u32 segment_id,
                                                                            BufferManager *buffer_manager,
                                                                            CreateIndexParam *param) {
-    UniquePtr<IndexFileWorker> file_worker = SegmentColumnIndexEntry::CreateFileWorker(column_index_entry, param, segment_id);
+    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
     auto buffer = buffer_manager->Get(Move(file_worker));
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
 
-BufferHandle SegmentColumnIndexEntry::GetIndex(SegmentColumnIndexEntry *segment_column_index_entry, BufferManager *) {
-    return segment_column_index_entry->buffer_->Load();
+BufferHandle SegmentColumnIndexEntry::GetIndex() {
+    return buffer_->Load();
 }
 
-void SegmentColumnIndexEntry::UpdateIndex(SegmentColumnIndexEntry *,
-                                          TxnTimeStamp,
-                                          FaissIndexPtr *,
-                                          BufferManager *) {
-    Error<NotImplementException>("Not implemented");
-}
+void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { Error<NotImplementException>("Not implemented"); }
 
-bool SegmentColumnIndexEntry::Flush(SegmentColumnIndexEntry *segment_column_index_entry, TxnTimeStamp checkpoint_ts) {
-    String &index_name = *segment_column_index_entry->column_index_entry_->index_dir_;
-    u64 segment_id = segment_column_index_entry->segment_id_;
+bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
+    String &index_name = *this->column_index_entry_->index_dir();
+    u64 segment_id = this->segment_id_;
     LOG_TRACE(Format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
-    if (segment_column_index_entry->max_ts_ <= segment_column_index_entry->checkpoint_ts_ || segment_column_index_entry->min_ts_ > checkpoint_ts) {
+    if (this->max_ts_ <= this->checkpoint_ts_ || this->min_ts_ > checkpoint_ts) {
         LOG_TRACE(Format("Segment: {}, Index: {} has been flushed at some previous checkpoint, or is not visible at current checkpoint.",
                          segment_id,
                          index_name));
         return false;
     }
-    if (segment_column_index_entry->buffer_ == nullptr) {
+    if (this->buffer_ == nullptr) {
         LOG_WARN("Index entry is not initialized");
         return false;
     }
-    if (segment_column_index_entry->buffer_->Save()) {
-        segment_column_index_entry->buffer_->Sync();
-        segment_column_index_entry->buffer_->CloseFile();
+    if (this->buffer_->Save()) {
+        this->buffer_->Sync();
+        this->buffer_->CloseFile();
     }
 
-    segment_column_index_entry->checkpoint_ts_ = checkpoint_ts;
+    this->checkpoint_ts_ = checkpoint_ts;
     LOG_TRACE(Format("Segment: {}, Index: {} is flushed", segment_id, index_name));
     return true;
 }
@@ -116,12 +104,17 @@ Json SegmentColumnIndexEntry::Serialize(SegmentColumnIndexEntry *segment_column_
 UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const Json &index_entry_json,
                                                                         ColumnIndexEntry *column_index_entry,
                                                                         BufferManager *buffer_mgr,
-                                                                        TableCollectionEntry *table_collection_entry) {
+                                                                        TableEntry *table_entry) {
     u32 segment_id = index_entry_json["segment_id"];
-    SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(table_collection_entry, segment_id);
-    u64 column_id = column_index_entry->column_id_;
+    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+
+    if (!status.ok()) {
+        Error<StorageException>(status.message());
+        return nullptr;
+    }
+    u64 column_id = column_index_entry->column_id();
     UniquePtr<CreateIndexParam> create_index_param =
-        SegmentEntry::GetCreateIndexParam(segment_entry, column_index_entry->index_base_.get(), table_collection_entry->columns_[column_id].get());
+        SegmentEntry::GetCreateIndexParam(segment_row_count, column_index_entry->index_base_ptr(), table_entry->GetColumnDefByID(column_id));
     // TODO: need to get create index param;
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());
@@ -146,60 +139,5 @@ void SegmentColumnIndexEntry::MergeFrom(BaseEntry &other) {
         checkpoint_ts_ = other_index_entry.checkpoint_ts_;
     }
 }
-
-UniquePtr<IndexFileWorker> SegmentColumnIndexEntry::CreateFileWorker(ColumnIndexEntry *column_index_entry, CreateIndexParam *param, u32 segment_id) {
-    UniquePtr<IndexFileWorker> file_worker = nullptr;
-    const auto *index_base = param->index_base_;
-    const auto *column_def = param->column_def_;
-    auto file_name = MakeShared<String>(SegmentColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
-            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
-            switch (elem_type) {
-                case kElemFloat: {
-                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(column_index_entry->index_dir_,
-                                                                             file_name,
-                                                                             index_base,
-                                                                             column_def,
-                                                                             create_annivfflat_param->row_count_);
-                    break;
-                }
-                default: {
-                    ExecutorException("Create IVF Flat index: unsupported element type.");
-                }
-            }
-            break;
-        }
-        case IndexType::kHnsw: {
-            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            file_worker =
-                MakeUnique<HnswFileWorker>(column_index_entry->index_dir_, file_name, index_base, column_def, create_hnsw_param->max_element_);
-            break;
-        }
-        case IndexType::kIRSFullText: {
-//            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
-            UniquePtr<String> err_msg =
-                    MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
-            break;
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
-        }
-    }
-    if (file_worker.get() == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
-        LOG_ERROR(*err_msg);
-        Error<StorageException>(*err_msg);
-    }
-    return file_worker;
-}
-
-String SegmentColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return Format("seg{}.idx", segment_id, index_name); }
 
 } // namespace infinity

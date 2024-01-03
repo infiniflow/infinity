@@ -14,23 +14,24 @@
 
 module;
 
-import base_entry;
+export module catalog:db_entry;
+
+import :table_meta;
+import :base_entry;
+
 import stl;
-import table_collection_type;
-import table_collection_entry;
+import table_entry_type;
 import parser;
 import third_party;
-import table_collection_detail;
-import table_collection_meta;
+import table_detail;
 import buffer_manager;
-import txn_manager;
 import status;
-
-export module db_entry;
 
 namespace infinity {
 
-export class DBEntry : public BaseEntry {
+class DBEntry : public BaseEntry {
+    friend struct NewCatalog;
+
 public:
     inline explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
         : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
@@ -40,31 +41,6 @@ public:
     }
 
 public:
-    static Status CreateTableCollection(DBEntry *db_entry,
-                                        TableCollectionType table_collection_type,
-                                        const SharedPtr<String> &table_collection_name,
-                                        const Vector<SharedPtr<ColumnDef>> &columns,
-                                        u64 txn_id,
-                                        TxnTimeStamp begin_ts,
-                                        TxnManager *txn_mgr,
-                                        BaseEntry *&base_entry);
-
-    static Status DropTableCollection(DBEntry *db_entry,
-                                      const String &table_collection_name,
-                                      ConflictType conflict_type,
-                                      u64 txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnManager *txn_mgr,
-                                      BaseEntry *&base_entry);
-
-    static Tuple<BaseEntry*, Status>
-    GetTableCollection(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts);
-
-    static void RemoveTableCollectionEntry(DBEntry *db_entry, const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
-
-    static Vector<TableCollectionEntry *> TableCollections(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts);
-
-    static Status GetTableCollectionsDetail(DBEntry *db_entry, u64 txn_id, TxnTimeStamp begin_ts, Vector<TableCollectionDetail> &output_table_array);
 
     static SharedPtr<String> ToString(DBEntry *db_entry);
 
@@ -74,11 +50,34 @@ public:
 
     virtual void MergeFrom(BaseEntry &other);
 
-public:
+    [[nodiscard]] const String& db_name() const { return *db_name_; }
+
+    [[nodiscard]] const SharedPtr<String>& db_name_ptr() const { return db_name_; }
+
+private:
+    Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
+                                            const SharedPtr<String> &table_collection_name,
+                                            const Vector<SharedPtr<ColumnDef>> &columns,
+                                            u64 txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr);
+
+    Tuple<TableEntry *, Status>
+    DropTable(const String &table_collection_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+
+    Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, u64 txn_id, TxnTimeStamp begin_ts);
+
+    void RemoveTableEntry(const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
+
+    Vector<TableEntry *> TableCollections(u64 txn_id, TxnTimeStamp begin_ts);
+
+    Status GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+
+private:
     RWMutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableCollectionMeta>> tables_{}; // NOTE : can use SharedPtr<String> as key.
+    HashMap<String, UniquePtr<TableMeta>> tables_{}; // NOTE : can use SharedPtr<String> as key.
 };
 
 } // namespace infinity

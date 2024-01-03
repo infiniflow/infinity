@@ -14,12 +14,28 @@
 
 module;
 
+export module catalog;
+export import :db_meta;
+export import :db_entry;
+export import :table_meta;
+export import :table_entry;
+export import :view_meta;
+export import :view_entry;
+export import :segment_entry;
+export import :block_entry;
+export import :block_column_entry;
+export import :table_index_meta;
+export import :table_index_entry;
+export import :column_index_entry;
+export import :segment_column_index_entry;
+export import :irs_index_entry;
+export import :base_entry;
+import :base_meta;
+
 import stl;
 import parser;
-import base_entry;
-import db_entry;
-import db_meta;
-import txn_manager;
+
+import table_def;
 import function;
 import function_set;
 import table_function;
@@ -29,8 +45,10 @@ import buffer_manager;
 import profiler;
 import status;
 import default_values;
-
-export module new_catalog;
+import table_detail;
+import index_def;
+import txn_store;
+import data_access_state;
 
 namespace infinity {
 
@@ -89,23 +107,87 @@ public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
-    static Status CreateDatabase(NewCatalog *catalog,
-                                 const String &db_name,
-                                 u64 txn_id,
-                                 TxnTimeStamp begin_ts,
-                                 TxnManager *txn_mgr,
-                                 BaseEntry *&db_entry,
-                                 ConflictType conflict_type = ConflictType::kError);
+    // Database related functions
+    Tuple<DBEntry *, Status>
+    CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
 
-    static Status
-    DropDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&db_entry);
+    Tuple<DBEntry *, Status> DropDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    static Status GetDatabase(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&new_db_entry);
+    Tuple<DBEntry *, Status> GetDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static void RemoveDBEntry(NewCatalog *catalog, const String &db_name, u64 txn_id, TxnManager *txn_mgr);
+    void RemoveDBEntry(const String &db_name, u64 txn_id, TxnManager *txn_mgr);
 
-    static Vector<DBEntry *> Databases(NewCatalog *catalog, u64 txn_id, TxnTimeStamp begin_ts);
+    // List databases
+    Vector<DBEntry *> Databases(u64 txn_id, TxnTimeStamp begin_ts);
 
+    // Table related functions
+    Tuple<TableEntry *, Status> CreateTable(const String &db_name,
+                                            u64 txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            const SharedPtr<TableDef> &table_def,
+                                            ConflictType conflict_type,
+                                            TxnManager *txn_mgr);
+
+    Tuple<TableEntry *, Status> DropTableByName(const String &db_name,
+                                                const String &table_name,
+                                                ConflictType conflict_type,
+                                                u64 txn_id,
+                                                TxnTimeStamp begin_ts,
+                                                TxnManager *txn_mgr);
+
+    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, u64 txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, u64 txn_id, TxnTimeStamp begin_ts);
+
+    static Status RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnManager *txn_mgr);
+
+    // Index Related methods
+    Tuple<TableEntry *, TableIndexEntry *, Status> CreateIndex(const String &db_name,
+                                                               const String &table_name,
+                                                               const SharedPtr<IndexDef> &index_def,
+                                                               ConflictType conflict_type,
+                                                               u64 txn_id,
+                                                               TxnTimeStamp begin_ts,
+                                                               TxnManager *txn_mgr);
+
+    Tuple<TableIndexEntry *, Status> DropIndex(const String &db_name,
+                                               const String &table_name,
+                                               const String &index_name,
+                                               ConflictType conflict_type,
+                                               u64 txn_id,
+                                               TxnTimeStamp begin_ts,
+                                               TxnManager *txn_mgr);
+
+    static void
+    CreateIndexFile(TableEntry *table_entry, void *txn_store, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
+
+    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr);
+
+    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_);
+
+    // Append related functions
+    static void Append(TableEntry *table_entry, u64 txn_id, void *txn_store, BufferManager *buffer_mgr);
+
+    static void CommitAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
+
+    static void RollbackAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, void *txn_store);
+
+    static Status Delete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+
+    static void CommitDelete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
+
+    static Status RollbackDelete(TableEntry *table_entry, u64 txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
+
+    static Status ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
+
+    static u32 GetNextSegmentID(TableEntry *table_entry);
+
+    static u32 GetMaxSegmentID(const TableEntry *table_entry);
+
+    static void ImportSegment(TableEntry* table_entry, u32 segment_id, SharedPtr<SegmentEntry>& segment_entry);
+
+    static void IncreaseTableRowCount(TableEntry* table_entry, u64 increased_row_count);
+public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
 
@@ -124,6 +206,8 @@ public:
 
     static void DeleteTableFunction(NewCatalog *catalog, String function_name);
 
+public:
+    // Serialization and Deserialization
     static Json Serialize(NewCatalog *catalog, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static void Deserialize(const Json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
@@ -136,13 +220,14 @@ public:
 
     void MergeFrom(NewCatalog &other);
 
+public:
+    // Profile related methods
+
     void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { history.Enqueue(Move(profiler)); }
 
     const QueryProfiler *GetProfilerRecord(SizeT index) { return history.GetElement(index); }
 
     const Vector<SharedPtr<QueryProfiler>> GetProfilerRecords() { return history.GetElements(); }
-
-    void CheckCatalog();
 
 public:
     SharedPtr<String> current_dir_{nullptr};

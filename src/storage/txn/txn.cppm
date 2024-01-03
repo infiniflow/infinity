@@ -14,10 +14,8 @@
 module;
 
 import stl;
-import base_entry;
 import parser;
-import table_collection_detail;
-// import table_collection_entry;
+import table_detail;
 import table_def;
 import index_def;
 import data_block;
@@ -28,7 +26,6 @@ import txn_state;
 import txn_context;
 import wal_entry;
 import txn_store;
-import table_index_entry;
 import database_detail;
 import status;
 
@@ -49,9 +46,11 @@ struct ScanParam {
 };
 
 class TxnManager;
-class NewCatalog;
-class TableCollectionEntry;
-class DBEntry;
+struct NewCatalog;
+struct TableEntry;
+struct DBEntry;
+struct BaseEntry;
+struct TableIndexEntry;
 
 export class Txn {
 public:
@@ -69,28 +68,28 @@ public:
     void Rollback();
 
     // Database OPs
-    Status CreateDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&db_entry);
+    Status CreateDatabase(const String &db_name, ConflictType conflict_type);
 
-    Status DropDatabase(const String &db_name, ConflictType conflict_type, BaseEntry *&db_entry);
+    Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
-    Status GetDatabase(const String &db_name, BaseEntry *&new_db_entry);
+    Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
 
     Vector<DatabaseDetail> ListDatabases();
 
     // Table and Collection OPs
-    Status GetTableCollections(const String &db_name, Vector<TableCollectionDetail> &output_table_array);
+    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
 
-    Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type, BaseEntry *&new_table_entry);
+    Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
-    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type, BaseEntry *&drop_table_entry);
+    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
 
-    Tuple<BaseEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
+    Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
-    Status GetTableEntry(const String &db_name, const String &table_name, TableCollectionEntry *&table_entry);
+    Tuple<TableEntry*, Status> GetTableEntry(const String &db_name, const String &table_name);
 
     // Index OPs
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
@@ -112,11 +111,6 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
-    // TODO: Why need them
-    void GetMetaTableState(MetaTableState *meta_table_state, const String &db_name, const String &table_name, const Vector<ColumnID> &columns);
-
-    void GetMetaTableState(MetaTableState *meta_table_state, const TableCollectionEntry *table_collection_entry, const Vector<ColumnID> &columns);
-
     // Getter
     BufferManager *GetBufferMgr() const;
 
@@ -136,7 +130,7 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
-    TxnTableStore *GetTxnTableStore(TableCollectionEntry *table_entry);
+    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
@@ -155,7 +149,7 @@ private:
 
     // Txn store
     Set<DBEntry *> txn_dbs_{};
-    Set<TableCollectionEntry *> txn_tables_{};
+    Set<TableEntry *> txn_tables_{};
     HashMap<String, TableIndexEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.

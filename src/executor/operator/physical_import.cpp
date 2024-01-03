@@ -40,18 +40,12 @@ import third_party;
 import local_file_system;
 import defer_op;
 import txn_store;
-import block_column_entry;
-import block_entry;
-import db_entry;
-import table_collection_meta;
 import wal_entry;
 import file_system_type;
 import file_system;
 import buffer_handle;
-
+import catalog;
 import infinity_exception;
-import table_collection_entry;
-import segment_entry;
 import zsv;
 
 module physical_import;
@@ -93,10 +87,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 }
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    if (table_collection_entry_->columns_.size() != 1) {
+    if (table_entry_->ColumnCount() != 1) {
         Error<ExecutorException>("FVECS file must have only one column.");
     }
-    auto &column_type = table_collection_entry_->columns_[0]->column_type_;
+    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
     if (column_type->type() != kEmbedding) {
         Error<ExecutorException>("FVECS file must have only one embedding column.");
     }
@@ -127,13 +121,12 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT vector_n = file_size / row_size;
 
     Txn *txn = query_context->GetTxn();
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_collection_entry_);
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
 
-    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry =
-        SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
-    BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    BufferHandle buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
+    u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
+    BlockEntry *last_block_entry = segment_entry->GetLastEntry();
+    BufferHandle buffer_handle = last_block_entry->GetColumnBlockEntry(0)->buffer()->Load();
     SizeT row_idx = 0;
     auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
     while (true) {
@@ -142,10 +135,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         if (dim != dimension or nbytes != sizeof(dimension)) {
             Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
         }
-        ptr_t dst_ptr = buf_ptr + last_block_entry->row_count_ * sizeof(FloatT) * dimension;
+        ptr_t dst_ptr = buf_ptr + last_block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
-        ++segment_entry->row_count_;
-        ++last_block_entry->row_count_;
+        segment_entry->IncreaseRowCount(1);
+        last_block_entry->IncreaseRowCount(1);
 
         ++row_idx;
         if (row_idx == vector_n) {
@@ -153,24 +146,24 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
             break;
         }
 
-        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+        if (segment_entry->Room() <= 0) {
             SaveSegmentData(txn_store, segment_entry);
 
-            segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
+            segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, query_context->GetTxn()->GetBufferMgr());
 
-            last_block_entry = segment_entry->block_entries_.back().get();
-            buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
+            last_block_entry = segment_entry->GetLastEntry();
+            buffer_handle = last_block_entry->GetColumnBlockEntry(0)->buffer()->Load();
         }
 
-        if (BlockEntry::Room(last_block_entry) <= 0) {
-            segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
-                                                                              segment_entry->block_entries_.size(),
-                                                                              0,
-                                                                              segment_entry->column_count_,
-                                                                              txn->GetBufferMgr()));
-            last_block_entry = segment_entry->block_entries_.back().get();
-            buffer_handle = last_block_entry->columns_[0]->buffer_->Load();
+        if (last_block_entry->GetAvailableCapacity() <= 0) {
+            segment_entry->AppendBlockEntry(MakeUnique<BlockEntry>(segment_entry.get(),
+                                                                   segment_entry->block_entries().size(),
+                                                                   0,
+                                                                   table_entry_->ColumnCount(),
+                                                                   txn->GetBufferMgr()));
+            last_block_entry = segment_entry->GetLastEntry();
+            buffer_handle = last_block_entry->GetColumnBlockEntry(0)->buffer()->Load();
             buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         }
     }
@@ -188,10 +181,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         Error<ExecutorException>(strerror(errno));
     }
     Txn *txn = query_context->GetTxn();
-    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
+    u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, txn->GetBufferMgr());
 
-    auto parser_context = MakeUnique<ZxvParserCtx>(table_collection_entry_, txn, segment_entry, delimiter_);
+    auto parser_context = MakeUnique<ZxvParserCtx>(table_entry_, txn, segment_entry, delimiter_);
 
     auto opts = MakeUnique<ZsvOpts>();
     if (header_) {
@@ -213,8 +206,8 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     parser_context->parser_.Finish();
 
     // add the last segment entry
-    if (parser_context->segment_entry_->row_count_ > 0) {
-        auto txn_store = parser_context->txn_->GetTxnTableStore(table_collection_entry_);
+    if (parser_context->segment_entry_->row_count() > 0) {
+        auto txn_store = parser_context->txn_->GetTxnTableStore(table_entry_);
         SaveSegmentData(txn_store, parser_context->segment_entry_);
     }
     fclose(fp);
@@ -227,7 +220,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
             Error<ExecutorException>(err_msg);
         }
     }
-    table_collection_entry_->row_count_ += parser_context->row_count_;
+    NewCatalog::IncreaseTableRowCount(table_entry_, parser_context->row_count_);
 
     auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", parser_context->row_count_));
     import_op_state->result_msg_ = Move(result_msg);
@@ -246,9 +239,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     }
 
     Txn *txn = query_context->GetTxn();
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_collection_entry_);
-    u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+    u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, txn->GetBufferMgr());
 
     SizeT start_pos = 0;
     while (true) {
@@ -263,33 +256,33 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         start_pos = end_pos + 1;
         Json line_json = Json::parse(json_sv);
 
-        if (SegmentEntry::Room(segment_entry.get()) <= 0) {
-            LOG_INFO(Format("Segment {} saved", segment_entry->segment_id_));
+        if (segment_entry->Room() <= 0) {
+            LOG_INFO(Format("Segment {} saved", segment_entry->segment_id()));
             SaveSegmentData(txn_store, segment_entry);
-            u64 segment_id = TableCollectionEntry::GetNextSegmentID(table_collection_entry_);
-            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_collection_entry_, segment_id, txn->GetBufferMgr());
+            u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+            segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, txn->GetBufferMgr());
         }
-        BlockEntry *block_entry = segment_entry->block_entries_.back().get();
-        if (BlockEntry::Room(block_entry) <= 0) {
-            LOG_INFO(Format("Block {} saved", block_entry->block_id_));
-            segment_entry->block_entries_.emplace_back(MakeUnique<BlockEntry>(segment_entry.get(),
-                                                                              segment_entry->block_entries_.size(),
-                                                                              0,
-                                                                              segment_entry->column_count_,
-                                                                              txn->GetBufferMgr()));
-            block_entry = segment_entry->block_entries_.back().get();
+        BlockEntry *block_entry = segment_entry->GetLastEntry();
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            LOG_INFO(Format("Block {} saved", block_entry->block_id()));
+            segment_entry->AppendBlockEntry(MakeUnique<BlockEntry>(segment_entry.get(),
+                                                                   segment_entry->block_entries().size(),
+                                                                   0,
+                                                                   table_entry_->ColumnCount(),
+                                                                   txn->GetBufferMgr()));
+            block_entry = segment_entry->GetLastEntry();
         }
 
         JSONLRowHandler(line_json, block_entry);
-        ++block_entry->row_count_;
-        ++segment_entry->row_count_;
-        ++table_collection_entry_->row_count_;
+        block_entry->IncreaseRowCount(1);
+        segment_entry->IncreaseRowCount(1);
+        NewCatalog::IncreaseTableRowCount(table_entry_, 1);
     }
-    if (segment_entry->row_count_ > 0) {
+    if (segment_entry->row_count() > 0) {
         SaveSegmentData(txn_store, segment_entry);
     }
 
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_collection_entry_->row_count_));
+    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_entry_->RowCount()));
     import_op_state->result_msg_ = Move(result_msg);
 }
 
@@ -300,7 +293,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
     ZsvParser &parser = parser_context->parser_;
     SizeT csv_column_count = parser.CellCount();
 
-    SizeT table_column_count = parser_context->table_collection_entry_->columns_.size();
+    SizeT table_column_count = parser_context->table_entry_->ColumnCount();
     if (csv_column_count != table_column_count) {
         parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
 
@@ -311,7 +304,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
     // Not check the header column name
     for (SizeT idx = 0; idx < csv_column_count; ++idx) {
         auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
-        auto *table_col_name = parser_context->table_collection_entry_->columns_[idx]->name().c_str();
+        const char *table_col_name = parser_context->table_entry_->GetColumnDefByID(idx)->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
@@ -350,7 +343,7 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
 template <typename T>
 void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
     T ele = DataType::StringToValue<T>(str_view);
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
+    column_data_entry->BlockColumnEntry::AppendRaw(dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
 }
 
 template <typename T>
@@ -361,58 +354,58 @@ void AppendEmbeddingData(BlockColumnEntry *column_data_entry, const Vector<Strin
         T ele = DataType::StringToValue<T>(ele_str_view);
         tmp_buffer[ele_idx++] = ele;
     }
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len, nullptr);
+    column_data_entry->BlockColumnEntry::AppendRaw(dst_offset, reinterpret_cast<ptr_t>(tmp_buffer.get()), sizeof(T) * arr_len, nullptr);
 }
 
 void AppendVarcharData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
     auto varchar_ptr = MakeUnique<VarcharT>();
     varchar_ptr->InitAsValue(str_view.data(), str_view.size());
     // TODO shenyushi: unnecessary copy here.
-    BlockColumnEntry::AppendRaw(column_data_entry, dst_offset, reinterpret_cast<ptr_t>(varchar_ptr.get()), sizeof(VarcharT), nullptr);
+    column_data_entry->BlockColumnEntry::AppendRaw(dst_offset, reinterpret_cast<ptr_t>(varchar_ptr.get()), sizeof(VarcharT), nullptr);
 }
 
 } // namespace
 
 void PhysicalImport::CSVRowHandler(void *context) {
     ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);
-    auto *table = parser_context->table_collection_entry_;
+    auto *table_entry = parser_context->table_entry_;
     SizeT column_count = parser_context->parser_.CellCount();
     auto *txn = parser_context->txn_;
-    auto txn_store = txn->GetTxnTableStore(table);
+    auto txn_store = txn->GetTxnTableStore(table_entry);
 
     auto segment_entry = parser_context->segment_entry_;
     // we have already used all space of the segment
-    if (SegmentEntry::Room(segment_entry.get()) <= 0) {
+    if (segment_entry->Room() <= 0) {
         SaveSegmentData(txn_store, segment_entry);
-        u64 segment_id = TableCollectionEntry::GetNextSegmentID(parser_context->table_collection_entry_);
-        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table, segment_id, txn->GetBufferMgr());
+        u64 segment_id = NewCatalog::GetNextSegmentID(parser_context->table_entry_);
+        parser_context->segment_entry_ = SegmentEntry::MakeNewSegmentEntry(table_entry, segment_id, txn->GetBufferMgr());
         segment_entry = parser_context->segment_entry_;
     }
 
-    BlockEntry *last_block_entry = segment_entry->block_entries_.back().get();
-    if (BlockEntry::Room(last_block_entry) <= 0) {
-        segment_entry->block_entries_.emplace_back(
-            MakeUnique<BlockEntry>(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn->GetBufferMgr()));
-        last_block_entry = segment_entry->block_entries_.back().get();
+    BlockEntry *last_block_entry = segment_entry->GetLastEntry();
+    if (last_block_entry->GetAvailableCapacity() <= 0) {
+        segment_entry->AppendBlockEntry(
+            MakeUnique<BlockEntry>(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry->ColumnCount(), txn->GetBufferMgr()));
+        last_block_entry = segment_entry->GetLastEntry();
     }
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
-    if (column_count != last_block_entry->columns_.size()) {
+    if (column_count != table_entry->ColumnCount()) {
         UniquePtr<String> err_msg =
             MakeUnique<String>(Format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
         LOG_ERROR(*err_msg);
         Error<StorageException>(*err_msg);
     }
     // append data to segment entry
-    SizeT write_row = last_block_entry->row_count_;
+    SizeT write_row = last_block_entry->row_count();
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         StringView str_view{};
         if (cell.len) {
             str_view = StringView((char *)cell.str, cell.len);
         }
-        BlockColumnEntry *block_column_entry = last_block_entry->columns_[column_idx].get();
-        auto column_type = block_column_entry->column_type_.get();
+        BlockColumnEntry *block_column_entry = last_block_entry->GetColumnBlockEntry(column_idx);
+        auto column_type = block_column_entry->column_type().get();
         // FIXME: Variable length types cannot use type inference addresses
         SizeT dst_offset = write_row * column_type->Size();
 
@@ -498,8 +491,8 @@ void PhysicalImport::CSVRowHandler(void *context) {
             }
         }
     }
-    ++last_block_entry->row_count_;
-    ++segment_entry->row_count_;
+    last_block_entry->IncreaseRowCount(1);
+    segment_entry->IncreaseRowCount(1);
     ++parser_context->row_count_;
 }
 
@@ -508,21 +501,17 @@ void AppendEmbeddingJsonl(BlockColumnEntry *block_column_entry, const Vector<T> 
     if (embedding.size() != dim) {
         Error<ExecutorException>("Embedding data size neq dimension.");
     }
-    BlockColumnEntry::AppendRaw(block_column_entry,
-                                dst_offset,
-                                reinterpret_cast<const_ptr_t>(embedding.data()),
-                                embedding.size() * sizeof(T),
-                                nullptr);
+    block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(embedding.data()), embedding.size() * sizeof(T), nullptr);
 }
 
 void PhysicalImport::JSONLRowHandler(const Json &line_json, BlockEntry *block_entry) {
-    SizeT column_n = table_collection_entry_->columns_.size();
-    SizeT row_cnt = block_entry->row_count_;
+    SizeT column_n = table_entry_->ColumnCount();
+    SizeT row_cnt = block_entry->row_count();
     for (SizeT i = 0; i < column_n; ++i) {
-        ColumnDef *column_def = table_collection_entry_->columns_[i].get();
-        auto block_column_entry = block_entry->columns_[i].get();
+        const ColumnDef *column_def = table_entry_->GetColumnDefByID(i);
+        auto block_column_entry = block_entry->GetColumnBlockEntry(i);
 
-        auto column_type = block_column_entry->column_type_.get();
+        auto column_type = block_column_entry->column_type().get();
         SizeT dst_offset = row_cnt * column_type->Size();
         switch (column_type->type()) {
             case LogicalType::kVarchar: {
@@ -565,37 +554,37 @@ void PhysicalImport::JSONLRowHandler(const Json &line_json, BlockEntry *block_en
             }
             case LogicalType::kBoolean: {
                 bool v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(bool), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(bool), nullptr);
                 break;
             }
             case LogicalType::kTinyInt: {
                 i8 v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i8), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i8), nullptr);
                 break;
             }
             case LogicalType::kSmallInt: {
                 i16 v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i16), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i16), nullptr);
                 break;
             }
             case LogicalType::kInteger: {
                 i32 v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i32), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i32), nullptr);
                 break;
             }
             case LogicalType::kBigInt: {
                 i64 v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i64), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(i64), nullptr);
                 break;
             }
             case LogicalType::kFloat: {
                 float v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(float), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(float), nullptr);
                 break;
             }
             case LogicalType::kDouble: {
                 double v = line_json[column_def->name_];
-                BlockColumnEntry::AppendRaw(block_column_entry, dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(double), nullptr);
+                block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(&v), sizeof(double), nullptr);
                 break;
             }
             default: {
@@ -608,12 +597,13 @@ void PhysicalImport::JSONLRowHandler(const Json &line_json, BlockEntry *block_en
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
     Vector<u16> block_row_counts;
 
-    block_row_counts.reserve(segment_entry->block_entries_.size());
-    for (auto &block_entry : segment_entry->block_entries_) {
-        BlockEntry::FlushData(block_entry.get(), block_entry->row_count_);
-        auto size = Max(segment_entry->block_entries_.size(), static_cast<SizeT>(block_entry->block_id_ + 1));
+    const auto &block_entries = segment_entry->block_entries();
+    block_row_counts.reserve(block_entries.size());
+    for (auto &block_entry : block_entries) {
+        block_entry->FlushData(block_entry->row_count());
+        auto size = Max(block_entries.size(), static_cast<SizeT>(block_entry->block_id() + 1));
         block_row_counts.resize(size);
-        block_row_counts[block_entry->block_id_] = block_entry->row_count_;
+        block_row_counts[block_entry->block_id()] = block_entry->row_count();
     }
 
     LOG_TRACE(Format("Block rows count {}", block_row_counts.size()));
@@ -621,13 +611,13 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
         LOG_TRACE(Format("Block {} row count {}", i, block_row_counts[i]));
     }
 
-    const String &db_name = *TableCollectionEntry::GetDBName(txn_store->table_entry_);
-    const String &table_name = *txn_store->table_entry_->table_collection_name_;
+    const String &db_name = *txn_store->table_entry_->GetDBName();
+    const String &table_name = *txn_store->table_entry_->GetTableName();
     txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                         table_name,
-                                                        *segment_entry->segment_dir_,
-                                                        segment_entry->segment_id_,
-                                                        segment_entry->block_entries_.size(),
+                                                        *segment_entry->segment_dir(),
+                                                        segment_entry->segment_id(),
+                                                        block_entries.size(),
                                                         block_row_counts));
 
     txn_store->Import(segment_entry);

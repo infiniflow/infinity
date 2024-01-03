@@ -21,11 +21,9 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
 import query_context;
 // import data_table;
 import operator_state;
-import db_entry;
 import data_block;
 import column_vector;
 import expression_evaluator;
@@ -45,8 +43,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
 
         auto txn = query_context->GetTxn();
-        auto db_name = TableCollectionEntry::GetDBEntry(table_entry_ptr_)->db_name_;
-        auto table_name = table_entry_ptr_->table_collection_name_;
+        const String& db_name = *table_entry_ptr_->GetDBName();
+        auto table_name = table_entry_ptr_->GetTableName();
         Vector<RowID> row_ids;
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
@@ -74,8 +72,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
 
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(column_vectors);
-            txn->Append(*db_name, *table_name, output_data_block);
-            txn->Delete(*db_name, *table_name, row_ids);
+            txn->Append(db_name, *table_name, output_data_block);
+            txn->Delete(db_name, *table_name, row_ids);
 
             UpdateOperatorState* update_operator_state = static_cast<UpdateOperatorState*>(operator_state);
             ++ update_operator_state->count_;

@@ -25,13 +25,13 @@ export module logical_insert;
 
 namespace infinity {
 
-class TableCollectionEntry;
+struct TableEntry;
 
 export class LogicalInsert : public LogicalNode {
 public:
     explicit inline
-    LogicalInsert(u64 node_id, TableCollectionEntry *table_collection_ptr, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
-        : LogicalNode(node_id, LogicalNodeType::kInsert), table_collection_entry_(table_collection_ptr), value_list_(Move(value_list)),
+    LogicalInsert(u64 node_id, TableEntry *table_collection_ptr, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
+        : LogicalNode(node_id, LogicalNodeType::kInsert), table_entry_(table_collection_ptr), value_list_(Move(value_list)),
           table_index_(table_index){};
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
@@ -46,9 +46,9 @@ public:
 
     inline void set_value_list(const Vector<Vector<SharedPtr<BaseExpression>>> &value_list) { value_list_ = value_list; }
 
-    inline TableCollectionEntry *table_collection_entry() { return table_collection_entry_; }
+    inline TableEntry *table_entry() { return table_entry_; }
 
-    [[nodiscard]] inline const TableCollectionEntry *table_collection_entry() const { return table_collection_entry_; }
+    [[nodiscard]] inline const TableEntry *table_entry() const { return table_entry_; }
 
     inline Vector<Vector<SharedPtr<BaseExpression>>> &value_list() { return value_list_; }
 
@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    TableCollectionEntry *table_collection_entry_{};
+    TableEntry *table_entry_{};
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_{};
     u64 table_index_{};
 };

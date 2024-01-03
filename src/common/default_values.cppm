@@ -59,7 +59,7 @@ export {
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
     constexpr SizeT SEGMENT_OFFSET_IN_DOCID = 23;           // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
     constexpr u64 SEGMENT_MASK_IN_DOCID = 0x7FFFFF;         // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
-    constexpr i32 INVALID_SEGMENT_ID = i32_max;
+    constexpr u32 INVALID_SEGMENT_ID = u32_max;
 
     // queue related constants, TODO: double check the necessary
     constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;

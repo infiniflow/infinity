@@ -16,8 +16,9 @@ module;
 
 #include <algorithm>
 
+module catalog;
+
 import stl;
-import base_entry;
 import infinity_exception;
 import default_values;
 import txn_manager;
@@ -26,8 +27,6 @@ import logger;
 import parser;
 import third_party;
 import status;
-
-module base_meta;
 
 #if 0
 

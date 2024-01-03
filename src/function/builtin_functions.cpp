@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import new_catalog;
+import catalog;
 import avg;
 import count;
 import first;

@@ -28,19 +28,14 @@ import storage;
 import wal_entry;
 import infinity_exception;
 
-import new_catalog;
-import db_entry;
-import table_collection_type;
+import catalog;
+
+import table_entry_type;
 import parser;
 import txn_store;
-import db_entry;
-import segment_entry;
-import block_entry;
-import table_collection_entry;
+
 import data_access_state;
-import table_index_entry;
 import status;
-import base_entry;
 import bg_task;
 
 import infinity_exception;
@@ -315,7 +310,7 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
 
     auto [max_commit_ts, wal_size] = GetWalState();
     if (wal_size == full_ckp_wal_size_) {
-        return ;
+        return;
     }
 
     bool is_full_checkpoint = true;
@@ -614,126 +609,73 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     }
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_entry{nullptr};
-    Status status = NewCatalog::CreateDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, storage_->txn_manager(), base_entry);
+    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name, txn_id, commit_ts, storage_->txn_manager());
     if (!status.ok()) {
         Error<StorageException>("Wal Replay: Create database failed");
     }
-    base_entry->Commit(commit_ts);
+    db_entry->Commit(commit_ts);
 }
 void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, base_db_entry);
-    if (!status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
-    }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    BaseEntry *base_table_entry{nullptr};
-    status = DBEntry::CreateTableCollection(db_entry,
-                                            TableCollectionType::kTableEntry,
-                                            cmd.table_def->table_name(),
-                                            cmd.table_def->columns(),
-                                            txn_id,
-                                            commit_ts,
-                                            storage_->txn_manager(),
-                                            base_table_entry);
-    if (!status.ok()) {
-        Error<StorageException>("Wal Replay: Create table failed" + *status.msg_);
+    auto [table_entry, table_status] =
+        storage_->catalog()->CreateTable(cmd.db_name, txn_id, commit_ts, cmd.table_def, ConflictType::kIgnore, storage_->txn_manager());
+
+    if (!table_status.ok()) {
+        Error<StorageException>("Wal Replay: Create table failed" + *table_status.msg_);
     }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
     table_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_entry{nullptr};
-    Status status = NewCatalog::DropDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, nullptr, base_entry);
+    auto [db_entry, status] = storage_->catalog()->DropDatabase(cmd.db_name, txn_id, commit_ts, nullptr);
     if (!status.ok()) {
         Error<StorageException>("Wal Replay: Drop database failed");
     }
-    base_entry->Commit(commit_ts);
+    db_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, base_db_entry);
-    if (!status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
+    auto [table_entry, table_status] =
+        storage_->catalog()->DropTableByName(cmd.db_name, cmd.table_name, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
+    if (!table_status.ok()) {
+        Error<StorageException>("Wal Replay: Drop table failed {}", table_status.message());
     }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-
-    BaseEntry *base_table_entry{nullptr};
-    status = DBEntry::DropTableCollection(db_entry, cmd.table_name, ConflictType::kReplace, txn_id, commit_ts, nullptr, base_table_entry);
-    if (!status.ok()) {
-        Error<StorageException>("Wal Replay: Drop table failed");
-    }
-    base_table_entry->Commit(commit_ts);
+    table_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status db_status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name_, txn_id, commit_ts, base_db_entry);
-    if (!db_status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
-    }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-
-    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts);
-    if (!table_status.ok()) {
-        Error<StorageException>("Wal Replay: Get table failed");
-    }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
-    BaseEntry *base_entry{nullptr};
-    auto index_def_entry_status =
-        TableCollectionEntry::CreateIndex(table_entry, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr, base_entry);
+    auto [table_entry, table_index_entry, index_def_entry_status] =
+        storage_->catalog()->CreateIndex(cmd.db_name_, cmd.table_name_, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr);
     if (!index_def_entry_status.ok()) {
         Error<StorageException>("Wal Replay: Create index failed");
     }
-    TableIndexEntry *table_index_entry = static_cast<TableIndexEntry *>(base_entry);
+
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    TableCollectionEntry::CreateIndexFile(table_entry, table_store.get(), table_index_entry, commit_ts, storage_->buffer_manager());
-    TableCollectionEntry::CommitCreateIndex(table_entry, table_store->txn_indexes_store_);
+    NewCatalog::CreateIndexFile(table_entry, table_store.get(), table_index_entry, commit_ts, storage_->buffer_manager());
+    NewCatalog::CommitCreateIndex(table_store->txn_indexes_store_);
     table_index_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status db_status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name_, txn_id, commit_ts, base_db_entry);
-    if (!db_status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
+    auto [table_index_entry, index_status] =
+        storage_->catalog()
+            ->DropIndex(cmd.db_name_, cmd.table_name_, cmd.index_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
+    if (!index_status.ok()) {
+        Error<StorageException>("Wal Replay: Drop index failed" + *index_status.msg_);
     }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name_, txn_id, commit_ts);
-    if (!table_status.ok()) {
-        Error<StorageException>(Format("Wal Replay: Get table failed {}", table_status.message()));
-    }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
-    BaseEntry *base_entry;
-    auto result_status =
-        TableCollectionEntry::DropIndex(table_entry, cmd.index_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager(), base_entry);
-    if (!result_status.ok()) {
-        Error<StorageException>("Wal Replay: Drop index failed" + *result_status.msg_);
-    }
-    base_entry->Commit(commit_ts);
+    table_index_entry->Commit(commit_ts);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) {
-    // Segment entry
-    BaseEntry *base_db_entry{nullptr};
-    Status db_status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, base_db_entry);
-    if (!db_status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
-    }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
 
-    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
-        Error<StorageException>("Wal Replay: Get table failed");
+        Error<StorageException>(Format("Wal Replay: Get table failed {}", table_status.message()));
     }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
+
     auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir);
     auto segment_entry = SegmentEntry::MakeReplaySegmentEntry(table_entry, cmd.segment_id, segment_dir_ptr, commit_ts);
 
@@ -741,54 +683,37 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(),
                                                   id,
                                                   0,
-                                                  segment_entry->column_count_,
+                                                  table_entry->ColumnCount(),
                                                   storage_->buffer_manager(),
                                                   cmd.row_counts_[id],
                                                   commit_ts,
                                                   commit_ts);
 
-        segment_entry->block_entries_.emplace_back(Move(block_entry));
-        segment_entry->row_count_ += cmd.row_counts_[id];
+        segment_entry->AppendBlockEntry(Move(block_entry));
+        segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
     }
 
-    table_entry->segment_map_.emplace(cmd.segment_id, Move(segment_entry));
-    // ATTENTION: focusing on the segment id
-    table_entry->next_segment_id_++;
+    NewCatalog::ImportSegment(table_entry, cmd.segment_id, segment_entry);
 }
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status db_status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, base_db_entry);
-    if (!db_status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
-    }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-
-    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
-        Error<StorageException>("Wal Replay: Get table failed");
+        Error<StorageException>(Format("Wal Replay: Get table failed {}", table_status.message()));
     }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
+
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids);
     fake_txn->FakeCommit(commit_ts);
-    TableCollectionEntry::Delete(table_store->table_entry_, table_store->txn_, table_store->delete_state_);
-    TableCollectionEntry::CommitDelete(table_store->table_entry_, table_store->txn_, table_store->delete_state_);
+    NewCatalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts) {
-    BaseEntry *base_db_entry{nullptr};
-    Status db_status = NewCatalog::GetDatabase(storage_->catalog(), cmd.db_name, txn_id, commit_ts, base_db_entry);
-    if (!db_status.ok()) {
-        Error<StorageException>("Wal Replay: Get database failed");
-    }
-    auto db_entry = dynamic_cast<DBEntry *>(base_db_entry);
-
-    auto [base_table_entry, table_status] = DBEntry::GetTableCollection(db_entry, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
     if (!table_status.ok()) {
-        Error<StorageException>("Wal Replay: Get table failed");
+        Error<StorageException>(Format("Wal Replay: Get table failed {}", table_status.message()));
     }
-    auto table_entry = dynamic_cast<TableCollectionEntry *>(base_table_entry);
 
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
 
@@ -799,8 +724,8 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     table_store->append_state_ = Move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    TableCollectionEntry::Append(table_store->table_entry_, table_store->txn_, table_store.get(), storage_->buffer_manager());
-    TableCollectionEntry::CommitAppend(table_store->table_entry_, table_store->txn_, table_store->append_state_.get());
+    NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
+    NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
 }
 
 } // namespace infinity

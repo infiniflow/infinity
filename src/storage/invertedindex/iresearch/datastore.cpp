@@ -49,10 +49,8 @@ import operator_state;
 import column_vector;
 import global_block_id;
 import block_index;
-import block_entry;
 import query_context;
 import column_buffer;
-import block_column_entry;
 import default_values;
 import value;
 import buffer_manager;
@@ -60,11 +58,9 @@ import default_values;
 import data_block;
 import txn;
 import index_def;
-import table_collection_entry;
-import base_entry;
+import catalog;
 import buffer_handle;
 import local_file_system;
-import segment_entry;
 import buffer_manager;
 import index_full_text;
 import infinity_exception;
@@ -289,7 +285,7 @@ void IRSDataStore::StopSchedule() {
     maintenance_state_->cancel_.store(true, MemoryOrderRelease);
 }
 
-void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
 
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
     constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};
@@ -297,7 +293,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
     static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
     static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
     bool schedule = false;
-    auto segment_id = segment_entry->segment_id_;
+    auto segment_id = segment_entry->segment_id();
     Vector<UniquePtr<IRSAnalyzer>> analyzers;
     for (const auto &ibase : index_def->index_array_) {
         auto index_base = reinterpret_cast<IndexFullText *>(ibase.get());
@@ -319,17 +315,18 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
         }
     }
 
-    for (const auto &block_entry : segment_entry->block_entries_) {
+    const auto &block_entries = segment_entry->block_entries();
+    for (const auto &block_entry : block_entries) {
         auto ctx = index_writer_->GetBatch();
-        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
-            auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id_, i));
+        for (SizeT i = 0; i < block_entry->row_count(); ++i) {
+            auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id(), i));
 
             for (SizeT col = 0; col < index_def->index_array_.size(); ++col) {
                 auto index_base = reinterpret_cast<IndexFullText *>(index_def->index_array_[col].get());
                 u64 column_id = table_entry->GetColumnIdByName(index_base->column_name());
-                auto block_column_entry = block_entry->columns_[column_id].get();
-                BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-                switch (block_column_entry->column_type_->type()) {
+                auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BufferHandle buffer_handle = block_column_entry->buffer()->Load();
+                switch (block_column_entry->column_type()->type()) {
                     case kTinyInt: {
                         auto block_data_ptr = reinterpret_cast<const TinyIntT *>(buffer_handle.GetData());
                         auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
@@ -408,7 +405,7 @@ void IRSDataStore::BatchInsert(TableCollectionEntry *table_entry, IndexDef *inde
                         doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
                     } break;
                     case kVarchar: {
-                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr, block_column_entry->base_dir_);
+                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr, block_column_entry->base_dir());
                         auto field = MakeUnique<TextField>(index_base->column_name().c_str(),
                                                            irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
                                                            text_features,

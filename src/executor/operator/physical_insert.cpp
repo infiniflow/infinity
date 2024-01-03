@@ -40,7 +40,7 @@ void PhysicalInsert::Init() {}
 bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     SizeT row_count = value_list_.size();
     SizeT column_count = value_list_[0].size();
-    SizeT table_collection_column_count = table_collection_entry_->columns_.size();
+    SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
         Error<ExecutorException>(
             Format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
@@ -72,8 +72,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     output_block->Finalize();
 
     auto *txn = query_context->GetTxn();
-    const String &db_name = *TableCollectionEntry::GetDBEntry(table_collection_entry_)->db_name_;
-    const String &table_name = *table_collection_entry_->table_collection_name_;
+    const String &db_name = *table_entry_->GetDBName();
+    const String &table_name = *table_entry_->GetTableName();
     txn->Append(db_name, table_name, output_block);
 
     UniquePtr<String> result_msg = MakeUnique<String>(Format("INSERTED {} Rows", output_block->row_count()));

@@ -26,7 +26,7 @@ namespace infinity {
 
 class MatchExpression;
 class BaseTableRef;
-class TableCollectionEntry;
+struct TableEntry;
 
 export class LogicalMatch : public LogicalNode {
 public:
@@ -38,7 +38,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
+    [[nodiscard]] TableEntry *table_collection_ptr() const;
 
     [[nodiscard]] String TableAlias() const;
 

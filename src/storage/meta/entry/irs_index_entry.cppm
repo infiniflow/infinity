@@ -14,18 +14,19 @@
 
 module;
 
+export module catalog:irs_index_entry;
+
+import :base_entry;
+
 import stl;
 import index_base;
-import base_entry;
 import third_party;
-
-export module irs_index_entry;
 
 namespace infinity {
 
-class TableIndexEntry;
+struct TableIndexEntry;
 class BufferManager;
-class TableCollectionEntry;
+struct TableEntry;
 class IRSDataStore;
 class IndexFullText;
 

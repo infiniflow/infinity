@@ -20,7 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
+import catalog;
 import base_expression;
 import match_expression;
 import base_table_ref;
@@ -62,7 +62,7 @@ public:
 
     [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
 
-    [[nodiscard]] inline TableCollectionEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 

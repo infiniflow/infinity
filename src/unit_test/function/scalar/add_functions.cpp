@@ -24,7 +24,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-import new_catalog;
+import catalog;
 import add;
 import scalar_function;
 import scalar_function_set;

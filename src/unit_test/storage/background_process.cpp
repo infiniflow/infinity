@@ -29,7 +29,6 @@ import data_block;
 import default_values;
 import txn_manager;
 import txn;
-import base_entry;
 import status;
 import backgroud_process;
 import bg_task;

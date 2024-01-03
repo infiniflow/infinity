@@ -21,11 +21,11 @@ import infinity_exception;
 
 import varchar_layout;
 import parser;
-import block_column_entry;
 import buffer_obj;
 import data_file_worker;
 import default_values;
 import column_buffer;
+import catalog;
 
 module column_buffer;
 namespace infinity {

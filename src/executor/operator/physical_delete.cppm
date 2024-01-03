@@ -20,7 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
+import catalog;
 import load_meta;
 import infinity_exception;
 
@@ -30,7 +30,7 @@ namespace infinity {
 
 export class PhysicalDelete final : public PhysicalOperator {
 public:
-    explicit PhysicalDelete(u64 id, UniquePtr<PhysicalOperator> left, TableCollectionEntry *table_entry_ptr, SharedPtr<Vector<LoadMeta>> load_metas)
+    explicit PhysicalDelete(u64 id, UniquePtr<PhysicalOperator> left, TableEntry *table_entry_ptr, SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kDelete, Move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr) {}
 
     ~PhysicalDelete() override = default;
@@ -48,7 +48,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    TableCollectionEntry *table_entry_ptr_{};
+    TableEntry *table_entry_ptr_{};
 
 private:
     SharedPtr<Vector<String>> output_names_{};

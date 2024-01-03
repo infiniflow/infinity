@@ -74,7 +74,7 @@ public:
         return data_blocks_[idx];
     }
 
-    [[nodiscard]] String &GetColumnNameById(SizeT idx) const;
+    [[nodiscard]] const String &GetColumnNameById(SizeT idx) const;
 
     [[nodiscard]] SharedPtr<DataType> GetColumnTypeById(SizeT idx) const;
 

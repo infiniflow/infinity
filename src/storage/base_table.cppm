@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import table_collection_type;
+import table_entry_type;
 
 import infinity_exception;
 
@@ -47,12 +47,12 @@ inline String ToString(BaseTableType type) {
 
 export class BaseTable {
 public:
-    explicit BaseTable(TableCollectionType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
+    explicit BaseTable(TableEntryType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
             : kind_(kind), schema_name_(Move(schema_name)), table_name_(Move(table_name)) {}
 
-    [[nodiscard]] inline TableCollectionType kind() const { return kind_; }
+    [[nodiscard]] inline TableEntryType kind() const { return kind_; }
 
-    TableCollectionType kind_{TableCollectionType::kTableEntry};
+    TableEntryType kind_{TableEntryType::kTableEntry};
 
     [[nodiscard]] inline const SharedPtr<String> &schema_name() const { return schema_name_; }
 

@@ -17,20 +17,21 @@ module;
 #include <ctime>
 #include <string>
 
+module catalog;
+
 import stl;
-import base_entry;
 import index_base;
 import third_party;
-import segment_column_index_entry;
-import table_index_entry;
 import local_file_system;
 import default_values;
 import random;
 import buffer_manager;
 import infinity_exception;
-import table_collection_entry;
-
-module column_index_entry;
+import index_file_worker;
+import parser;
+import annivfflat_index_file_worker;
+import hnsw_file_worker;
+import logger;
 
 namespace infinity {
 
@@ -46,20 +47,20 @@ ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
     txn_id_ = txn_id;
 }
 
-SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
+UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                                   u64 column_id,
                                                                   TableIndexEntry *table_index_entry,
                                                                   u64 txn_id,
                                                                   SharedPtr<String> index_dir,
                                                                   TxnTimeStamp begin_ts) {
     //    SharedPtr<String> index_dir =
-    //        DetermineIndexDir(*TableIndexMeta::GetTableCollectionEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
-    return MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
+    //        DetermineIndexDir(*TableIndexMeta::GetTableEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
+    return MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
 }
 
-void ColumnIndexEntry::CommitCreatedIndex(ColumnIndexEntry *column_index_entry, u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
-    UniqueLock<RWMutex> w_locker(column_index_entry->rw_locker_);
-    column_index_entry->index_by_segment.emplace(segment_id, Move(index_entry));
+void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
+    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+    this->index_by_segment_.emplace(segment_id, Move(index_entry));
 }
 
 Json ColumnIndexEntry::Serialize(ColumnIndexEntry *column_index_entry, TxnTimeStamp max_commit_ts) {
@@ -77,16 +78,16 @@ Json ColumnIndexEntry::Serialize(ColumnIndexEntry *column_index_entry, TxnTimeSt
         json["commit_ts"] = column_index_entry->commit_ts_.load();
         json["deleted"] = column_index_entry->deleted_;
         json["column_id"] = column_index_entry->column_id_;
-        json["index_dir"] = *column_index_entry->index_dir_;
+        json["index_dir"] = *column_index_entry->index_dir();
         json["index_base"] = column_index_entry->index_base_->Serialize();
 
-        for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment) {
-            segment_column_index_entry_candidates.emplace_back((SegmentColumnIndexEntry*)index_entry.get());
+        for (const auto &[segment_id, index_entry] : column_index_entry->index_by_segment_) {
+            segment_column_index_entry_candidates.emplace_back((SegmentColumnIndexEntry *)index_entry.get());
         }
     }
 
-    for(const auto& segment_column_index_entry: segment_column_index_entry_candidates) {
-        SegmentColumnIndexEntry::Flush(segment_column_index_entry, max_commit_ts);
+    for (const auto &segment_column_index_entry : segment_column_index_entry_candidates) {
+        segment_column_index_entry->Flush(max_commit_ts);
         json["index_by_segment"].push_back(SegmentColumnIndexEntry::Serialize(segment_column_index_entry));
     }
 
@@ -96,7 +97,7 @@ Json ColumnIndexEntry::Serialize(ColumnIndexEntry *column_index_entry, TxnTimeSt
 UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_index_entry_json,
                                                           TableIndexEntry *table_index_entry,
                                                           BufferManager *buffer_mgr,
-                                                          TableCollectionEntry *table_collection_entry) {
+                                                          TableEntry *table_entry) {
     bool deleted = column_index_entry_json["deleted"];
     if (deleted) {
         Error<StorageException>("Column index entry can't be deleted.");
@@ -116,8 +117,8 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_ind
     if (column_index_entry_json.contains("index_by_segment")) {
         for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
             UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
-                SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_collection_entry);
-            column_index_entry->index_by_segment.emplace(segment_column_index_entry->segment_id_, Move(segment_column_index_entry));
+                SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_entry);
+            column_index_entry->index_by_segment_.emplace(segment_column_index_entry->segment_id(), Move(segment_column_index_entry));
         }
     }
 
@@ -133,5 +134,59 @@ SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, 
     } while (!fs.CreateDirectoryNoExp(*index_dir));
     return index_dir;
 }
+
+UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
+    UniquePtr<IndexFileWorker> file_worker = nullptr;
+    const auto *index_base = param->index_base_;
+    const auto *column_def = param->column_def_;
+    auto file_name = MakeShared<String>(ColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
+    switch (index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
+            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
+            switch (elem_type) {
+                case kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(this->index_dir(),
+                                                                             file_name,
+                                                                             index_base,
+                                                                             column_def,
+                                                                             create_annivfflat_param->row_count_);
+                    break;
+                }
+                default: {
+                    ExecutorException("Create IVF Flat index: unsupported element type.");
+                }
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
+            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
+            break;
+        }
+        case IndexType::kIRSFullText: {
+            //            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+            break;
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            Error<StorageException>(*err_msg);
+        }
+    }
+    if (file_worker.get() == nullptr) {
+        UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
+        LOG_ERROR(*err_msg);
+        Error<StorageException>(*err_msg);
+    }
+    return file_worker;
+}
+
+String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return Format("seg{}.idx", segment_id, index_name); }
 
 } // namespace infinity

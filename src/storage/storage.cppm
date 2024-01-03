@@ -16,7 +16,7 @@ module;
 
 import stl;
 import config;
-import new_catalog;
+import catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;

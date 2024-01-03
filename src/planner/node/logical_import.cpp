@@ -19,8 +19,7 @@ module;
 import stl;
 import column_binding;
 import parser;
-import db_entry;
-import table_collection_meta;
+import catalog;
 
 module logical_import;
 
@@ -62,8 +61,7 @@ String LogicalImport::ToString(i64 &space) const {
         }
     }
 
-    DBEntry *db_entry = TableCollectionMeta::GetDBEntry(table_collection_entry_->table_collection_meta_);
-    ss << "to " << *db_entry->db_name_ << '.' << *table_collection_entry_->table_collection_name_;
+    ss << "to " << *table_entry_->GetDBName() << '.' << *table_entry_->GetTableName();
 
     space += arrow_str.size();
 

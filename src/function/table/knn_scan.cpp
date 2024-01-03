@@ -20,15 +20,13 @@ import stl;
 import data_block;
 import table_function;
 import query_context;
-import new_catalog;
+import catalog;
 import knn_scan_data;
 import block_index;
 import global_block_id;
 
 import infinity_exception;
-import block_entry;
 import column_buffer;
-import block_column_entry;
 import parser;
 import knn_distance;
 import third_party;

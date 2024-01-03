@@ -22,7 +22,7 @@ import parser;
 import third_party;
 import data_block;
 import table_def;
-import table_collection_type;
+import table_entry_type;
 import value;
 
 module data_table;
@@ -127,7 +127,7 @@ SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
 }
 
 DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)
-    : BaseTable(TableCollectionType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(Move(table_def_ptr)),
+    : BaseTable(TableEntryType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(Move(table_def_ptr)),
       row_count_(0), type_(type) {}
 
 SizeT DataTable::ColumnCount() const { return definition_ptr_->column_count(); }
@@ -138,7 +138,7 @@ const SharedPtr<String> &DataTable::SchemaName() const { return definition_ptr_-
 
 SizeT DataTable::GetColumnIdByName(const String &column_name) { return definition_ptr_->GetColIdByName(column_name); }
 
-String &DataTable::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
+const String &DataTable::GetColumnNameById(SizeT idx) const { return definition_ptr_->columns()[idx]->name(); }
 
 SharedPtr<DataType> DataTable::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
 

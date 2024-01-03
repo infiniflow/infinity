@@ -23,7 +23,7 @@ import infinity_exception;
 import base_expression;
 import column_expression;
 import column_identifer;
-import table_collection_entry;
+import catalog;
 import block_index;
 
 module bind_context;
@@ -161,7 +161,7 @@ void BindContext::AddViewBinding(const String &name,
 
 void BindContext::AddTableBinding(const String &table_alias,
                                   u64 table_index,
-                                  TableCollectionEntry *table_collection_entry_ptr,
+                                  TableEntry *table_collection_entry_ptr,
                                   SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                   SharedPtr<Vector<String>> column_names,
                                   SharedPtr<BlockIndex> block_index) {

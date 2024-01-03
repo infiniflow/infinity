@@ -17,7 +17,7 @@ module;
 import stl;
 import parser;
 import block_index;
-import table_collection_entry;
+import catalog;
 
 export module binding;
 
@@ -40,7 +40,7 @@ public:
     static SharedPtr<Binding> MakeBinding(BindingType binding_type,
                                           const String &name,
                                           u64 table_index,
-                                          TableCollectionEntry *table_collection_entry_ptr,
+                                          TableEntry *table_collection_entry_ptr,
                                           SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                           SharedPtr<Vector<String>> column_names,
                                           SharedPtr<BlockIndex> block_index);
@@ -60,7 +60,7 @@ public:
     //    SharedPtr<LogicalNode> logical_node_ptr_{nullptr};
 
     // if the binding is table, this is the table_ptr
-    TableCollectionEntry *table_collection_entry_ptr_{nullptr};
+    TableEntry *table_collection_entry_ptr_{nullptr};
 
     SharedPtr<BlockIndex> block_index_{};
 

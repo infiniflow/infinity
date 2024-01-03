@@ -18,7 +18,7 @@ module;
 
 import stl;
 import table_ref;
-import table_collection_entry;
+import catalog;
 import parser;
 import table_function;
 import block_index;
@@ -31,7 +31,7 @@ namespace infinity {
 
 export class BaseTableRef : public TableRef {
 public:
-    explicit BaseTableRef(TableCollectionEntry *table_entry_ptr,
+    explicit BaseTableRef(TableEntry *table_entry_ptr,
                           Vector<SizeT> column_ids,
                           SharedPtr<BlockIndex> block_index,
                           const String &alias,
@@ -52,7 +52,7 @@ public:
         replace_field<SharedPtr<DataType>>(*column_types_, indices);
     };
 
-    TableCollectionEntry *table_entry_ptr_{};
+    TableEntry *table_entry_ptr_{};
     Vector<SizeT> column_ids_{};
     SharedPtr<BlockIndex> block_index_{};
 

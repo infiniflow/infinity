@@ -14,21 +14,22 @@
 
 module;
 
-import stl;
-import segment_entry;
-import block_iter;
-
 export module segment_iter;
+
+import stl;
+import catalog;
+import block_iter;
 
 namespace infinity {
 
 export class SegmentIter {
 public:
     SegmentIter(const SegmentEntry *entry, SharedPtr<Vector<SizeT>> column_ids) : entry_(entry), block_idx_(0), column_ids_(column_ids) {
-        if (entry->block_entries_.empty()) {
+        const auto& block_entries = entry->block_entries();
+        if (block_entries.empty()) {
             block_iter_ = None;
         } else {
-            block_iter_ = BlockIter(entry->block_entries_[block_idx_].get(), *column_ids);
+            block_iter_ = BlockIter(block_entries[block_idx_].get(), *column_ids);
         }
     }
 
@@ -40,11 +41,13 @@ public:
             return ret;
         }
         block_idx_++;
-        if (block_idx_ >= entry_->block_entries_.size()) {
+
+        const auto& block_entries = entry_->block_entries();
+        if (block_idx_ >= block_entries.size()) {
             block_iter_ = None;
             return None;
         }
-        block_iter_ = BlockIter(entry_->block_entries_[block_idx_].get(), *column_ids_);
+        block_iter_ = BlockIter(block_entries[block_idx_].get(), *column_ids_);
         return Next();
     }
 

@@ -14,13 +14,13 @@
 
 module;
 
-import stl;
-import base_entry;
-import parser;
-import base_entry;
-import status;
+export module catalog:view_meta;
 
-export module view_meta;
+import :base_entry;
+
+import stl;
+import parser;
+import status;
 
 namespace infinity {
 
@@ -40,17 +40,20 @@ public:
                                       TxnTimeStamp begin_ts,
                                       TxnManager *txn_mgr);
 
-    static Status DropNewEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
-
-    static void DeleteNewEntry(ViewMeta *table_meta, u64 txn_id, TxnManager *txn_mgr);
-
-    static Status GetEntry(ViewMeta *table_meta, u64 txn_id, TxnTimeStamp begin_ts);
-
     static SharedPtr<String> ToString(ViewMeta *table_meta);
 
-    static inline void *GetDBEntry(ViewMeta *view_meta) { return view_meta->db_entry_; }
 
-public:
+
+private:
+    Status DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
+
+    void DeleteNewEntry(u64 txn_id, TxnManager *txn_mgr);
+
+    Status GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+
+    inline void *GetDBEntry() { return this->db_entry_; }
+    
+private:
     RWMutex rw_locker_{};
     SharedPtr<String> view_name_{};
 

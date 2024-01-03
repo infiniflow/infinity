@@ -15,8 +15,7 @@
 module;
 
 import stl;
-import segment_entry;
-import block_entry;
+import catalog;
 import global_block_id;
 
 module block_index;
@@ -24,19 +23,21 @@ module block_index;
 namespace infinity {
 
 void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp) {
-    if (timestamp >= segment_entry->min_row_ts_) {
+    if (timestamp >= segment_entry->min_row_ts()) {
+        u32 segment_id = segment_entry->segment_id();
         segments_.emplace_back(segment_entry);
-        segment_index_.emplace(segment_entry->segment_id_, segment_entry);
-        if (segment_entry->block_entries_.empty()) {
+        const auto &block_entries = segment_entry->block_entries();
+        segment_index_.emplace(segment_id, segment_entry);
+        if (block_entries.empty()) {
             return;
         }
-        segment_block_index_[segment_entry->segment_id_].reserve(segment_entry->block_entries_.size());
-        SizeT block_count = segment_entry->block_entries_.size();
+        segment_block_index_[segment_id].reserve(block_entries.size());
+        SizeT block_count = block_entries.size();
         for (SizeT idx = 0; idx < block_count; ++idx) {
-            const auto &block_entry = segment_entry->block_entries_[idx];
-            if (timestamp >= block_entry->min_row_ts_) {
-                segment_block_index_[segment_entry->segment_id_].emplace(block_entry->block_id_, block_entry.get());
-                global_blocks_.emplace_back(GlobalBlockID{segment_entry->segment_id_, block_entry->block_id_});
+            const auto &block_entry = block_entries[idx];
+            if (timestamp >= block_entry->min_row_ts()) {
+                segment_block_index_[segment_id].emplace(block_entry->block_id(), block_entry.get());
+                global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
             }
         }
     }

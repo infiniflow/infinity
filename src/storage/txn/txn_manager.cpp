@@ -19,7 +19,7 @@ module;
 import txn;
 import txn_state;
 import stl;
-import new_catalog;
+import catalog;
 
 import infinity_exception;
 import wal_entry;

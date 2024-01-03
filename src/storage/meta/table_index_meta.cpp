@@ -17,7 +17,8 @@ module;
 #include <algorithm>
 #include <vector>
 
-import base_entry;
+module catalog;
+
 import stl;
 import parser;
 import index_def;
@@ -28,61 +29,67 @@ import logger;
 import third_party;
 
 import infinity_exception;
-import table_collection_entry;
 import status;
 import iresearch_datastore;
-import table_index_entry;
-import base_meta;
-
-module table_index_meta;
 
 namespace infinity {
 
 struct SegmentEntry;
 
-TableIndexMeta::TableIndexMeta(TableCollectionEntry *table_collection_entry, SharedPtr<String> index_name)
-    : index_name_(Move(index_name)), table_collection_entry_(table_collection_entry) {}
+TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) : index_name_(Move(index_name)), table_entry_(table_entry) {}
 
-Status TableIndexMeta::CreateTableIndexEntry(TableIndexMeta *table_index_meta,
-                                             const SharedPtr<IndexDef> &index_def,
-                                             ConflictType conflict_type,
-                                             u64 txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             TxnManager *txn_mgr,
-                                             BaseEntry *&new_index_entry) {
-    return BaseMeta::CheckDDLResult(CreateTableIndexEntryInternal(table_index_meta, index_def, txn_id, begin_ts, txn_mgr, new_index_entry),
-                                    conflict_type);
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+                                                                       ConflictType conflict_type,
+                                                                       u64 txn_id,
+                                                                       TxnTimeStamp begin_ts,
+                                                                       TxnManager *txn_mgr) {
+
+    auto [table_index_entry, status] = CreateTableIndexEntryInternal(index_def, txn_id, begin_ts, txn_mgr);
+    switch (conflict_type) {
+        case ConflictType::kError: {
+            return {table_index_entry, status};
+        }
+        case ConflictType::kIgnore: {
+            if (status.code() == ErrorCode::kDuplicate or status.code() == ErrorCode::kNotFound) {
+                return {table_index_entry, Status::OK()};
+            } else {
+                return {table_index_entry, status};
+            }
+        }
+        default: {
+            Error<StorageException>("Invalid conflict type.");
+            return {table_index_entry, status};
+        }
+    }
 }
 
-Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index_meta,
-                                                     const SharedPtr<IndexDef> &index_def,
-                                                     u64 txn_id,
-                                                     TxnTimeStamp begin_ts,
-                                                     TxnManager *txn_mgr,
-                                                     BaseEntry *&new_index_entry) {
-    UniqueLock<RWMutex> rw_locker(table_index_meta->rw_locker_);
+Tuple<TableIndexEntry *, Status>
+TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+    TableIndexEntry *table_index_entry_ptr{nullptr};
 
-    if (table_index_meta->entry_list_.empty()) {
+    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+
+    if (this->entry_list_.empty()) {
         // Insert a dummy entry.
         UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
         dummy_entry->deleted_ = true;
-        table_index_meta->entry_list_.emplace_back(Move(dummy_entry));
+        this->entry_list_.emplace_back(Move(dummy_entry));
 
         // Create a new table index entry
-        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, table_index_meta, txn_id, begin_ts);
-        new_index_entry = table_index_entry.get();
-        table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
+        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+        table_index_entry_ptr = table_index_entry.get();
+        this->entry_list_.emplace_front(Move(table_index_entry));
         LOG_TRACE("New table index entry is added.");
-        return Status::OK();
+        return {table_index_entry_ptr, Status::OK()};
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
-        BaseEntry *header_base_entry = table_index_meta->entry_list_.front().get();
+        BaseEntry *header_base_entry = this->entry_list_.front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, table_index_meta, txn_id, begin_ts);
-            new_index_entry = table_index_entry.get();
-            table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
+            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+            table_index_entry_ptr = table_index_entry.get();
+            this->entry_list_.emplace_front(Move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
-            return Status::OK();
+            return {table_index_entry_ptr, Status::OK()};
         }
 
         TableIndexEntry *header_entry = (TableIndexEntry *)header_base_entry;
@@ -90,23 +97,23 @@ Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index
             if (begin_ts > header_entry->commit_ts_) {
                 if (header_entry->deleted_) {
                     // No conflict
-                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, table_index_meta, txn_id, begin_ts);
-                    new_index_entry = table_index_entry.get();
-                    table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
+                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                    table_index_entry_ptr = table_index_entry.get();
+                    this->entry_list_.emplace_front(Move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
-                    return Status::OK();
+                    return {table_index_entry_ptr, Status::OK()};
                 } else {
                     // Duplicated index name
-                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *table_index_meta->index_name_));
+                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *this->index_name_));
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kDuplicate, Move(err_msg));
+                    return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                 }
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg =
                     MakeUnique<String>(Format("Write-write conflict: There is a committed database which is later than current transaction."));
                 LOG_ERROR(*err_msg);
-                return Status(ErrorCode::kWWConflict, Move(err_msg));
+                return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
             }
         } else {
 
@@ -119,20 +126,20 @@ Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index
                         // Same txn
                         if (header_entry->deleted_) {
                             // No conflict
-                            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, table_index_meta, txn_id, begin_ts);
-                            new_index_entry = table_index_entry.get();
-                            table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
+                            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                            table_index_entry_ptr = table_index_entry.get();
+                            this->entry_list_.emplace_front(Move(table_index_entry));
                             LOG_TRACE("New table index entry is added.");
-                            return Status::OK();
+                            return {table_index_entry_ptr, Status::OK()};
                         } else {
-                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *table_index_meta->index_name_));
+                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *this->index_name_));
                             LOG_ERROR(*err_msg);
-                            return Status(ErrorCode::kDuplicate, Move(err_msg));
+                            return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                         }
                     } else {
                         UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
-                        return Status(ErrorCode::kWWConflict, Move(err_msg));
+                        return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                     }
                 }
                 case TxnState::kCommitting:
@@ -141,57 +148,68 @@ Status TableIndexMeta::CreateTableIndexEntryInternal(TableIndexMeta *table_index
                     UniquePtr<String> err_msg = MakeUnique<String>(
                         Format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kWWConflict, Move(err_msg));
+                    return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
                     // Remove the header entry
-                    table_index_meta->entry_list_.erase(table_index_meta->entry_list_.begin());
+                    this->entry_list_.erase(this->entry_list_.begin());
 
                     // Append new one
-                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, table_index_meta, txn_id, begin_ts);
-                    new_index_entry = table_index_entry.get();
-                    table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
+                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                    table_index_entry_ptr = table_index_entry.get();
+                    this->entry_list_.emplace_front(Move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
-                    return Status::OK();
+                    return {table_index_entry_ptr, Status::OK()};
                 }
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Invalid db entry txn state");
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kUndefined, Move(err_msg));
+                    return {nullptr, Status(ErrorCode::kUndefined, Move(err_msg))};
                 }
             }
         }
     }
 }
 
-Status TableIndexMeta::DropTableIndexEntry(TableIndexMeta *table_index_meta,
-                                           ConflictType conflict_type,
-                                           u64 txn_id,
-                                           TxnTimeStamp begin_ts,
-                                           TxnManager *txn_mgr,
-                                           BaseEntry *&dropped_index_entry) {
-    return BaseMeta::CheckDDLResult(DropTableIndexEntryInternal(table_index_meta, txn_id, begin_ts, txn_mgr, dropped_index_entry), conflict_type);
+Tuple<TableIndexEntry *, Status>
+TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+
+    auto [table_index_entry, status] = DropTableIndexEntryInternal(txn_id, begin_ts, txn_mgr);
+    switch (conflict_type) {
+        case ConflictType::kError: {
+            return {table_index_entry, status};
+        }
+        case ConflictType::kIgnore: {
+            if (status.code() == ErrorCode::kDuplicate or status.code() == ErrorCode::kNotFound) {
+                return {table_index_entry, Status::OK()};
+            } else {
+                return {table_index_entry, status};
+            }
+        }
+        default: {
+            Error<StorageException>("Invalid conflict type.");
+            return {table_index_entry, status};
+        }
+    }
 }
 
-Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_meta,
-                                                   u64 txn_id,
-                                                   TxnTimeStamp begin_ts,
-                                                   TxnManager *,
-                                                   BaseEntry *&dropped_index_entry) {
-    UniqueLock<RWMutex> w_locker(table_index_meta->rw_locker_);
+Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *) {
 
-    if (table_index_meta->entry_list_.empty()) {
+    TableIndexEntry *table_index_entry_ptr{nullptr};
+    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+
+    if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty index entry list.");
         LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
-    BaseEntry *header_base_entry = table_index_meta->entry_list_.front().get();
+    BaseEntry *header_base_entry = this->entry_list_.front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid index entry.");
         LOG_ERROR(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
     TableIndexEntry *header_index_entry = (TableIndexEntry *)header_base_entry;
@@ -201,34 +219,34 @@ Status TableIndexMeta::DropTableIndexEntryInternal(TableIndexMeta *table_index_m
             if (header_index_entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
                 LOG_TRACE(*err_msg);
-                return Status(ErrorCode::kNotFound, Move(err_msg));
+                return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
             }
 
             // Append new one to drop index
-            auto table_index_entry = TableIndexEntry::NewDropTableIndexEntry(table_index_meta, txn_id, begin_ts);
-            dropped_index_entry = table_index_entry.get();
-            dropped_index_entry->deleted_ = true;
-            table_index_meta->entry_list_.emplace_front(Move(table_index_entry));
-            return Status::OK();
+            auto table_index_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
+            table_index_entry_ptr = table_index_entry.get();
+            table_index_entry_ptr->deleted_ = true;
+            this->entry_list_.emplace_front(Move(table_index_entry));
+            return {table_index_entry_ptr, Status::OK()};
         } else {
             // Write-Write conflict
             UniquePtr<String> err_msg =
                 MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kWWConflict, Move(err_msg));
+            return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
         }
     } else {
         // Uncommitted, check if the same txn
         if (txn_id == header_index_entry->txn_id_) {
             // Same txn, remove the header db entry
-            dropped_index_entry = header_index_entry;
-            table_index_meta->entry_list_.erase(table_index_meta->entry_list_.begin());
-            return Status::OK();
+            table_index_entry_ptr = header_index_entry;
+            this->entry_list_.erase(this->entry_list_.begin());
+            return {table_index_entry_ptr, Status::OK()};
         } else {
             // Not same txn, issue WW conflict
             UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kWWConflict, Move(err_msg));
+            return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
         }
     }
 }
@@ -244,14 +262,14 @@ Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp ma
         json_res["index_name"] = *table_index_meta->index_name_;
 
         table_index_entry_candidates.reserve(table_index_meta->entry_list_.size());
-        for(const auto& base_entry: table_index_meta->entry_list_) {
-            if(base_entry->entry_type_ == EntryType::kDummy) {
+        for (const auto &base_entry : table_index_meta->entry_list_) {
+            if (base_entry->entry_type_ == EntryType::kDummy) {
                 continue;
             }
-            if(base_entry->entry_type_ != EntryType::kTableIndex) {
+            if (base_entry->entry_type_ != EntryType::kTableIndex) {
                 Error<StorageException>("Unexpected entry type during serialize table index meta");
             }
-            if(base_entry->commit_ts_ <= max_commit_ts) {
+            if (base_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
                 table_index_entry_candidates.push_back((TableIndexEntry *)base_entry.get());
             }
@@ -264,8 +282,7 @@ Json TableIndexMeta::Serialize(TableIndexMeta *table_index_meta, TxnTimeStamp ma
     return json_res;
 }
 
-UniquePtr<TableIndexMeta>
-TableIndexMeta::Deserialize(const Json &table_index_meta_json, TableCollectionEntry *table_entry, BufferManager *buffer_mgr) {
+UniquePtr<TableIndexMeta> TableIndexMeta::Deserialize(const Json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
     LOG_TRACE(Format("load index"));
 
     SharedPtr<String> index_name = MakeShared<String>(table_index_meta_json["index_name"]);
@@ -281,13 +298,16 @@ TableIndexMeta::Deserialize(const Json &table_index_meta_json, TableCollectionEn
     return res;
 }
 
-Status TableIndexMeta::GetEntry(TableIndexMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry *&base_entry) {
-    SharedLock<RWMutex> r_locker(meta->rw_locker_);
-    for (const auto &entry : meta->entry_list_) {
+Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+
+    TableIndexEntry *table_index_entry{nullptr};
+
+    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    for (const auto &entry : this->entry_list_) {
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kNotFound, Move(err_msg));
+            return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
         }
 
         if (entry->commit_ts_ < UNCOMMIT_TS) {
@@ -296,26 +316,27 @@ Status TableIndexMeta::GetEntry(TableIndexMeta *meta, u64 txn_id, TxnTimeStamp b
                 if (entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kNotFound, Move(err_msg));
+                    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
                 } else {
-                    base_entry = entry.get();
-                    return Status::OK();
+                    table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+                    return {table_index_entry, Status::OK()};
                 }
             }
         } else if (txn_id == entry->txn_id_) {
             // same txn
-            base_entry = entry.get();
-            return Status::OK();
+            table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+            return {table_index_entry, Status::OK()};
         }
     }
+
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return Status(ErrorCode::kNotFound, Move(err_msg));
+    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
 }
 
-void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager *) {
-    UniqueLock<RWMutex> w_locker(meta->rw_locker_);
-    if (meta->entry_list_.empty()) {
+void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
+    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+    if (this->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
         return;
     }
@@ -323,9 +344,9 @@ void TableIndexMeta::DeleteNewEntry(TableIndexMeta *meta, u64 txn_id, TxnManager
     // `std::remove_if` move all elements that satisfy the predicate and move all the last element to the front of list. return value is the end of
     // the moved elements.
     auto removed_iter =
-        std::remove_if(meta->entry_list_.begin(), meta->entry_list_.end(), [&](UniquePtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
+        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](UniquePtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
     // erase the all "moved" elements in the end of list
-    meta->entry_list_.erase(removed_iter, meta->entry_list_.end());
+    this->entry_list_.erase(removed_iter, this->entry_list_.end());
 }
 
 void TableIndexMeta::MergeFrom(TableIndexMeta &other) {

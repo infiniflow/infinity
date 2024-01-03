@@ -18,7 +18,7 @@ import stl;
 import query_result;
 import query_options;
 import table;
-import table_collection_detail;
+import table_detail;
 import session;
 import parser;
 

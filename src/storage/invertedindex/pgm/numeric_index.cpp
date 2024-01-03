@@ -24,14 +24,12 @@ import stl;
 import third_party;
 import data_block;
 import column_vector;
-import block_entry;
-import block_column_entry;
 import buffer_manager;
 import default_values;
 import data_block;
 import buffer_handle;
 import local_file_system;
-import segment_entry;
+import catalog;
 import parser;
 import codec;
 import file_writer;
@@ -204,54 +202,55 @@ void NumericIndex::CreatePGM(LogicalType logical_type) {
 
 void NumericIndex::Insert(SegmentEntry *segment_entry, SharedPtr<ColumnDef> column_def, BufferManager *buffer_mgr) {
     u64 column_id = column_def->id();
+    const auto& block_entries = segment_entry->block_entries();
     if (!column_index_.get()) {
-        CreatePGM(segment_entry->block_entries_[0]->columns_[column_id].get()->column_type_->type());
+        CreatePGM(block_entries[0]->GetColumnBlockEntry(column_id)->column_type()->type());
     }
 
-    for (const auto &block_entry : segment_entry->block_entries_) {
-        for (SizeT i = 0; i < block_entry->row_count_; ++i) {
-            auto block_column_entry = block_entry->columns_[column_id].get();
-            BufferHandle buffer_handle = block_column_entry->buffer_->Load();
-            switch (block_column_entry->column_type_->type()) {
+    for (const auto &block_entry : block_entries) {
+        for (SizeT i = 0; i < block_entry->row_count(); ++i) {
+            auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BufferHandle buffer_handle = block_column_entry->buffer()->Load();
+            switch (block_column_entry->column_type()->type()) {
                 case kTinyInt: {
                     auto block_data_ptr = reinterpret_cast<const TinyIntT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kSmallInt: {
                     auto block_data_ptr = reinterpret_cast<const SmallIntT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kInteger: {
                     auto block_data_ptr = reinterpret_cast<const IntegerT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kBigInt: {
                     auto block_data_ptr = reinterpret_cast<const BigIntT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kFloat: {
                     auto block_data_ptr = reinterpret_cast<const FloatT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kDouble: {
                     auto block_data_ptr = reinterpret_cast<const DoubleT *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kDate: {
                     auto block_data_ptr = reinterpret_cast<const DateType *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kTime: {
                     auto block_data_ptr = reinterpret_cast<const TimeType *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kDateTime: {
                     auto block_data_ptr = reinterpret_cast<const DateTimeType *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 case kTimestamp: {
                     auto block_data_ptr = reinterpret_cast<const TimestampType *>(buffer_handle.GetData());
-                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count_);
+                    column_index_->AppendBlock(block_data_ptr, block_entry->row_count());
                 } break;
                 default:
                     break;

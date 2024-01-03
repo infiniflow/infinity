@@ -14,18 +14,18 @@
 
 module;
 
+export module block_column_iter;
+
 import stl;
 import buffer_handle;
-import block_column_entry;
-
-export module block_column_iter;
+import catalog;
 
 namespace infinity {
 
 export class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, u16 row_count)
-        : buffer_handle_(entry->buffer_->Load()), ele_size_(entry->column_type_->Size()), row_count_(row_count), offset_(0) {}
+        : buffer_handle_(entry->buffer()->Load()), ele_size_(entry->column_type()->Size()), row_count_(row_count), offset_(0) {}
 
     Optional<const void *> Next() {
         if (offset_ >= row_count_) {
