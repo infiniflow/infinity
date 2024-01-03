@@ -110,6 +110,7 @@ public:
         output_array.insert(output_array.end(), queue_.begin(), queue_.end());
         queue_.clear();
         full_cv_.notify_one();
+        return true;
     }
 
     [[nodiscard]] SizeT Size() const {

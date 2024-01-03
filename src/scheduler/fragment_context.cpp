@@ -443,32 +443,41 @@ FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query
 
 void FragmentContext::TryFinishFragment() {
     if (!TryFinishFragmentInner()) {
-        LOG_TRACE(Format("{} tasks in fragment are not completed: {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
-        return;
-    }
-    LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
-    fragment_status_ = FragmentStatus::kFinish;
+        LOG_TRACE(Format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        if (fragment_type_ != FragmentType::kParallelStream) {
+            return;
+        }
+        auto *parent_plan_fragment = fragment_ptr_->GetParent();
+        if (parent_plan_fragment == nullptr) {
+            return;
+        }
 
-    auto *sink_op = GetSinkOperator();
-    if (sink_op->sink_type() == SinkType::kResult) {
-        Complete();
-        return;
-    }
+        auto *scheduler = query_context_->scheduler();
+        LOG_TRACE(Format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
+        scheduler->ScheduleFragment(parent_plan_fragment);
+    } else {
+        LOG_TRACE(Format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+        fragment_status_ = FragmentStatus::kFinish;
+        auto *sink_op = GetSinkOperator();
+        if (sink_op->sink_type() == SinkType::kResult) {
+            Complete();
+            return;
+        }
+        auto *parent_plan_fragment = fragment_ptr_->GetParent();
+        if (parent_plan_fragment == nullptr) {
+            return;
+        }
 
-    // Try to schedule parent fragment
-    auto *parent_plan_fragment = fragment_ptr_->GetParent();
-    if (parent_plan_fragment == nullptr) {
-        return;
-    }
-    auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+        auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+        if (!parent_fragment_ctx->TryStartFragment()) {
+            return;
+        }
+        // All child fragment are finished.
 
-    if (!parent_fragment_ctx->TryStartFragment() && parent_fragment_ctx->fragment_type_ != FragmentType::kParallelStream) {
-        return;
+        auto *scheduler = query_context_->scheduler();
+        LOG_TRACE(Format("Schedule fragment: {} because fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
+        scheduler->ScheduleFragment(parent_plan_fragment);
     }
-    // All child fragment are finished.
-    auto *scheduler = query_context_->scheduler();
-    scheduler->ScheduleFragment(parent_plan_fragment);
-    return;
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }

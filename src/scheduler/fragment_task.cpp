@@ -15,6 +15,7 @@
 module;
 
 #include <sstream>
+#include <thread>
 
 import fragment_context;
 import profiler;
@@ -44,6 +45,7 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64) {
+    LOG_TRACE(Format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -60,7 +62,7 @@ void FragmentTask::OnExecute(i64) {
 
     bool execute_success{false};
     bool source_complete = source_op->Execute(fragment_context->query_context(), source_state_.get());
-    if(source_state_->error_message_.get() == nullptr) {
+    if (source_state_->error_message_.get() == nullptr) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -111,7 +113,7 @@ u64 FragmentTask::FragmentId() const {
 }
 
 // Finished **OR** Error
-bool FragmentTask::IsComplete() const { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
+bool FragmentTask::IsComplete() { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
 
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {
@@ -125,8 +127,8 @@ bool FragmentTask::QuitFromWorkerLoop() {
     }
     auto *queue_state = static_cast<QueueSourceState *>(source_state_.get());
 
-    UniqueLock<Mutex> lock(mutex_);
     if (status_ == FragmentTaskStatus::kRunning && queue_state->source_queue_.Empty()) {
+        LOG_TRACE(Format("Task: {} of Fragment: {} is quit from worker loop", task_id_, FragmentId()));
         status_ = FragmentTaskStatus::kPending;
         return true;
     }

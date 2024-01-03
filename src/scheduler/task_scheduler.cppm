@@ -52,18 +52,12 @@ public:
     // `plan_fragment` can be scheduled because all of its dependencies are met.
     void ScheduleFragment(PlanFragment *plan_fragment);
 
+    void DumpPlanFragment(PlanFragment *plan_fragment);
+
 private:
     Vector<PlanFragment *> GetStartFragments(PlanFragment* plan_fragment);
 
-    // void ScheduleOneWorkerPerQuery(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
-    // void ScheduleOneWorkerIfPossible(QueryContext* query_context, const Vector<FragmentTask *> &tasks, PlanFragment* plan_fragment);
-    // void ScheduleRoundRobin(const Vector<FragmentTask *> &tasks);
-
     void ScheduleTask(FragmentTask *task, u64 worker_id);
-
-    // inline u64 ProposedWorkerID(u64 object_id) const {
-    //     return (object_id) % worker_count_;
-    // }
 
     void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
 

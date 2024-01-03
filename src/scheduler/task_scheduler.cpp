@@ -16,7 +16,6 @@ module;
 
 #include <list>
 #include <sched.h>
-#include <vector>
 
 import stl;
 import config;
@@ -31,6 +30,7 @@ import plan_fragment;
 import fragment_context;
 import default_values;
 import physical_operator_type;
+import physical_operator;
 
 module task_scheduler;
 
@@ -95,7 +95,9 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     }
 
     Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
-    last_cpu_id_ = 0; // FIXME
+    if (worker_workloads_[0] == 0) {
+        last_cpu_id_ = 0; // FIXME
+    }
     u64 &worker_id = last_cpu_id_;
     for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
@@ -115,7 +117,7 @@ void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
             task_ptrs.emplace_back(task.get());
         }
     }
-    last_cpu_id_ = 0; // FIXME
+    // last_cpu_id_ = 0; // FIXME
     u64 &worker_id = last_cpu_id_;
     for (auto *task_ptr : task_ptrs) {
         if (task_ptr->LastWorkerID() == -1) {
@@ -133,7 +135,6 @@ void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
     ++worker_workloads_[worker_id];
     worker_array_[worker_id].queue_->Enqueue(task);
 }
-
 
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     List<FragmentTask *> task_lists;
@@ -172,51 +173,22 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
     }
 }
 
-// void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-//     LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
-//     u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
-//     for (const auto &fragment_task : tasks) {
-//         ScheduleTask(fragment_task, worker_id);
-//     }
-// }
-
-// void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-//     // Schedule worker 0 if possible
-//     u64 scheduled_worker = u64_max;
-//     u64 min_load_worker{0};
-//     u64 min_work_load{u64_max};
-//     for (u64 proposed_worker = 0; proposed_worker < worker_count_; ++proposed_worker) {
-//         u64 current_work_load = worker_workloads_[proposed_worker];
-//         if (current_work_load < 1) {
-//             scheduled_worker = proposed_worker;
-//             break;
-//         } else {
-//             if (current_work_load < min_work_load) {
-//                 min_load_worker = proposed_worker;
-//                 min_work_load = current_work_load;
-//             }
-//         }
-//     }
-
-//     if (scheduled_worker == u64_max) {
-//         scheduled_worker = min_load_worker;
-//     }
-
-//     worker_workloads_[scheduled_worker] += tasks.size();
-//     LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
-//                      tasks.size(),
-//                      query_context->query_id(),
-//                      scheduled_worker));
-//     for (const auto &fragment_task : tasks) {
-//         ScheduleTask(fragment_task, scheduled_worker);
-//     }
-// }
-
-// void TaskScheduler::ScheduleRoundRobin(const Vector<FragmentTask *> &tasks) {
-//     for (const auto &fragment_task : tasks) {
-//         ScheduleTask(fragment_task, last_cpu_id_++);
-//         last_cpu_id_ %= worker_count_;
-//     }
-// }
+void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
+    StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
+        LOG_TRACE(Format("Fragment id: {}, type: {}", fragment->FragmentID(), FragmentType2String(fragment->GetFragmentType())));
+        auto *fragment_ctx = fragment->GetContext();
+        for (auto &task : fragment_ctx->Tasks()) {
+            LOG_TRACE(Format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+        }
+        for (auto iter = fragment_ctx->GetOperators().begin(); iter != fragment_ctx->GetOperators().end(); ++iter) {
+            LOG_TRACE(Format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+        }
+        for (auto &child : fragment->Children()) {
+            TraverseFragmentTree(child.get());
+        }
+    };
+    TraverseFragmentTree(root);
+    LOG_TRACE("");
+}
 
 } // namespace infinity

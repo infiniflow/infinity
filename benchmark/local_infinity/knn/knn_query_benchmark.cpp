@@ -89,7 +89,7 @@ int main() {
     int ef = 100;
     int M = 16;
     int ef_construct = 200;
-    size_t thread_num = 1;
+    size_t thread_num = 8;
     size_t total_times = 3;
 
     std::cout << "benchmark: " << (sift ? "sift" : "gist") << std::endl;

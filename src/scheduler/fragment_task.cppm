@@ -24,12 +24,25 @@ namespace infinity {
 
 class FragmentContext;
 
-export enum class FragmentTaskStatus {
+export enum class FragmentTaskStatus : i8 {
     kPending,
     kRunning,
     kFinished,
     kError,
 };
+
+export String FragmentTaskStatus2String(FragmentTaskStatus status) {
+    switch (status) {
+        case FragmentTaskStatus::kPending:
+            return String("Pending");
+        case FragmentTaskStatus::kRunning:
+            return String("Running");
+        case FragmentTaskStatus::kFinished:
+            return String("Finished");
+        case FragmentTaskStatus::kError:
+            return String("Error");
+    }
+}
 
 export class FragmentTask {
 public:
@@ -54,10 +67,9 @@ public:
 
     [[nodiscard]] inline i64 TaskID() const { return task_id_; }
 
-    [[nodiscard]] bool IsComplete() const;
+    [[nodiscard]] bool IsComplete();
 
     bool TryIntoWorkerLoop() {
-        UniqueLock<Mutex> lock(mutex_);
         if (status_ == FragmentTaskStatus::kPending) {
             status_ = FragmentTaskStatus::kRunning;
             return true;
@@ -75,6 +87,8 @@ public:
 
     inline void set_status(FragmentTaskStatus new_status) { status_ = new_status; }
 
+    [[nodiscard]] inline FragmentTaskStatus status() const { return status_; }
+
     FragmentContext *fragment_context() const;
 
 public:
@@ -85,8 +99,7 @@ public:
     UniquePtr<SinkState> sink_state_{};
 
 private:
-    Mutex mutex_{};
-    FragmentTaskStatus status_{FragmentTaskStatus::kPending};
+    Atomic<FragmentTaskStatus> status_{FragmentTaskStatus::kPending};
 
     void *fragment_context_{};
     bool is_terminator_{false};
