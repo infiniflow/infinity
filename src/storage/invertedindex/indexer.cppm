@@ -11,18 +11,25 @@ import index_segment_reader;
 import posting_writer;
 import data_block;
 import column_indexer;
+import third_party;
 export module indexer;
 
 namespace infinity {
+
+namespace detail {
+template <class T>
+struct Hash {
+    inline SizeT operator()(const T &val) const { return val; }
+};
+} // namespace detail
+
 export class Indexer {
 public:
-    using PostingTable = HashMap<String, PostingWriter *>;
-
     Indexer();
 
     ~Indexer();
 
-    void Open(const InvertedIndexConfig &index_config, const String &directory);
+    void Open(const InvertedIndexConfig &index_config, const String &directory, Vector<u64> &column_ids);
 
     void Add(DataBlock *data_block);
 
@@ -31,13 +38,10 @@ public:
     SharedPtr<IndexSegmentReader> CreateInMemSegmentReader();
 
 private:
-    void DoAddPosting(const String &term);
-
-private:
     InvertedIndexConfig index_config_;
     String directory_;
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
-    PostingTable *posting_table_{nullptr};
+    FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
 };
 } // namespace infinity
