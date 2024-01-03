@@ -7,7 +7,7 @@ import argparse
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 9000
     sort_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/aggregate"
 
     table_name = "test_simple_agg_big_cpp"
     agg_path = sort_dir + "/test_simple_agg_big.csv"
@@ -31,6 +31,16 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write(
             "CREATE TABLE {} (c1 int, c2 float);\n".format(table_name)
         )
+
+        # select count(*) from test_simple_agg_big
+        slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT count(*) FROM {};\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write(str(0))
+        slt_file.write("\n")
+
+
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
@@ -98,6 +108,13 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
 
+        # select count(*) from test_simple_agg_big
+        slt_file.write("\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT count(*) FROM {};\n".format(table_name))
+        slt_file.write("----\n")
+        slt_file.write(str(row_n))
+        slt_file.write("\n")
 
 
         slt_file.write("\n")

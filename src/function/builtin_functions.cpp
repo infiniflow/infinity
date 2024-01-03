@@ -22,6 +22,7 @@ import first;
 import max;
 import min;
 import sum;
+import count_star;
 
 import add;
 import abs;
@@ -52,6 +53,7 @@ import special_function;
 
 import parser;
 
+
 module builtin_functions;
 
 namespace infinity {
@@ -68,6 +70,7 @@ void BuiltinFunctions::Init() {
 void BuiltinFunctions::RegisterAggregateFunction() {
     RegisterAvgFunction(catalog_ptr_);
     RegisterCountFunction(catalog_ptr_);
+    RegisterCountStarFunction(catalog_ptr_);
     RegisterFirstFunction(catalog_ptr_);
     RegisterMaxFunction(catalog_ptr_);
     RegisterMinFunction(catalog_ptr_);
