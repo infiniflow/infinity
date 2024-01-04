@@ -189,4 +189,15 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
 
 String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return Format("seg{}.idx", segment_id, index_name); }
 
+Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes) {
+    for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
+        atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
+        auto status = segment_column_index_entry->CreateIndexDo(index_base_.get(), column_def, create_index_idx);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 } // namespace infinity

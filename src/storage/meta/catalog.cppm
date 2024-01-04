@@ -158,8 +158,12 @@ public:
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr);
 
-    static void
-    CreateIndexFile(TableEntry *table_entry, void *txn_store, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
+    static void CreateIndexFile(TableEntry *table_entry,
+                                void *txn_store,
+                                TableIndexEntry *table_index_entry,
+                                TxnTimeStamp begin_ts,
+                                BufferManager *buffer_mgr,
+                                bool prepare);
 
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr);
 
@@ -184,9 +188,10 @@ public:
 
     static u32 GetMaxSegmentID(const TableEntry *table_entry);
 
-    static void ImportSegment(TableEntry* table_entry, u32 segment_id, SharedPtr<SegmentEntry>& segment_entry);
+    static void ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry);
 
-    static void IncreaseTableRowCount(TableEntry* table_entry, u64 increased_row_count);
+    static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);
+
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);

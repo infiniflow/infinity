@@ -90,10 +90,12 @@ public:
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
-    Tuple<TableEntry*, Status> GetTableEntry(const String &db_name, const String &table_name);
+    Tuple<TableEntry *, Status> GetTableEntry(const String &db_name, const String &table_name);
 
     // Index OPs
-    Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+    Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare);
+
+    Status CreateIndexDo(const String &db_name, const String &table_name, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 

@@ -24,6 +24,7 @@ import knn_scan_data;
 import table_def;
 import parser;
 import merge_knn_data;
+import create_index_data;
 import blocking_queue;
 
 export module operator_state;
@@ -238,6 +239,26 @@ export struct CreateTableOperatorState : public OperatorState {
 
 export struct CreateIndexOperatorState : public OperatorState {
     inline explicit CreateIndexOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndex) {}
+};
+
+export struct CreateIndexPrepareOperatorState : public OperatorState {
+    inline explicit CreateIndexPrepareOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexPrepare) {}
+
+    UniquePtr<String> result_msg_{};
+};
+
+export struct CreateIndexDoOperatorState : public OperatorState {
+    inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
+
+    bool input_complete_ = false;
+    CreateIndexSharedData *create_index_shared_data_;
+};
+
+export struct CreateIndexFinishOperatorState : public OperatorState {
+    inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
+
+    bool input_complete_ = false;
+    UniquePtr<String> error_message_{};
 };
 
 // Create Collection
