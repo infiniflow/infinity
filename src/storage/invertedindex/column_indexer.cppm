@@ -28,7 +28,7 @@ public:
 private:
     void SetAnalyzer();
 
-    void DoAddPosting(const String &term);
+    PostingWriter *DoAddPosting(const String &term);
 
 private:
     u64 column_id_;
@@ -38,5 +38,6 @@ private:
     PostingTable *posting_table_{nullptr};
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
+    bool is_real_time_{false};
 };
 } // namespace infinity

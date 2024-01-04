@@ -48,20 +48,28 @@ void ColumnIndexer::SetAnalyzer() {
 void ColumnIndexer::Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
     for (SizeT i = 0; i < column_vector->Size(); ++i) {
         String data = column_vector->ToString(i);
-        TermList result;
-        analyzer_->Analyze(data, result, jieba_specialize_);
-        for (SizeT i = 0; i < result.size(); ++i) {
+        TermList results;
+        analyzer_->Analyze(data, results, jieba_specialize_);
+        for (SizeT i = 0; i < results.size(); ++i) {
+            if (is_real_time_) {
+                PostingWriter *posting_writer = DoAddPosting(results[i].text_);
+                /// TODO
+                posting_writer->AddPosition(results[i].word_offset_);
+            } else {
+            }
         }
     }
 }
 
-void ColumnIndexer::DoAddPosting(const String &term) {
+PostingWriter *ColumnIndexer::DoAddPosting(const String &term) {
     PostingTable::iterator it = posting_table_->find(term);
     if (it == posting_table_->end()) {
         PostingWriter *posting_writer = new (buffer_pool_->Allocate(sizeof(PostingWriter)))
             PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         posting_table_->emplace(term, posting_writer);
+        return posting_writer;
     }
+    return it->second;
 }
 
 } // namespace infinity
