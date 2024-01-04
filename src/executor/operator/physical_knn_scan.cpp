@@ -379,10 +379,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
                             static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        auto [dists, labels] = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, bitmask);
+                        auto [result_n1, d_ptr, v_ptr] = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
                         if (result_n < 0) {
-                            result_n = dists.size();
-                        } else if (result_n != (i64)dists.size()) {
+                            result_n = result_n1;
+                        } else if (result_n != (i64)result_n1) {
                             throw ExecutorException("Bug");
                         }
 
@@ -397,17 +397,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             case KnnDistanceType::kCosine:
                             case KnnDistanceType::kInnerProduct: {
                                 for (i64 i = 0; i < result_n; ++i) {
-                                    dists[i] = -dists[i];
+                                    d_ptr[i] = -d_ptr[i];
                                 }
                                 break;
                             }
                         }
 
-                        auto row_ids = MakeUnique<RowID[]>(result_n);
+                        auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
                         for (i64 i = 0; i < result_n; ++i) {
-                            row_ids[i] = RowID::FromUint64(labels[i]);
+                            row_ids[i] = RowID::FromUint64(index->GetLabel(v_ptr[i]));
                         }
-                        merge_heap->Search(0, dists.data(), row_ids.get(), result_n);
+                        merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     }
                 };
                 switch (index_hnsw->encode_type_) {

@@ -133,18 +133,19 @@ private:
 
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     template <bool WithLock = false>
-    Vector<PDV> SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Bitmask &bitmask = Bitmask()) const {
-        Vector<PDV> result;
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>>
+    SearchLayer1(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n) const {
+        auto d_ptr = MakeUniqueForOverwrite<DataType[]>(result_n);
+        auto i_ptr = MakeUniqueForOverwrite<VertexType[]>(result_n);
+        HeapResultHandler<CompareMax<DataType, VertexType>> result_handler(1, result_n, d_ptr.get(), i_ptr.get());
+        result_handler.Begin();
         DistHeap candidate;
 
         data_store_.Prefetch(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
-        auto dist = bitmask.IsTrue(enter_point) ? distance_(query, data_store_.GetVec(enter_point), data_store_) : 0;
+        auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
         candidate.emplace(-dist, enter_point);
-        if (bitmask.IsTrue(enter_point)) {
-            result.emplace_back(dist, enter_point);
-            std::push_heap(result.begin(), result.end(), CMP());
-        }
+        result_handler.AddResult(0, dist, enter_point);
 
         Vector<bool> visited(data_store_.cur_vec_num(), false);
         visited[enter_point] = true;
@@ -152,14 +153,14 @@ private:
         while (!candidate.empty()) {
             const auto [minus_c_dist, c_idx] = candidate.top();
             candidate.pop();
-            if (result.size() == result_n && -minus_c_dist > result[0].first) {
+            if (result_handler.GetSize(0) == result_n && -minus_c_dist > result_handler.GetDistance0(0)) {
                 break;
             }
 
-            SharedLock<RWMutex> lock;
-            if constexpr (WithLock) {
-                lock = SharedLock<RWMutex>(vertex_mutex_[c_idx]);
-            }
+            // SharedLock<RWMutex> lock;
+            // if constexpr (WithLock) {
+            //     lock = SharedLock<RWMutex>(vertex_mutex_[c_idx]);
+            // }
 
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
             int prefetch_start = neighbor_size - 1 - prefetch_offset_;
@@ -177,21 +178,14 @@ private:
                     prefetch_start -= prefetch_step_;
                 }
                 auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
-                if (result.size() < result_n || dist < result[0].first) {
+                if (result_handler.GetSize(0) < result_n || dist < result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
-                    if (bitmask.IsTrue(n_idx)) {
-                        if (result.size() == result_n) {
-                            std::pop_heap(result.begin(), result.end(), CMP());
-                            result.pop_back();
-                        }
-                        result.emplace_back(dist, n_idx);
-                        std::push_heap(result.begin(), result.end(), CMP());
-                    }
+                    result_handler.AddResult(0, dist, n_idx);
                 }
             }
         }
-
-        return result;
+        result_handler.EndWithoutSort();
+        return {result_handler.GetSize(0), Move(d_ptr), Move(i_ptr)};
     }
 
     template <bool WithLock = false>
@@ -350,7 +344,11 @@ public:
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
         for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-            Vector<PDV> search_result = SearchLayer<WithLock>(ep, query, cur_layer, ef_construction_);
+            auto [result_n, d_ptr, v_ptr] = SearchLayer1<WithLock>(ep, query, cur_layer, ef_construction_);
+            auto search_result = Vector<PDV>(result_n);
+            for (SizeT i = 0; i < result_n; ++i) {
+                search_result[i] = {d_ptr[i], v_ptr[i]};
+            }
 
             const auto [q_neighbors_p, q_neighbor_size_p] = graph_store_.GetNeighborsMut(vertex_i, cur_layer);
             SelectNeighborsHeuristic(Move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
@@ -360,24 +358,26 @@ public:
     }
 
     template <bool WithLock = false>
-    Pair<Vector<DataType>, Vector<LabelType>> KnnSearch(const DataType *q, SizeT k, const Bitmask &bitmask = Bitmask()) const {
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearch(const DataType *q, SizeT k) const {
         auto query = data_store_.MakeQuery(q);
         VertexType ep = graph_store_.enterpoint();
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        auto search_result = SearchLayer<WithLock>(ep, query, 0, Max(k, ef_), bitmask);
-        std::sort_heap(search_result.begin(), search_result.end(), CMP());
+        return SearchLayer1<WithLock>(ep, query, 0, Max(k, ef_));
+        // std::sort_heap(search_result.begin(), search_result.end(), CMP());
 
-        SizeT result_n = Min(k, search_result.size());
-        Vector<DataType> result_dist(result_n);
-        Vector<LabelType> result_label(result_n);
-        for (SizeT i = 0; i < result_n; ++i) {
-            result_dist[i] = search_result[i].first;
-            result_label[i] = labels_[search_result[i].second];
-        }
-        return {Move(result_dist), Move(result_label)};
+        // SizeT result_n = Min(k, search_result.size());
+        // Vector<DataType> result_dist(result_n);
+        // Vector<LabelType> result_label(result_n);
+        // for (SizeT i = 0; i < result_n; ++i) {
+        //     result_dist[i] = search_result[i].first;
+        //     result_label[i] = labels_[search_result[i].second];
+        // }
+        // return {Move(result_dist), Move(result_label)};
     }
+
+    LabelType GetLabel(VertexType vertex_i) const { return labels_[vertex_i]; }
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
