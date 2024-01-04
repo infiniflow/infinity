@@ -76,51 +76,47 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
                                 SizeT count,
                                 SharedPtr<Selection> &output_true_select) {
     SharedPtr<ColumnVector> bool_column = MakeShared<ColumnVector>(MakeShared<DataType>(LogicalType::kBoolean));
-    bool_column->Initialize();
+    bool_column->Initialize(ColumnVectorType::kCompactBit);
 
     ExpressionEvaluator expr_evaluator;
     expr_evaluator.Init(input_data_);
     expr_evaluator.Execute(expr, state, bool_column);
 
-    const auto *bool_column_ptr = (const u8 *)(bool_column->data());
-    SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-
-    Select(bool_column_ptr, null_mask, count, output_true_select, true);
+    Select(bool_column, count, output_true_select, true);
 }
 
-void ExpressionSelector::Select(const u8 *__restrict bool_column,
-                                const SharedPtr<Bitmask> &null_mask,
-                                SizeT count,
-                                SharedPtr<Selection> &output_true_select,
-                                bool nullable) {
+void ExpressionSelector::Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable) {
+    if (bool_column->vector_type() != ColumnVectorType::kCompactBit || bool_column->data_type()->type() != LogicalType::kBoolean) {
+        Error<ExecutorException>("Attempting to select non-boolean expression");
+    }
+    const auto &boolean_buffer = *(bool_column->buffer_);
+    const auto &null_mask = bool_column->nulls_ptr_;
     if (nullable && !(null_mask->IsAllTrue())) {
-            const u64 *result_null_data = null_mask->GetData();
-            SizeT unit_count = BitmaskBuffer::UnitCount(count);
-            for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-                end_index = Min(end_index, count);
-                if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                    // all data of 64 rows are not null
-                    while (start_index < end_index) {
-                        if (bool_column[start_index] > 0) {
-                            output_true_select->Append(start_index);
-                        }
-                        ++start_index;
+        const u64 *result_null_data = null_mask->GetData();
+        SizeT unit_count = BitmaskBuffer::UnitCount(count);
+        for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
+            end_index = Min(end_index, count);
+            if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
+                // all data of 64 rows are not null
+                for (; start_index < end_index; ++start_index) {
+                    if (boolean_buffer.GetCompactBit(start_index)) {
+                        output_true_select->Append(start_index);
                     }
-                } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                    // all data of 64 rows are null
-                    start_index = end_index;
-                } else {
-                    while (start_index < end_index) {
-                        if ((null_mask->IsTrue(start_index)) && (bool_column[start_index] > 0)) {
-                            output_true_select->Append(start_index);
-                        }
-                        ++start_index;
+                }
+            } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
+                // all data of 64 rows are null
+                start_index = end_index;
+            } else {
+                for (; start_index < end_index; ++start_index) {
+                    if ((null_mask->IsTrue(start_index)) && boolean_buffer.GetCompactBit(start_index)) {
+                        output_true_select->Append(start_index);
                     }
                 }
             }
+        }
     } else {
         for (SizeT idx = 0; idx < count; ++idx) {
-            if (bool_column[idx] > 0) {
+            if (boolean_buffer.GetCompactBit(idx)) {
                 output_true_select->Append(idx);
             }
         }

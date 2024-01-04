@@ -14,6 +14,7 @@
 
 module;
 
+#include <type_traits>
 import stl;
 import new_catalog;
 
@@ -30,7 +31,13 @@ namespace infinity {
 struct NotFunction {
     template <typename TA, typename TB>
     static inline void Run(TA input, TB &result) {
-        result = !input;
+        if constexpr (std::is_same_v<std::remove_cv_t<TA>, u8> && std::is_same_v<std::remove_cv_t<TB>, u8>) {
+            result = ~input;
+        } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT>) {
+            result = !input;
+        } else {
+            Error<TypeException>("NOT function accepts only u8 and BooleanT.");
+        }
     }
 };
 

@@ -27,6 +27,7 @@ import base_table_ref;
 import block_entry;
 import knn_scan_data;
 import column_buffer;
+import vector_buffer;
 import block_column_entry;
 import knn_distance;
 import third_party;
@@ -92,7 +93,7 @@ void ReadDataBlock(DataBlock *output,
     output->Finalize();
 }
 
-void MergeIntoBitmask(const u8 *__restrict input_bool_column,
+void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
                       const SharedPtr<Bitmask> &input_null_mask,
                       const SizeT count,
                       Bitmask &bitmask,
@@ -100,7 +101,7 @@ void MergeIntoBitmask(const u8 *__restrict input_bool_column,
                       SizeT bitmask_offset = 0) {
     if ((!nullable) || (input_null_mask->IsAllTrue())) {
         for (SizeT idx = 0; idx < count; ++idx) {
-            if (input_bool_column[idx] == 0) {
+            if (!(input_bool_column_buffer->GetCompactBit(idx))) {
                 bitmask.SetFalse(idx + bitmask_offset);
             }
         }
@@ -115,7 +116,7 @@ void MergeIntoBitmask(const u8 *__restrict input_bool_column,
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (; start_index < end_index; ++start_index) {
-                    if (input_bool_column[start_index] == 0) {
+                    if (!(input_bool_column_buffer->GetCompactBit(start_index))) {
                         bitmask.SetFalse(start_index + bitmask_offset);
                     }
                 }
@@ -134,7 +135,7 @@ void MergeIntoBitmask(const u8 *__restrict input_bool_column,
                 }
             } else {
                 for (; start_index < end_index; ++start_index) {
-                    if (!(input_null_mask->IsTrue(start_index)) || (input_bool_column[start_index] == 0)) {
+                    if (!(input_null_mask->IsTrue(start_index)) || !(input_bool_column_buffer->GetCompactBit(start_index))) {
                         bitmask.SetFalse(start_index + bitmask_offset);
                     }
                 }
@@ -265,13 +266,13 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             // filter and build bitmask, if filter_expression_ != nullptr
             db_for_filter->Reset(row_count);
             ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
-            bool_column->Initialize(ColumnVectorType::kFlat, row_count);
+            bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             ExpressionEvaluator expr_evaluator;
             expr_evaluator.Init(db_for_filter);
             expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-            const auto *bool_column_ptr = (const u8 *)(bool_column->data());
+            const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
             SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-            MergeIntoBitmask(bool_column_ptr, null_mask, row_count, bitmask, true);
+            MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true);
             bool_column->Reset();
         }
 
@@ -314,12 +315,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 auto row_count = block_entry->row_count_;
                 db_for_filter->Reset(row_count);
                 ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry.get(), base_table_ref_->column_ids_);
-                bool_column->Initialize(ColumnVectorType::kFlat, row_count);
+                bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
                 expr_evaluator.Init(db_for_filter);
                 expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);
-                const auto *bool_column_ptr = (const u8 *)(bool_column->data());
+                const VectorBuffer *bool_column_buffer = bool_column->buffer_.get();
                 SharedPtr<Bitmask> &null_mask = bool_column->nulls_ptr_;
-                MergeIntoBitmask(bool_column_ptr, null_mask, row_count, bitmask, true, segment_row_count_real);
+                MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true, segment_row_count_real);
                 segment_row_count_real += row_count;
                 bool_column->Reset();
             }

@@ -13,11 +13,10 @@
 // limitations under the License.
 
 module;
-
+#include <string>
 import parser;
 import stl;
-//
-//import infinity_exception;
+import infinity_exception;
 
 export module null_value;
 
@@ -25,7 +24,7 @@ export namespace infinity {
 
 template <typename ValueType>
 inline ValueType NullValue() {
-    TypeError(DataType::TypeToString<ValueType>() + " doesn't have null value.");
+    TypeException(DataType::TypeToString<ValueType>() + " doesn't have null value.");
 }
 
 template <>

@@ -23,7 +23,7 @@ export module vector_buffer;
 
 namespace infinity {
 
-export enum class VectorBufferType { kInvalid, kStandard, kHeap };
+export enum class VectorBufferType { kInvalid, kStandard, kHeap, kCompactBit };
 
 export class VectorBuffer {
 public:
@@ -41,6 +41,8 @@ public:
 
     void Initialize(SizeT type_size, SizeT capacity);
 
+    void InitializeCompactBit(SizeT capacity);
+
     void ResetToInit();
 
     void Copy(ptr_t input, SizeT size);
@@ -49,6 +51,18 @@ public:
         // return data_.get(); 
         return data_;
     }
+
+    [[nodiscard]] bool GetCompactBit(SizeT idx) const;
+
+    void SetCompactBit(SizeT idx, bool val);
+
+    [[nodiscard]] static bool RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx);
+
+    static void RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val);
+
+    static bool CompactBitIsSame(const SharedPtr<VectorBuffer> &lhs, SizeT lhs_cnt, const SharedPtr<VectorBuffer> &rhs, SizeT rhs_cnt);
+
+    static void CopyCompactBits(u8 *dst, const u8 *src, SizeT dst_start_id, SizeT src_start_id, SizeT count);
 
 public:
     bool initialized_{false};

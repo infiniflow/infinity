@@ -36,6 +36,7 @@ export enum class ColumnVectorType : i8 {
     kInvalid,
     kFlat,          // Stand without any encode
     kConstant,      // All vector has same type and value
+    kCompactBit,    // Compact bit encoding
                     //    kDictionary, // There is a dictionary zone
                     //    kRLE, // Run length encoding
                     //    kSequence,
@@ -190,6 +191,23 @@ private:
         }
     }
 
+    template <>
+    static void CopyValue<BooleanT>(const ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+        auto dst_tail = dst.tail_index_;
+        const VectorBuffer *src_buffer = src.buffer_.get();
+        auto dst_buffer = dst.buffer_.get();
+        if (dst_tail % 8 == 0 && from % 8 == 0) {
+            SizeT dst_byte_offset = dst_tail / 8;
+            SizeT src_byte_offset = from / 8;
+            SizeT byte_count = (count + 7) / 8; // copy to tail
+            Memcpy(dst_buffer->GetData() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
+        } else {
+            for (SizeT idx = 0; idx < count; ++idx) {
+                dst_buffer->SetCompactBit(dst_tail + idx, src_buffer->GetCompactBit(from + idx));
+            }
+        }
+    }
+
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
@@ -228,6 +246,17 @@ ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__r
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         ((DataT *)(dst))[idx] = ((const DataT *)(src))[row_id];
+    }
+}
+
+template <>
+inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT count,
+                                             const Selection &input_select) {
+    for (SizeT idx = 0; idx < count; ++idx) {
+        SizeT row_id = input_select[idx];
+        dst_buf->SetCompactBit(idx, src_buf->GetCompactBit(row_id));
     }
 }
 
@@ -382,6 +411,19 @@ inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
     SizeT source_end_idx = source_start_idx + count;
 
     std::copy(((const DataT *)(src)) + source_start_idx, ((const DataT *)(src)) + source_end_idx, ((DataT *)(dst)) + dest_start_idx);
+}
+
+template <>
+inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_buf,
+                                             VectorBuffer *__restrict dst_buf,
+                                             SizeT source_start_idx,
+                                             SizeT dest_start_idx,
+                                             SizeT count) {
+    VectorBuffer::CopyCompactBits(reinterpret_cast<u8 *>(dst_buf->GetData()),
+                                  reinterpret_cast<const u8 *>(src_buf->GetData()),
+                                  dest_start_idx,
+                                  source_start_idx,
+                                  count);
 }
 
 template <>
@@ -544,6 +586,12 @@ inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, Si
     ptr_t dst = dst_buf->GetData();
 
     ((DataT *)(dst))[dst_idx] = ((const DataT *)(src))[src_idx];
+}
+
+template <>
+inline void
+ColumnVector::CopyRowFrom<BooleanT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    dst_buf->SetCompactBit(dst_idx, src_buf->GetCompactBit(src_idx));
 }
 
 template <>

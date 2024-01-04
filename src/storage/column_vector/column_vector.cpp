@@ -61,9 +61,12 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             //        case LogicalType::kBitmap:
             //        case LogicalType::kPolygon:
             //        case LogicalType::kPath:
+        case LogicalType::kBoolean: {
+            vector_buffer_type = VectorBufferType::kCompactBit;
+            break;
+        }
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
-
             break;
         }
         case LogicalType::kInvalid:
@@ -242,6 +245,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
     if (vector_type == ColumnVectorType::kInvalid) {
         Error<StorageException>("Attempt to initialize column vector to invalid type.");
     }
+
+    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
+    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
+    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
+        vector_type = ColumnVectorType::kCompactBit;
+    }
+
     // TODO: No check on capacity value.
 
     vector_type_ = vector_type;
@@ -255,9 +265,12 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
 //        case LogicalType::kBitmap:
 //        case LogicalType::kPolygon:
 //        case LogicalType::kPath:
+        case LogicalType::kBoolean: {
+            vector_buffer_type = VectorBufferType::kCompactBit;
+            break;
+        }
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
-
             break;
         }
         case LogicalType::kInvalid:
@@ -314,9 +327,12 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             //        case LogicalType::kBitmap:
             //        case LogicalType::kPolygon:
             //        case LogicalType::kPath:
+        case LogicalType::kBoolean: {
+            vector_buffer_type = VectorBufferType::kCompactBit;
+            break;
+        }
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
-
             break;
         }
         case LogicalType::kInvalid:
@@ -652,7 +668,7 @@ String ColumnVector::ToString(SizeT row_index) const {
 
     switch (data_type_->type()) {
         case kBoolean: {
-            return ((BooleanT *)data_ptr_)[row_index] ? "true" : "false";
+            return buffer_->GetCompactBit(row_index) ? "true" : "false";
         }
         case kTinyInt: {
             return ToStr(((TinyIntT *)data_ptr_)[row_index]);
@@ -782,7 +798,7 @@ Value ColumnVector::GetValue(SizeT index) const {
     switch (data_type_->type()) {
 
         case kBoolean: {
-            return Value::MakeBool(((BooleanT *)data_ptr_)[index]);
+            return Value::MakeBool(buffer_->GetCompactBit(index));
         }
         case kTinyInt: {
             return Value::MakeTinyInt(((TinyIntT *)data_ptr_)[index]);
@@ -902,7 +918,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
     switch (data_type_->type()) {
 
         case kBoolean: {
-            ((BooleanT *)data_ptr_)[index] = value.GetValue<BooleanT>();
+            buffer_->SetCompactBit(index, value.GetValue<BooleanT>());
             break;
         }
         case kTinyInt: {
@@ -1062,7 +1078,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     switch (data_type_->type()) {
 
         case kBoolean: {
-            ((BooleanT *)data_ptr_)[index] = *(BooleanT *)(raw_ptr);
+            buffer_->SetCompactBit(index, *(BooleanT *)(raw_ptr));
             break;
         }
         case kTinyInt: {
@@ -1401,7 +1417,20 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
      }
 
      switch (data_type_->type()) {
-         case kBoolean:
+         case kBoolean: {
+             auto src_ptr = reinterpret_cast<const u8 *>(column_buffer.GetAll());
+             auto get_boolean_at = [src_ptr](SizeT row_idx) -> BooleanT {
+                 SizeT byte_idx = row_idx / 8;
+                 SizeT bit_idx = row_idx % 8;
+                 return (src_ptr[byte_idx] >> bit_idx) & u8(1);
+             };
+             auto dst_buffer = buffer_.get();
+             for (SizeT row_idx = 0; row_idx < appended_rows; ++row_idx) {
+                 dst_buffer->SetCompactBit(tail_index_ + row_idx, get_boolean_at(start_row + row_idx));
+             }
+             this->tail_index_ += appended_rows;
+             break;
+         }
          case kTinyInt:
          case kSmallInt:
          case kInteger:
@@ -1586,6 +1615,9 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
                     return false;
             }
         }
+    } else if (data_type_->type() == LogicalType::kBoolean) {
+        return other.data_type_->type() == LogicalType::kBoolean &&
+               VectorBuffer::CompactBitIsSame(this->buffer_, this->tail_index_, other.buffer_, other.tail_index_);
     } else {
         return 0 == Memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
     }
@@ -1596,11 +1628,16 @@ i32 ColumnVector::GetSizeInBytes() const {
     if (!initialized) {
         Error<StorageException>("Column vector isn't initialized.");
     }
-    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant) {
+    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
         Error<StorageException>(Format("Not supported vector_type {}", int(vector_type_)));
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
-    size += sizeof(i32) + this->tail_index_ * this->data_type_size_;
+    size += sizeof(i32);
+    if (vector_type_ == ColumnVectorType::kCompactBit) {
+        size += (this->tail_index_ + 7) / 8;
+    } else {
+        size += this->tail_index_ * this->data_type_size_;
+    }
     if (data_type_->type() == kVarchar) {
         size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
     }
@@ -1612,15 +1649,21 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     if (!initialized) {
         Error<StorageException>("Column vector isn't initialized.");
     }
-    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant) {
+    if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
         Error<NotImplementException>(Format("Not supported vector_type {}", int(vector_type_)));
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
     // write fixed part
     WriteBufAdv<i32>(ptr, tail_index_);
-    Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
-    ptr += this->tail_index_ * this->data_type_size_;
+    if (vector_type_ == ColumnVectorType::kCompactBit) {
+        SizeT byte_size = (this->tail_index_ + 7) / 8;
+        Memcpy(ptr, this->data_ptr_, byte_size);
+        ptr += byte_size;
+    } else {
+        Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
+        ptr += this->tail_index_ * this->data_type_size_;
+    }
     // write variable part
     if (data_type_->type() == kVarchar) {
         i32 heap_len = buffer_->fix_heap_mgr_->total_size();
@@ -1641,9 +1684,15 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     // read fixed part
     i32 tail_index = ReadBufAdv<i32>(ptr);
     column_vector->tail_index_ = tail_index;
-    i32 data_type_size = data_type->Size();
-    Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
-    ptr += tail_index * data_type_size;
+    if (vector_type == ColumnVectorType::kCompactBit) {
+        SizeT byte_size = (tail_index + 7) / 8;
+        Memcpy((void *)column_vector->data_ptr_, ptr, byte_size);
+        ptr += byte_size;
+    } else {
+        i32 data_type_size = data_type->Size();
+        Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
+        ptr += tail_index * data_type_size;
+    }
     // read variable part
     if (data_type->type() == kVarchar) {
         i32 heap_len = ReadBufAdv<i32>(ptr);

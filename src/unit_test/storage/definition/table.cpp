@@ -81,7 +81,7 @@ TEST_F(TableTest, test1) {
         SharedPtr<ColumnVector> column1 = order_by_table->GetDataBlockById(block_id)->column_vectors[0];
         EXPECT_EQ(column1->data_type()->type(), LogicalType::kBoolean);
         for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-            EXPECT_EQ(((BooleanT *)column1->data())[row_id], row_id % 2 == 0);
+            EXPECT_EQ(column1->buffer_->GetCompactBit(row_id), row_id % 2 == 0);
         }
 
         // Check Column2 data
