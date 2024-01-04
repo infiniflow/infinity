@@ -15,16 +15,19 @@
 module;
 
 #include <functional>
+
+export module knn:knn_flat_ip;
+
+import :distance;
+import :result_handler;
+import :vector_distance;
+import :mlas_matrix_multiply;
+
 import stl;
-import knn_distance;
 import parser;
-import knn_result_handler;
 import infinity_exception;
 import default_values;
-import vector_distance;
 import bitmask;
-
-export module knn_flat_ip;
 
 namespace infinity {
 

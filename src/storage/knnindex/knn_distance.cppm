@@ -14,11 +14,11 @@
 
 module;
 
+export module knn:distance;
+
 import stl;
 import parser;
 import bitmask;
-
-export module knn_distance;
 
 namespace infinity {
 

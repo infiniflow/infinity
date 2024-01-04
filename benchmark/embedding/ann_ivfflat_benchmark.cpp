@@ -13,9 +13,8 @@
 #include <unordered_set>
 
 import stl;
-import ann_ivf_flat;
 import index_def;
-import annivfflat_index_data;
+import knn;
 import parser;
 import local_file_system;
 import index_base;

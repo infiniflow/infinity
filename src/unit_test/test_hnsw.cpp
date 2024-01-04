@@ -20,15 +20,11 @@
 #include <queue>
 #include <random>
 
-import hnsw_alg;
+import knn;
 import file_system;
 import file_system_type;
 import local_file_system;
 import file_system_type;
-import plain_store;
-import lvq_store;
-import dist_func_l2;
-import dist_func_ip;
 import compilation_config;
 
 using namespace infinity;

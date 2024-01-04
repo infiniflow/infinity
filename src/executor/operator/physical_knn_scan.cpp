@@ -16,6 +16,10 @@ module;
 
 #include <algorithm>
 #include <string>
+
+
+module physical_knn_scan;
+
 import stl;
 import query_context;
 import parser;
@@ -27,7 +31,6 @@ import base_table_ref;
 import knn_scan_data;
 import column_buffer;
 import vector_buffer;
-import knn_distance;
 import third_party;
 
 import infinity_exception;
@@ -39,11 +42,8 @@ import column_expression;
 
 import index_base;
 import buffer_manager;
-import merge_knn;
-import knn_result_handler;
 import index_def;
-import ann_ivf_flat;
-import annivfflat_index_data;
+import knn;
 import buffer_handle;
 import data_block;
 import bitmask;
@@ -53,15 +53,8 @@ import expression_evaluator;
 import expression_state;
 import index_hnsw;
 
-import hnsw_alg;
-import plain_store;
-import lvq_store;
-import dist_func_l2;
-import dist_func_ip;
 import knn_expression;
 import value;
-
-module physical_knn_scan;
 
 namespace infinity {
 

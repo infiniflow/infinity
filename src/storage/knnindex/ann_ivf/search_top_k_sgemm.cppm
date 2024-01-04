@@ -17,13 +17,15 @@ module;
 #include <functional>
 #include <immintrin.h>
 #include <limits>
-import stl;
-import knn_result_handler;
-import mlas_matrix_multiply;
-import vector_distance;
-import heap_twin_operation;
 
-export module search_top_k_sgemm;
+export module knn:search_top_k_sgemm;
+
+import :result_handler;
+import :heap_twin_operation;
+import :vector_distance;
+import :mlas_matrix_multiply;
+
+import stl;
 
 namespace infinity {
 

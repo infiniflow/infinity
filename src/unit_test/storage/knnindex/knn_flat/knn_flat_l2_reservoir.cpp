@@ -21,7 +21,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 import parser;
-import knn_flat_l2_reservoir;
+import knn;
 import infinity_context;
 
 class KnnFlatL2ReservoirTest : public BaseTest {};

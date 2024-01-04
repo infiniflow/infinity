@@ -14,13 +14,13 @@
 
 module;
 
+export module hnsw_file_worker;
+
 import stl;
 import index_file_worker;
-import hnsw_alg;
+import txn;
 import parser;
 import index_base;
-
-export module hnsw_file_worker;
 
 namespace infinity {
 

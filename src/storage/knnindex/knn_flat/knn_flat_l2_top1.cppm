@@ -14,17 +14,18 @@
 
 module;
 
+export module knn:knn_flat_l2_top1;
+
+import :distance;
+import :result_handler;
+import :vector_distance;
+
 import stl;
-import knn_result_handler;
-import knn_distance;
 import parser;
 
 import infinity_exception;
 import default_values;
-import vector_distance;
 import bitmask;
-
-export module knn_flat_l2_top1;
 
 namespace infinity {
 

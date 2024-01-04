@@ -14,8 +14,11 @@
 
 module;
 #include <algorithm>
+
+export module knn:heap_twin_operation;
+
 import stl;
-export module heap_twin_operation;
+
 namespace infinity {
 
 // assume that distances have been initialized

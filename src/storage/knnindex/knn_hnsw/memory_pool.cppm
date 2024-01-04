@@ -17,10 +17,10 @@ module;
 #include <concepts>
 #include <algorithm>
 
+export module knn:hnsw_mem_pool;
+
 import stl;
 import specific_concurrent_queue;
-
-export module hnsw_mem_pool;
 
 namespace infinity {
 

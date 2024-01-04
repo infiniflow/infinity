@@ -17,11 +17,12 @@ module;
 #include <iostream>
 #include <new>
 
-import stl;
-import hnsw_common;
-import file_system;
+export module knn:graph_store;
 
-export module graph_store;
+import :hnsw_common;
+
+import stl;
+import file_system;
 
 namespace infinity {
 

@@ -13,21 +13,23 @@
 // limitations under the License.
 
 module;
+
 #include <algorithm>
 #include <functional>
+
+export module knn:ann_ivf_flat;
+
+import :distance;
+import :result_handler;
+import :annivfflat_index_data;
+import :search_top_k;
+import :vector_distance;
+
 import stl;
-import knn_distance;
 import parser;
 import infinity_exception;
 import index_base;
-import annivfflat_index_data;
-import kmeans_partition;
-import vector_distance;
-import search_top_k;
-import knn_result_handler;
 import bitmask;
-
-export module ann_ivf_flat;
 
 namespace infinity {
 

@@ -16,6 +16,8 @@ module;
 
 #include <memory>
 
+module knn_scan;
+
 import stl;
 import data_block;
 import table_function;
@@ -28,11 +30,9 @@ import global_block_id;
 import infinity_exception;
 import column_buffer;
 import parser;
-import knn_distance;
+import knn;
 import third_party;
 import logger;
-
-module knn_scan;
 
 namespace infinity {
 

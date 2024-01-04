@@ -14,18 +14,19 @@
 
 module;
 
+export module knn:knn_flat_l2_blas;
+
+import :distance;
+import :result_handler;
+import :vector_distance;
+import :mlas_matrix_multiply;
+
 import stl;
-import knn_result_handler;
-import knn_distance;
 import parser;
 
 import infinity_exception;
 import default_values;
-import vector_distance;
-import mlas_matrix_multiply;
 import bitmask;
-
-export module knn_flat_l2_blas;
 
 namespace infinity {
 

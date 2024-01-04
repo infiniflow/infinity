@@ -15,17 +15,19 @@
 module;
 
 #include <functional>
+
+export module knn:knn_flat_l2;
+
+import :vector_distance;
+import :distance;
+import :result_handler;
+
 import stl;
-import knn_distance;
 import parser;
 
-import knn_result_handler;
 import infinity_exception;
 import default_values;
-import vector_distance;
 import bitmask;
-
-export module knn_flat_l2;
 
 namespace infinity {
 

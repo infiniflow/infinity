@@ -13,14 +13,15 @@
 // limitations under the License.
 
 module;
+
 #include <utility>
 #include <limits>
+
+export module knn:hnsw_common;
 
 import stl;
 import file_system;
 import infinity_exception;
-
-export module hnsw_common;
 
 namespace infinity {
 export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }

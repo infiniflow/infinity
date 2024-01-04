@@ -17,11 +17,12 @@ module;
 #include <cassert>
 #include <xmmintrin.h>
 
+export module knn:plain_store;
+
+import :hnsw_common;
+
 import stl;
 import file_system;
-import hnsw_common;
-
-export module plain_store;
 
 namespace infinity {
 

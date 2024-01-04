@@ -13,23 +13,24 @@
 // limitations under the License.
 
 module;
+
 #include <algorithm>
 #include <iostream>
 #include <random>
+
+export module knn:hnsw_alg;
 
 import stl;
 import file_system;
 import file_system_type;
 import infinity_exception;
-import knn_result_handler;
 import bitmask;
 
-import hnsw_common;
-import plain_store;
-import graph_store;
-import lvq_store;
-
-export module hnsw_alg;
+import :hnsw_common;
+import :plain_store;
+import :graph_store;
+import :lvq_store;
+import :result_handler;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.

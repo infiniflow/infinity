@@ -14,13 +14,13 @@
 
 module;
 
+export module merge_knn_data;
+
 import stl;
 import table_function;
 import parser;
 import base_table_ref;
-import merge_knn;
-
-export module merge_knn_data;
+import knn;
 
 namespace infinity {
 

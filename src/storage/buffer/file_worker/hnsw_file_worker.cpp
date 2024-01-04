@@ -14,21 +14,17 @@
 
 module;
 
+module hnsw_file_worker;
+
 import infinity_exception;
 import stl;
 import index_file_worker;
-import hnsw_alg;
+import knn;
 import index_hnsw;
 import parser;
 import index_base;
-import dist_func_l2;
-import dist_func_ip;
-import lvq_store;
-import plain_store;
 import third_party;
 import logger;
-
-module hnsw_file_worker;
 
 namespace infinity {
 HnswFileWorker::~HnswFileWorker() {

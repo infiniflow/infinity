@@ -21,13 +21,14 @@ module;
 #include <random>
 // #include <sys/time.h>
 
+export module knn:kmeans_partition;
+
+import :search_top_k;
+import :vector_distance;
+
 import stl;
 import infinity_exception;
-import search_top_k;
 import index_base;
-import vector_distance;
-
-export module kmeans_partition;
 
 namespace infinity {
 

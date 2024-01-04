@@ -9,6 +9,7 @@ target_link_libraries(
     infinity_core
     sql_parser
     benchmark_profiler
+    onnxruntime_mlas
 )
 
 add_executable(ann_ivfflat_benchmark

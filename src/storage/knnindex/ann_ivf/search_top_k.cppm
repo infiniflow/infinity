@@ -18,14 +18,17 @@ module;
 #include <limits>
 #include <type_traits>
 
-import stl;
-import vector_distance;
-import search_top_1_sgemm;
-import search_top_k_sgemm;
-import heap_twin_operation;
-import knn_result_handler;
+export module knn:search_top_k;
 
-export module search_top_k;
+import :distance;
+import :result_handler;
+import :vector_distance;
+import :mlas_matrix_multiply;
+import :search_top_1_sgemm;
+import :search_top_k_sgemm;
+import :heap_twin_operation;
+
+import stl;
 
 namespace infinity {
 

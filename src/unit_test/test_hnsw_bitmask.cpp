@@ -16,11 +16,7 @@
 
 import stl;
 import bitmask;
-import plain_store;
-import lvq_store;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
+import knn;
 
 using namespace infinity;
 

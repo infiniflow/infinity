@@ -13,11 +13,14 @@
 // limitations under the License.
 
 module;
-#include <type_traits>
-import stl;
-import some_simd_functions;
 
-export module vector_distance;
+#include <type_traits>
+
+export module knn:vector_distance;
+
+import :some_simd_functions;
+
+import stl;
 
 namespace infinity {
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>

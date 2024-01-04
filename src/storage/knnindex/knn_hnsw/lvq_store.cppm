@@ -18,13 +18,14 @@ module;
 #include <type_traits>
 #include <xmmintrin.h>
 
-import stl;
-import hnsw_common;
-import file_system;
-import plain_store;
-import infinity_exception;
+export module knn:lvq_store;
 
-export module lvq_store;
+import :hnsw_common;
+import :plain_store;
+
+import stl;
+import file_system;
+import infinity_exception;
 
 namespace infinity {
 

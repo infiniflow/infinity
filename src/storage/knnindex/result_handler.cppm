@@ -15,12 +15,13 @@
 module;
 #include <algorithm>
 #include <cstring>
+
+export module knn:result_handler;
+
 import stl;
 import parser;
 import infinity_exception;
 import bitmask;
-
-export module knn_result_handler;
 
 namespace infinity {
 

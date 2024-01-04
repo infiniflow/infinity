@@ -34,7 +34,7 @@ import defer_op;
 import index_ivfflat;
 import index_hnsw;
 import buffer_handle;
-import annivfflat_index_data;
+import knn;
 import annivfflat_index_file_worker;
 import index_file_worker;
 import hnsw_file_worker;
@@ -45,12 +45,7 @@ import parser;
 import txn_store;
 import index_base;
 
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
+import knn;
 import segment_iter;
 
 namespace infinity {

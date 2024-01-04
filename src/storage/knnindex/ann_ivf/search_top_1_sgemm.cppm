@@ -16,11 +16,14 @@ module;
 #include <algorithm>
 #include <immintrin.h>
 #include <limits>
-import stl;
-import mlas_matrix_multiply;
-import vector_distance;
 
-export module search_top_1_sgemm;
+export module knn:search_top_1_sgemm;
+
+import :vector_distance;
+import :mlas_matrix_multiply;
+import :result_handler;
+
+import stl;
 
 namespace infinity {
 

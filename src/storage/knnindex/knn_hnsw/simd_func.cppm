@@ -18,9 +18,9 @@ module;
 #include <cassert>
 #include <iostream>
 
-import stl;
+export module knn:hnsw_simd_func;
 
-export module hnsw_simd_func;
+import stl;
 
 namespace infinity {
 

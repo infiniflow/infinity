@@ -16,8 +16,7 @@
 #include <cstdint>
 #include <random>
 
-import dist_func_ip;
-import lvq_store;
+import knn;
 
 using namespace infinity;
 

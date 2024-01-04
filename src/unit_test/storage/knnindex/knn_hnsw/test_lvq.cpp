@@ -16,11 +16,10 @@
 #include <iostream>
 #include <random>
 
-import lvq_store;
+import knn;
 import local_file_system;
 import file_system;
 import file_system_type;
-import dist_func_l2;
 import compilation_config;
 
 using namespace infinity;

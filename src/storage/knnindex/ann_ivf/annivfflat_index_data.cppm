@@ -14,15 +14,16 @@
 
 module;
 
+export module knn:annivfflat_index_data;
+
+import :kmeans_partition;
+import :search_top_k;
+
 import stl;
 import index_base;
 import file_system;
 import file_system_type;
-import search_top_k;
-import kmeans_partition;
 import infinity_exception;
-
-export module annivfflat_index_data;
 
 namespace infinity {
 

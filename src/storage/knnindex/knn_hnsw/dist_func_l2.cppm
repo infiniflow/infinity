@@ -17,13 +17,14 @@ module;
 #include "header.h"
 #include <type_traits>
 
-import stl;
-import hnsw_common;
-import plain_store;
-import lvq_store;
-import hnsw_simd_func;
+export module knn:dist_func_l2;
 
-export module dist_func_l2;
+import :plain_store;
+import :hnsw_simd_func;
+import :hnsw_common;
+import :lvq_store;
+
+import stl;
 
 namespace infinity {
 

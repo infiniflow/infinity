@@ -16,10 +16,7 @@
 #include <cstdint>
 #include <random>
 
-import dist_func_l2;
-import hnsw_simd_func;
-import lvq_store;
-import hnsw_common;
+import knn;
 
 using namespace infinity;
 
