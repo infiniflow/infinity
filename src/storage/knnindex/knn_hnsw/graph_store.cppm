@@ -103,6 +103,7 @@ private:
           graph_(static_cast<char *>(operator new[](max_vertex * level0_size_, std::align_val_t(8)))), //
           loaded_vertex_n_(loaded_vertex_n),                                                           //
           loaded_layers_(loaded_layers)                                                                //
+                                                                                                       //
     {}
 
     void Init() {
@@ -261,6 +262,9 @@ public:
                     VertexType neighbor_idx = neighbors[i];
                     assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
                     assert(neighbor_idx != vertex_i);
+
+                    int n_layer = GetLevel0(neighbor_idx).GetLayers().second;
+                    assert(n_layer >= layer_i);
                 }
             }
         }
@@ -283,7 +287,13 @@ public:
             os << "layer " << layer << std::endl;
             for (VertexType vertex_i : layer2vertex[layer]) {
                 os << vertex_i << ": ";
-                auto [neighbors, neighbor_n] = GetLevel0(vertex_i).GetNeighbors();
+                const int *neighbors = nullptr;
+                int neighbor_n = 0;
+                if (layer == 0) {
+                    std::tie(neighbors, neighbor_n) = GetLevel0(vertex_i).GetNeighbors();
+                } else {
+                    std::tie(neighbors, neighbor_n) = GetLevelX(GetLevel0(vertex_i), layer).GetNeighbors();
+                }
                 for (int i = 0; i < neighbor_n; ++i) {
                     os << neighbors[i] << ", ";
                 }

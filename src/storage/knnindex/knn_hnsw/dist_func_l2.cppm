@@ -45,13 +45,13 @@ public:
             if (dim % 16 == 0) {
                 SIMDFunc = F32L2AVX512;
             } else {
-                SIMDFunc = F32L2BF;
+                SIMDFunc = F32L2AVX512Residual;
             }
 #elif defined(USE_AVX)
             if (dim % 16 == 0) {
                 SIMDFunc = F32L2AVX;
             } else {
-                SIMDFunc = F32L2BF;
+                SIMDFunc = F32L2AVXResidual;
             }
 #else
             SIMDFunc = F32L2BF;
@@ -101,13 +101,13 @@ public:
             if (dim % 64 == 0) {
                 SIMDFunc = I8IPAVX512;
             } else {
-                SIMDFunc = I8IPBF;
+                SIMDFunc = I8IPAVX512Residual;
             }
 #elif defined(USE_AVX)
             if (dim % 32 == 0) {
                 SIMDFunc = I8IPAVX;
             } else {
-                SIMDFunc = I8IPBF;
+                SIMDFunc = I8IPAVXResidual;
             }
 #else
             SIMDFunc = I8IPBF;

@@ -367,10 +367,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             case IndexType::kHnsw: {
                 BufferHandle index_handle = segment_column_index_entry->GetIndex();
                 auto index_hnsw = static_cast<const IndexHnsw *>(segment_column_index_entry->column_index_entry()->index_base_ptr());
-                auto KnnScanOld = [&](auto *index) {
-                    Vector<DataType> dists(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
-                    Vector<RowID> row_ids(knn_scan_shared_data->topk_ * knn_scan_shared_data->query_count_);
-
+                using LabelType = u64;
+                auto KnnScan = [&](auto *index) {
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                         if (opt_param.param_name_ == "ef") {
                             u64 ef = std::stoull(opt_param.param_value_);
@@ -382,73 +380,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
                             static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        MaxHeap<Pair<DataType, u64>> heap = index->KnnSearch(query, knn_scan_shared_data->topk_, bitmask);
+                        auto bitmask_optional = bitmask.IsAllTrue() ? None : Optional<Bitmask>(Move(bitmask));
+                        auto [result_n1, d_ptr, v_ptr] = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, bitmask_optional);
                         if (result_n < 0) {
-                            result_n = heap.size();
-                        } else if (result_n != (i64)heap.size()) {
+                            result_n = result_n1;
+                        } else if (result_n != (i64)result_n1) {
                             throw ExecutorException("Bug");
                         }
-                        u64 id = 0;
-                        while (!heap.empty()) {
-                            const auto &[dist, row_id] = heap.top();
-                            row_ids[query_idx * knn_scan_shared_data->topk_ + id] = RowID::FromUint64(row_id);
-                            switch (knn_scan_shared_data->knn_distance_type_) {
-                                case KnnDistanceType::kInvalid: {
-                                    throw ExecutorException("Bug");
-                                }
-                                case KnnDistanceType::kL2:
-                                case KnnDistanceType::kHamming: {
-                                    dists[query_idx * knn_scan_shared_data->topk_ + id] = +dist;
-                                    break;
-                                }
-                                case KnnDistanceType::kCosine:
-                                case KnnDistanceType::kInnerProduct: {
-                                    dists[query_idx * knn_scan_shared_data->topk_ + id] = -dist;
-                                    break;
-                                }
-                            }
-                            ++id;
-                            heap.pop();
-                        }
-                    }
-                    merge_heap->Search(dists.data(), row_ids.data(), result_n);
-                };
-                auto KnnScanUseHeap = [&]<typename LabelType>(auto *index) {
-                    if constexpr (!std::is_same_v<LabelType, u64>) {
-                        Error<ExecutorException>("Bug: Hnsw LabelType must be u64");
-                    }
-                    for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
-                        if (opt_param.param_name_ == "ef") {
-                            u64 ef = std::stoull(opt_param.param_value_);
-                            index->SetEf(ef);
-                        }
-                    }
-                    i64 result_n = -1;
-                    for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
-                        const DataType *query =
-                            static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        auto search_result = index->KnnSearchReturnPair(query, knn_scan_shared_data->topk_, bitmask);
-                        auto &[result_size, unique_ptr_pair] = search_result;
-                        auto &[d_ptr, l_ptr] = unique_ptr_pair;
-                        if (result_n < 0) {
-                            result_n = result_size;
-                        } else if (result_n != (i64)result_size) {
-                            throw ExecutorException("Bug");
-                        }
-                        if (result_size <= 0) {
-                            continue;
-                        }
-                        UniquePtr<RowID[]> row_ids_ptr;
-                        RowID *row_ids = nullptr;
-                        if constexpr (sizeof(RowID) == sizeof(LabelType)) {
-                            row_ids = reinterpret_cast<RowID *>(l_ptr.get());
-                        } else {
-                            row_ids_ptr = MakeUniqueForOverwrite<RowID[]>(result_size);
-                            row_ids = row_ids_ptr.get();
-                        }
-                        for (SizeT i = 0; i < result_size; ++i) {
-                            row_ids[i] = RowID::FromUint64(l_ptr[i]);
-                        }
+
                         switch (knn_scan_shared_data->knn_distance_type_) {
                             case KnnDistanceType::kInvalid: {
                                 throw ExecutorException("Bug");
@@ -459,30 +398,31 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             }
                             case KnnDistanceType::kCosine:
                             case KnnDistanceType::kInnerProduct: {
-                                for (SizeT i = 0; i < result_size; ++i) {
+                                for (i64 i = 0; i < result_n; ++i) {
                                     d_ptr[i] = -d_ptr[i];
                                 }
                                 break;
                             }
                         }
-                        merge_heap->Search(0, d_ptr.get(), row_ids, result_size);
+
+                        auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                        for (i64 i = 0; i < result_n; ++i) {
+                            row_ids[i] = RowID::FromUint64(index->GetLabel(v_ptr[i]));
+                        }
+                        merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                     }
-                };
-                auto KnnScan = [&](auto *index) {
-                    using LabelType = typename std::remove_pointer_t<decltype(index)>::HnswLabelType;
-                    KnnScanUseHeap.template operator()<LabelType>(index);
                 };
                 switch (index_hnsw->encode_type_) {
                     case HnswEncodeType::kPlain: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainIPDist<f32>>;
+                                using Hnsw = KnnHnsw<f32, LabelType, PlainStore<f32>, PlainIPDist<f32>>;
                                 // Fixme: const_cast here. may have bug.
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32, u64, PlainStore<f32>, PlainL2Dist<f32>>;
+                                using Hnsw = KnnHnsw<f32, LabelType, PlainStore<f32>, PlainL2Dist<f32>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
@@ -495,12 +435,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     case HnswEncodeType::kLVQ: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                                using Hnsw = KnnHnsw<f32, LabelType, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32, u64, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                                using Hnsw = KnnHnsw<f32, LabelType, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
