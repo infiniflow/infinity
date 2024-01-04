@@ -85,55 +85,55 @@ int main() {
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
     {
-        auto [dists, labels] = hnsw_index->KnnSearch(query_embedding.get(), top_k);
+        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k);
 
-        EXPECT_VALUE_EQ(dists[0], 0);
-        EXPECT_VALUE_EQ(labels[0], 0);
+        EXPECT_VALUE_EQ(result[0].first, 0);
+        EXPECT_VALUE_EQ(result[0].second, 0);
 
-        EXPECT_VALUE_EQ(dists[1], 0.02);
-        EXPECT_VALUE_EQ(labels[1], 1);
+        EXPECT_VALUE_EQ(result[1].first, 0.02);
+        EXPECT_VALUE_EQ(result[1].second, 1);
 
-        EXPECT_VALUE_EQ(dists[2], 0.08);
-        EXPECT_VALUE_EQ(labels[2], 2);
+        EXPECT_VALUE_EQ(result[2].first, 0.08);
+        EXPECT_VALUE_EQ(result[2].second, 2);
 
-        EXPECT_VALUE_EQ(dists[3], 0.2);
-        EXPECT_VALUE_EQ(labels[3], 3);
+        EXPECT_VALUE_EQ(result[3].first, 0.2);
+        EXPECT_VALUE_EQ(result[3].second, 3);
     }
 
     auto p_bitmask = Bitmask::Make(64);
     p_bitmask->SetFalse(1);
     --top_k;
     {
-        auto [dists, labels] = hnsw_index->KnnSearch(query_embedding.get(), top_k, *p_bitmask);
+        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
 
-        EXPECT_VALUE_EQ(dists[0], 0);
-        EXPECT_VALUE_EQ(labels[0], 0);
+        EXPECT_VALUE_EQ(result[0].first, 0);
+        EXPECT_VALUE_EQ(result[0].second, 0);
 
-        EXPECT_VALUE_EQ(dists[1], 0.08);
-        EXPECT_VALUE_EQ(labels[1], 2);
+        EXPECT_VALUE_EQ(result[1].first, 0.08);
+        EXPECT_VALUE_EQ(result[1].second, 2);
 
-        EXPECT_VALUE_EQ(dists[2], 0.2);
-        EXPECT_VALUE_EQ(labels[2], 3);
+        EXPECT_VALUE_EQ(result[2].first, 0.2);
+        EXPECT_VALUE_EQ(result[2].second, 3);
     }
 
     p_bitmask->SetFalse(0);
     --top_k;
     {
-        auto [dists, labels] = hnsw_index->KnnSearch(query_embedding.get(), top_k, *p_bitmask);
+        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
 
-        EXPECT_VALUE_EQ(dists[0], 0.08);
-        EXPECT_VALUE_EQ(labels[0], 2);
+        EXPECT_VALUE_EQ(result[0].first, 0.08);
+        EXPECT_VALUE_EQ(result[0].second, 2);
 
-        EXPECT_VALUE_EQ(dists[1], 0.2);
-        EXPECT_VALUE_EQ(labels[1], 3);
+        EXPECT_VALUE_EQ(result[1].first, 0.2);
+        EXPECT_VALUE_EQ(result[1].second, 3);
     }
 
     p_bitmask->SetFalse(2);
     --top_k;
     {
-        auto [dists, labels] = hnsw_index->KnnSearch(query_embedding.get(), top_k, *p_bitmask);
+        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
 
-        EXPECT_VALUE_EQ(dists[0], 0.2);
-        EXPECT_VALUE_EQ(labels[0], 3);
+        EXPECT_VALUE_EQ(result[0].first, 0.2);
+        EXPECT_VALUE_EQ(result[0].second, 3);
     }
 }

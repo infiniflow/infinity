@@ -379,7 +379,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
                         const DataType *query =
                             static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
-                        auto [result_n1, d_ptr, v_ptr] = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                        auto bitmask_optional = bitmask.IsAllTrue() ? None : Optional<Bitmask>(Move(bitmask));
+                        auto [result_n1, d_ptr, v_ptr] = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, bitmask_optional);
                         if (result_n < 0) {
                             result_n = result_n1;
                         } else if (result_n != (i64)result_n1) {

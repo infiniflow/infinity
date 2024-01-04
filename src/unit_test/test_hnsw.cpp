@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cassert>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <queue>
 #include <random>
-#include <fstream>
-#include <cassert>
 
 import hnsw_alg;
 import file_system;
@@ -76,9 +76,9 @@ int main() {
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            auto [dists, labels] = hnsw_index->KnnSearch(query, 1);
-            assert(labels.size() == 1);
-            if (labels[0] == (LabelT)i) {
+            auto result = hnsw_index->KnnSearch1(query, 1);
+            assert(result.size() == 1);
+            if (result[0].second == (LabelT)i) {
                 ++correct;
             }
         }
@@ -102,9 +102,9 @@ int main() {
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            auto [dist, labels] = hnsw_index->KnnSearch(query, 1);
-            assert(labels.size() == 1);
-            if (labels[0] == (LabelT)i) {
+            auto result = hnsw_index->KnnSearch1(query, 1);
+            assert(result.size() == 1);
+            if (result[0].second == (LabelT)i) {
                 ++correct;
             }
         }

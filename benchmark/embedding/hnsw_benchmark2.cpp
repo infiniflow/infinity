@@ -153,7 +153,7 @@ int main() {
     infinity::BaseProfiler profiler;
     std::cout << "Start!" << std::endl;
     int round = 3;
-    Vector<Vector<LabelT>> results(number_of_queries);
+    std::vector<std::vector<std::pair<float, LabelT>>> results(number_of_queries);
     std::cout << "Query thread number: " << query_thread_n << std::endl;
     for (int ef = 100; ef <= 300; ef += 25) {
         knn_hnsw->SetEf(ef);
@@ -171,8 +171,8 @@ int main() {
                             break;
                         }
                         const float *query = queries + cur_idx * dimension;
-                        auto [dists, labels] = knn_hnsw->KnnSearch<false>(query, test_top);
-                        results[cur_idx] = std::move(labels);
+                        auto result = knn_hnsw->KnnSearch1<false>(query, test_top);
+                        results[cur_idx] = std::move(result);
                     }
                 });
             }
@@ -182,7 +182,7 @@ int main() {
             profiler.End();
             if (i == 0) {
                 for (size_t query_idx = 0; query_idx < number_of_queries; ++query_idx) {
-                    for (const auto &label : results[query_idx]) {
+                    for (const auto &[dist, label] : results[query_idx]) {
                         if (ground_truth_sets[query_idx].contains(label)) {
                             ++correct;
                         }
