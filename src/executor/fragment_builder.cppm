@@ -29,9 +29,9 @@ public:
 
     UniquePtr<PlanFragment> BuildFragment(PhysicalOperator *phys_op);
 
+private:
     void BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);
 
-private:
     void BuildExplain(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);
 
     idx_t GetFragmentId() { return fragment_id_++; }

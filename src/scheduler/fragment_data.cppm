@@ -21,13 +21,40 @@ export module fragment_data;
 
 namespace infinity {
 
-export struct FragmentData {
-    UniquePtr<DataBlock> data_block_{};
-    UniquePtr<String> error_message_{};
+export enum class FragmentDataType {
+    kData,
+    kNone,
+    kError,
+    kInvalid,
+};
+
+export struct FragmentDataBase {
+    FragmentDataType type_{FragmentDataType::kInvalid};
     u64 fragment_id_{u64_max};
+
+    FragmentDataBase(FragmentDataType type, u64 fragment_id) : type_(type), fragment_id_(fragment_id) {}
+};
+
+export struct FragmentError : public FragmentDataBase {
+    UniquePtr<String> error_message_{};
+
+    FragmentError(u64 fragment_id, UniquePtr<String> error_message)
+        : FragmentDataBase(FragmentDataType::kError, fragment_id), error_message_(Move(error_message)) {}
+};
+
+export struct FragmentData : public FragmentDataBase {
+    UniquePtr<DataBlock> data_block_{};
     i64 task_id_{-1};
     SizeT data_idx_{u64_max};
     SizeT data_count_{u64_max};
+
+    FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, SizeT data_idx, SizeT data_count)
+        : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(Move(data_block)), task_id_(task_id), data_idx_(data_idx),
+          data_count_(data_count) {}
+};
+
+export struct FragmentNone : public FragmentDataBase {
+    FragmentNone(u64 fragment_id) : FragmentDataBase(FragmentDataType::kNone, fragment_id) {}
 };
 
 } // namespace infinity
