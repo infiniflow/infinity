@@ -85,8 +85,10 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        std::cout << "query gist/sift ef=?" << std::endl;
+    if (argc < 3) {
+        std::cout << "query gist/sift ef=? , with optional test_data_path (default to /infinity/test/data in docker) and optional infinity path "
+                     "(default to /tmp/infinity)"
+                  << std::endl;
         return 1;
     }
     bool sift = true;
@@ -104,6 +106,9 @@ int main(int argc, char *argv[]) {
     std::cin >> total_times;
 
     std::string path = "/tmp/infinity";
+    if (argc >= 5) {
+        path = std::string(argv[4]);
+    }
     LocalFileSystem fs;
 
     Infinity::LocalInit(path);
@@ -113,8 +118,12 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::string> results;
 
-    std::string query_path = std::string(test_data_path());
-    std::string groundtruth_path = std::string(test_data_path());
+    std::string base_path = std::string(test_data_path());
+    if (argc >= 4) {
+        base_path = std::string(argv[3]);
+    }
+    std::string query_path = base_path;
+    std::string groundtruth_path = base_path;
     size_t dimension = 0;
     int64_t topk = 100;
 
