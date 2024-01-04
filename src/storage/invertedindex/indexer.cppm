@@ -29,7 +29,7 @@ public:
 
     ~Indexer();
 
-    void Open(const InvertedIndexConfig &index_config, const String &directory, Vector<u64> &column_ids);
+    void Open(const InvertedIndexConfig &index_config, const String &directory);
 
     void Add(DataBlock *data_block);
 
@@ -40,6 +40,7 @@ public:
 private:
     InvertedIndexConfig index_config_;
     String directory_;
+    Vector<u64> column_ids_;
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;

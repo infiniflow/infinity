@@ -22,7 +22,7 @@ Indexer::Indexer() {}
 
 Indexer::~Indexer() {}
 
-void Indexer::Open(const InvertedIndexConfig &index_config, const String &directory, Vector<u64> &column_ids) {
+void Indexer::Open(const InvertedIndexConfig &index_config, const String &directory) {
     index_config_ = index_config;
     String index_name = index_config_.GetIndexName();
     Path path = Path(directory) / index_name;
@@ -34,8 +34,10 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
     }
     byte_slice_pool_.reset(new MemoryPool);
     buffer_pool_.reset(new RecyclePool);
-    for (SizeT i = 0; i < column_ids.size(); ++i) {
-        u64 column_id = column_ids[i];
+
+    index_config_.GetColumnIDs(column_ids_);
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
         column_indexers_[column_id] = MakeUnique<ColumnIndexer>(column_id, index_config_, byte_slice_pool_, buffer_pool_);
     }
 }
@@ -53,9 +55,9 @@ void Indexer::Add(DataBlock *data_block) {
             column_vectors.push_back(column_vector);
         }
     }
-    /// TODO column_id ?
     for (SizeT i = 0; i < column_vectors.size(); ++i) {
-        u64 column_id = i;
+        /// TODO column_id ?
+        u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Add(column_vectors[i], row_ids);
     }
 }

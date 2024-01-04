@@ -27,8 +27,14 @@ public:
     void SetIndexName(const String &index_name) { index_name_ = index_name; }
     String GetIndexName() const { return index_name_; }
 
-    void SetAnalyzer(const String &analyzer) { analyzer_ = analyzer; }
-    String GetAnalyzer() const { return analyzer_; }
+    void SetAnalyzer(const u64 column_id, const String &analyzer) { analyzers_[column_id] = analyzer; }
+    String GetAnalyzer(const u64 column_id) const { return analyzers_.at(column_id); }
+
+    void GetColumnIDs(Vector<u64> &column_ids) {
+        for (auto it = analyzers_.begin(); it != analyzers_.end(); ++it) {
+            column_ids.push_back(it->first);
+        }
+    }
 
 private:
     String index_name_;
@@ -36,6 +42,7 @@ private:
     optionflag_t flag_;
     bool is_short_list_vbyte_compress_;
     String analyzer_;
+    HashMap<u64, String> analyzers_;
 };
 
 } // namespace infinity

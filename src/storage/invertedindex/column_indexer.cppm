@@ -12,6 +12,7 @@ import posting_writer;
 import data_block;
 import parser;
 import column_vector;
+import analyzer;
 export module column_indexer;
 
 namespace infinity {
@@ -25,7 +26,9 @@ public:
     void Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
 private:
-    void DoAddPosting(const String &term);
+    void SetAnalyzer();
+
+    PostingWriter *DoAddPosting(const String &term);
 
 private:
     u64 column_id_;
@@ -33,5 +36,8 @@ private:
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
     PostingTable *posting_table_{nullptr};
+    UniquePtr<Analyzer> analyzer_;
+    bool jieba_specialize_{false};
+    bool is_real_time_{false};
 };
 } // namespace infinity
