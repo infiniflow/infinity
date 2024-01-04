@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import new_catalog;
+import catalog;
 import table_function;
 import query_context;
 import data_block;

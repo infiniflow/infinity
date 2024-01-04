@@ -22,7 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
-import new_catalog;
+import catalog;
 import min;
 import function_set;
 import aggregate_function_set;

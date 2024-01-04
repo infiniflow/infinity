@@ -16,7 +16,7 @@ module;
 
 import stl;
 import third_party;
-import segment_entry;
+import catalog;
 import buffer_manager;
 import file_system;
 import parser;

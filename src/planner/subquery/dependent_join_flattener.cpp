@@ -35,7 +35,7 @@ import column_expression;
 import binding;
 import base_table_ref;
 
-import new_catalog;
+import catalog;
 import function_set;
 import scalar_function;
 import scalar_function_set;

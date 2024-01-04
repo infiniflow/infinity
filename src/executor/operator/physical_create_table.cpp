@@ -22,7 +22,6 @@ import data_table;
 import parser;
 import physical_operator_type;
 import operator_state;
-import base_entry;
 import status;
 import load_meta;
 
@@ -59,8 +58,7 @@ bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *op
 
     auto txn = query_context->GetTxn();
 
-    BaseEntry *new_table_entry{nullptr};
-    Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_, new_table_entry);
+    Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
     auto create_table_operator_state = (CreateTableOperatorState *)operator_state;
     if (!status.ok()) {
         create_table_operator_state->error_message_ = Move(status.msg_);

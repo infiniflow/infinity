@@ -27,7 +27,6 @@ import join_table_ref;
 import base_table_ref;
 import query_context;
 import binding;
-import table_collection_entry;
 import bound_select_statement;
 import bound_delete_statement;
 import bound_update_statement;
@@ -49,9 +48,8 @@ import limit_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
 import table_scan;
-import base_entry;
-import view_entry;
-import table_collection_type;
+import catalog;
+import table_entry_type;
 import block_index;
 import cast_expression;
 import search_expression;
@@ -382,12 +380,12 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
         schema_name = from_table->db_name_;
     }
 
-    auto [base_table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
+    auto [table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
     }
-    TableCollectionEntry *table_collection_entry = static_cast<TableCollectionEntry *>(base_table_entry);
-    if (table_collection_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
+
+    if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         Error<PlannerException>("Currently, collection isn't supported.");
     }
 
@@ -396,12 +394,12 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     SharedPtr<Vector<String>> names_ptr = MakeShared<Vector<String>>();
     Vector<SizeT> columns;
 
-    SizeT column_count = table_collection_entry->columns_.size();
+    SizeT column_count = table_entry->ColumnCount();
     types_ptr->reserve(column_count);
     names_ptr->reserve(column_count);
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
-        const ColumnDef *column_def = table_collection_entry->columns_[idx].get();
+        const ColumnDef *column_def = table_entry->GetColumnDefByID(idx);
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
@@ -410,13 +408,13 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     u64 txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    SharedPtr<BlockIndex> block_index = TableCollectionEntry::GetBlockIndex(table_collection_entry, txn_id, begin_ts);
+    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_id, begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_collection_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
+    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
-    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_collection_entry, types_ptr, names_ptr, block_index);
+    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr, block_index);
 
     return table_ref;
 }
@@ -710,14 +708,14 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
             break;
         }
         case BindingType::kTable: {
-            SizeT column_count = binding->table_collection_entry_ptr_->columns_.size();
+            SizeT column_count = binding->table_collection_entry_ptr_->ColumnCount();
 
             // Reserve more data in select list
             output_select_list.reserve(output_select_list.size() + column_count);
 
             // Build select list
             for (SizeT idx = 0; idx < column_count; ++idx) {
-                String column_name = binding->table_collection_entry_ptr_->columns_[idx]->name_;
+                String column_name = binding->table_collection_entry_ptr_->GetColumnDefByID(idx)->name_;
                 auto *column_expr = new ColumnExpr();
                 column_expr->names_.emplace_back(table_name);
                 column_expr->names_.emplace_back(column_name);

@@ -23,7 +23,7 @@ import physical_operator_type;
 import base_expression;
 import global_block_id;
 import base_table_ref;
-import table_collection_entry;
+import catalog;
 import block_index;
 import load_meta;
 import knn_expression;
@@ -32,9 +32,6 @@ import infinity_exception;
 export module physical_knn_scan;
 
 namespace infinity {
-
-class BlockColumnEntry;
-class SegmentColumnIndexEntry;
 
 export class PhysicalKnnScan final : public PhysicalOperator {
 public:
@@ -60,7 +57,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    [[nodiscard]] TableCollectionEntry *table_collection_ptr() const;
+    [[nodiscard]] TableEntry *table_collection_ptr() const;
 
     [[nodiscard]] String TableAlias() const;
 

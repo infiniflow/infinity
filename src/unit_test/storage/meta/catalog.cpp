@@ -29,8 +29,7 @@ import data_block;
 import default_values;
 import txn_manager;
 import txn;
-import base_entry;
-import new_catalog;
+import catalog;
 import status;
 
 class CatalogTest : public BaseTest {
@@ -70,41 +69,38 @@ TEST_F(CatalogTest, simple_test1) {
 
     // create db in empty catalog should be success
     {
-        BaseEntry* base_entry{nullptr};
-        Status status = NewCatalog::CreateDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr, base_entry);
+        auto [base_entry, status] = catalog->CreateDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         // store this entry
         databases["db1"] = base_entry;
     }
 
     {
-        BaseEntry* base_db_entry{nullptr};
-        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
+        auto [db_entry1, status1] = catalog->GetDatabase("db1", txn1->TxnID(), txn1->BeginTS());
         // should be visible to same txn
         EXPECT_TRUE(status1.ok());
-        EXPECT_EQ(base_db_entry, databases["db1"]);
+        EXPECT_EQ(db_entry1, databases["db1"]);
 
         // should not be visible to other txn
-        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS(), base_db_entry);
+        auto [db_entry2, status2] = catalog->GetDatabase("db1", txn2->TxnID(), txn2->BeginTS());
         EXPECT_TRUE(!status2.ok());
+        EXPECT_EQ(db_entry2, nullptr);
     }
 
     // drop db should be success
     {
-        BaseEntry* base_entry{nullptr};
-        Status status = NewCatalog::DropDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr, base_entry);
+        auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(base_entry, databases["db1"]);
         // remove this entry
         databases.erase("db1");
 
-        BaseEntry* base_db_entry{nullptr};
-        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1->TxnID(), txn1->BeginTS(), base_db_entry);
+        auto [db_entry1, status1] = catalog->GetDatabase("db1", txn1->TxnID(), txn1->BeginTS());
         // should not be visible to same txn
         EXPECT_TRUE(!status1.ok());
 
         // should not be visible to other txn
-        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn2->TxnID(), txn2->BeginTS(), base_db_entry);
+        auto [db_entry2, status2] = catalog->GetDatabase("db1", txn2->TxnID(), txn2->BeginTS());
         EXPECT_TRUE(!status2.ok());
     }
 
@@ -129,15 +125,10 @@ TEST_F(CatalogTest, simple_test2) {
     auto *txn2 = txn_mgr->CreateTxn();
     txn2->Begin();
 
-    HashMap<String, BaseEntry *> databases;
-
     // create db in empty catalog should be success
     {
-        BaseEntry* base_entry{nullptr};
-        Status status = txn1->CreateDatabase("db1", ConflictType::kError, base_entry);
+        Status status = txn1->CreateDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        // store this entry
-        databases["db1"] = base_entry;
     }
 
     u64 txn1_id = txn1->TxnID();
@@ -146,8 +137,7 @@ TEST_F(CatalogTest, simple_test2) {
 
     // should not be visible to txn2
     {
-        BaseEntry* base_db_entry{nullptr};
-        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn1_id, txn1_begin_ts, base_db_entry);
+        auto [db_entry, status1] = catalog->GetDatabase("db1", txn1_id, txn1_begin_ts);
         // should not be visible to same txn
         EXPECT_TRUE(!status1.ok());
     }
@@ -159,22 +149,15 @@ TEST_F(CatalogTest, simple_test2) {
 
     // should be visible to txn3
     {
-        BaseEntry* base_db_entry{nullptr};
-        Status status1 = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS(), base_db_entry);
+        auto [db_entry1, status1] = catalog->GetDatabase("db1", txn3->TxnID(), txn3->BeginTS());
         EXPECT_TRUE(status1.ok());
-        EXPECT_EQ(base_db_entry, databases["db1"]);
+        EXPECT_NE(db_entry1, nullptr);
 
-        BaseEntry* base_entry{nullptr};
-        Status status = txn3->DropDatabase("db1", ConflictType::kError, base_entry);
+        Status status = txn3->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        // should be different db entry
-        EXPECT_NE(base_entry, databases["db1"]);
-        // remove this entry
-        databases.erase("db1");
 
         // should not be visible to other txn
-        base_db_entry = nullptr;
-        Status status2 = NewCatalog::GetDatabase(catalog, "db1", txn3->TxnID(), txn3->BeginTS(), base_db_entry);
+        auto [db_entry2, status2] = catalog->NewCatalog::GetDatabase("db1", txn3->TxnID(), txn3->BeginTS());
         EXPECT_TRUE(!status2.ok());
     }
 
@@ -196,18 +179,12 @@ TEST_F(CatalogTest, concurrent_test) {
 
         // lock protect databases
         std::mutex lock;
-        HashMap<String, BaseEntry *> databases;
 
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
-                BaseEntry* base_entry{};
                 String db_name = "db" + ToStr(db_id);
-                Status status = txn->CreateDatabase(db_name, ConflictType::kError, base_entry);
+                Status status = txn->CreateDatabase(db_name, ConflictType::kError);
                 EXPECT_TRUE(status.ok());
-                // store this entry
-                lock.lock();
-                databases[db_name] = base_entry;
-                lock.unlock();
             }
         };
 
@@ -229,11 +206,10 @@ TEST_F(CatalogTest, concurrent_test) {
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
                 String db_name = "db" + ToStr(db_id);
-                BaseEntry* base_entry{nullptr};
-                Status status = NewCatalog::GetDatabase(catalog, db_name, txn->TxnID(), txn->BeginTS(), base_entry);
+                auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn->TxnID(), txn->BeginTS());
                 EXPECT_TRUE(status.ok());
                 // only read, don't need lock
-                EXPECT_EQ(base_entry, databases[db_name]);
+                EXPECT_NE(db_entry, nullptr);
             }
         };
 
@@ -254,13 +230,8 @@ TEST_F(CatalogTest, concurrent_test) {
         auto drop_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
                 String db_name = "db" + ToStr(db_id);
-                BaseEntry* base_entry{nullptr};
-                Status status = txn->DropDatabase(db_name, ConflictType::kError, base_entry);
+                Status status = txn->DropDatabase(db_name, ConflictType::kError);
                 EXPECT_TRUE(status.ok());
-                // store this entry
-                lock.lock();
-                databases.erase(db_name);
-                lock.unlock();
             }
         };
 
@@ -279,8 +250,7 @@ TEST_F(CatalogTest, concurrent_test) {
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {
             String db_name = "db" + ToStr(db_id);
-            BaseEntry* base_db_entry{nullptr};
-            Status status = NewCatalog::GetDatabase(catalog, db_name, txn7->TxnID(), txn7->BeginTS(), base_db_entry);
+            auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
             EXPECT_TRUE(!status.ok());
         }
     }

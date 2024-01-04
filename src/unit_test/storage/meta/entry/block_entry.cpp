@@ -24,9 +24,7 @@ import third_party;
 import logger;
 import value;
 import default_values;
-import base_entry;
-import block_column_entry;
-import block_entry;
+import catalog;
 
 class BlockVersionTest : public BaseTest {};
 

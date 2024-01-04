@@ -24,11 +24,9 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
 import query_context;
 // import data_table;
 import operator_state;
-import db_entry;
 import data_block;
 import column_vector;
 import expression_evaluator;
@@ -41,13 +39,10 @@ import iresearch_datastore;
 import value;
 import third_party;
 import iresearch_analyzer;
-import irs_index_entry;
 import base_table_ref;
-import segment_entry;
-import block_entry;
 import column_buffer;
-import block_column_entry;
 import load_meta;
+import catalog;
 
 module physical_match;
 
@@ -83,7 +78,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SharedPtr<IrsIndexEntry> irs_index_entry;
     Map<String, String> column2analyzer;
-    TableCollectionEntry::GetFullTextAnalyzers(base_table_ref_->table_entry_ptr_, txn_id, begin_ts, irs_index_entry, column2analyzer);
+    base_table_ref_->table_entry_ptr_->GetFullTextAnalyzers(txn_id, begin_ts, irs_index_entry, column2analyzer);
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
     String default_field = search_ops.options_["default_field"];
@@ -101,7 +96,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     SharedPtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
     if (dataStore == nullptr) {
         throw ExecutorException(
-            Format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->table_collection_name_));
+            Format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));
     }
     rc = dataStore->Search(flt.get(), search_ops.options_, result);
     if (rc != 0) {
@@ -123,18 +118,14 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         u32 segment_offset = row_id.segment_offset_;
         u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-        SegmentEntry *segment_entry = TableCollectionEntry::GetSegmentByID(base_table_ref_->table_entry_ptr_, segment_id);
-        if (segment_entry == nullptr) {
-            throw ExecutorException(Format("Cannot find segment, segment id: {}", segment_id));
-        }
-        BlockEntry *block_entry = SegmentEntry::GetBlockEntryByID(segment_entry, block_id);
-        if (block_entry == nullptr) {
-            throw ExecutorException(Format("Cannot find block, segment id: {}, block id: {}", segment_id, block_id));
-        }
+
+
+        const BlockEntry* block_entry = base_table_ref_->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
+
         SizeT column_id = 0;
         for (; column_id < column_n; ++column_id) {
-            UniquePtr<BlockColumnEntry> &column = block_entry->columns_[column_ids[column_id]];
-            ColumnBuffer column_buffer = BlockColumnEntry::GetColumnData(column.get(), query_context->storage()->buffer_manager());
+            BlockColumnEntry* block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
+            ColumnBuffer column_buffer = block_column_ptr->GetColumnData(query_context->storage()->buffer_manager());
             output_data_block->column_vectors[column_id]->AppendWith(column_buffer, block_offset, 1);
         }
 
@@ -178,7 +169,7 @@ String PhysicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "PhysicalMatch ";
     }
-    String res = Format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_entry_ptr_->table_collection_name_), match_expr_->ToString());
+    String res = Format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_entry_ptr_->GetTableName()), match_expr_->ToString());
     return res;
 }
 

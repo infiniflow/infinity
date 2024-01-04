@@ -412,7 +412,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 
     SharedPtr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
-                                      logical_insert_ptr->table_collection_entry(),
+                                      logical_insert_ptr->table_entry(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list(),
                                       logical_operator->load_metas());
@@ -456,7 +456,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalImport *logical_import = (LogicalImport *)(logical_operator.get());
     return MakeUnique<PhysicalImport>(logical_operator->node_id(),
-                                      logical_import->table_collection_entry(),
+                                      logical_import->table_entry(),
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),

@@ -19,7 +19,7 @@ import parser;
 import logical_node;
 import logical_node_type;
 import column_binding;
-import table_collection_entry;
+import catalog;
 import base_expression;
 export module logical_update;
 
@@ -28,7 +28,7 @@ namespace infinity {
 export class LogicalUpdate final : public LogicalNode {
 
 public:
-    LogicalUpdate(u64 node_id, TableCollectionEntry *table_entry_ptr, const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
+    LogicalUpdate(u64 node_id, TableEntry *table_entry_ptr, const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns)
         : LogicalNode(node_id, LogicalNodeType::kUpdate), table_entry_ptr_(table_entry_ptr), update_columns_(update_columns) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
@@ -41,7 +41,7 @@ public:
 
     inline String name() final { return "LogicalUpdate"; }
 
-    TableCollectionEntry *table_entry_ptr_{};
+    TableEntry *table_entry_ptr_{};
     Vector<Pair<SizeT, SharedPtr<BaseExpression>>> update_columns_; // Column ID = Expression
 };
 

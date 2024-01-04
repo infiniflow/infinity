@@ -23,7 +23,7 @@ import physical_operator_type;
 import global_block_id;
 import table_function;
 import base_table_ref;
-import table_collection_entry;
+import catalog;
 import block_index;
 import load_meta;
 
@@ -33,7 +33,7 @@ namespace infinity {
 
 // class TableScanFunction;
 // class BaseTableRef;
-// class TableCollectionEntry;
+// struct TableEntry;
 // class BlockIndex;
 
 export class PhysicalTableScan : public PhysicalOperator {
@@ -60,7 +60,7 @@ public:
 
     u64 TableIndex() const;
 
-    TableCollectionEntry *TableEntry() const;
+    TableEntry *TableEntry() const;
 
     SizeT BlockEntryCount() const;
 

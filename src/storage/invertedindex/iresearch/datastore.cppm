@@ -24,8 +24,7 @@ import operator_state;
 import column_vector;
 import query_context;
 import index_def;
-import segment_entry;
-import table_collection_entry;
+import catalog;
 import buffer_manager;
 import default_values;
 
@@ -130,7 +129,7 @@ public:
 
     void StopSchedule();
 
-    void BatchInsert(TableCollectionEntry *table_entry, IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
+    void BatchInsert(TableEntry *table_entry, const IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
 

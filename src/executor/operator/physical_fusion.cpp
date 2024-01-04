@@ -23,11 +23,10 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
 import query_context;
 // import data_table;
 import operator_state;
-import db_entry;
+
 import data_block;
 import column_vector;
 import expression_evaluator;

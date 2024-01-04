@@ -28,7 +28,7 @@ using PutWalEntryFn = StdFunction<void(SharedPtr<WalEntry>)>;
 
 // class WalEntry;
 // class BufferManager;
-class NewCatalog;
+struct NewCatalog;
 
 export class TxnManager {
 public:

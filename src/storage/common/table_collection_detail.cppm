@@ -15,16 +15,16 @@
 module;
 
 import stl;
-import table_collection_type;
+import table_entry_type;
 
-export module table_collection_detail;
+export module table_detail;
 
 namespace infinity {
 
-export struct TableCollectionDetail {
+export struct TableDetail {
     SharedPtr<String> db_name_{};
-    SharedPtr<String> table_collection_name_{};
-    TableCollectionType table_collection_type_;
+    SharedPtr<String> table_name_{};
+    TableEntryType table_entry_type_;
     i64 column_count_{};
     i64 row_count_{};
     i64 segment_count_{};

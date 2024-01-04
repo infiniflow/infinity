@@ -16,11 +16,11 @@ module;
 
 #include <vector>
 
-import stl;
-import block_entry;
-import block_column_iter;
-
 export module block_iter;
+
+import stl;
+import catalog;
+import block_column_iter;
 
 namespace infinity {
 
@@ -29,7 +29,7 @@ public:
     BlockIter(const BlockEntry *entry, const Vector<SizeT> &column_ids) {
         Vector<BlockColumnIter> column_iters;
         for (auto column_id : column_ids) {
-            column_iters.emplace_back(BlockEntry::GetColumnDataByID(entry, column_id), entry->row_count_);
+            column_iters.emplace_back(entry->GetColumnDataByID(column_id), entry->row_count());
         }
         column_iters_ = column_iters;
     }

@@ -23,8 +23,6 @@ import logical_node_type;
 import match_expression;
 import parser;
 import default_values;
-import table_collection_entry;
-import db_entry;
 import third_party;
 
 module logical_match;
@@ -66,7 +64,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatch::GetOutputTypes() const {
     return result_types;
 }
 
-TableCollectionEntry *LogicalMatch::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableEntry *LogicalMatch::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
 String LogicalMatch::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -89,10 +87,9 @@ String LogicalMatch::ToString(i64 &space) const {
     table_name += " - table name: ";
     table_name += this->TableAlias();
     table_name += "(";
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(base_table_ref_->table_entry_ptr_);
-    table_name += *db_entry->db_name_;
+    table_name += *base_table_ref_->table_entry_ptr_->GetDBName();
     table_name += ".";
-    table_name += *base_table_ref_->table_entry_ptr_->table_collection_name_;
+    table_name += *base_table_ref_->table_entry_ptr_->GetTableName();
     table_name += ")";
     ss << table_name << std::endl;
 

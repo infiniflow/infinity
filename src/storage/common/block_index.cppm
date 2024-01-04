@@ -21,8 +21,8 @@ export module block_index;
 
 namespace infinity {
 
-class BlockEntry;
-class SegmentEntry;
+struct BlockEntry;
+struct SegmentEntry;
 
 export struct BlockIndex {
     void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp);

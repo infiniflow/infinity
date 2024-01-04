@@ -80,7 +80,7 @@ public:
 
     std::string ToString() const;
 
-    inline std::string &name() { return name_; }
+    inline const std::string &name() const { return name_; }
 
     [[nodiscard]] inline int64_t id() const { return id_; }
 

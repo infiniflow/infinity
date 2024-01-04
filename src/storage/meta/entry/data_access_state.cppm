@@ -14,12 +14,12 @@
 
 module;
 
+export module data_access_state;
+
 import stl;
 import data_block;
 import column_vector;
 import parser;
-
-export module data_access_state;
 
 namespace infinity {
 

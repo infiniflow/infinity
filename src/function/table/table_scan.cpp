@@ -23,10 +23,8 @@ import table_scan_function_data;
 import block_index;
 import global_block_id;
 import query_context;
-import block_entry;
-import block_column_entry;
 import column_buffer;
-import new_catalog;
+import catalog;
 
 module table_scan;
 
@@ -54,13 +52,13 @@ void TableScanFunc(QueryContext *query_context, TableFunctionData *table_functio
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
 
-        auto remaining_rows = current_block_entry->row_count_ - read_offset;
+        auto remaining_rows = current_block_entry->row_count() - read_offset;
         auto write_size = Min(write_capacity, remaining_rows);
 
         SizeT output_column_id{0};
         for (auto column_id : column_ids) {
             ColumnBuffer column_buffer =
-                BlockColumnEntry::GetColumnData(current_block_entry->columns_[column_id].get(), query_context->storage()->buffer_manager());
+                current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
             output.column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
         }
 

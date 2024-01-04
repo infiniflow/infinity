@@ -32,10 +32,8 @@ import cast_expression;
 import cast_function;
 import bound_cast_func;
 import base_expression;
-import base_entry;
 import txn;
-import table_collection_entry;
-import table_collection_type;
+import table_entry_type;
 import third_party;
 import table_def;
 import logical_create_table;
@@ -159,14 +157,12 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [base_table_entry, status] = txn->GetTableByName(schema_name, table_name);
+    auto [table_entry, status] = txn->GetTableByName(schema_name, table_name);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
     }
 
-    TableCollectionEntry *table_entry = static_cast<TableCollectionEntry *>(base_table_entry);
-
-    if (table_entry->table_collection_type_ == TableCollectionType::kCollectionEntry) {
+    if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         Error<PlannerException>("Currently, collection isn't supported.");
     }
 
@@ -202,7 +198,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             //        Value null_value = Value::MakeNullData();
             //        SharedPtr<BaseExpression> null_value_expr = MakeShared<ValueExpression>(null_value);
 
-            SizeT table_column_count = table_entry->columns_.size();
+            SizeT table_column_count = table_entry->ColumnCount();
 
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
@@ -211,7 +207,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = statement->columns_->at(column_idx);
                 SizeT table_column_id = table_entry->GetColumnIdByName(column_name);
-                const SharedPtr<DataType> &table_column_type = table_entry->columns_[table_column_id]->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(table_column_id)->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (value_type == *table_column_type) {
                     rewrite_value_list[table_column_id] = value_list[column_idx];
@@ -232,7 +228,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
             value_list = rewrite_value_list;
         } else {
-            SizeT table_column_count = table_entry->columns_.size();
+            SizeT table_column_count = table_entry->ColumnCount();
             if (value_list.size() != table_column_count) {
                 Error<PlannerException>(Format("INSERT: Table column count ({}) and "
                                                "input value count mismatch ({})",
@@ -244,7 +240,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
-                const SharedPtr<DataType> &table_column_type = table_entry->columns_[column_idx]->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByID(column_idx)->column_type_;
                 DataType value_type = value_list[column_idx]->Type();
                 if (*table_column_type == value_type) {
                     rewrite_value_list[column_idx] = value_list[column_idx];
@@ -639,7 +635,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
 
-    auto [base_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
     }
@@ -667,11 +663,10 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [base_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         Error<PlannerException>(status.message());
     }
-    auto table_collection_entry = dynamic_cast<TableCollectionEntry *>(base_entry);
 
     // Check the file existence
     LocalFileSystem fs;
@@ -682,7 +677,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_collection_entry,
+                                                                      table_entry,
                                                                       statement->file_path_,
                                                                       statement->header_,
                                                                       statement->delimiter_,
@@ -703,8 +698,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            BaseEntry *base_db_entry{nullptr};
-            Status status = txn->GetDatabase(use_command_info->db_name(), base_db_entry);
+            auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
@@ -731,7 +725,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCheckTable: {
             CheckTable *check_table = (CheckTable *)(command_statement->command_info_.get());
-            auto [base_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
+            auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);

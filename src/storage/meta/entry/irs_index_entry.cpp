@@ -14,19 +14,16 @@
 
 module;
 
+module catalog;
+
 import stl;
-import base_entry;
 import third_party;
 import infinity_exception;
-import table_index_entry;
-import table_index_meta;
 import buffer_manager;
 import iresearch_datastore;
 import index_base;
 import index_full_text;
 import logger;
-
-module irs_index_entry;
 
 namespace infinity {
 
@@ -36,12 +33,12 @@ IrsIndexEntry::IrsIndexEntry(TableIndexEntry *, SharedPtr<String> index_dir, u64
     begin_ts_ = begin_ts;
 }
 
-Json IrsIndexEntry::Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp) {
+Json IrsIndexEntry::Serialize(TxnTimeStamp) {
     Json json;
-    json["txn_id"] = index_def_entry->txn_id_.load();
-    json["begin_ts"] = index_def_entry->begin_ts_;
-    json["commit_ts"] = index_def_entry->commit_ts_.load();
-    json["index_dir"] = *index_def_entry->index_dir_;
+    json["txn_id"] = this->txn_id_.load();
+    json["begin_ts"] = this->begin_ts_;
+    json["commit_ts"] = this->commit_ts_.load();
+    json["index_dir"] = *this->index_dir_;
 
     return json;
 }
@@ -66,14 +63,10 @@ SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String 
     return nullptr;
 }
 
-SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                         u64 txn_id,
-                                                         SharedPtr<String> index_dir,
-                                                         TxnTimeStamp begin_ts) {
+SharedPtr<IrsIndexEntry>
+IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry, u64 txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts) {
     auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    irs_index_entry->irs_index_ =
-        MakeShared<IRSDataStore>(*(TableIndexMeta::GetTableCollectionEntry(table_index_entry->table_index_meta_)->table_collection_name_),
-                                 *(index_dir));
+    irs_index_entry->irs_index_ = MakeShared<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
     return irs_index_entry;
 }
 

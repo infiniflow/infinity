@@ -14,10 +14,10 @@
 
 module;
 
+export module catalog:base_entry;
+
 import stl;
 import default_values;
-
-export module base_entry;
 
 namespace infinity {
 

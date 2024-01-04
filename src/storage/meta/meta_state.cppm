@@ -14,14 +14,14 @@
 
 module;
 
-import stl;
-
 export module meta_state;
+
+import stl;
 
 namespace infinity {
 
-class SegmentEntry;
-class BlockEntry;
+struct SegmentEntry;
+struct BlockEntry;
 class BlockColumnEntry;
 class DataBlock;
 class ColumnVector;

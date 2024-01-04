@@ -47,7 +47,7 @@ import cast_function;
 import bound_cast_func;
 import cast_table;
 
-import new_catalog;
+import catalog;
 import column_binding;
 import third_party;
 

@@ -14,11 +14,11 @@
 
 module;
 
+module catalog;
+
 import stl;
 
 import infinity_exception;
-
-module base_entry;
 
 namespace infinity {
 

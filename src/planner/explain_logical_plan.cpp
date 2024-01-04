@@ -50,9 +50,6 @@ import logical_fusion;
 
 import third_party;
 import parser;
-import db_entry;
-import table_collection_entry;
-import table_collection_meta;
 
 import expression_type;
 import knn_expression;
@@ -599,16 +596,14 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
 
     // Schema name
     {
-        DBEntry *db_entry = TableCollectionMeta::GetDBEntry(insert_node->table_collection_entry()->table_collection_meta_);
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *db_entry->db_name_);
+        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetDBName());
 
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str =
-            Format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_collection_entry()->table_collection_name_);
+        String table_name_str = Format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetTableName());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -740,11 +735,9 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     table_name += table_scan_node->TableAlias();
     table_name += "(";
 
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->table_collection_ptr());
-
-    table_name += *db_entry->db_name_;
+    table_name += *table_scan_node->table_collection_ptr()->GetDBName();
     table_name += ".";
-    table_name += *table_scan_node->table_collection_ptr()->table_collection_name_;
+    table_name += *table_scan_node->table_collection_ptr()->GetTableName();
     table_name += ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -788,11 +781,9 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     table_name += knn_scan_node->TableAlias();
     table_name += "(";
 
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(knn_scan_node->table_collection_ptr());
-
-    table_name += *db_entry->db_name_;
+    table_name += *knn_scan_node->table_collection_ptr()->GetDBName();
     table_name += ".";
-    table_name += *knn_scan_node->table_collection_ptr()->table_collection_name_;
+    table_name += *knn_scan_node->table_collection_ptr()->GetTableName();
     table_name += ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -1250,13 +1241,13 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            if(show_node->segment_id().has_value()) {
+            if (show_node->segment_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
                 output_columns_str += " - segment: " + ToStr(*show_node->segment_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
             }
 
-            if(show_node->block_id().has_value()) {
+            if (show_node->block_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
                 output_columns_str += " - block: " + ToStr(*show_node->block_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
@@ -1467,14 +1458,14 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
     }
 
     {
-        DBEntry *db_entry = TableCollectionMeta::GetDBEntry(import_node->table_collection_entry()->table_collection_meta_);
-        SharedPtr<String> schema_name = MakeShared<String>(Format("{} - schema name: {}", String(intent_size, ' '), *db_entry->db_name_));
+        SharedPtr<String> schema_name =
+            MakeShared<String>(Format("{} - schema name: {}", String(intent_size, ' '), *import_node->table_entry()->GetDBName()));
         result->emplace_back(schema_name);
     }
 
     {
-        SharedPtr<String> table_name = MakeShared<String>(
-            Format("{} - table name: {}", String(intent_size, ' '), *import_node->table_collection_entry()->table_collection_name_));
+        SharedPtr<String> table_name =
+            MakeShared<String>(Format("{} - table name: {}", String(intent_size, ' '), *import_node->table_entry()->GetTableName()));
         result->emplace_back(table_name);
     }
 

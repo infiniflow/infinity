@@ -24,8 +24,6 @@ import column_binding;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
-import table_collection_entry;
-import db_entry;
 
 module logical_update;
 
@@ -53,14 +51,13 @@ String LogicalUpdate::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "UPDATE ";
-    const DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry_ptr_);
-    ss << *db_entry->db_name_ << "." << *table_entry_ptr_->table_collection_name_;
+    ss << *table_entry_ptr_->GetDBName() << "." << *table_entry_ptr_->GetTableName();
     ss << " SET";
     for (SizeT i = 0; i < update_columns_.size(); i++) {
         if (i > 0)
             ss << ", ";
         ss << " ";
-        ss << table_entry_ptr_->columns_[update_columns_[i].first]->name_;
+        ss << table_entry_ptr_->GetColumnDefByID(update_columns_[i].first)->name_;
         ss << " = " << update_columns_[i].second->Name();
     }
     return ss.str();

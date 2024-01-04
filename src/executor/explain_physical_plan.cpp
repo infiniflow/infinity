@@ -17,7 +17,6 @@ module;
 #include <string>
 
 import stl;
-import db_entry;
 
 import parser;
 import physical_operator;
@@ -79,9 +78,7 @@ import explain_logical_plan;
 import logical_show;
 
 import infinity_exception;
-
-import table_collection_meta;
-import table_collection_entry;
+import catalog;
 import base_expression;
 import knn_expression;
 import third_party;
@@ -581,14 +578,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, SharedPtr<V
 
     // Schema name
     {
-        DBEntry *db_entry = TableCollectionMeta::GetDBEntry(insert_node->table_collection_entry()->table_collection_meta_);
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *db_entry->db_name_;
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *insert_node->table_entry()->GetDBName();
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_collection_entry()->table_collection_name_;
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_entry()->GetTableName();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -698,11 +694,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, Shar
     result->emplace_back(MakeShared<String>(table_scan_header));
 
     // Table alias and name
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_scan_node->TableEntry());
-
     String table_name = String(intent_size, ' ') + " - table name: " + table_scan_node->table_alias() + "(";
-    table_name += *db_entry->db_name_ + ".";
-    table_name += *table_scan_node->TableEntry()->table_collection_name_ + ")";
+    table_name += *table_scan_node->TableEntry()->GetDBName() + ".";
+    table_name += *table_scan_node->TableEntry()->GetTableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
@@ -737,10 +731,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     // Table alias and name
     String table_name = String(intent_size, ' ') + " - table name: " + knn_scan_node->TableAlias() + "(";
 
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(knn_scan_node->table_collection_ptr());
-
-    table_name += *db_entry->db_name_ + ".";
-    table_name += *knn_scan_node->table_collection_ptr()->table_collection_name_ + ")";
+    table_name += *knn_scan_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *knn_scan_node->table_collection_ptr()->GetTableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
@@ -1222,9 +1214,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, SharedPtr<V
         header = "DELETE FROM ";
     }
 
-    TableCollectionEntry *table_entry = delete_node->table_entry_ptr_;
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
-    header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
+    TableEntry *table_entry = delete_node->table_entry_ptr_;
+    header += *table_entry->GetDBName() + "." + *table_entry->GetTableName();
     result->emplace_back(MakeShared<String>(header));
 }
 
@@ -1236,9 +1227,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalUpdate *update_node, SharedPtr<V
         header = "UPDATE ";
     }
 
-    TableCollectionEntry *table_entry = update_node->table_entry_ptr_;
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry);
-    header += *db_entry->db_name_ + "." + *table_entry->table_collection_name_;
+    TableEntry *table_entry = update_node->table_entry_ptr_;
+    header += *table_entry->GetDBName() + "." + *table_entry->GetTableName();
     result->emplace_back(MakeShared<String>(header));
 }
 
@@ -1256,15 +1246,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
     }
 
     {
-        DBEntry *db_entry = TableCollectionMeta::GetDBEntry(import_node->table_collection_entry()->table_collection_meta_);
-
-        SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + " - schema name: " + *db_entry->db_name_);
+        SharedPtr<String> schema_name = MakeShared<String>(String(intent_size, ' ') + " - schema name: " + *import_node->table_entry()->GetDBName());
         result->emplace_back(schema_name);
     }
 
     {
-        SharedPtr<String> table_name =
-            MakeShared<String>(String(intent_size, ' ') + " - table name: " + *import_node->table_collection_entry()->table_collection_name_);
+        SharedPtr<String> table_name = MakeShared<String>(String(intent_size, ' ') + " - table name: " + *import_node->table_entry()->GetTableName());
         result->emplace_back(table_name);
     }
 
@@ -1670,14 +1657,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     explain_header_str += "(" + ToStr(match_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
 
-
     // Table alias and name
     String table_name = String(intent_size, ' ') + " - table name: " + match_node->TableAlias() + "(";
 
-    DBEntry *db_entry = TableCollectionEntry::GetDBEntry(match_node->table_collection_ptr());
-
-    table_name += *db_entry->db_name_ + ".";
-    table_name += *match_node->table_collection_ptr()->table_collection_name_ + ")";
+    table_name += *match_node->table_collection_ptr()->GetDBName() + ".";
+    table_name += *match_node->table_collection_ptr()->GetTableName() + ")";
     result->emplace_back(MakeShared<String>(table_name));
 
     // Table index
@@ -1705,9 +1689,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMatch *match_node, SharedPtr<Vec
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
         explain_header_str = String(intent_size - 2, ' ') + "-> FUSION ";

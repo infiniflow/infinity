@@ -19,13 +19,13 @@ import stl;
 import parser;
 import function;
 import base_expression;
-//import new_catalog;
+//import catalog;
 
 export module function_set;
 
 namespace infinity {
 
-class NewCatalog;
+struct NewCatalog;
 
 export class FunctionSet {
 public:

@@ -14,18 +14,19 @@
 
 module;
 
+export module catalog:irs_index_entry;
+
+import :base_entry;
+
 import stl;
 import index_base;
-import base_entry;
 import third_party;
-
-export module irs_index_entry;
 
 namespace infinity {
 
-class TableIndexEntry;
+struct TableIndexEntry;
 class BufferManager;
-class TableCollectionEntry;
+struct TableEntry;
 class IRSDataStore;
 class IndexFullText;
 
@@ -40,7 +41,7 @@ public:
 
     void AddColumn(SharedPtr<IndexBase> index_base, u64 column_id);
 
-    static Json Serialize(const IrsIndexEntry *index_def_entry, TxnTimeStamp max_commit_ts);
+    Json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<IrsIndexEntry> Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 

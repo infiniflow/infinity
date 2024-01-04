@@ -20,7 +20,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_collection_entry;
+import catalog;
 import base_expression;
 import load_meta;
 import infinity_exception;
@@ -33,7 +33,7 @@ export class PhysicalUpdate : public PhysicalOperator {
 public:
     explicit PhysicalUpdate(u64 id,
                             UniquePtr<PhysicalOperator> left,
-                            TableCollectionEntry *table_entry_ptr,
+                            TableEntry *table_entry_ptr,
                             const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns,
                             SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kUpdate, Move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr),
@@ -54,7 +54,7 @@ public:
         return 0;
     }
 
-    TableCollectionEntry *table_entry_ptr_;
+    TableEntry *table_entry_ptr_;
     const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns_;
 
 private:

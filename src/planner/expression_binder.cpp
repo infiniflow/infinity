@@ -53,10 +53,9 @@ import scalar_function_set;
 import scalar_function;
 import special_function;
 
-import new_catalog;
+import catalog;
 import query_context;
 import logger;
-import table_collection_entry;
 
 module expression_binder;
 
@@ -278,8 +277,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                     auto constant_exp = new ConstantExpr(LiteralType::kInteger);
                     // catulate row count
                     String &table_name = bind_context_ptr->table_names_[0];
-                    TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-                    constant_exp->integer_value_ = table_entry->row_count_;
+                    TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+                    constant_exp->integer_value_ = table_entry->row_count();
                     (*expr.arguments_)[0] = constant_exp;
                     auto &expr_rewrite = (FunctionExpr &)expr;
                     expr_rewrite.func_name_ = "COUNT_STAR";
@@ -547,12 +546,12 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         String &table_name = bind_context_ptr->table_names_[0];
         String column_name = special_function->name();
 
-        TableCollectionEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
         SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
                                                                                table_name,
                                                                                bind_context_ptr->table_name2table_index_[table_name],
                                                                                column_name,
-                                                                               table_entry->columns_.size() + special_function->extra_idx(),
+                                                                               table_entry->ColumnCount() + special_function->extra_idx(),
                                                                                depth,
                                                                                special_function->special_type());
         return bound_column_expr;

@@ -24,8 +24,6 @@ import column_binding;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
-import table_collection_entry;
-import db_entry;
 
 module logical_delete;
 
@@ -53,8 +51,7 @@ String LogicalDelete::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "DELETE FROM ";
-    const DBEntry *db_entry = TableCollectionEntry::GetDBEntry(table_entry_ptr_);
-    ss << *db_entry->db_name_ << "." << *table_entry_ptr_->table_collection_name_;
+    ss << *table_entry_ptr_->GetDBName() << "." << *table_entry_ptr_->GetTableName();
     space += arrow_str.size();
 
     return ss.str();

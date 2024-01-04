@@ -63,7 +63,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalKnnScan::GetOutputTypes() const {
     return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
 }
 
-TableCollectionEntry *LogicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableEntry *LogicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
 String LogicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -76,7 +76,7 @@ String LogicalKnnScan::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "KnnScan: " << *base_table_ref_->table_entry_ptr_->table_collection_name_ << ", on: ";
+    ss << String(space, ' ') << arrow_str << "KnnScan: " << *base_table_ref_->table_entry_ptr_->GetTableName() << ", on: ";
     SizeT column_count = base_table_ref_->column_names_->size();
     for (SizeT i = 0; i < column_count - 1; ++i) {
         ss << base_table_ref_->column_names_->at(i) << " ";

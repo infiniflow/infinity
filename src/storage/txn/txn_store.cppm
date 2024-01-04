@@ -17,17 +17,17 @@ module;
 import stl;
 import parser;
 import data_access_state;
-import table_index_entry;
-import column_index_entry;
-import irs_index_entry;
+// import catalog;
 
 export module txn_store;
 
 namespace infinity {
 
 class Txn;
-class TableCollectionEntry;
-class SegmentEntry;
+struct TableIndexEntry;
+struct IrsIndexEntry;
+struct TableEntry;
+struct SegmentEntry;
 class DataBlock;
 class SegmentColumnIndexEntry;
 
@@ -37,21 +37,21 @@ struct TxnSegmentIndexStore {
 
 export struct TxnIndexStore {
 public:
-    explicit TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
+    explicit TxnIndexStore(TableIndexEntry *table_index_entry);
     TxnIndexStore() = default;
 
     TableIndexEntry *const table_index_entry_{};
 
-//    Vector<ColumnIndexEntry*> column_index_entry_{};
-//
-    IrsIndexEntry* irs_index_entry_{};
+    //    Vector<ColumnIndexEntry*> column_index_entry_{};
+    //
+    IrsIndexEntry *irs_index_entry_{};
 
     HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
 };
 
 export class TxnTableStore {
 public:
-    explicit inline TxnTableStore(TableCollectionEntry *table_entry, Txn *txn) : table_entry_(table_entry), txn_(txn) {}
+    explicit inline TxnTableStore(TableEntry *table_entry, Txn *txn) : table_entry_(table_entry), txn_(txn) {}
 
     UniquePtr<String> Append(const SharedPtr<DataBlock> &input_block);
 
@@ -78,7 +78,7 @@ public:
 
     SizeT current_block_id_{0};
 
-    TableCollectionEntry *table_entry_{};
+    TableEntry *table_entry_{};
     Txn *txn_{};
 };
 

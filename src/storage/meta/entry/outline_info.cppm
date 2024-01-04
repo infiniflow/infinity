@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module outline_info;
+
+import stl;
 
 namespace infinity {
 
