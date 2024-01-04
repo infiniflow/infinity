@@ -31,7 +31,7 @@ import meta_state;
 import block_column_entry;
 import column_buffer;
 import table_collection_entry;
-import wal_entry;
+import wal;
 import infinity_exception;
 import status;
 import base_entry;

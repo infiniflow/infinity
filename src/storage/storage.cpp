@@ -24,7 +24,7 @@ import config;
 import stl;
 import buffer_manager;
 import default_values;
-import wal_manager;
+import wal;
 import new_catalog;
 import txn_manager;
 import builtin_functions;

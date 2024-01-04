@@ -19,7 +19,7 @@ import config;
 import new_catalog;
 import txn_manager;
 import buffer_manager;
-import wal_manager;
+import wal;
 import backgroud_process;
 
 export module storage;
