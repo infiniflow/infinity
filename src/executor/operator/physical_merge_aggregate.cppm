@@ -23,6 +23,8 @@ import physical_operator_type;
 import load_meta;
 import base_table_ref;
 import infinity_exception;
+import value;
+import data_block;
 
 export module physical_merge_aggregate;
 
@@ -53,6 +55,74 @@ public:
         Error<NotImplementException>("TaskletCount not Implement");
         return 0;
     }
+
+    template <typename T>
+    T GetInputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
+
+    template <typename T>
+    T GetOutputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
+
+    template <typename T>
+    using MathOperation = StdFunction<T(T, T)>;
+
+    void SimpleMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state);
+
+    template <typename T>
+    void UpdateData(MergeAggregateOperatorState *op_state, MathOperation<T> operation, SizeT col_idx);
+
+    template <typename T>
+    void WriteValueAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, T value);
+
+    template <typename T>
+    void HandleSum(MergeAggregateOperatorState *op_state, SizeT col_idx);
+
+    template <typename T>
+    void HandleCount(MergeAggregateOperatorState *op_state, SizeT col_idx);
+
+    template <typename T>
+    void HandleMin(MergeAggregateOperatorState *op_state, SizeT col_idx);
+
+    template <typename T>
+    void HandleMax(MergeAggregateOperatorState *op_state, SizeT col_idx);
+
+    template <typename T>
+    void HandleAggregateFunction(const String &function_name, MergeAggregateOperatorState *op_state, SizeT col_idx);
+
+    template <typename T>
+    Value CreateValue(T value) {
+        Error<NotImplementException>("Unhandled type for makeValue");
+    }
+
+    template <>
+    Value CreateValue<IntegerT>(IntegerT value) {
+        return Value::MakeInt(value);
+    }
+
+    template <>
+    Value CreateValue<BigIntT>(BigIntT value) {
+        return Value::MakeBigInt(value);
+    }
+
+    template <>
+    Value CreateValue<DoubleT>(DoubleT value) {
+        return Value::MakeDouble(value);
+    }
+
+    template <>
+    Value CreateValue<FloatT>(FloatT value) {
+        return Value::MakeFloat(value);
+    }
+
+    template <>
+    Value CreateValue<TinyIntT>(TinyIntT value) {
+        return Value::MakeTinyInt(value);
+    }
+
+    template <>
+    Value CreateValue<SmallIntT>(SmallIntT value) {
+        return Value::MakeSmallInt(value);
+    }
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

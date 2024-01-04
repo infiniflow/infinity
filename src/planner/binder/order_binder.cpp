@@ -56,6 +56,9 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
 }
 
 SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    if (expr.type_ == ParsedExprType::kFunction) {
+        return ExpressionBinder::BuildFuncExpr((FunctionExpr &)expr, bind_context_ptr, depth, root);
+    }
     if (expr.type_ == ParsedExprType::kKnn) {
         return ExpressionBinder::BuildKnnExpr((KnnExpr &)expr, bind_context_ptr, depth, root);
     }

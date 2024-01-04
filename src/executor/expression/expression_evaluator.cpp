@@ -79,10 +79,10 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     // Create output chunk.
     // TODO: Now output chunk is pre-allocate memory in expression state
     // TODO: In the future, it can be implemented as on-demand allocation.
-    SharedPtr<ColumnVector> &child_output = child_state->OutputColumnVector();
-    Execute(child_expr, child_state, child_output);
+    SharedPtr<ColumnVector> &child_output_col = child_state->OutputColumnVector();
+    this->Execute(child_expr, child_state, child_output_col);
 
-    if (expr->aggregate_function_.argument_type_ != *child_output->data_type()) {
+    if (expr->aggregate_function_.argument_type_ != *child_output_col->data_type()) {
         Error<ExecutorException>("Argument type isn't matched with the child expression output");
     }
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
@@ -93,7 +93,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());
 
     // 2. Loop to fill the aggregate state
-    expr->aggregate_function_.update_func_(expr->aggregate_function_.GetState(), child_output);
+    expr->aggregate_function_.update_func_(expr->aggregate_function_.GetState(), child_output_col);
 
     // 3. Get the aggregate result and append to output column vector.
 
@@ -157,7 +157,8 @@ void ExpressionEvaluator::Execute(const SharedPtr<ValueExpression> &expr,
                                   SharedPtr<ExpressionState> &,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     // memory copy here.
-    output_column_vector->SetValue(0, expr->GetValue());
+    auto value = expr->GetValue();
+    output_column_vector->SetValue(0, value);
     output_column_vector->Finalize(1);
 }
 
