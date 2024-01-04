@@ -17,6 +17,8 @@
 #include <memory>
 #include <queue>
 #include <random>
+#include <fstream>
+#include <cassert>
 
 import hnsw_alg;
 import file_system;
@@ -33,21 +35,23 @@ using namespace infinity;
 
 int main() {
     using LabelT = uint64_t;
-    using RetHeap = std::priority_queue<std::pair<float, LabelT>>;
 
     std::string save_dir = tmp_data_path();
 
-    int dim = 128;
+    int dim = 16;
     int element_size = 1000;
+    int M = 16;
+    int ef_construction = 200;
 
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
+    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
 
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
     // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
     // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
 
-    std::default_random_engine rng;
+    std::mt19937 rng;
+    rng.seed(0);
     std::uniform_real_distribution<float> distrib_real;
 
     auto data = std::make_unique<float[]>(dim * element_size);
@@ -57,27 +61,24 @@ int main() {
 
     LocalFileSystem fs;
 
-    int M = 16;
-    int ef_construction = 200;
-
     {
         auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
 
         auto labels = std::make_unique<LabelT[]>(element_size);
         std::iota(labels.get(), labels.get() + element_size, 0);
-        hnsw_index->Insert(data.get(), labels.get(), element_size);
-        // hnsw_index->Dump(std::cout);
+        hnsw_index->InsertVecs(data.get(), labels.get(), element_size);
+        std::ofstream os("tmp/dump.txt");
+        hnsw_index->Dump(os);
         hnsw_index->Check();
-
-        // hnsw_index->Dump(std::cout);
-        hnsw_index->Check();
+        return 0;
 
         hnsw_index->SetEf(10);
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            RetHeap result = hnsw_index->KnnSearch(query, 1);
-            if (result.top().second == (LabelT)i) {
+            auto [dists, labels] = hnsw_index->KnnSearch(query, 1);
+            assert(labels.size() == 1);
+            if (labels[0] == (LabelT)i) {
                 ++correct;
             }
         }
@@ -97,12 +98,13 @@ int main() {
         hnsw_index->SetEf(10);
 
         // hnsw_index->Dump(std::cout);
-        // hnsw_index->Check();
+        hnsw_index->Check();
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            std::priority_queue<std::pair<float, LabelT>> result = hnsw_index->KnnSearch(query, 1);
-            if (result.top().second == (LabelT)i) {
+            auto [dist, labels] = hnsw_index->KnnSearch(query, 1);
+            assert(labels.size() == 1);
+            if (labels[0] == (LabelT)i) {
                 ++correct;
             }
         }
