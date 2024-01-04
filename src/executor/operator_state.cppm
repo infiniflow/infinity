@@ -339,7 +339,7 @@ export struct QueueSourceState : public SourceState {
 
     bool GetData();
 
-    BlockingQueue<SharedPtr<FragmentData>> source_queue_{};
+    BlockingQueue<SharedPtr<FragmentDataBase>> source_queue_{};
 
     Map<u64, u64> num_tasks_; // fragment_id -> number of pending tasks
 
@@ -356,7 +356,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-    BlockingQueue<UniquePtr<FragmentData>> source_queue_{};
+    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -406,7 +406,7 @@ export struct QueueSinkState : public SinkState {
     inline explicit QueueSinkState(u64 fragment_id, u64 task_id) : SinkState(SinkStateType::kQueue, fragment_id, task_id) {}
 
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-    Vector<BlockingQueue<SharedPtr<FragmentData>> *> fragment_data_queues_;
+    Vector<BlockingQueue<SharedPtr<FragmentDataBase>> *> fragment_data_queues_;
 };
 
 export struct MaterializeSinkState : public SinkState {
