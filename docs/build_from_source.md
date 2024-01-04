@@ -109,5 +109,5 @@ ninja -j 12
 ### Step4 Start up Infinity server
 
 ```shell
-.build/src/infinity
+./build/src/infinity
 ```
