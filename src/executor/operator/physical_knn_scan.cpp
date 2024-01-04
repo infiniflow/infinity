@@ -367,6 +367,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             case IndexType::kHnsw: {
                 BufferHandle index_handle = segment_column_index_entry->GetIndex();
                 auto index_hnsw = static_cast<const IndexHnsw *>(segment_column_index_entry->column_index_entry()->index_base_ptr());
+                using LabelType = u64;
                 auto KnnScan = [&](auto *index) {
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                         if (opt_param.param_name_ == "ef") {
