@@ -31,14 +31,6 @@ namespace infinity {
 
 class PlanFragment;
 
-//class KnnScanSharedData;
-
-// enum class FragmentStatus {
-//     kNotStart,
-//     k
-//     kStart,
-//     kFinish,
-// };
 export enum class FragmentType {
     kInvalid,
     kSerialMaterialize,

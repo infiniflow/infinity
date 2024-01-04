@@ -19,15 +19,14 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import base_expression;
+import knn_expression;
+import base_table_ref;
+import table_collection_entry;
 
 export module logical_knn_scan;
 
 namespace infinity {
-
-class BaseExpression;
-class KnnExpression;
-class BaseTableRef;
-class TableCollectionEntry;
 
 export class LogicalKnnScan : public LogicalNode {
 public:

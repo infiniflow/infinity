@@ -22,9 +22,9 @@ export module task_result;
 
 namespace infinity {
 
-enum class TaskResultType { kInvalid };
+export enum class TaskResultType { kInvalid };
 
-class TaskResult {
+export class TaskResult {
 public:
     explicit TaskResult(TaskResultType task_result_type) : task_result_type_(task_result_type) {}
 

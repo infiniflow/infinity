@@ -17,9 +17,12 @@ module;
 #include <sstream>
 
 import stl;
+import logical_node_type;
 import column_binding;
-import base_expression;
+import logical_node;
 import parser;
+import third_party;
+import base_expression;
 
 module logical_project;
 

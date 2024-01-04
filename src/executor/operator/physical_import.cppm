@@ -35,12 +35,6 @@ export module physical_import;
 
 namespace infinity {
 
-// class TableCollectionEntry;
-// class Txn;
-// class SegmentEntry;
-// class ImportInputState;
-// class ImportOutputState;
-
 class ZxvParserCtx {
 public:
     ZsvParser parser_;

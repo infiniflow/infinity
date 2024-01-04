@@ -19,12 +19,11 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import table_collection_entry;
 
 export module logical_import;
 
 namespace infinity {
-
-class TableCollectionEntry;
 
 export class LogicalImport : public LogicalNode {
 public:

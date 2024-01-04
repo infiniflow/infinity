@@ -26,7 +26,6 @@ export module table_function;
 namespace infinity {
 
 class QueryContext;
-//class DataBlock;
 
 export class TableFunctionData : public FunctionData {
 public:

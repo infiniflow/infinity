@@ -20,12 +20,11 @@ import column_binding;
 import logical_node;
 import parser;
 import third_party;
+import base_expression;
 
 export module logical_project;
 
 namespace infinity {
-
-class BaseExpression;
 
 export class LogicalProject : public LogicalNode {
 public:

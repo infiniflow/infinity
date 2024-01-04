@@ -25,18 +25,6 @@ namespace infinity {
 class Storage;
 class BGTaskProcessor;
 
-class SeqGenerator {
-public:
-    // Begin with 1 to avoid distinguish uninitialized value and the minimal
-    // valid value.
-    explicit SeqGenerator(i64 begin = 1) : next_seq_(begin) {}
-    i64 Generate() { return next_seq_.fetch_add(1); }
-    i64 GetLast() { return next_seq_.load() - 1; }
-
-private:
-    Atomic<i64> next_seq_;
-};
-
 export class WalManager {
 public:
     static String WalCommandTypeToString(WalCommandType type);

@@ -19,12 +19,11 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import base_expression;
 
 export module logical_sort;
 
 namespace infinity {
-
-class BaseExpression;
 
 export class LogicalSort : public LogicalNode {
 public:

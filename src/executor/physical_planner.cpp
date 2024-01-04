@@ -50,7 +50,6 @@ import physical_intersect;
 import physical_knn_scan;
 import physical_limit;
 import physical_merge_hash;
-import physical_merge_join;
 import physical_merge_knn;
 import physical_merge_limit;
 import physical_aggregate;

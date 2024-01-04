@@ -23,13 +23,12 @@ import bind_context;
 import table_ref;
 import binding;
 import bind_alias_proxy;
+import bound_delete_statement;
+import bound_update_statement;
 
 export module query_binder;
 
 namespace infinity {
-
-class BoundDeleteStatement;
-class BoundUpdateStatement;
 
 export class QueryBinder {
 public:

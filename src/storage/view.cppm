@@ -22,7 +22,7 @@ export module view;
 // A view means a logical plan
 namespace infinity {
 
-class View {
+export class View {
 public:
     explicit
     View(SharedPtr<CreateViewInfo> create_view_info, SharedPtr<Vector<String>> column_names, SharedPtr<Vector<SharedPtr<DataType>>> column_types)

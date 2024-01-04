@@ -15,41 +15,40 @@
 module;
 
 import stl;
+import logical_node;
+import logical_create_schema;
+import logical_create_table;
+import logical_create_index;
+import logical_create_collection;
+import logical_create_view;
+import logical_drop_schema;
+import logical_drop_table;
+import logical_drop_collection;
+import logical_drop_view;
+import logical_insert;
+import logical_delete;
+import logical_update;
+import logical_project;
+import logical_filter;
+import logical_table_scan;
+import logical_knn_scan;
+import logical_aggregate;
+import logical_sort;
+import logical_limit;
+import logical_cross_product;
+import logical_join;
+import logical_show;
+import logical_import;
+import logical_export;
+import logical_flush;
+import logical_optimize;
+import logical_match;
+import logical_fusion;
+import base_expression;
 
 export module explain_logical_plan;
 
 namespace infinity {
-
-class LogicalNode;
-class LogicalCreateSchema;
-class LogicalCreateTable;
-class LogicalCreateIndex;
-class LogicalCreateCollection;
-class LogicalCreateView;
-class LogicalDropSchema;
-class LogicalDropTable;
-class LogicalDropCollection;
-class LogicalDropView;
-class LogicalInsert;
-class LogicalDelete;
-class LogicalUpdate;
-class LogicalProject;
-class LogicalFilter;
-class LogicalTableScan;
-class LogicalKnnScan;
-class LogicalAggregate;
-class LogicalSort;
-class LogicalLimit;
-class LogicalCrossProduct;
-class LogicalJoin;
-class LogicalShow;
-class LogicalImport;
-class LogicalExport;
-class LogicalFlush;
-class LogicalOptimize;
-class LogicalMatch;
-class LogicalFusion;
-class BaseExpression;
 
 export class ExplainLogicalPlan {
 public:

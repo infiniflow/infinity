@@ -18,20 +18,18 @@ module;
 
 import stl;
 import logical_node;
-import logical_node_type;
 import logical_create_schema;
-import logical_create_view;
 import logical_create_table;
+import logical_create_index;
 import logical_create_collection;
+import logical_create_view;
 import logical_drop_schema;
 import logical_drop_table;
 import logical_drop_collection;
 import logical_drop_view;
+import logical_insert;
 import logical_delete;
 import logical_update;
-import logical_flush;
-import logical_optimize;
-import logical_insert;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
@@ -42,18 +40,20 @@ import logical_limit;
 import logical_cross_product;
 import logical_join;
 import logical_show;
-import logical_export;
 import logical_import;
-import logical_create_index;
+import logical_export;
+import logical_flush;
+import logical_optimize;
 import logical_match;
 import logical_fusion;
+import base_expression;
 
+import logical_node_type;
 import third_party;
 import parser;
 import db_entry;
 import table_collection_entry;
 import table_collection_meta;
-
 import expression_type;
 import knn_expression;
 import aggregate_expression;
@@ -65,7 +65,6 @@ import between_expression;
 import in_expression;
 import value_expression;
 import reference_expression;
-
 import infinity_exception;
 
 module explain_logical_plan;

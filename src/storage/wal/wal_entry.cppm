@@ -28,10 +28,6 @@ import index_def;
 
 namespace infinity {
 
-// class TableDef;
-//
-// class DataBlock;
-
 export enum class WalCommandType : i8 {
     INVALID = 0,
     // -----------------------------

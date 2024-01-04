@@ -33,6 +33,7 @@ import third_party;
 module expression_transformer;
 
 namespace infinity {
+enum class VisitControlType { kInvalid, kVisit, kNotVisit };
 
 Vector<SharedPtr<BaseExpression>> SplitExpressionByDelimiter(const SharedPtr<BaseExpression> &expression, ConjunctionType delimiter) {
     Vector<SharedPtr<BaseExpression>> result;

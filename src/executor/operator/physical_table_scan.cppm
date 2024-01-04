@@ -31,11 +31,6 @@ export module physical_table_scan;
 
 namespace infinity {
 
-// class TableScanFunction;
-// class BaseTableRef;
-// class TableCollectionEntry;
-// class BlockIndex;
-
 export class PhysicalTableScan : public PhysicalOperator {
 public:
     explicit PhysicalTableScan(u64 id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<Vector<LoadMeta>> load_metas, bool add_row_id = false)

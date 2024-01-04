@@ -28,13 +28,12 @@ import block_index;
 import load_meta;
 import knn_expression;
 import infinity_exception;
+import block_column_entry;
+import segment_column_index_entry;
 
 export module physical_knn_scan;
 
 namespace infinity {
-
-class BlockColumnEntry;
-class SegmentColumnIndexEntry;
 
 export class PhysicalKnnScan final : public PhysicalOperator {
 public:

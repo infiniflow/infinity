@@ -15,20 +15,19 @@
 module;
 
 import stl;
+import base_expression;
+import aggregate_expression;
+import case_expression;
+import cast_expression;
+import reference_expression;
+import function_expression;
+import value_expression;
+import in_expression;
+import column_vector;
 
 export module expression_state;
 
 namespace infinity {
-
-class BaseExpression;
-class AggregateExpression;
-class CaseExpression;
-class CastExpression;
-class ReferenceExpression;
-class FunctionExpression;
-class ValueExpression;
-class InExpression;
-class ColumnVector;
 
 export class ExpressionState {
 public:

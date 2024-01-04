@@ -24,8 +24,6 @@ export module subquery_expression;
 
 namespace infinity {
 
-//class ColumnExpression;
-
 export class SubqueryExpression : public BaseExpression {
 public:
     explicit SubqueryExpression(UniquePtr<BoundSelectStatement> select_node, SubqueryType subquery_type);
