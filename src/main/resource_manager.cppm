@@ -30,6 +30,7 @@ public:
         return cpu_count;
     }
 
+    // inline u64 GetCpuResource() { return GetCpuResource(Thread::hardware_concurrency()); }
     inline u64 GetCpuResource() { return GetCpuResource(4); }
 
     inline u64 GetMemoryResource(u64 memory_size) {
