@@ -22,7 +22,7 @@ import stl;
 import new_catalog;
 
 import infinity_exception;
-import wal_entry;
+import wal;
 import logger;
 import buffer_manager;
 

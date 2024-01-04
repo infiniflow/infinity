@@ -24,12 +24,11 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal_entry;
+import wal;
 import value;
 import parser;
 import data_block;
 import default_values;
-import wal_manager;
 import index_ivfflat;
 import index_def;
 

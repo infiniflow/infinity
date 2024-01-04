@@ -20,7 +20,7 @@ import stl;
 import txn;
 import buffer_manager;
 import txn_state;
-import wal_entry;
+import wal;
 
 namespace infinity {
 

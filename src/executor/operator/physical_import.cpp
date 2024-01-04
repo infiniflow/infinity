@@ -44,7 +44,7 @@ import block_column_entry;
 import block_entry;
 import db_entry;
 import table_collection_meta;
-import wal_entry;
+import wal;
 import file_system_type;
 import file_system;
 import buffer_handle;

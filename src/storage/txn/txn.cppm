@@ -26,7 +26,6 @@ import data_access_state;
 import buffer_manager;
 import txn_state;
 import txn_context;
-import wal_entry;
 import txn_store;
 import table_index_entry;
 import database_detail;
@@ -52,6 +51,8 @@ class TxnManager;
 class NewCatalog;
 class TableCollectionEntry;
 class DBEntry;
+struct WalEntry;
+struct WalCmd;
 
 export class Txn {
 public:
@@ -167,7 +168,7 @@ private:
     String db_name_{};
 
     // WalEntry
-    SharedPtr<WalEntry> wal_entry_;
+    SharedPtr<WalEntry> wal_entry_{};
 
     // WalManager notify the  commit bottom half is done
     Mutex lock_{};

@@ -17,7 +17,7 @@ Tests <!-- At least one of them must be included. -->
 
 - [ ] Unit test
 - [ ] Integration test
-- [ ] Manual test (add detailed scripts or steps below)
+- [ ] Manual test (knn performance test)
 - [ ] No code
 
 Side effects
