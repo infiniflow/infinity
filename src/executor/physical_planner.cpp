@@ -504,6 +504,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                          logical_aggregate->aggregate_index_,
                                                          logical_operator->load_metas());
 
+
+
     if (tasklet_count == 1) {
         return physical_agg_op;
     } else {

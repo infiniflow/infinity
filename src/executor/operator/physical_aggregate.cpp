@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <vector>
 import stl;
 import txn;
 import query_context;
@@ -49,14 +50,15 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     Vector<SharedPtr<ColumnDef>> groupby_columns;
     SizeT group_count = groups_.size();
 
-    if(group_count == 0) {
+    if (group_count == 0) {
         // Aggregate without group by expression
         // e.g. SELECT count(a) FROM table;
-        if (SimpleAggregate(this->output_, prev_op_state, aggregate_operator_state)) {
-            return true;
-        } else {
-            return false;
+        auto result = SimpleAggregateExecute(prev_op_state->data_block_array_, aggregate_operator_state->data_block_array_);
+        prev_op_state->data_block_array_.clear();
+        if (prev_op_state->Complete()) {
+            aggregate_operator_state->SetComplete();
         }
+        return result;
     }
 #if 0
     groupby_columns.reserve(group_count);
@@ -275,17 +277,20 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                         }
                         case kVarchar: {
                             Error<NotImplementException>("Varchar data shuffle isn't implemented.");
-//                            VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
-//                            VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-//                            if (src_ref.IsInlined()) {
-//                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-//                            } else {
-//                                dst_ref.length = src_ref.length;
-//                                Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-//
-//                                dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-//                                Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-//                            }
+                            //                            VarcharT &dst_ref = ((VarcharT
+                            //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
+                            //                            = ((VarcharT
+                            //                            *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
+                            //                            (src_ref.IsInlined()) {
+                            //                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
+                            //                            } else {
+                            //                                dst_ref.length = src_ref.length;
+                            //                                Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+                            //
+                            //                                dst_ref.ptr =
+                            //                                output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
+                            //                                Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                            //                            }
                             break;
                         }
                         case kDate: {
@@ -404,17 +409,19 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                 }
                 case kVarchar: {
                     Error<NotImplementException>("Varchar data shuffle isn't implemented.");
-//                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
-//                    VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-//                    if (src_ref.IsInlined()) {
-//                        Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-//                    } else {
-//                        dst_ref.length = src_ref.length;
-//                        Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-//
-//                        dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-//                        Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-//                    }
+                    //                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
+                    //                    VarcharT &src_ref = ((VarcharT
+                    //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
+                    //                    (src_ref.IsInlined()) {
+                    //                        Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
+                    //                    } else {
+                    //                        dst_ref.length = src_ref.length;
+                    //                        Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+                    //
+                    //                        dst_ref.ptr =
+                    //                        output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
+                    //                        Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                    //                    }
                     break;
                 }
                 case kDate: {
@@ -559,12 +566,18 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 #endif
 }
 
-bool PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table,
-                                        OperatorState *pre_operator_state,
-                                        AggregateOperatorState *aggregate_operator_state) {
+bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks) {
     SizeT aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
         Error<ExecutorException>("Simple Aggregate without aggregate expression.");
+    }
+
+    SizeT input_block_count = input_blocks.size();
+
+    if (input_block_count == 0) {
+        // No input data
+        LOG_TRACE("No input, no aggregate result");
+        return true;
     }
 
     // Prepare the output table columns
@@ -579,19 +592,14 @@ bool PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table,
     Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(aggregates_count);
 
-    SizeT input_block_count = pre_operator_state->data_block_array_.size();
-
-    for (i64 idx = 0; auto &expr: aggregates_) {
+    for (i64 idx = 0; auto &expr : aggregates_) {
         // expression state
         expr_states.emplace_back(ExpressionState::CreateState(expr));
 
         SharedPtr<DataType> output_type = MakeShared<DataType>(expr->Type());
 
         // column definition
-        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx,
-                                                             output_type,
-                                                             expr->Name(),
-                                                             HashSet<ConstraintType>());
+        SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, output_type, expr->Name(), HashSet<ConstraintType>());
         aggregate_columns.emplace_back(col_def);
 
         // for output block
@@ -600,55 +608,24 @@ bool PhysicalAggregate::SimpleAggregate(SharedPtr<DataTable> &output_table,
         ++idx;
     }
 
-    if (input_block_count == 0) {
-        // No input data
-        LOG_TRACE("No input, no aggregate result");
-        return true;
-    }
-    // Loop blocks
-
-    //    ExpressionEvaluator evaluator;
-    //    //evaluator.Init(input_table_->data_blocks_);
-    //    for (SizeT expr_idx = 0; expr_idx < aggregates_count; ++expr_idx) {
-    //
-    //        ExpressionEvaluator evaluator;
-    //        evaluator.Init(aggregates_[])
-    //        Vector<SharedPtr<ColumnVector>> blocks_column;
-    //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
-    //        evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], blocks_column[expr_idx]);
-    //        if(blocks_column[0].get() != output_data_block->column_vectors[expr_idx].get()) {
-    //            // column vector in blocks column might be changed to the column vector from column reference.
-    //            // This check and assignment is to make sure the right column vector are assign to output_data_block
-    //            output_data_block->column_vectors[expr_idx] = blocks_column[0];
-    //        }
-    //    }
-    //
-    //    output_data_block->Finalize();
-
     for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
-        DataBlock *input_data_block = pre_operator_state->data_block_array_[block_idx].get();
+        DataBlock *input_data_block = input_blocks[block_idx].get();
 
-        aggregate_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-        DataBlock *output_data_block = aggregate_operator_state->data_block_array_.back().get();
+        output_blocks.emplace_back(DataBlock::MakeUniquePtr());
+
+        DataBlock *output_data_block = output_blocks.back().get();
         output_data_block->Init(*GetOutputTypes());
 
         ExpressionEvaluator evaluator;
         evaluator.Init(input_data_block);
 
         SizeT expression_count = aggregates_count;
-        // Prepare the expression states
-
+        // calculate every columns value
         for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-            //        Vector<SharedPtr<ColumnVector>> blocks_column;
-            //        blocks_column.emplace_back(output_data_block->column_vectors[expr_idx]);
+            LOG_TRACE("Physical aggregate Execute");
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
         output_data_block->Finalize();
-    }
-
-    pre_operator_state->data_block_array_.clear();
-    if (pre_operator_state->Complete()) {
-        aggregate_operator_state->SetComplete();
     }
     return true;
 }

@@ -2,6 +2,9 @@
 # description: Test basic sql statement for sample
 # group: [basic]
 
+statement ok
+DROP TABLE IF EXISTS NATION;
+
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement error
 CREATE TABLE NATION (
