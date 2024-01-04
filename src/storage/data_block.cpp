@@ -105,7 +105,8 @@ void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
     column_vectors.reserve(column_count_);
     for (SizeT idx = 0; idx < column_count_; ++idx) {
         column_vectors.emplace_back(MakeShared<ColumnVector>(types[idx]));
-        column_vectors[idx]->Initialize(ColumnVectorType::kFlat, capacity);
+        auto column_vector_type = (types[idx]->type() == LogicalType::kBoolean) ? ColumnVectorType::kCompactBit : ColumnVectorType::kFlat;
+        column_vectors[idx]->Initialize(column_vector_type, capacity);
     }
     capacity_ = capacity;
     initialized = true;
@@ -142,8 +143,9 @@ void DataBlock::Reset() {
     // No data is appended into any column.
 
     for (SizeT i = 0; i < column_count_; ++i) {
+        ColumnVectorType old_vector_type = column_vectors[i]->vector_type();
         column_vectors[i]->Reset();
-        column_vectors[i]->Initialize();
+        column_vectors[i]->Initialize(old_vector_type);
     }
 
     row_count_ = 0;
@@ -156,8 +158,9 @@ void DataBlock::Reset(SizeT capacity) {
     // Reset each column into just initialized status.
     // No data is appended into any column.
     for (SizeT i = 0; i < column_count_; ++i) {
+        ColumnVectorType old_vector_type = column_vectors[i]->vector_type();
         column_vectors[i]->Reset();
-        column_vectors[i]->Initialize(ColumnVectorType::kFlat, capacity);
+        column_vectors[i]->Initialize(old_vector_type, capacity);
     }
     row_count_ = 0;
     capacity_ = capacity;

@@ -25,6 +25,7 @@ class ExpressionState;
 class DataBlock;
 class Selection;
 class Bitmask;
+class ColumnVector;
 
 export class ExpressionSelector {
 public:
@@ -43,11 +44,7 @@ public:
 
     void Select(const SharedPtr<BaseExpression> &expr, SharedPtr<ExpressionState> &state, SizeT count, SharedPtr<Selection> &output_true_select);
 
-    static void Select(const u8 *__restrict bool_column,
-                       const SharedPtr<Bitmask> &null_mask,
-                       SizeT count,
-                       SharedPtr<Selection> &output_true_select,
-                       bool nullable);
+    static void Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable);
 
 private:
     const DataBlock *input_data_{nullptr};

@@ -14,6 +14,7 @@
 
 module;
 
+#include <type_traits>
 import stl;
 import catalog;
 
@@ -21,7 +22,7 @@ import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
-import third_party;
+// import third_party;
 
 module or_func;
 
@@ -30,7 +31,15 @@ namespace infinity {
 struct OrFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = left or right;
+        if constexpr (std::is_same_v<std::remove_cv_t<TA>, u8> && std::is_same_v<std::remove_cv_t<TB>, u8> &&
+                      std::is_same_v<std::remove_cv_t<TC>, u8>) {
+            result = left | right;
+        } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT> &&
+                             std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
+            result = left or right;
+        } else {
+            Error<TypeException>("OR function accepts only u8 and BooleanT.");
+        }
     }
 };
 

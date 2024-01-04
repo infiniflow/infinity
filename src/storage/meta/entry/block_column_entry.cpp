@@ -82,6 +82,16 @@ void BlockColumnEntry::Append(BlockColumnEntry *column_entry,
     if (column_entry->buffer_ == nullptr) {
         Error<StorageException>("Not initialize buffer handle");
     }
+    if (column_entry->column_type_->type() == kBoolean) {
+        BufferHandle buffer_handle = column_entry->buffer_->Load();
+        auto dst_p = reinterpret_cast<u8 *>(buffer_handle.GetDataMut());
+        VectorBuffer::CopyCompactBits(dst_p,
+                                      reinterpret_cast<const u8 *>(input_column_vector->data()),
+                                      column_entry_offset,
+                                      input_column_vector_offset,
+                                      append_rows);
+        return;
+    }
     SizeT data_type_size = input_column_vector->data_type_size_;
 
     ptr_t src_ptr = input_column_vector->data() + input_column_vector_offset * data_type_size;
@@ -96,7 +106,15 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
     // ptr_t dst_ptr = column_data_entry->buffer_handle_->LoadData() + dst_offset;
     DataType *column_type = this->column_type_.get();
     switch (column_type->type()) {
-        case kBoolean:
+        case kBoolean: {
+            auto src_boolean = reinterpret_cast<const BooleanT *>(src_p);
+            SizeT data_count = data_size / sizeof(BooleanT);
+            auto dst_ptr_u8 = reinterpret_cast<u8 *>(buffer_handle.GetDataMut());
+            for (SizeT i = 0; i < data_count; ++i) {
+                VectorBuffer::RawPointerSetCompactBit(dst_ptr_u8, dst_offset + i, src_boolean[i]);
+            }
+            break;
+        }
         case kDate:
         case kTime:
         case kDateTime:

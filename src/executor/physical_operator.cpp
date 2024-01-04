@@ -56,7 +56,9 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
         // Filling ColumnVector
         for (SizeT j = 0; j < load_column_count; ++j) {
             SharedPtr<ColumnVector> column_vector = ColumnVector::Make(load_metas[j].type_);
-            column_vector->Initialize(ColumnVectorType::kFlat, capacity);
+            auto column_vector_type =
+                (load_metas[j].type_->type() == LogicalType::kBoolean) ? ColumnVectorType::kCompactBit : ColumnVectorType::kFlat;
+            column_vector->Initialize(column_vector_type, capacity);
 
             input_block->InsertVector(column_vector, load_metas[j].index_);
         }

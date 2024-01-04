@@ -4,7 +4,6 @@ import stl;
 import doc_list_format_option;
 import pos_list_format_option;
 import posting_value;
-import index_config;
 import index_defines;
 export module posting_list_format;
 
@@ -15,9 +14,10 @@ public:
     inline PostingFormatOption(optionflag_t flag = OPTION_FLAG_ALL) : has_term_payload_(false) { InitOptionFlag(flag); }
     ~PostingFormatOption() = default;
 
-    inline void Init(const SharedPtr<InvertedIndexConfig> &index_config) {
-        InitOptionFlag(index_config->GetOptionFlag());
-        doc_list_format_option_.SetShortListVbyteCompress(index_config->IsShortListVbyteCompress());
+    inline void InitOptionFlag(optionflag_t flag) {
+        has_term_payload_ = flag & of_term_payload;
+        doc_list_format_option_.Init(flag);
+        pos_list_format_option_.Init(flag);
     }
 
     bool HasTfBitmap() const { return doc_list_format_option_.HasTfBitmap(); }
@@ -43,16 +43,7 @@ public:
     bool operator==(const PostingFormatOption &right) const;
 
     bool IsOnlyTermPayLoad() const { return HasTermPayload() && !HasTfBitmap() && !HasPositionList(); }
-
-    PostingFormatOption GetBitmapPostingFormatOption() const;
-
 private:
-    inline void InitOptionFlag(optionflag_t flag) {
-        has_term_payload_ = flag & of_term_payload;
-        doc_list_format_option_.Init(flag);
-        pos_list_format_option_.Init(flag);
-    }
-
     bool has_term_payload_;
     DocListFormatOption doc_list_format_option_;
     PositionListFormatOption pos_list_format_option_;

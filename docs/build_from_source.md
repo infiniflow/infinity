@@ -86,7 +86,6 @@ wget https://cmake.org/files/v3.28/cmake-3.28.1-linux-x86_64.tar.gz
 tar zxvf cmake-3.28.1-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.28.1-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.28.1-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.28.1-linux-x86_64
 sudo apt install -y ninja-build clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev libevent-dev liburing-dev libthrift-dev
->>>>>>> up_stream/main
 ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ```
 
