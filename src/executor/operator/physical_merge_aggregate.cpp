@@ -17,15 +17,17 @@ module;
 #include <string>
 #include <vector>
 import stl;
+import third_party;
 import query_context;
 import operator_state;
-import infinity_exception;
 import logger;
 import value;
 import data_block;
 import parser;
 import physical_aggregate;
 import aggregate_expression;
+
+import infinity_exception;
 
 module physical_merge_aggregate;
 
@@ -37,7 +39,7 @@ using MathOperation = StdFunction<T(T, T)>;
 void PhysicalMergeAggregate::Init() {}
 
 bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    LOG_TRACE("PhysicalMergeAggregate::Execute:: mark");
+
     auto merge_aggregate_op_state = static_cast<MergeAggregateOperatorState *>(operator_state);
 
     SimpleMergeAggregateExecute(merge_aggregate_op_state);
@@ -59,6 +61,7 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
 void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorState *op_state) {
     if (op_state->data_block_array_.empty()) {
         op_state->data_block_array_.emplace_back(Move(op_state->input_data_block_));
+        LOG_TRACE("Physical MergeAggregate execute first block");
     } else {
         auto agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
         auto aggs_size = agg_op->aggregates_.size();
@@ -70,6 +73,15 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
             auto func_return_type = agg_expression->aggregate_function_.return_type_;
 
             switch (func_return_type.type()) {
+                LOG_TRACE("Physical MergeAggregate execute remain block");
+                case kTinyInt: {
+                    HandleAggregateFunction<TinyIntT>(function_name, op_state, col_idx);
+                    break;
+                }
+                case kSmallInt: {
+                    HandleAggregateFunction<SmallIntT>(function_name, op_state, col_idx);
+                    break;
+                }
                 case kInteger: {
                     HandleAggregateFunction<IntegerT>(function_name, op_state, col_idx);
                     break;
@@ -87,7 +99,7 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                     break;
                 }
                 default:
-                    Error<NotImplementException>("input_value_type not Implement");
+                    Error<NotImplementException>("Input value type not Implement");
             }
         }
     }
@@ -95,18 +107,20 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
 
 template <typename T>
 void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name, MergeAggregateOperatorState *op_state, SizeT col_idx) {
-    if (String(function_name) == String("COUNT")) {
+    LOG_TRACE(function_name);
+    if (function_name == "COUNT") {
         LOG_TRACE("COUNT");
         HandleCount<T>(op_state, col_idx);
-    } else if (String(function_name) == String("MIN")) {
-        LOG_TRACE("MIN");
+    } else if (function_name == "MIN") {
         HandleMin<T>(op_state, col_idx);
-    } else if (String(function_name) == String("MAX")) {
-        LOG_TRACE("MAX");
+    } else if (function_name == "MAX") {
         HandleMax<T>(op_state, col_idx);
-    } else if (String(function_name) == String("SUM")) {
-        LOG_TRACE("SUM");
+    } else if (function_name == "SUM") {
         HandleSum<T>(op_state, col_idx);
+    } else if (function_name == "COUNT_STAR") {
+        // no action for "COUNT_STAR"
+    } else {
+        Error<NotImplementException>(Format("Function type {} not Implement.", function_name));
     }
 }
 
@@ -157,21 +171,6 @@ void PhysicalMergeAggregate::UpdateData(MergeAggregateOperatorState *op_state, M
     T output = GetOutputData<T>(op_state, 0, col_idx, 0);
     T new_value = operation(input, output);
     WriteValueAtPosition<T>(op_state, 0, col_idx, 0, new_value);
-}
-
-template <typename T>
-T PhysicalMergeAggregate::AddData(T a, T b) {
-    return a + b;
-}
-
-template <typename T>
-T PhysicalMergeAggregate::MinValue(T a, T b) {
-    return (a < b) ? a : b;
-}
-
-template <typename T>
-T PhysicalMergeAggregate::MaxValue(T a, T b) {
-    return (a > b) ? a : b;
 }
 
 } // namespace infinity

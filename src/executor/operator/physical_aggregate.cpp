@@ -277,17 +277,20 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                         }
                         case kVarchar: {
                             Error<NotImplementException>("Varchar data shuffle isn't implemented.");
-//                            VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx];
-//                            VarcharT &src_ref = ((VarcharT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-//                            if (src_ref.IsInlined()) {
-//                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-//                            } else {
-//                                dst_ref.length = src_ref.length;
-//                                Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-//
-//                                dst_ref.ptr = output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-//                                Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-//                            }
+                            //                            VarcharT &dst_ref = ((VarcharT
+                            //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
+                            //                            = ((VarcharT
+                            //                            *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
+                            //                            (src_ref.IsInlined()) {
+                            //                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
+                            //                            } else {
+                            //                                dst_ref.length = src_ref.length;
+                            //                                Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+                            //
+                            //                                dst_ref.ptr =
+                            //                                output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
+                            //                                Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                            //                            }
                             break;
                         }
                         case kDate: {
@@ -569,6 +572,14 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         Error<ExecutorException>("Simple Aggregate without aggregate expression.");
     }
 
+    SizeT input_block_count = input_blocks.size();
+
+    if (input_block_count == 0) {
+        // No input data
+        LOG_TRACE("No input, no aggregate result");
+        return true;
+    }
+
     // Prepare the output table columns
     Vector<SharedPtr<ColumnDef>> aggregate_columns;
     aggregate_columns.reserve(aggregates_count);
@@ -580,8 +591,6 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
     // Prepare the output block
     Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(aggregates_count);
-
-    SizeT input_block_count = input_blocks.size();
 
     for (i64 idx = 0; auto &expr : aggregates_) {
         // expression state
@@ -597,12 +606,6 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         output_types.emplace_back(output_type);
 
         ++idx;
-    }
-
-    if (input_block_count == 0) {
-        // No input data
-        LOG_TRACE("No input, no aggregate result");
-        return true;
     }
 
     for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {

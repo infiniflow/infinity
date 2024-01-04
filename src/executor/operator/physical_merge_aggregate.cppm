@@ -57,34 +57,15 @@ public:
     }
 
     template <typename T>
-    T GetDataFromValueAtInputBlockPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
-
-    template <typename T>
-    T GetDataFromValueAtOutputBlockPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
-
-    void WriteIntegerAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, IntegerT integer);
-
-    template <typename T>
     T GetInputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
 
     template <typename T>
     T GetOutputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
 
     template <typename T>
-    T MinValue(T a, T b);
-
-    template <typename T>
-    T MaxValue(T a, T b);
-
-    template <typename T>
-    T AddData(T a, T b);
-
-    template <typename T>
     using MathOperation = StdFunction<T(T, T)>;
 
     void SimpleMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state);
-
-    void UpdateBlockData(MergeAggregateOperatorState *merge_aggregate_op_state, SizeT col_idx);
 
     template <typename T>
     void UpdateData(MergeAggregateOperatorState *op_state, MathOperation<T> operation, SizeT col_idx);
@@ -130,6 +111,16 @@ public:
     template <>
     Value CreateValue<FloatT>(FloatT value) {
         return Value::MakeFloat(value);
+    }
+
+    template <>
+    Value CreateValue<TinyIntT>(TinyIntT value) {
+        return Value::MakeTinyInt(value);
+    }
+
+    template <>
+    Value CreateValue<SmallIntT>(SmallIntT value) {
+        return Value::MakeSmallInt(value);
     }
 
 private:
