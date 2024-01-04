@@ -106,7 +106,7 @@ public:
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }
 
-    inline SizeT RowCount() const { return row_count_; }
+    inline SizeT row_count() const { return row_count_; }
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
 

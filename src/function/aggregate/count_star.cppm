@@ -14,31 +14,14 @@
 
 module;
 
-import wal;
-import blocking_queue;
-import bg_task;
 import stl;
 
-export module backgroud_process;
+export module count_star;
 
 namespace infinity {
 
-export class BGTaskProcessor {
-public:
-    explicit BGTaskProcessor(WalManager* wal_manager);
-    void Start();
-    void Stop();
+class NewCatalog;
 
-public:
-    void Submit(SharedPtr<BGTask> bg_task);
-
-private:
-    void Process();
-
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
-    Thread processor_thread_{};
-
-    WalManager* wal_manager_{};
-};
+export void RegisterCountStarFunction(const UniquePtr<NewCatalog> &catalog_ptr);
 
 }

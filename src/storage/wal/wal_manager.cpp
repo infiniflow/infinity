@@ -25,7 +25,6 @@ import third_party;
 import txn_manager;
 import txn;
 import storage;
-import wal_entry;
 import infinity_exception;
 
 import catalog;
@@ -41,7 +40,7 @@ import bg_task;
 import infinity_exception;
 // #include "statement/extra/extra_ddl_info.h"
 
-module wal_manager;
+module wal;
 
 namespace infinity {
 

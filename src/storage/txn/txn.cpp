@@ -22,7 +22,7 @@ import stl;
 import infinity_exception;
 
 import txn_manager;
-import wal_entry;
+import wal;
 import third_party;
 import logger;
 import data_block;

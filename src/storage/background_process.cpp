@@ -19,7 +19,7 @@ import bg_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
-import wal_manager;
+import wal;
 
 namespace infinity {
 

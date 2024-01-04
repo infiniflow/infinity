@@ -62,17 +62,17 @@ UniquePtr<String> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block)
 
     if (current_block->row_count() + input_block->row_count() > current_block->capacity()) {
         SizeT to_append = current_block->capacity() - current_block->row_count();
-        current_block->AppendWith(input_block, 0, to_append);
+        current_block->AppendWith(input_block.get(), 0, to_append);
         current_block->Finalize();
 
         blocks_.emplace_back(DataBlock::Make());
         blocks_.back()->Init(column_types);
         ++current_block_id_;
         current_block = blocks_[current_block_id_].get();
-        current_block->AppendWith(input_block, to_append, input_block->row_count() - to_append);
+        current_block->AppendWith(input_block.get(), to_append, input_block->row_count() - to_append);
     } else {
         SizeT to_append = input_block->row_count();
-        current_block->AppendWith(input_block, 0, to_append);
+        current_block->AppendWith(input_block.get(), 0, to_append);
     }
     current_block->Finalize();
 

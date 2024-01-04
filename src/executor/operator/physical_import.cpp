@@ -40,7 +40,8 @@ import third_party;
 import local_file_system;
 import defer_op;
 import txn_store;
-import wal_entry;
+import catalog;
+import wal;
 import file_system_type;
 import file_system;
 import buffer_handle;
@@ -282,7 +283,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         SaveSegmentData(txn_store, segment_entry);
     }
 
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_entry_->RowCount()));
+    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_entry_->row_count()));
     import_op_state->result_msg_ = Move(result_msg);
 }
 

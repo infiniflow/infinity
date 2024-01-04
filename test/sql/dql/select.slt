@@ -2,21 +2,75 @@ statement ok
 DROP TABLE IF EXISTS select1;
 
 statement ok
+DROP TABLE IF EXISTS select2;
+
+statement ok
+DROP TABLE IF EXISTS select3;
+
+statement ok
 CREATE TABLE select1 (id INTEGER PRIMARY KEY, name VARCHAR, age INTEGER);
 
 statement ok
 CREATE TABLE select2 (id INTEGER , age INTEGER);
+
+statement ok
+CREATE TABLE select3 (c1 INTEGER, c2 INTEGER, c3 INTEGER);
 
 # copy data from csv file
 query I
 COPY select2 FROM '/tmp/infinity/test_data/nation.csv' WITH ( DELIMITER ',' );
 ----
 
+statement ok
+INSERT INTO select3 VALUES(0,1,2),(3,4,5),(6,7,8);
+
 #query ITI
 #SELECT * FROM select1 ORDER by age ASC;
 #----
 #2 Jane 25
 #1 John 30
+
+query III
+SELECT * from select3;
+----
+0 1 2
+3 4 5
+6 7 8
+
+query III
+SELECT c1, c2, c3 from select3;
+----
+0 1 2
+3 4 5
+6 7 8
+
+query III
+SELECT c2, c3 from select3;
+----
+1 2
+4 5
+7 8
+
+query III
+SELECT c2 from select3;
+----
+1
+4
+7
+
+query III
+SELECT c3, c2, c1 from select3;
+----
+2 1 0
+5 4 3
+8 7 6
+
+query III
+SELECT c2, c1 from select3;
+----
+1 0
+4 3
+7 6
 
 statement ok
 DROP TABLE select1;

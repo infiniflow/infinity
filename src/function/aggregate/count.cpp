@@ -159,15 +159,16 @@ void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(count_function);
     }
     {
-//        AggregateFunction count_function =
-//            UnaryAggregate<CountState<PathT, BigIntT>, PathT, BigIntT>(func_name, DataType(LogicalType::kPath), DataType(LogicalType::kBigInt));
-//        function_set_ptr->AddFunction(count_function);
+        //        AggregateFunction count_function =
+        //            UnaryAggregate<CountState<PathT, BigIntT>, PathT, BigIntT>(func_name, DataType(LogicalType::kPath),
+        //            DataType(LogicalType::kBigInt));
+        //        function_set_ptr->AddFunction(count_function);
     }
     {
-//        AggregateFunction count_function = UnaryAggregate<CountState<PolygonT, BigIntT>, PolygonT, BigIntT>(func_name,
-//                                                                                                            DataType(LogicalType::kPolygon),
-//                                                                                                            DataType(LogicalType::kBigInt));
-//        function_set_ptr->AddFunction(count_function);
+        //        AggregateFunction count_function = UnaryAggregate<CountState<PolygonT, BigIntT>, PolygonT, BigIntT>(func_name,
+        //                                                                                                            DataType(LogicalType::kPolygon),
+        //                                                                                                            DataType(LogicalType::kBigInt));
+        //        function_set_ptr->AddFunction(count_function);
     }
     {
         AggregateFunction count_function =
@@ -175,9 +176,10 @@ void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(count_function);
     }
     {
-//        AggregateFunction count_function =
-//            UnaryAggregate<CountState<BitmapT, BigIntT>, BitmapT, BigIntT>(func_name, DataType(LogicalType::kBitmap), DataType(LogicalType::kBigInt));
-//        function_set_ptr->AddFunction(count_function);
+        //        AggregateFunction count_function =
+        //            UnaryAggregate<CountState<BitmapT, BigIntT>, BitmapT, BigIntT>(func_name, DataType(LogicalType::kBitmap),
+        //            DataType(LogicalType::kBigInt));
+        //        function_set_ptr->AddFunction(count_function);
     }
     {
         AggregateFunction count_function =
@@ -185,9 +187,10 @@ void RegisterCountFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(count_function);
     }
     {
-//        AggregateFunction count_function =
-//            UnaryAggregate<CountState<BlobT, BigIntT>, BlobT, BigIntT>(func_name, DataType(LogicalType::kBlob), DataType(LogicalType::kBigInt));
-//        function_set_ptr->AddFunction(count_function);
+        //        AggregateFunction count_function =
+        //            UnaryAggregate<CountState<BlobT, BigIntT>, BlobT, BigIntT>(func_name, DataType(LogicalType::kBlob),
+        //            DataType(LogicalType::kBigInt));
+        //        function_set_ptr->AddFunction(count_function);
     }
     {
         AggregateFunction count_function = UnaryAggregate<CountState<EmbeddingT, BigIntT>, EmbeddingT, BigIntT>(func_name,

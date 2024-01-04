@@ -23,7 +23,7 @@ import config;
 import stl;
 import buffer_manager;
 import default_values;
-import wal_manager;
+import wal;
 import catalog;
 import txn_manager;
 import builtin_functions;

@@ -16,6 +16,8 @@ module;
 
 #include <fstream>
 
+module wal;
+
 import stl;
 import serialize;
 import table_def;
@@ -26,9 +28,6 @@ import parser;
 import third_party;
 import index_def;
 import crc;
-import wal_entry;
-
-module wal_entry;
 
 namespace infinity {
 

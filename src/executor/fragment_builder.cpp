@@ -38,7 +38,7 @@ UniquePtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op
     auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
     plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
     BuildFragments(phys_op, plan_fragment.get());
-    if (plan_fragment->GetSourceNode() != nullptr) {
+    if (plan_fragment->GetSourceNode() == nullptr) {
         plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
     }
     return plan_fragment;

@@ -42,11 +42,6 @@ public:
           block_index_(Move(block_index)), column_names_(Move(column_names)), column_types_(Move(column_types)), table_index_(table_index) {}
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
-         // OPT1212: linear judge in assert
-        if (!std::is_sorted(indices.cbegin(), indices.cend())) {
-            Error<PlannerException>("Indices must be in order");
-        }
-
         replace_field<SizeT>(column_ids_, indices);
         replace_field<String>(*column_names_, indices);
         replace_field<SharedPtr<DataType>>(*column_types_, indices);

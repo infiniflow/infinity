@@ -25,6 +25,7 @@ import hash_table;
 import base_expression;
 import load_meta;
 import infinity_exception;
+import data_block;
 
 export module physical_aggregate;
 
@@ -44,8 +45,8 @@ public:
                                Vector<SharedPtr<BaseExpression>> aggregates,
                                u64 aggregate_index,
                                SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id, load_metas), groups_(Move(groups)), aggregates_(Move(aggregates)),
-          groupby_index_(groupby_index), aggregate_index_(aggregate_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kAggregate, Move(left), nullptr, id, load_metas), groups_(Move(groups)),
+          aggregates_(Move(aggregates)), groupby_index_(groupby_index), aggregate_index_(aggregate_index) {}
 
     ~PhysicalAggregate() override = default;
 
@@ -66,9 +67,7 @@ public:
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    bool SimpleAggregate(SharedPtr<DataTable> &output_table,
-                                            OperatorState *pre_operator_state,
-                                            AggregateOperatorState *aggregate_operator_state);
+    bool SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 

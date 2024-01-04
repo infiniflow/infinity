@@ -25,3 +25,11 @@ Ben 33 1,2,3,4,5
 William 28 1,2,3,4,5
 Chuck 29 1,2,3,4,5
 Viola 35 1,2,3,4,5
+
+query III
+SELECT count(*) FROM test_jsonl;
+----
+14
+
+statement ok
+DROP TABLE IF EXISTS test_jsonl;

@@ -38,14 +38,14 @@ struct DivFunction {
         if (left == std::numeric_limits<TA>::min() && right == -1) {
             return false;
         }
-        result = left / right;
+        result = DoubleT(left) / DoubleT(right);
         return true;
     }
 };
 
 template <>
 inline bool DivFunction::Run(FloatT left, FloatT right, FloatT &result) {
-    result = left / right;
+    result = left / DoubleT(right);
     if (std::isnan(result) || std::isinf(result))
         return false;
     return true;
@@ -65,6 +65,12 @@ inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     return false;
 }
 
+template <>
+inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
+    Error<NotImplementException>("Not implement huge int divide operator.");
+    return false;
+}
+
 void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = "/";
 
@@ -72,38 +78,38 @@ void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     ScalarFunction div_function_int8(func_name,
                                      {DataType(LogicalType::kTinyInt), DataType(LogicalType::kTinyInt)},
-                                     {DataType(LogicalType::kTinyInt)},
-                                     &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, TinyIntT, DivFunction>);
+                                     {DataType(LogicalType::kDouble)},
+                                     &ScalarFunction::BinaryFunctionWithFailure<TinyIntT, TinyIntT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int8);
 
     ScalarFunction div_function_int16(func_name,
                                       {DataType(LogicalType::kSmallInt), DataType(LogicalType::kSmallInt)},
-                                      {DataType(LogicalType::kSmallInt)},
-                                      &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, SmallIntT, DivFunction>);
+                                      {DataType(LogicalType::kDouble)},
+                                      &ScalarFunction::BinaryFunctionWithFailure<SmallIntT, SmallIntT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int16);
 
     ScalarFunction div_function_int32(func_name,
                                       {DataType(LogicalType::kInteger), DataType(LogicalType::kInteger)},
-                                      {DataType(LogicalType::kInteger)},
-                                      &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, IntegerT, DivFunction>);
+                                      {DataType(LogicalType::kDouble)},
+                                      &ScalarFunction::BinaryFunctionWithFailure<IntegerT, IntegerT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int32);
 
     ScalarFunction div_function_int64(func_name,
                                       {DataType(LogicalType::kBigInt), DataType(LogicalType::kBigInt)},
-                                      {DataType(LogicalType::kBigInt)},
-                                      &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, BigIntT, DivFunction>);
+                                      {DataType(LogicalType::kDouble)},
+                                      &ScalarFunction::BinaryFunctionWithFailure<BigIntT, BigIntT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int64);
 
     ScalarFunction div_function_int128(func_name,
                                        {DataType(LogicalType::kHugeInt), DataType(LogicalType::kHugeInt)},
-                                       {DataType(LogicalType::kHugeInt)},
-                                       &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, HugeIntT, DivFunction>);
+                                       {DataType(LogicalType::kDouble)},
+                                       &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int128);
 
     ScalarFunction div_function_float(func_name,
                                       {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},
-                                      {DataType(LogicalType::kFloat)},
-                                      &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, FloatT, DivFunction>);
+                                      {DataType(LogicalType::kDouble)},
+                                      &ScalarFunction::BinaryFunctionWithFailure<FloatT, FloatT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_float);
 
     ScalarFunction div_function_double(func_name,

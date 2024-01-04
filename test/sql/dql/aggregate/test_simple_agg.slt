@@ -54,6 +54,165 @@ SELECT COUNT(c1) FROM simple_agg
 ----
 3
 
+query III
+SELECT SUM(c1)+SUM(c1) FROM simple_agg;
+----
+12
+
+query III
+SELECT MAX(c1)+SUM(c1) FROM simple_agg;
+----
+9
+
+query III
+SELECT MAX(c1)+SUM(c2) FROM simple_agg;
+----
+9.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18.000000
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18.000000
+
+query III
+SELECT MAX(c1)-SUM(c2) FROM simple_agg;
+----
+-3.000000
+
+query III
+SELECT MAX(c1)/SUM(c2) FROM simple_agg;
+----
+0.500000
+
+query III
+SELECT MAX(c1)/AVG(c2) FROM simple_agg;
+----
+1.500000
+
+query III
+SELECT MAX(c1)*AVG(c2) FROM simple_agg;
+----
+6.000000
+
+query IIII
+SELECT COUNT(*) FROM simple_agg;
+----
+3
+
 
 statement ok
 DROP TABLE simple_agg;
+
+
+statement ok
+CREATE TABLE simple_agg (c1 SMALLINT , c2 TINYINT);
+
+# insert data
+query I
+INSERT INTO simple_agg VALUES (1, 1),(2,2),(3,3);
+----
+
+query I
+SELECT SUM(c1) FROM simple_agg
+----
+6
+
+query II
+SELECT SUM(c2) FROM simple_agg
+----
+6
+
+query I
+SELECT AVG(c1) FROM simple_agg
+----
+2.000000
+
+query II
+SELECT AVG(c2) FROM simple_agg
+----
+2.000000
+
+query I
+SELECT MIN(c1) FROM simple_agg
+----
+1
+
+query II
+SELECT MIN(c2) FROM simple_agg
+----
+1
+
+query I
+SELECT MAX(c1) FROM simple_agg
+----
+3
+
+query II
+SELECT MAX(c2) FROM simple_agg
+----
+3
+
+query I
+SELECT COUNT(c1) FROM simple_agg
+----
+3
+
+query III
+SELECT SUM(c1)+SUM(c1) FROM simple_agg;
+----
+12
+
+query III
+SELECT MAX(c1)+SUM(c1) FROM simple_agg;
+----
+9
+
+query III
+SELECT MAX(c1)+SUM(c2) FROM simple_agg;
+----
+9
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18
+
+query III
+SELECT MAX(c1)*SUM(c2) FROM simple_agg;
+----
+18
+
+query III
+SELECT MAX(c1)-SUM(c2) FROM simple_agg;
+----
+-3
+
+query III
+SELECT MAX(c1)/SUM(c2) FROM simple_agg;
+----
+0.500000
+
+
+query III
+SELECT MAX(c1)/AVG(c2) FROM simple_agg;
+----
+1.500000
+
+query III
+SELECT MAX(c1)*AVG(c2) FROM simple_agg;
+----
+6.000000
+
+query IIII
+SELECT COUNT(*) FROM simple_agg;
+----
+3
+
+statement ok
+DROP TABLE simple_agg;
+

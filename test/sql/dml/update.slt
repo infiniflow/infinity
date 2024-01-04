@@ -23,6 +23,11 @@ SELECT * FROM products;
 5 6
 7 8
 
+query II
+SELECT count(*) FROM products;
+----
+4
+
 statement ok
 UPDATE products SET price=100 WHERE product_no = 3;
 
@@ -33,6 +38,12 @@ SELECT * FROM products;
 3 100
 5 6
 7 8
+
+query II
+SELECT count(*) FROM products;
+----
+4
+
 
 statement ok
 UPDATE products SET price=price+3 WHERE product_no = 1 OR product_no = 5;

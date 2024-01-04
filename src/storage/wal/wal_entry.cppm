@@ -16,7 +16,7 @@ module;
 
 #include <typeinfo>
 
-export module wal_entry;
+export module wal:wal_entry;
 
 import stl;
 import parser;

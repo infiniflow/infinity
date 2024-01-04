@@ -14,5 +14,5 @@
 
 export module wal;
 
-export import wal_entry;
-export import wal_manager;
+export import :wal_entry;
+export import :wal_manager;

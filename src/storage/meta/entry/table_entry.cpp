@@ -295,7 +295,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
         segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
         row_count += block_row_hashmap.size();
     }
-    this->row_count_ += row_count;
+    this->row_count_ -= row_count;
 }
 
 Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
@@ -323,7 +323,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     }
 
     UniqueLock<RWMutex> rw_locker(this->rw_locker_);
-    this->row_count_ += row_count;
+    this->row_count_ = row_count;
     this->segment_map_.emplace(segment->segment_id_, Move(segment));
     return Status::OK();
 }
