@@ -40,6 +40,14 @@ void log_m256(const __m256i &value) {
     std::cout << "]" << std::endl;
 }
 
+export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    int32_t res = 0;
+    for (size_t i = 0; i < dim; i++) {
+        res += (int16_t)(pv1[i]) * pv2[i];
+    }
+    return res;
+}
+
 #if defined(USE_AVX512)
 export int32_t I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim64 = dim >> 6;
@@ -65,6 +73,10 @@ export int32_t I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 
     // Reduce add
     return _mm512_reduce_add_epi32(sum);
+}
+
+export int32_t I8IPAVX512Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8IPAVX512(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
@@ -98,17 +110,23 @@ export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     // Extract the result
     return _mm256_extract_epi32(sum, 0) + _mm256_extract_epi32(sum, 4);
 }
+
+export int32_t I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8IPAVX(pv1, pv2, dim) + I8IPBF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
+}
+
 #endif
 
-export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    int32_t res = 0;
+//------------------------------//------------------------------//------------------------------
+
+export float F32L2BF(const float *pv1, const float *pv2, size_t dim) {
+    float res = 0;
     for (size_t i = 0; i < dim; i++) {
-        res += (int16_t)(pv1[i]) * pv2[i];
+        float t = pv1[i] - pv2[i];
+        res += t * t;
     }
     return res;
 }
-
-//------------------------------//------------------------------//------------------------------
 
 #if defined(USE_AVX512)
 
@@ -136,6 +154,10 @@ export float F32L2AVX512(const float *pv1, const float *pv2, size_t dim) {
                 TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + TmpRes[15];
 
     return (res);
+}
+
+export float F32L2AVX512Residual(const float *pv1, const float *pv2, size_t dim) {
+    return F32L2AVX512(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 
 #endif
@@ -171,18 +193,22 @@ export float F32L2AVX(const float *pv1, const float *pv2, size_t dim) {
     return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7];
 }
 
+export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
+    return F32L2AVX(pv1, pv2, dim) + F32L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
+}
+
 #endif
 
-export float F32L2BF(const float *pv1, const float *pv2, size_t dim) {
+//------------------------------//------------------------------//------------------------------
+
+export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
     float res = 0;
     for (size_t i = 0; i < dim; i++) {
-        float t = pv1[i] - pv2[i];
-        res += t * t;
+        res += pv1[i] * pv2[i];
     }
     return res;
 }
 
-//------------------------------//------------------------------//------------------------------
 #if defined(USE_AVX512)
 
 export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
@@ -209,6 +235,10 @@ export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
                 TmpRes[11] + TmpRes[12] + TmpRes[13] + TmpRes[14] + TmpRes[15];
 
     return sum;
+}
+
+export float F32IPAVX512Residual(const float *pVect1, const float *pVect2, SizeT qty) {
+    return F32IPAVX512(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
 
 #endif
@@ -246,14 +276,10 @@ export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
     return sum;
 }
 
-#endif
-
-export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
-    float res = 0;
-    for (size_t i = 0; i < dim; i++) {
-        res += pv1[i] * pv2[i];
-    }
-    return res;
+export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qty) {
+    return F32IPAVX(pVect1, pVect2, qty) + F32IPBF(pVect1 + (qty & ~15), pVect2 + (qty & ~15), qty & 15);
 }
+
+#endif
 
 } // namespace infinity
