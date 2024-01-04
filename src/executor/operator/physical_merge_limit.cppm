@@ -16,9 +16,11 @@ module;
 
 import stl;
 import parser;
+import base_expression;
 import query_context;
 import operator_state;
 import physical_operator;
+import physical_limit;
 import physical_operator_type;
 import load_meta;
 import infinity_exception;
@@ -29,12 +31,11 @@ namespace infinity {
 
 export class PhysicalMergeLimit final : public PhysicalOperator {
 public:
-    explicit PhysicalMergeLimit(SharedPtr<Vector<String>> output_names,
-                                SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                u64 id,
-                                SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeLimit, nullptr, nullptr, id, load_metas), output_names_(Move(output_names)),
-          output_types_(Move(output_types)) {}
+    explicit PhysicalMergeLimit(u64 id,
+                                UniquePtr<PhysicalOperator> left,
+                                SharedPtr<BaseExpression> limit_expr,
+                                SharedPtr<BaseExpression> offset_expr,
+                                SharedPtr<Vector<LoadMeta>> load_metas);
 
     ~PhysicalMergeLimit() override = default;
 
@@ -42,9 +43,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
     SizeT TaskletCount() override {
         Error<NotImplementException>("TaskletCount not Implement");
@@ -52,8 +53,10 @@ public:
     }
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    SharedPtr<BaseExpression> limit_expr_{};
+    SharedPtr<BaseExpression> offset_expr_{};
+
+    UniquePtr<LimitCounter> counter_{};
 };
 
 } // namespace infinity

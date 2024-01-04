@@ -6,24 +6,26 @@ import argparse
 
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 9000
-    sort_dir = "./test/data/csv"
+    limit = 8500
+    offset = 20
+    limit_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql"
 
-    table_name = "test_sort"
-    sort_path = sort_dir + "/test_sort.csv"
-    slt_path = slt_dir + "/sort.slt"
-    copy_path = copy_dir + "/test_sort.csv"
+    table_name = "test_big_limit"
+    limit_path = limit_dir + "/test_big_limit.csv"
+    slt_path = slt_dir + "/big_limit.slt"
+    copy_path = copy_dir + "/test_big_limit.csv"
 
-    os.makedirs(sort_dir, exist_ok=True)
+    os.makedirs(limit_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(sort_path) and os.path.exists(slt_path) and generate_if_exists:
+    if os.path.exists(limit_path) and os.path.exists(slt_path) and generate_if_exists:
         print(
             "File {} and {} already existed exists. Skip Generating.".format(
-                slt_path, sort_path
+                slt_path, limit_path
             )
         )
         return
-    with open(sort_path, "w") as sort_file, open(slt_path, "w") as slt_file:
+    with open(limit_path, "w") as limit_file, open(slt_path, "w") as slt_file:
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
         slt_file.write("\n")
@@ -41,16 +43,15 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         slt_file.write("\n")
         slt_file.write("query I\n")
-        slt_file.write("SELECT * FROM {} order by c1, c2;\n".format(table_name))
+        slt_file.write("SELECT * FROM {} limit {} offset {};\n".format(table_name, limit, offset))
         slt_file.write("----\n")
 
-        random_integers = np.random.randint(low=1, high=row_n, size=row_n)
+        for _ in range(row_n):
+            limit_file.write("0,0")
+            limit_file.write("\n")
 
-        for i in random_integers:
-            sort_file.write("0," + str(i))
-            sort_file.write("\n")
-        for i in sorted(random_integers):
-            slt_file.write("0 " + str(i))
+        for _ in range(limit):
+            slt_file.write("0 0")
             slt_file.write("\n")
 
         slt_file.write("\n")
@@ -60,7 +61,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate sort data for test")
+    parser = argparse.ArgumentParser(description="Generate limit data for test")
 
     parser.add_argument(
         "-g",

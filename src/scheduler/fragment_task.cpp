@@ -100,7 +100,7 @@ void FragmentTask::OnExecute(i64) {
 
     if (execute_success or sink_state_->error_message_.get() != nullptr) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
-        sink_op->Execute(query_context, sink_state_.get());
+        sink_op->Execute(query_context, fragment_context, sink_state_.get());
     }
 }
 
