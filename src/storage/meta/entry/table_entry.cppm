@@ -65,7 +65,7 @@ private:
 
     void RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
-    void CreateIndexFile(void *txn_store, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr);
+    void CreateIndexFile(void *txn_store, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr, bool prepare);
 
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_);
 

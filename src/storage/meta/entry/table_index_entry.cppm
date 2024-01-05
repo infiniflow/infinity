@@ -24,6 +24,7 @@ import :base_entry;
 import stl;
 import index_def;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -61,6 +62,8 @@ public:
     inline const IndexDef *index_def() const { return index_def_.get(); }
     const SharedPtr<IrsIndexEntry> &irs_index_entry() const { return irs_index_entry_; }
     HashMap<u64, UniquePtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
+
+    Status CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);

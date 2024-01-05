@@ -24,6 +24,8 @@ import third_party;
 import buffer_obj;
 import parser;
 import index_file_worker;
+import status;
+import index_base;
 
 namespace infinity {
 
@@ -69,6 +71,8 @@ private:
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry>
     LoadIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
+
+    Status CreateIndexDo(IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx);
 
 private:
     const ColumnIndexEntry *column_index_entry_{};

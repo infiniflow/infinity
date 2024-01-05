@@ -269,8 +269,9 @@ void NewCatalog::CreateIndexFile(TableEntry *table_entry,
                                  void *txn_store,
                                  TableIndexEntry *table_index_entry,
                                  TxnTimeStamp begin_ts,
-                                 BufferManager *buffer_mgr) {
-    return table_entry->CreateIndexFile(txn_store, table_index_entry, begin_ts, buffer_mgr);
+                                 BufferManager *buffer_mgr,
+                                 bool prepare) {
+    return table_entry->CreateIndexFile(txn_store, table_index_entry, begin_ts, buffer_mgr, prepare);
 }
 
 Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr) {
@@ -314,15 +315,13 @@ u32 NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return TableEntry::G
 
 u32 NewCatalog::GetMaxSegmentID(const TableEntry *table_entry) { return TableEntry::GetMaxSegmentID(table_entry); }
 
-void NewCatalog::ImportSegment(TableEntry* table_entry, u32 segment_id, SharedPtr<SegmentEntry>& segment_entry) {
+void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
     table_entry->segment_map_.emplace(segment_id, Move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }
 
-void NewCatalog::IncreaseTableRowCount(TableEntry* table_entry, u64 increased_row_count) {
-    table_entry->row_count_ += increased_row_count;
-}
+void NewCatalog::IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count) { table_entry->row_count_ += increased_row_count; }
 
 SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
     // Transfer the function to upper case.

@@ -26,6 +26,14 @@ import infinity_exception;
 
 import index_file_worker;
 import status;
+import index_base;
+import index_hnsw;
+import hnsw_common;
+import dist_func_l2;
+import dist_func_ip;
+import hnsw_alg;
+import lvq_store;
+import plain_store;
 
 namespace infinity {
 SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferObj *buffer)
@@ -55,6 +63,95 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
 }
 
 BufferHandle SegmentColumnIndexEntry::GetIndex() { return buffer_->Load(); }
+
+Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
+    switch (index_base->index_type_) {
+        case IndexType::kHnsw: {
+            auto InsertHnswDo = [&](auto *hnsw_index, atomic_u64 &create_index_idx) {
+                SizeT vertex_n = hnsw_index->GetVertexNum();
+                while (true) {
+                    SizeT idx = create_index_idx.fetch_add(1);
+                    if (idx % 10000 == 0) {
+                        LOG_INFO(Format("Insert index: {}", idx));
+                    }
+                    if (idx >= vertex_n) {
+                        break;
+                    }
+                    hnsw_index->Build(idx);
+                }
+            };
+            auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                Error<StorageException>("HNSW supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+
+            BufferHandle buffer_handle = GetIndex();
+
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    switch (index_hnsw->encode_type_) {
+                        case HnswEncodeType::kPlain: {
+                            switch (index_hnsw->metric_type_) {
+                                case MetricType::kMerticInnerProduct: {
+                                    auto *hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainIPDist<float>> *>(buffer_handle.GetDataMut());
+                                    InsertHnswDo(hnsw_index, create_index_idx);
+                                    break;
+                                }
+                                case MetricType::kMerticL2: {
+                                    auto *hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainL2Dist<float>> *>(buffer_handle.GetDataMut());
+                                    InsertHnswDo(hnsw_index, create_index_idx);
+                                    break;
+                                }
+                                default: {
+                                    Error<StorageException>("Not implemented");
+                                }
+                            }
+                            break;
+                        }
+                        case HnswEncodeType::kLVQ: {
+                            switch (index_hnsw->metric_type_) {
+                                case MetricType::kMerticInnerProduct: {
+                                    auto *hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQIPCache<float, i8>>, LVQIPDist<float, i8>> *>(
+                                            buffer_handle.GetDataMut());
+                                    InsertHnswDo(hnsw_index, create_index_idx);
+                                    break;
+                                }
+                                case MetricType::kMerticL2: {
+                                    auto *hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQL2Cache<float, i8>>, LVQL2Dist<float, i8>> *>(
+                                            buffer_handle.GetDataMut());
+                                    InsertHnswDo(hnsw_index, create_index_idx);
+                                    break;
+                                }
+                                default: {
+                                    Error<StorageException>("Not implemented");
+                                }
+                            }
+                            break;
+                        }
+                        default: {
+                            Error<StorageException>("Not implemented");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    Error<StorageException>("Not implemented");
+                }
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    return Status::OK();
+}
 
 void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { Error<NotImplementException>("Not implemented"); }
 

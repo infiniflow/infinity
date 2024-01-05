@@ -47,6 +47,10 @@ public:
         replace_field<SharedPtr<DataType>>(*column_types_, indices);
     };
 
+    SharedPtr<String> schema_name() const { return table_entry_ptr_->GetDBName(); }
+
+    SharedPtr<String> table_name() const { return table_entry_ptr_->GetTableName(); }
+
     TableEntry *table_entry_ptr_{};
     Vector<SizeT> column_ids_{};
     SharedPtr<BlockIndex> block_index_{};
