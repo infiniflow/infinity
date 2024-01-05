@@ -38,8 +38,10 @@ import query_result;
 using namespace infinity;
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        std::cout << "import sift or gist" << std::endl;
+    if (argc < 2) {
+        std::cout << "import sift or gist, with optional test_data_path (default to /infinity/test/data in docker) and optional infinity path "
+                     "(default to /tmp/infinity)"
+                  << std::endl;
         return 1;
     }
     bool sift = true;
@@ -49,6 +51,9 @@ int main(int argc, char *argv[]) {
     sift = strcmp(argv[1], "sift") == 0;
 
     std::string data_path = "/tmp/infinity";
+    if (argc >= 4) {
+        data_path = std::string(argv[3]);
+    }
 
     LocalFileSystem fs;
     if (fs.Exists(data_path)) {
@@ -71,6 +76,9 @@ int main(int argc, char *argv[]) {
         // init column defs
         std::shared_ptr<DataType> col1_type = nullptr;
         std::string base_path = std::string(test_data_path());
+        if (argc >= 3) {
+            base_path = std::string(argv[2]);
+        }
         std::string table_name;
         if (sift) {
             col1_type = std::make_shared<DataType>(LogicalType::kEmbedding, std::make_shared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128));
