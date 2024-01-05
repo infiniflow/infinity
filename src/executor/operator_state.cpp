@@ -112,16 +112,6 @@ bool QueueSourceState::GetData() {
             merge_aggregate_op_state->input_complete_ = completed;
             break;
         }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *create_index_do_op_state = static_cast<CreateIndexDoOperatorState *>(next_op_state);
-            create_index_do_op_state->input_complete_ = completed;
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
-            create_index_finish_op_state->input_complete_ = completed;
-            break;
-        }
         default: {
             Error<ExecutorException>("Not support operator type");
             break;

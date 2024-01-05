@@ -338,6 +338,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(insert_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *create_index_prepare_output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(create_index_prepare_output_state->result_msg_);
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            auto *create_index_do_output_state = static_cast<CreateIndexDoOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(create_index_do_output_state->result_msg_);
+            break;
+        }
         default: {
             Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
@@ -362,38 +372,26 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         return;
     }
     SizeT output_data_block_count = task_operator_state->data_block_array_.size();
-    switch (task_operator_state->operator_type_) {
-        case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexDo: {
-            for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-                next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
-            }
-            break;
+    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
+        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+                                                      std::move(task_operator_state->data_block_array_[idx]),
+                                                      queue_sink_state->task_id_,
+                                                      idx,
+                                                      output_data_block_count);
+        if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
+            fragment_data->data_idx_ = None;
         }
-        default: {
-            for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-                auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
-                                                              std::move(task_operator_state->data_block_array_[idx]),
-                                                              queue_sink_state->task_id_,
-                                                              idx,
-                                                              output_data_block_count);
-                if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-                    fragment_data->data_idx_ = None;
-                }
 
-                for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-                    // when the Enqueue returns false,
-                    // it means that the downstream has collected enough data,
-                    // preventing the Queue from Enqueue in data again to avoid redundant calculations.
-                    if (!next_fragment_queue->Enqueue(fragment_data)) {
-                        task_operator_state->SetComplete();
-                    }
-                }
+        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+            // when the Enqueue returns false,
+            // it means that the downstream has collected enough data,
+            // preventing the Queue from Enqueue in data again to avoid redundant calculations.
+            if (!next_fragment_queue->Enqueue(fragment_data)) {
+                task_operator_state->SetComplete();
             }
-            task_operator_state->data_block_array_.clear();
-            break;
         }
     }
+    task_operator_state->data_block_array_.clear();
 }
 
 } // namespace infinity

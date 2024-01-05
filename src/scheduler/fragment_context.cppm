@@ -32,6 +32,13 @@ namespace infinity {
 
 class PlanFragment;
 
+enum class FragmentStatus {
+    kNotStart,
+    kStart,
+    kFinish,
+    kInvalid,
+};
+
 export enum class FragmentType {
     kInvalid,
     kSerialMaterialize,
@@ -39,26 +46,38 @@ export enum class FragmentType {
     kParallelStream,
 };
 
+export String FragmentType2String(FragmentType type) {
+    switch (type) {
+        case FragmentType::kInvalid:
+            return String("Invalid");
+        case FragmentType::kSerialMaterialize:
+            return String("SerialMaterialize");
+        case FragmentType::kParallelMaterialize:
+            return String("ParallelMaterialize");
+        case FragmentType::kParallelStream:
+            return String("ParallelStream");
+    }
+}
+
 export class FragmentContext {
 public:
-    static void
-    BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Vector<FragmentTask *> &tasks);
+    static void BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr);
 
 public:
     explicit FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context);
 
     virtual ~FragmentContext() = default;
 
-    inline void IncreaseTask() { task_n_.fetch_add(1); }
+    inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
-        if(!query_context_->is_enable_profiling()) {
-            return ;
+        if (!query_context_->is_enable_profiling()) {
+            return;
         }
         query_context_->FlushProfiler(std::move(profiler));
     }
 
-    void FinishTask();
+    void TryFinishFragment();
 
     Vector<PhysicalOperator *> &GetOperators();
 
@@ -70,19 +89,20 @@ public:
 
     inline Vector<UniquePtr<FragmentTask>> &Tasks() { return tasks_; }
 
-    [[nodiscard]] inline bool IsMaterialize() const { return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize; }
-
+    [[nodiscard]] inline bool IsMaterialize() const {
+        return fragment_type_ == FragmentType::kSerialMaterialize || fragment_type_ == FragmentType::kParallelMaterialize;
+    }
 
     inline SharedPtr<DataTable> GetResult() {
         std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return completed_; });
+        cv_.wait(lk, [&] { return fragment_status_ == FragmentStatus::kFinish; });
 
         return GetResultInternal();
     }
 
     inline void Complete() {
         std::unique_lock<std::mutex> lk(locker_);
-        completed_ = true;
+        fragment_status_ = FragmentStatus::kFinish;
         cv_.notify_one();
     }
 
@@ -93,6 +113,19 @@ public:
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
 private:
+    bool TryStartFragment() {
+        if (fragment_status_ != FragmentStatus::kNotStart) {
+            return false;
+        }
+        u64 unfinished_child = unfinished_child_n_.fetch_sub(1);
+        return unfinished_child == 1;
+    }
+
+    bool TryFinishFragmentInner() {
+        u64 unfinished_task = unfinished_task_n_.fetch_sub(1);
+        return unfinished_task == 1;
+    }
+
     void MakeSourceState(i64 parallel_count);
 
     void MakeSinkState(i64 parallel_count);
@@ -107,16 +140,18 @@ protected:
     std::condition_variable cv_{};
 
     PlanFragment *fragment_ptr_{};
-    //    HashMap<u64, UniquePtr<FragmentTask>> tasks_;
+
+    QueryContext *query_context_{};
+
     Vector<UniquePtr<FragmentTask>> tasks_{};
 
-    bool finish_building_{false};
-    bool completed_{false};
-    i64 finished_task_count_{};
     Vector<SharedPtr<DataBlock>> data_array_{};
 
     FragmentType fragment_type_{FragmentType::kInvalid};
-    QueryContext *query_context_{};
+    FragmentStatus fragment_status_{FragmentStatus::kInvalid};
+
+    atomic_u64 unfinished_task_n_{0};
+    atomic_u64 unfinished_child_n_{0};
 };
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {
