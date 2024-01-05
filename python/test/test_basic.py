@@ -15,12 +15,10 @@ import os
 
 import pandas as pd
 from numpy import dtype
-from sqlglot import condition
 
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
-from infinity.remote_thrift.table import traverse_conditions
 
 
 class TestCase:
@@ -49,13 +47,14 @@ class TestCase:
         infinity_obj = infinity.connect(REMOTE_HOST)
         assert infinity_obj
 
-        res = infinity_obj.create_database("")
-        assert not res.success
-        assert res.error_msg
+        try:
+            db = infinity_obj.create_database("")
+        except Exception as e:
+            assert str(e) == "Empty database name is given."
 
         assert infinity_obj.disconnect()
 
-    def test_infinity_thrift(self):
+    def test_basic(self):
         """
         target: test basic operation
         method:
@@ -160,8 +159,8 @@ class TestCase:
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
 
-            parent_dir = os.path.dirname(os.path.dirname(os.getcwd()))
-            test_csv_dir = parent_dir + "/test/data/csv/embedding_int_dim3.csv"
+            test_dir = "/tmp/infinity/test_data/"
+            test_csv_dir = test_dir + "embedding_int_dim3.csv"
             assert os.path.exists(test_csv_dir)
 
             res = table_obj.import_data(test_csv_dir, None)
@@ -177,14 +176,3 @@ class TestCase:
             # disconnect
             res = infinity_obj.disconnect()
             assert res.success
-
-    def test_traverse_conditions(self):
-        res = traverse_conditions(condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
-        print(res)
-        res = traverse_conditions(condition("c1 = 1"))
-        print(res)
-        res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
-        print(res)
-        res = traverse_conditions(
-            condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
-        print(res)

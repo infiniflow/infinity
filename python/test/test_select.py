@@ -25,7 +25,7 @@ class TestSelect:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_infinity_select(self):
+    def test_select(self):
         """
         target: test table select apis
         method:

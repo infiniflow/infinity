@@ -44,8 +44,7 @@ mv gist/gist_groundtruth.ivecs test/data/benchmark/gist_1m/gist_groundtruth.ivec
 cd python
 
 pip install -r requirements.txt
-python setup.py bdist_wheel
-pip install dist/infinity_sdk-0.1.0.dev1-py3-none-any.whl
+pip install .
 ```
 
 ## Import the Benchmark datasets
@@ -57,8 +56,8 @@ cd benchmark
 #   -h, --help            show this help message and exit
 #   -d DATA_SET, --data DATA_SET
 
-python remote_benchmark_import.py -d sift_1m
-python remote_benchmark_import.py -d gist_1m
+python remote_benchmark_knn_import.py -d sift_1m
+python remote_benchmark_knn_import.py -d gist_1m
 ```
 
 ## Run Benchmark
@@ -73,9 +72,9 @@ python remote_benchmark_import.py -d gist_1m
 # ROUNDS indicates the number of times Python executes the benchmark, and the result represents the average duration for each run.
 
 # Perform a benchmark on the SIFT1M dataset using a single thread, running it only once.
-python remote_benchmark.py -t 1 -r 1 -d sift_1m
+python remote_benchmark_knn.py -t 1 -r 1 -d sift_1m
 # Perform a benchmark on the GIST1M dataset using a single thread, running it only once.
-python remote_benchmark.py -t 1 -r 1 -d gist_1m
+python remote_benchmark_knn -t 1 -r 1 -d gist_1m
 ```
 ## A SIFT1M Benchmark report
 

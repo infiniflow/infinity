@@ -1,6 +1,7 @@
 import argparse
 import os
 from shutil import copyfile
+import subprocess
 
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
@@ -13,7 +14,13 @@ def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
     os.system(f"pip install infinity_sdk")
-    os.system(f"python -m pytest {python_test_dir}/test")
+    print("start pysdk test...")
+    process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+    output, error = process.stdout, process.stderr
+    print(output.decode())
+    if process.returncode != 0:
+        raise Exception(f"An error occurred: {error.decode()}")  # Raises an exception with the error message.
 
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
@@ -25,7 +32,12 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
     for dirpath, dirnames, filenames in os.walk(slt_dir):
         for filename in filenames:
             file = os.path.join(dirpath, filename)
-            os.system(sqllogictest_bin + " " + file)
+            process = subprocess.run([sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, error = process.stdout, process.stderr
+            if process.returncode != 0:
+                raise Exception(f"An error occurred: {error.decode()}")  # Prints the error message.
+            else:
+                print(f"Output: {output.decode()}")  # Prints the output.
             print("Finished running test file: " + file)
             print("-" * 100)
             test_cnt += 1
