@@ -15,7 +15,7 @@ def main():
         last_line = f.readlines()[-1]
     print()
     print("last line from log:", last_line)
-    result = float(last_line.split(' ')[-1])
+    result = float(last_line.split(' ')[-2])
     print("average time:", result, 's')
     print("required time:", standard, 's')
     print()
