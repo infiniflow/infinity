@@ -692,7 +692,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop: {
             if (fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -706,6 +705,22 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
                 auto sink_state = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), task_id);
                 sink_state->column_types_ = last_operator->GetOutputTypes();
                 sink_state->column_names_ = last_operator->GetOutputNames();
+
+                tasks_[task_id]->sink_state_ = Move(sink_state);
+            }
+            break;
+        }
+        case PhysicalOperatorType::kLimit: {
+            if (fragment_type_ != FragmentType::kParallelStream) {
+                Error<SchedulerException>(Format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            if ((i64)tasks_.size() != parallel_count) {
+                Error<SchedulerException>(Format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+
+            for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
+                auto sink_state = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
 
                 tasks_[task_id]->sink_state_ = Move(sink_state);
             }
