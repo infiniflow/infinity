@@ -121,7 +121,7 @@ private:
     void Init();
 
 public:
-    KnnScanSharedData* shared_data_;
+    KnnScanSharedData* knn_scan_shared_data_;
     const u32 task_id_;
 
     UniquePtr<MergeKnnBase> merge_knn_base_{};

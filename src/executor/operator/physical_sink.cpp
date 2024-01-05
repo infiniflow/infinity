@@ -128,19 +128,6 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
-        case PhysicalOperatorType::kKnnScan: {
-            throw ExecutorException("KnnScan shouldn't be here");
-            KnnScanOperatorState *knn_output_state = static_cast<KnnScanOperatorState *>(task_op_state);
-            if (knn_output_state->data_block_array_.empty()) {
-                Error<ExecutorException>("Empty knn scan output");
-            }
-
-            for (auto &data_block : knn_output_state->data_block_array_) {
-                materialize_sink_state->data_block_array_.emplace_back(Move(data_block));
-            }
-            knn_output_state->data_block_array_.clear();
-            break;
-        }
         case PhysicalOperatorType::kAggregate: {
             AggregateOperatorState *agg_output_state = static_cast<AggregateOperatorState *>(task_op_state);
             if (agg_output_state->data_block_array_.empty()) {
@@ -322,6 +309,17 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             }
             break;
         }
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
+            if (output_state->error_message_.get() != nullptr) {
+                result_sink_state->error_message_ = Move(output_state->error_message_);
+                break;
+            }
+            result_sink_state->result_def_ = {
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+            };
+            break;
+        }
         default: {
             Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
@@ -347,7 +345,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
     }
 }
 
-void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_context, QueueSinkState *queue_sink_state, OperatorState *task_operator_state) {
+void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_context,
+                                                      QueueSinkState *queue_sink_state,
+                                                      OperatorState *task_operator_state) {
     if (queue_sink_state->error_message_.get() != nullptr) {
         LOG_TRACE(Format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
         auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
@@ -362,33 +362,38 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         return;
     }
     SizeT output_data_block_count = task_operator_state->data_block_array_.size();
-    if (output_data_block_count == 0) {
-        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-            next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
-        }
-        return;
-        // Error<ExecutorException>("No output from last operator.");
-    }
-    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
-                                                      Move(task_operator_state->data_block_array_[idx]),
-                                                      queue_sink_state->task_id_,
-                                                      idx,
-                                                      output_data_block_count);
-        if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-            fragment_data->data_idx_ = None;
-        }
-
-        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-            // when the Enqueue returns false,
-            // it means that the downstream has collected enough data,
-            // preventing the Queue from Enqueue in data again to avoid redundant calculations.
-            if (!next_fragment_queue->Enqueue(fragment_data)) {
-                task_operator_state->SetComplete();
+    switch (task_operator_state->operator_type_) {
+        case PhysicalOperatorType::kCreateIndexPrepare:
+        case PhysicalOperatorType::kCreateIndexDo: {
+            for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+                next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
             }
+            break;
+        }
+        default: {
+            for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
+                auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+                                                              Move(task_operator_state->data_block_array_[idx]),
+                                                              queue_sink_state->task_id_,
+                                                              idx,
+                                                              output_data_block_count);
+                if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
+                    fragment_data->data_idx_ = None;
+                }
+
+                for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+                    // when the Enqueue returns false,
+                    // it means that the downstream has collected enough data,
+                    // preventing the Queue from Enqueue in data again to avoid redundant calculations.
+                    if (!next_fragment_queue->Enqueue(fragment_data)) {
+                        task_operator_state->SetComplete();
+                    }
+                }
+            }
+            task_operator_state->data_block_array_.clear();
+            break;
         }
     }
-    task_operator_state->data_block_array_.clear();
 }
 
 } // namespace infinity
