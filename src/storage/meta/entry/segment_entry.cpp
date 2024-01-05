@@ -151,27 +151,12 @@ void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<
     }
 }
 
-template <typename DataType>
-class OneColumnIterator {
-public:
-    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
-
-    Optional<const DataType *> Next() {
-        if (auto ret = segment_iter_.Next(); ret) {
-            return reinterpret_cast<const DataType *>((*ret)[0]);
-        }
-        return None;
-    }
-
-private:
-    SegmentIter segment_iter_;
-};
-
 SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                                  SharedPtr<ColumnDef> column_def,
                                                                  TxnTimeStamp create_ts,
                                                                  BufferManager *buffer_mgr,
-                                                                 TxnTableStore *txn_store) {
+                                                                 TxnTableStore *txn_store,
+                                                                 bool prepare) {
     u64 column_id = column_def->id();
     //    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
     const IndexBase *index_base = column_index_entry->index_base_ptr();
@@ -237,7 +222,11 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
                     segment_offset += DEFAULT_BLOCK_CAPACITY;
                 }
                 OneColumnIterator<float> one_column_iter(this, column_id);
-                hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
+                if (!prepare) {
+                    hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
+                } else {
+                    hnsw_index->StoreData(one_column_iter, row_ids.data(), row_ids.size());
+                }
             };
             switch (embedding_info->Type()) {
                 case kElemFloat: {

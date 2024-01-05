@@ -107,9 +107,19 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeAggregate: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
-            //merge_aggregate_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
+            // merge_aggregate_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
             merge_aggregate_op_state->input_data_block_ = Move(fragment_data->data_block_);
             merge_aggregate_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            auto *create_index_do_op_state = static_cast<CreateIndexDoOperatorState *>(next_op_state);
+            create_index_do_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
+            create_index_finish_op_state->input_complete_ = completed;
             break;
         }
         default: {

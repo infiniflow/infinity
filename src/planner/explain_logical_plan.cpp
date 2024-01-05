@@ -310,12 +310,12 @@ void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPt
     }
 
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name();
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->base_table_ref()->schema_name();
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name();
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->base_table_ref()->table_name();
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 

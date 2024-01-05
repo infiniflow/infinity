@@ -98,7 +98,8 @@ protected:
                                                        SharedPtr<ColumnDef> column_def,
                                                        TxnTimeStamp create_ts,
                                                        BufferManager *buffer_mgr,
-                                                       TxnTableStore *txn_store);
+                                                       TxnTableStore *txn_store,
+                                                       bool prepare);
 
     void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16 start_pos, u16 row_count);
 

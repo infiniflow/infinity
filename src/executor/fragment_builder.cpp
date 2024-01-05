@@ -229,8 +229,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(Format("{} shouldn't have child.", phys_op->GetName()));
             }
-            PhysicalKnnScan* knn_scan = static_cast<PhysicalKnnScan*>(phys_op);
-            if(knn_scan->TaskCount() == 1) {
+            PhysicalKnnScan *knn_scan = static_cast<PhysicalKnnScan *>(phys_op);
+            if (knn_scan->TaskCount() == 1) {
                 current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             } else {
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
@@ -260,6 +260,51 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
                 BuildFragments(phys_op->left(), current_fragment_ptr);
             }
+            return;
+        }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            if (phys_op->left() != nullptr || phys_op->right() != nullptr) {
+                Error<SchedulerException>(Format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            return;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
+                Error<SchedulerException>(Format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+
+            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+            next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                            SinkType::kLocalQueue,
+                                            phys_op->left()->GetOutputNames(),
+                                            phys_op->left()->GetOutputTypes());
+            BuildFragments(phys_op->left(), next_plan_fragment.get());
+
+            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            return;
+        }
+        case PhysicalOperatorType::kCreateIndexFinish: {
+            if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
+                Error<SchedulerException>(Format("Invalid input node of {}", phys_op->GetName()));
+            }
+            current_fragment_ptr->AddOperator(phys_op);
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+
+            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+            next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                            SinkType::kLocalQueue,
+                                            phys_op->left()->GetOutputNames(),
+                                            phys_op->left()->GetOutputTypes());
+            BuildFragments(phys_op->left(), next_plan_fragment.get());
+
+            current_fragment_ptr->AddChild(Move(next_plan_fragment));
             return;
         }
         default: {

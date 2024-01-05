@@ -25,6 +25,7 @@ import index_base;
 import third_party;
 import index_base;
 import index_file_worker;
+import status;
 
 namespace infinity {
 
@@ -69,6 +70,8 @@ public:
     UniquePtr<IndexFileWorker> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
 private:
+    Status CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes);
+
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
     void CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry);
     static String IndexFileName(const String &index_name, u32 segment_id);

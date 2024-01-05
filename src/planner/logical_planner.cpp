@@ -66,6 +66,7 @@ import index_base;
 import index_ivfflat;
 import index_hnsw;
 import index_full_text;
+import base_table_ref;
 
 module logical_planner;
 
@@ -486,8 +487,11 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         index_def_ptr->index_array_.emplace_back(base_index_ptr);
     }
 
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
+
     auto logical_create_index_operator =
-        LogicalCreateIndex::Make(bind_context_ptr->GetNewLogicalNodeId(), schema_name, table_name, index_def_ptr, create_index_info->conflict_type_);
+        MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, index_def_ptr, create_index_info->conflict_type_);
 
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");
