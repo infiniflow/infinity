@@ -7,7 +7,7 @@ import sys
 
 
 def main():
-    benchmark_bars = {"sift_1": 2255.7, "sift_4": 869230.0}
+    benchmark_bars = {"sift_1": 2255.7, "sift_4": 869230.0, "sift_8": 1}
     benchmark_id = sys.argv[1]
     standard = benchmark_bars[benchmark_id]
     file_path = sys.argv[2]
