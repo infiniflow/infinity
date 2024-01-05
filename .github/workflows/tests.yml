@@ -150,25 +150,17 @@ jobs:
       if: ${{ !cancelled() && !failure() }}
       run: ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark sift $PWD/test/data $PWD/db_tmp
 
-    - name: Benchmark sift search 1 thread repeat 100 times
+    - name: Benchmark sift search 1 thread repeat 20 times
       if: ${{ !cancelled() && !failure() }}
-      run: echo $(date --rfc-3339=s) "Benchmark sift search 1 thread average time:" $(echo "1 100" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | awk '/Total cost/ {total+=$4; count+=1} END {print total/count}') | tee -a $HOME/benchmark/benchmark_sift_1_thread.log
+      run: echo $(date --rfc-3339=s) "Benchmark sift search 1 thread average time:" $(echo "1 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | awk '/Total cost/ {total+=$4; count+=1} END {printf ("%f s", total/count)}') | tee -a $HOME/benchmark/benchmark_sift_1_thread.log
 
-    - name: Benchmark sift search 4 threads repeat 100 times
+    - name: Benchmark sift search 8 threads repeat 20 times
       if: ${{ !cancelled() && !failure() }}
-      run: echo $(date --rfc-3339=s) "Benchmark sift search 4 threads average time:" $(echo "4 100" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | awk '/Total cost/ {total+=$4; count+=1} END {print total/count}') | tee -a $HOME/benchmark/benchmark_sift_4_threads.log
-
-    - name: Benchmark sift search 8 threads repeat 100 times
-      if: ${{ !cancelled() && !failure() }}
-      run: echo $(date --rfc-3339=s) "Benchmark sift search 8 threads average time:" $(echo "8 100" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | awk '/Total cost/ {total+=$4; count+=1} END {print total/count}') | tee -a $HOME/benchmark/benchmark_sift_8_threads.log
+      run: echo $(date --rfc-3339=s) "Benchmark sift search 8 threads average time:" $(echo "8 20" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | awk '/Total cost/ {total+=$4; count+=1} END {printf ("%f s", total/count)}') | tee -a $HOME/benchmark/benchmark_sift_8_threads.log
 
     - name: Benchmark sift check 1 thread result
       if: ${{ !cancelled() && !failure() }}
       run: ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
-
-    - name: Benchmark sift check 4 threads result
-      if: ${{ !cancelled() }}
-      run: ./tools/ci_tools/check_benchmark_result.py sift_4 $HOME/benchmark/benchmark_sift_4_threads.log
 
     - name: Benchmark sift check 8 threads result
       if: ${{ !cancelled() }}

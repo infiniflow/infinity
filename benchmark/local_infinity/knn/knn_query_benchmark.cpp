@@ -57,7 +57,7 @@ std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &di
     return data;
 }
 
-template <class Function>
+template <typename Function>
 inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
@@ -68,7 +68,7 @@ inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn
     }
 }
 
-template <class Function>
+template <typename Function>
 inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string &table_name) {
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    do {
+    for (size_t times = 0; times < total_times + 2; ++times) {
         std::cout << "--- Start to run search benchmark: " << std::endl;
         std::vector<std::vector<uint64_t>> query_results(query_count);
         for (auto &v : query_results) {
@@ -227,13 +227,17 @@ int main(int argc, char *argv[]) {
                     query_results[query_idx].emplace_back(data[i].ToUint64());
                 }
             }
-//            delete[] embedding_data_ptr;
         };
         BaseProfiler profiler;
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();
-        results.push_back(Format("Total cost : {}", profiler.ElapsedToString(1000)));
+        // skip 2 warm up loops
+        if (times >= 2) {
+            auto elapsed_ns = profiler.Elapsed();
+            auto elapsed_s = elapsed_ns / (1'000'000'000.0);
+            results.push_back(Format("Total cost : {} s", elapsed_s));
+        }
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
             for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
@@ -257,7 +261,7 @@ int main(int argc, char *argv[]) {
             results.push_back(Format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
             results.push_back(Format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
         }
-    } while (--total_times);
+    }
 
     std::cout << ">>> Query Benchmark End <<<" << std::endl;
     for (const auto &item : results) {

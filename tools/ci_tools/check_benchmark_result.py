@@ -7,7 +7,7 @@ import sys
 
 
 def main():
-    benchmark_bars = {"sift_1": 2255.7, "sift_4": 869230.0, "sift_8": 1}
+    benchmark_bars = {"sift_1": 2.256, "sift_4": 0.869, "sift_8": 0.501}
     benchmark_id = sys.argv[1]
     standard = benchmark_bars[benchmark_id]
     file_path = sys.argv[2]
@@ -16,8 +16,8 @@ def main():
     print()
     print("last line from log:", last_line)
     result = float(last_line.split(' ')[-1])
-    print("average time:", result)
-    print("required time:", standard)
+    print("average time:", result, 's')
+    print("required time:", standard, 's')
     print()
     difference_percentage = 100 * (result - standard) / standard
     print("difference percentage: {:.2f}%".format(difference_percentage))
