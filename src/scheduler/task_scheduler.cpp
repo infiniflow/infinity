@@ -72,6 +72,19 @@ void TaskScheduler::UnInit() {
     }
 }
 
+u64 TaskScheduler::FindLeastWorkloadWorker() {
+    u64 min_workload = worker_workloads_[0];
+    u64 min_workload_worker_id = 0;
+    for (u64 worker_id = 1; worker_id < worker_count_ && min_workload; ++worker_id) {
+        if (worker_workloads_[worker_id] < min_workload) {
+            min_workload = worker_workloads_[worker_id];
+            min_workload_worker_id = worker_id;
+        }
+    }
+    return min_workload_worker_id;
+}
+
+
 Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
     Vector<PlanFragment *> leaf_fragments;
     StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
@@ -95,10 +108,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     }
 
     Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
-    if (worker_workloads_[0] == 0) {
-        last_cpu_id_ = 0; // FIXME
-    }
-    u64 &worker_id = last_cpu_id_;
     for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
@@ -106,9 +115,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
             if (!task->TryIntoWorkerLoop()) {
                 Error<SchedulerException>("Task can't be scheduled");
             }
+            u64 worker_id = FindLeastWorkloadWorker();
             ScheduleTask(task.get(), worker_id);
-            ++worker_id;
-            worker_id %= worker_count_;
         }
     }
 }
@@ -121,13 +129,10 @@ void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
             task_ptrs.emplace_back(task.get());
         }
     }
-    // last_cpu_id_ = 0; // FIXME
-    u64 &worker_id = last_cpu_id_;
     for (auto *task_ptr : task_ptrs) {
         if (task_ptr->LastWorkerID() == -1) {
+            u64 worker_id = FindLeastWorkloadWorker();
             ScheduleTask(task_ptr, worker_id);
-            ++worker_id;
-            worker_id %= worker_count_;
         } else {
             ScheduleTask(task_ptr, task_ptr->LastWorkerID());
         }

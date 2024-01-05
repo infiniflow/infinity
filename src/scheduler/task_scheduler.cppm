@@ -55,6 +55,8 @@ public:
     void DumpPlanFragment(PlanFragment *plan_fragment);
 
 private:
+    u64 FindLeastWorkloadWorker();
+
     Vector<PlanFragment *> GetStartFragments(PlanFragment* plan_fragment);
 
     void ScheduleTask(FragmentTask *task, u64 worker_id);
@@ -62,8 +64,6 @@ private:
     void WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id);
 
 private:
-    u64 last_cpu_id_{0};
-
     bool initialized_{false};
 
     Vector<Worker> worker_array_{};
