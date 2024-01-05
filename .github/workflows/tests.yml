@@ -13,8 +13,73 @@ on:
       - '*.md'
 
 jobs:
-  tests:
-    name: tests
+  debug_tests:
+    name: debug_tests
+    # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
+    # https://github.com/orgs/community/discussions/26261
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+    runs-on: [ "self-hosted" ]
+    steps:
+      # https://github.com/hmarr/debug-action
+      #- uses: hmarr/debug-action@v2
+
+      - name: Show PR labels
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          echo "Workflow triggered by ${{ github.event_name }}"
+          if [[ ${{ github.event_name }} == 'pull_request' ]]; then
+            echo "PR labels: ${{ join(github.event.pull_request.labels.*.name, ', ') }}"
+          fi
+
+      - name: Ensure workspace ownership
+        if: ${{ !cancelled() && !failure() }}
+        run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
+
+      - name: Check out code
+        if: ${{ !cancelled() && !failure() }}
+        uses: actions/checkout@v3
+        with:
+          ssh-key: ${{ secrets.MY_DEPLOY_KEY }}
+
+      - name: Start builder container
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
+
+      - name: Build debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
+
+      - name: Unit test debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/test_main"
+
+      - name: Install pysdk
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
+
+      - name: Start infinity debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+
+      - name: pysdk & sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+
+      - name: Stop infinity debug
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: sudo kill $(pidof cmake-build-debug/src/infinity)
+
+      - name: Collect infinity debug output
+        # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: cat debug.log 2>/dev/null || true
+
+  release_tests:
+    name: release_tests and benchmark
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
     # https://github.com/orgs/community/discussions/26261
     if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
@@ -46,37 +111,6 @@ jobs:
       run: |
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
         sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:ubuntu2310
-
-    - name: Build debug version
-      if: ${{ !cancelled() && !failure() }}
-      run: sudo docker exec infinity_build bash -c "cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
-
-    - name: Unit test debug version
-      if: ${{ !cancelled() && !failure() }}
-      run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-debug/src/test_main"
-
-    - name: Install pysdk
-      if: ${{ !cancelled() && !failure() }}
-      run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
-
-    - name: Start infinity debug version
-      if: ${{ !cancelled() && !failure() }}
-      run: |
-        # Run a command in the background
-        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
-
-    - name: pysdk & sqllogictest debug version
-      if: ${{ !cancelled() && !failure() }}
-      run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
-
-    - name: Stop infinity debug
-      if: ${{ !cancelled() }} # always run this step even if previous steps failed
-      run: sudo kill $(pidof cmake-build-debug/src/infinity)
-
-    - name: Collect infinity debug output
-      # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
-      if: ${{ !cancelled() }} # always run this step even if previous steps failed
-      run: cat debug.log 2>/dev/null || true
 
     - name: Build release version
       if: ${{ !cancelled() && !failure() }}
