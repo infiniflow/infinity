@@ -18,7 +18,9 @@ def python_skd_test(python_test_dir: str):
     process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
     output, error = process.stdout, process.stderr
+    print(output.decode())
     if process.returncode != 0:
+        print(f"Output: {error.decode()}")
         raise Exception(f"An error occurred: {error.decode()}")  # Raises an exception with the error message.
     else:
         print(f"Output: {output.decode()}")  # Prints the output.
