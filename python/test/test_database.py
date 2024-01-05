@@ -21,7 +21,7 @@ class TestDatabase:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_infinity_thrift(self):
+    def test_database(self):
         """
         target: test table apis
         method:

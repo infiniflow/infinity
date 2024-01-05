@@ -23,7 +23,7 @@ class TestUpdate:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_infinity_thrift(self):
+    def test_update(self):
         """
         target: test table update apis
         method:
