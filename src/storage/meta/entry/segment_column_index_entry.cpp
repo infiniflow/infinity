@@ -28,12 +28,7 @@ import index_file_worker;
 import status;
 import index_base;
 import index_hnsw;
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
+import knn;
 
 namespace infinity {
 SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferObj *buffer)
