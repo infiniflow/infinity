@@ -12,17 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import infinity
-from infinity.common import REMOTE_HOST
+from sqlglot import condition
+
+from infinity.remote_thrift.table import traverse_conditions
 
 
-class TestConnection:
-    def test_connect_and_disconnect_ok(self):
-        """
-        target: test connect and server ok
-        method: connect server
-        expected: ok
-        """
-        infinity_obj = infinity.connect(REMOTE_HOST)
-        assert infinity_obj
-        assert infinity_obj.disconnect()
+class TestCondition:
+
+    def test_traverse_conditions(self):
+        res = traverse_conditions(condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
+        print(res)
+        res = traverse_conditions(condition("c1 = 1"))
+        print(res)
+        res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
+        print(res)
+        res = traverse_conditions(
+            condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
+        print(res)

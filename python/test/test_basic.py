@@ -15,12 +15,10 @@ import os
 
 import pandas as pd
 from numpy import dtype
-from sqlglot import condition
 
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
-from infinity.remote_thrift.table import traverse_conditions
 
 
 class TestCase:
@@ -177,14 +175,3 @@ class TestCase:
             # disconnect
             res = infinity_obj.disconnect()
             assert res.success
-
-    def test_traverse_conditions(self):
-        res = traverse_conditions(condition("c1 > 1 and c2 < 2 or c3 = 3.3"))
-        print(res)
-        res = traverse_conditions(condition("c1 = 1"))
-        print(res)
-        res = traverse_conditions(condition("-8 < c1 and c1 <= -7"))
-        print(res)
-        res = traverse_conditions(
-            condition("(-7 < c1 or 9 <= c1) and (c1 = 3)"))
-        print(res)

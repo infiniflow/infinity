@@ -1,17 +1,9 @@
-# dependency
+# python-infinity
 
-## python
+# dependency
 
 ```shell
 pip install -r requirements.txt
-```
-
-## cpp
-
-### thrift
-
-```shell
-sudo apt-get install thrift-compiler
 ```
 
 # build
@@ -26,7 +18,9 @@ pip install dist/*.whl
 ```
 
 # upload
-twine upload dist/*  
+```shell
+twine upload dist/* 
+```
 # using
 
 ```python

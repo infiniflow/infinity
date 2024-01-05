@@ -23,7 +23,7 @@ class TestDelete:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_infinity_thrift(self):
+    def test_delete(self):
         """
         target: test table delete apis
         method:
