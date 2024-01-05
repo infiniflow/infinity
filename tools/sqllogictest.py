@@ -20,10 +20,7 @@ def python_skd_test(python_test_dir: str):
     output, error = process.stdout, process.stderr
     print(output.decode())
     if process.returncode != 0:
-        print(f"Output: {error.decode()}")
         raise Exception(f"An error occurred: {error.decode()}")  # Raises an exception with the error message.
-    else:
-        print(f"Output: {output.decode()}")  # Prints the output.
 
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
