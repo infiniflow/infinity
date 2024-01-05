@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         };
-        BaseProfiler profiler;
+        BaseProfiler profiler("ParallelFor");
         profiler.Begin();
         ParallelFor(0, query_count, thread_num, query_function, table_name);
         profiler.End();
