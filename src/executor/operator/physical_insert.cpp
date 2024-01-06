@@ -30,6 +30,7 @@ import expression_evaluator;
 import base_expression;
 
 import infinity_exception;
+import catalog;
 
 module physical_insert;
 

@@ -14,14 +14,19 @@
 
 module;
 
-import stl;
 #include <sstream>
-import column_binding;
-import parser;
-import base_expression;
+
+import stl;
 import logical_node_type;
-import default_values;
+import column_binding;
+import logical_node;
+import parser;
+import match_expression;
 import base_table_ref;
+import catalog;
+
+import base_expression;
+import default_values;
 
 module logical_table_scan;
 

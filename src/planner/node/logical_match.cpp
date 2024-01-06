@@ -24,6 +24,7 @@ import match_expression;
 import parser;
 import default_values;
 import third_party;
+import catalog;
 
 module logical_match;
 

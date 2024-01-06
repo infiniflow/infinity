@@ -23,12 +23,11 @@ import physical_operator_type;
 import base_expression;
 import load_meta;
 import infinity_exception;
+import catalog;
 
 export module physical_insert;
 
 namespace infinity {
-
-struct TableEntry;
 
 export class PhysicalInsert : public PhysicalOperator {
 public:

@@ -19,15 +19,14 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import fusion_expression;
+import match_expression;
+import base_table_ref;
+import catalog;
 
 export module logical_fusion;
 
 namespace infinity {
-
-class FusionExpression;
-class MatchExpression;
-class BaseTableRef;
-struct TableEntry;
 
 export class LogicalFusion : public LogicalNode {
 public:

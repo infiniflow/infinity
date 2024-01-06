@@ -17,11 +17,10 @@ module;
 import stl;
 import physical_operator;
 import logical_node;
+import query_context;
 
 export module physical_planner;
 namespace infinity {
-
-class QueryContext;
 
 export class PhysicalPlanner {
 public:

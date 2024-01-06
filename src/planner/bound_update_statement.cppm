@@ -26,10 +26,6 @@ export module bound_update_statement;
 
 namespace infinity {
 
-// class BindContext;
-// class QueryContext;
-// class BaseExpression;
-
 export struct BoundUpdateStatement final : public BoundStatement {
 public:
     static inline UniquePtr<BoundUpdateStatement> Make(SharedPtr<BindContext> bind_context) {

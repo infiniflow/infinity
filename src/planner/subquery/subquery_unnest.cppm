@@ -16,6 +16,10 @@ module;
 
 import stl;
 import column_binding;
+import logical_node;
+import base_expression;
+import subquery_expression;
+import column_expression;
 
 export module subquery_unnest;
 
@@ -23,10 +27,6 @@ namespace infinity {
 
 class QueryContext;
 class BindContext;
-class LogicalNode;
-class BaseExpression;
-class SubqueryExpression;
-class ColumnExpression;
 
 export class SubqueryUnnest {
 public:

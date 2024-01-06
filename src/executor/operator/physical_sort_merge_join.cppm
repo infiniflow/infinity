@@ -23,7 +23,7 @@ import physical_operator_type;
 import load_meta;
 import infinity_exception;
 
-export module physical_merge_join;
+export module physical_sort_merge_join;
 
 namespace infinity {
 

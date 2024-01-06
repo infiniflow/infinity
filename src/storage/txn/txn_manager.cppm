@@ -26,8 +26,6 @@ namespace infinity {
 
 using PutWalEntryFn = StdFunction<void(SharedPtr<WalEntry>)>;
 
-// class WalEntry;
-// class BufferManager;
 struct NewCatalog;
 
 export class TxnManager {

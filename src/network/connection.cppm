@@ -26,8 +26,6 @@ export module connection;
 
 namespace infinity {
 
-enum class ConnectionStatus : char { kIdle, kRunning, kSuspend, kTerminated };
-
 export class Connection {
 public:
     explicit Connection(AsioIOService &io_service);
