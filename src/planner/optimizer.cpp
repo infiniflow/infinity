@@ -23,6 +23,9 @@ import lazy_load;
 import parser;
 import explain_logical_plan;
 import optimizer_rule;
+import bound_delete_statement;
+import bound_update_statement;
+import logical_node;
 
 module optimizer;
 

@@ -32,12 +32,6 @@ export module physical_import;
 
 namespace infinity {
 
-// struct TableEntry;
-// class Txn;
-// struct SegmentEntry;
-// class ImportInputState;
-// class ImportOutputState;
-
 class ZxvParserCtx {
 public:
     ZsvParser parser_;

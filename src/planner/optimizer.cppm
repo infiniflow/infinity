@@ -16,12 +16,12 @@ module;
 
 import stl;
 import optimizer_rule;
+import logical_node;
 
 export module optimizer;
 
 namespace infinity {
 
-class LogicalNode;
 class QueryContext;
 
 export class Optimizer {

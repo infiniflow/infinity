@@ -19,14 +19,13 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import match_expression;
+import base_table_ref;
+import catalog;
 
 export module logical_match;
 
 namespace infinity {
-
-class MatchExpression;
-class BaseTableRef;
-struct TableEntry;
 
 export class LogicalMatch : public LogicalNode {
 public:

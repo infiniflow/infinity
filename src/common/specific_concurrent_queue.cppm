@@ -20,12 +20,11 @@ public:
     bool TryDequeue(T &item);
 };
 
-using PFV = Pair<float, i32>;
-using CMP = CompareByFirst<float, i32>;
-using FloatDistHeap = Heap<PFV, CMP>;
-template class SpecificConcurrentQueue<FloatDistHeap>;
+export using PFV = Pair<float, i32>;
+export using CMP = CompareByFirst<float, i32>;
+export using FloatDistHeap = Heap<PFV, CMP>;
 
-template class SpecificConcurrentQueue<BufferObj *>;
-
-template class SpecificConcurrentQueue<Vector<bool>>;
+export template class SpecificConcurrentQueue<FloatDistHeap>;
+export template class SpecificConcurrentQueue<BufferObj *>;
+export template class SpecificConcurrentQueue<Vector<bool>>;
 } // namespace infinity

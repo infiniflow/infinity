@@ -17,16 +17,19 @@ module;
 #include <memory>
 
 import stl;
-import parser;
-import base_expression;
-import query_context;
+import column_binding;
 import logical_node;
+import base_expression;
+import subquery_expression;
+import column_expression;
+
+import parser;
+import query_context;
 import bind_context;
 import expression_type;
 import value;
 import dependent_join_flattener;
 
-import subquery_expression;
 import value_expression;
 import function_expression;
 import aggregate_expression;
@@ -48,7 +51,6 @@ import bound_cast_func;
 import cast_table;
 
 import catalog;
-import column_binding;
 import third_party;
 
 import infinity_exception;

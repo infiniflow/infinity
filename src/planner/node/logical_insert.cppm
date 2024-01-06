@@ -20,12 +20,11 @@ import column_binding;
 import logical_node;
 import parser;
 import base_expression;
+import catalog;
 
 export module logical_insert;
 
 namespace infinity {
-
-struct TableEntry;
 
 export class LogicalInsert : public LogicalNode {
 public:

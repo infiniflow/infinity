@@ -69,7 +69,6 @@ public:
 private:
     // Friend to encapsulate `Unload` interface and to increase `rc_`.
     friend class BufferHandle;
-    // friend class BufferHandleMut;
 
     // called when BufferHandle needs mutable pointer.
     void GetMutPointer();
