@@ -23,7 +23,7 @@ import logical_node;
 import parser;
 import match_expression;
 import base_table_ref;
-import table_collection_entry;
+import catalog;
 
 import base_expression;
 import default_values;

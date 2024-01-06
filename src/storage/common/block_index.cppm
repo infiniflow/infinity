@@ -16,12 +16,13 @@ module;
 
 import stl;
 import global_block_id;
-import block_entry;
-import catalog:segment_entry;
 
 export module block_index;
 
 namespace infinity {
+
+struct BlockEntry;
+struct SegmentEntry;
 
 export struct BlockIndex {
     void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp);

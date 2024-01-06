@@ -23,7 +23,7 @@ import logical_node_type;
 import knn_expression;
 import parser;
 import default_values;
-import table_collection_entry;
+import catalog;
 
 module logical_knn_scan;
 

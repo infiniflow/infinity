@@ -67,7 +67,6 @@ import physical_match;
 import physical_fusion;
 
 import physical_operator_type;
-import db_entry;
 import parser;
 import explain_logical_plan;
 import logical_show;

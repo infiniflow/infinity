@@ -19,6 +19,7 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import base_table_ref;
 import index_def;
 
 export module logical_create_index;
