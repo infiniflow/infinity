@@ -310,7 +310,7 @@ public:
         if (ret == DataStore::ERR_IDX) {
             Error<StorageException>("Data index is not enough.");
         }
-        std::copy(labels, labels + insert_n, labels_.get() + ret);
+        Copy(labels, labels + insert_n, labels_.get() + ret);
         return ret;
     }
 

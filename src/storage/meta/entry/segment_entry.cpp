@@ -415,7 +415,7 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
     SharedPtr<String> segment_dir;
     do {
         u32 seed = time(nullptr);
-        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
+        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
 }

@@ -32,7 +32,7 @@ SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
     while (bytes_copied < n) {
         working_buffer = *chunk;
         SizeT bytes_to_copy = std::min(static_cast<SizeT>(working_buffer.Size()), n - bytes_copied);
-        Memcpy(to + bytes_copied, working_buffer.Begin(), bytes_to_copy);
+        std::memcpy(to + bytes_copied, working_buffer.Begin(), bytes_to_copy);
         bytes_copied += bytes_to_copy;
         chunk = std::next(chunk);
     }
@@ -50,7 +50,7 @@ void WriteBuffer::Write(const char *from, SizeT n) {
     while (bytes_copied < n) {
         NextIfAtEnd();
         SizeT bytes_to_copy = std::min(static_cast<SizeT>(working_buffer_.End() - pos_), n - bytes_copied);
-        Memcpy(pos_, from + bytes_copied, bytes_to_copy);
+        std::memcpy(pos_, from + bytes_copied, bytes_to_copy);
         pos_ += bytes_to_copy;
         bytes_copied += bytes_to_copy;
     }

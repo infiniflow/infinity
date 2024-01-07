@@ -282,14 +282,14 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             //                            = ((VarcharT
                             //                            *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
                             //                            (src_ref.IsInlined()) {
-                            //                                Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
+                            //                                std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
                             //                            } else {
                             //                                dst_ref.length = src_ref.length;
-                            //                                Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+                            //                                std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
                             //
                             //                                dst_ref.ptr =
                             //                                output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                            //                                Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                            //                                std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
                             //                            }
                             break;
                         }
@@ -324,7 +324,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         }
 
         if (output_row_idx != datablock_size) {
-            Error<ExecutorException>("Expected block size: " + ToStr(datablock_size) + ", but only copied data size: " + ToStr(output_row_idx));
+            Error<ExecutorException>("Expected block size: " + std::to_string(datablock_size) + ", but only copied data size: " + std::to_string(output_row_idx));
         }
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -413,14 +413,14 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     //                    VarcharT &src_ref = ((VarcharT
                     //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
                     //                    (src_ref.IsInlined()) {
-                    //                        Memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
+                    //                        std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
                     //                    } else {
                     //                        dst_ref.length = src_ref.length;
-                    //                        Memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
+                    //                        std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
                     //
                     //                        dst_ref.ptr =
                     //                        output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                    //                        Memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
+                    //                        std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
                     //                    }
                     break;
                 }

@@ -144,12 +144,12 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -211,12 +211,12 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -281,12 +281,12 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
@@ -354,12 +354,12 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ <= VARCHAR_INLINE_LEN) {
-        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
         }

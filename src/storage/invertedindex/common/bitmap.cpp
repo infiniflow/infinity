@@ -37,7 +37,7 @@ Bitmap::Bitmap(u32 item_count, bool set, MemoryPool *pool) {
     data_ = pool_ ? (u32 *)pool_->Allocate(slot_count_ * sizeof(u32)) : new u32[slot_count_];
 
     item_count_ = item_count;
-    Memset(data_, set ? 0xFF : 0x0, slot_count_ * sizeof(u32));
+    std::memset(data_, set ? 0xFF : 0x0, slot_count_ * sizeof(u32));
     set_count_ = set ? item_count : 0;
     mount_ = false;
     init_set_ = set;
@@ -52,7 +52,7 @@ Bitmap::Bitmap(const Bitmap &rhs) {
 
     if (rhs.GetData() != nullptr) {
         data_ = pool_ ? (u32 *)pool_->Allocate(slot_count_ * sizeof(u32)) : new u32[slot_count_];
-        Memcpy(data_, rhs.data_, slot_count_ * sizeof(u32));
+        std::memcpy(data_, rhs.data_, slot_count_ * sizeof(u32));
     } else {
         data_ = nullptr;
     }
@@ -77,7 +77,7 @@ Bitmap &Bitmap::operator=(const Bitmap &rhs) {
 
         if (rhs.GetData() != nullptr) {
             data_ = pool_ ? (u32 *)pool_->Allocate(slot_count_ * sizeof(u32)) : new u32[slot_count_];
-            Memcpy(data_, rhs.data_, slot_count_ * sizeof(u32));
+            std::memcpy(data_, rhs.data_, slot_count_ * sizeof(u32));
         } else {
             data_ = nullptr;
         }
@@ -97,7 +97,7 @@ bool Bitmap::Alloc(u32 item_count, bool set) {
     data_ = pool_ ? (u32 *)pool_->Allocate(slot_count_ * sizeof(u32)) : new u32[slot_count_];
 
     item_count_ = item_count;
-    Memset(data_, set ? 0xFF : 0x0, slot_count_ * sizeof(u32));
+    std::memset(data_, set ? 0xFF : 0x0, slot_count_ * sizeof(u32));
     set_count_ = set ? item_count : 0;
 
     return true;
@@ -223,7 +223,7 @@ bool Bitmap::Reset(u32 index) {
 }
 
 void Bitmap::ResetAll() {
-    Memset(data_, 0x0, slot_count_ * sizeof(u32));
+    std::memset(data_, 0x0, slot_count_ * sizeof(u32));
     set_count_ = 0;
 }
 
@@ -239,7 +239,7 @@ void Bitmap::ResetAllAfter(u32 index) {
 
     if (quot < slot_count_ - 1) {
         u32 siz = slot_count_ - quot - 1;
-        Memset(((char *)data_) + (quot + 1) * sizeof(u32), 0, siz * sizeof(u32));
+        std::memset(((char *)data_) + (quot + 1) * sizeof(u32), 0, siz * sizeof(u32));
     }
 
     RefreshSetCountByScanning();
@@ -422,7 +422,7 @@ bool Bitmap::operator==(Bitmap &bitmap) {
     if (data_ == bitmap.data_) {
         return true;
     }
-    return Memcmp(data_, bitmap.data_, slot_count_ * sizeof(u32)) == 0;
+    return std::memcmp(data_, bitmap.data_, slot_count_ * sizeof(u32)) == 0;
 }
 
 bool Bitmap::operator!=(Bitmap &bitmap) { return !(*this == bitmap); }

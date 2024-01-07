@@ -90,7 +90,7 @@ public:
     explicit EmbeddingValueInfo(const Vector<T> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
         SizeT len = values_p.size() * sizeof(T);
         data_.resize(len);
-        Memcpy(data_.data(), values_p.data(), len);
+        std::memcpy(data_.data(), values_p.data(), len);
     }
 
     Pair<const_ptr_t, SizeT> GetData() const { return MakePair<const_ptr_t, SizeT>(data_.data(), data_.size()); }

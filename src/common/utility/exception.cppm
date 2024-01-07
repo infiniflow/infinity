@@ -153,7 +153,7 @@ export template <typename ExceptionType>
 inline void
 Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line()) {
     String err_msg = message;
-    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
     throw ExceptionType(err_msg);
 }
 

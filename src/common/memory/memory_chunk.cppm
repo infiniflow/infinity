@@ -42,7 +42,7 @@ public:
         }
         auto nDataBytes = size_ - holder_;
         auto p = (char *)(this) + holder_;
-        Memset(p, 0, nDataBytes);
+        std::memset(p, 0, nDataBytes);
     }
 
 protected:

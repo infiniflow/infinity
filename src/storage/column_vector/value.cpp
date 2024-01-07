@@ -209,7 +209,7 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     SizeT len = embedding_info->Size();
     SharedPtr<EmbeddingValueInfo> embedding_value_info = MakeShared<EmbeddingValueInfo>();
     embedding_value_info->data_.resize(len);
-    Memcpy(embedding_value_info->data_.data(), ptr, len);
+    std::memcpy(embedding_value_info->data_.data(), ptr, len);
     Value value(LogicalType::kEmbedding, type_info_ptr);
     value.value_info_ = embedding_value_info;
     return value;
@@ -714,25 +714,25 @@ String Value::ToString() const {
             return value_.boolean ? "true" : "false";
         }
         case kTinyInt: {
-            return ToStr(value_.tiny_int);
+            return std::to_string(value_.tiny_int);
         }
         case kSmallInt: {
-            return ToStr(value_.small_int);
+            return std::to_string(value_.small_int);
         }
         case kInteger: {
-            return ToStr(value_.integer);
+            return std::to_string(value_.integer);
         }
         case kBigInt: {
-            return ToStr(value_.big_int);
+            return std::to_string(value_.big_int);
         }
         case kHugeInt: {
             return value_.huge_int.ToString();
         }
         case kFloat: {
-            return ToStr(value_.float32);
+            return std::to_string(value_.float32);
         }
         case kDouble: {
-            return ToStr(value_.float64);
+            return std::to_string(value_.float64);
         }
         case kDate: {
             return value_.date.ToString();

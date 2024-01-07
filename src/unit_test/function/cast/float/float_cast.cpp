@@ -184,49 +184,49 @@ TEST_F(FloatCastTest, float_cast0) {
         source = std::numeric_limits<FloatT>::lowest();
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
 
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 47);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = std::numeric_limits<FloatT>::max();
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 46);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 0;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 8);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 9;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 8);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 10;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 9);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 99;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 9);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = -100;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 11);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 100;
         EXPECT_TRUE(FloatTryCastToVarlen::Run(source, target, col_varchar_ptr));
-//        src_str = ToStr(source);
+//        src_str = std::to_string(source);
 //        EXPECT_EQ(src_str.size(), 10);
 //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
     }
@@ -387,7 +387,7 @@ TEST_F(FloatCastTest, float_cast1) {
         EXPECT_TRUE(result);
         for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
             f32 check_value = static_cast<f32>(i);
-            String check_str(ToStr(check_value));
+            String check_str(std::to_string(check_value));
             Value vx = col_target->GetValue(i);
             const String &s2 = vx.GetVarchar();
             EXPECT_STREQ(s2.c_str(), check_str.c_str());

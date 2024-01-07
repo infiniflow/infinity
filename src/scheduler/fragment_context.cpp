@@ -305,15 +305,15 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     {
         String fragment_header = "Fragment #";
 
-        fragment_header += ToStr(fragment_ptr->FragmentID());
+        fragment_header += std::to_string(fragment_ptr->FragmentID());
         fragment_header += " * ";
-        fragment_header += ToStr(tasks->size());
+        fragment_header += std::to_string(tasks->size());
         fragment_header += " Task";
 
         result.emplace_back(MakeShared<String>(fragment_header));
     }
     for (const auto &task : *tasks) {
-        result.emplace_back(MakeShared<String>("-> Task #" + ToStr(task->TaskID())));
+        result.emplace_back(MakeShared<String>("-> Task #" + std::to_string(task->TaskID())));
     }
     // NOTE: Insert blank elements after each Fragment for alignment
     result.emplace_back(MakeShared<String>());

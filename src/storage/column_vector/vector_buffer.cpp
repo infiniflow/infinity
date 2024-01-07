@@ -80,8 +80,8 @@ void VectorBuffer::Copy(ptr_t input, SizeT size) {
     if (data_size_ < size) {
         Error<TypeException>("Attempt to copy an amount of data that cannot currently be accommodated");
     }
-    // Memcpy(data_.get(), input, size);
-    Memcpy(data_, input, size);
+    // std::memcpy(data_.get(), input, size);
+    std::memcpy(data_, input, size);
 }
 
 bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx) {
@@ -148,7 +148,7 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
         SizeT extra;
         if (start_offset == 0) {
             // Copy by byte when the start index is aligned.
-            Memcpy(dst_ptr_u8 + dest_start_idx / 8, src_ptr_u8 + source_start_idx / 8, count / 8);
+            std::memcpy(dst_ptr_u8 + dest_start_idx / 8, src_ptr_u8 + source_start_idx / 8, count / 8);
             // Copy the last bits.
             extra = count % 8;
         } else {
@@ -161,7 +161,7 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
             } else {
                 u8 source_mask = u8(0xff) << start_offset;
                 dst_1 = (dst_1 & (~source_mask)) | (src_1 & source_mask);
-                Memcpy(dst_ptr_u8 + (dest_start_idx / 8) + 1, src_ptr_u8 + (source_start_idx / 8) + 1, (count - start_todo) / 8);
+                std::memcpy(dst_ptr_u8 + (dest_start_idx / 8) + 1, src_ptr_u8 + (source_start_idx / 8) + 1, (count - start_todo) / 8);
                 extra = (count - start_todo) % 8;
             }
         }

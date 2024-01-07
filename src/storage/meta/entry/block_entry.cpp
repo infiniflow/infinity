@@ -75,9 +75,9 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     int32_t deleted_size = ReadBufAdv<int32_t>(ptr);
     created_.resize(created_size);
     deleted_.resize(deleted_size);
-    Memcpy(created_.data(), ptr, created_size * sizeof(CreateField));
+    std::memcpy(created_.data(), ptr, created_size * sizeof(CreateField));
     ptr += created_size * sizeof(CreateField);
-    Memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
+    std::memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != buf_len) {
         Error<StorageException>("Failed to load block_version file: " + version_path);
@@ -91,9 +91,9 @@ void BlockVersion::SaveToFile(const String &version_path) {
     char *ptr = buf.data();
     WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
     WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
-    Memcpy(ptr, created_.data(), created_.size() * sizeof(CreateField));
+    std::memcpy(ptr, created_.data(), created_.size() * sizeof(CreateField));
     ptr += created_.size() * sizeof(CreateField);
-    Memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
+    std::memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != exp_size) {
         Error<StorageException>("Failed to save block_version file: " + version_path);
@@ -294,7 +294,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
         }
         checkpoint_version.created_ = this->block_version_->created_;
         checkpoint_version.deleted_.reserve(checkpoint_row_count);
-        Memcpy(checkpoint_version.deleted_.data(), deleted.data(), checkpoint_row_count * sizeof(TxnTimeStamp));
+        std::memcpy(checkpoint_version.deleted_.data(), deleted.data(), checkpoint_row_count * sizeof(TxnTimeStamp));
     }
     for (int i = 0; i < checkpoint_row_count; i++) {
         if (checkpoint_version.deleted_[i] > checkpoint_ts) {

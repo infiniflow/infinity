@@ -49,7 +49,7 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
             SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
             if (column_vector->data_type()->type() == LogicalType::kRowID) {
                 row_ids.resize(column_vector->Size());
-                Memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
+                std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
                 break;
             }
         }

@@ -327,7 +327,7 @@ i32 WalEntry::GetSizeInBytes() const {
 
 void WalEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
-    Memcpy(ptr, this, sizeof(WalEntryHeader));
+    std::memcpy(ptr, this, sizeof(WalEntryHeader));
     ptr += sizeof(WalEntryHeader);
     WriteBufAdv(ptr, static_cast<i32>(cmds.size()));
     SizeT cmd_count = cmds.size();
@@ -490,7 +490,7 @@ WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
 SharedPtr<WalEntry> WalEntryIterator::Next() {
     if (end_ > buf_.data()) {
         i32 entry_size;
-        Memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
+        std::memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
         end_ = end_ - entry_size;
         auto entry = WalEntry::ReadAdv(end_, entry_size);
         end_ = end_ - entry_size;

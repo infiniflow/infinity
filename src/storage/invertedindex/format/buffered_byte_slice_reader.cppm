@@ -82,7 +82,7 @@ bool BufferedByteSliceReader::Decode(T *buffer, SizeT count, SizeT &decode_count
         const ShortBuffer &shortBuffer = buffered_byte_slice_->GetBuffer();
         const T *src = shortBuffer.GetRowTyped<T>(current_value->location_);
 
-        Memcpy((void *)buffer, (const void *)src, buffer_size * sizeof(T));
+        std::memcpy((void *)buffer, (const void *)src, buffer_size * sizeof(T));
 
         decode_count = buffer_size;
         short_buffer_cursor_++;

@@ -49,7 +49,7 @@ void Indexer::Add(DataBlock *data_block) {
         SharedPtr<ColumnVector> column_vector = data_block->column_vectors[i];
         if (column_vector->data_type()->type() == LogicalType::kRowID) {
             row_ids.resize(column_vector->Size());
-            Memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
+            std::memcpy(row_ids.data(), column_vector->data(), column_vector->Size() * sizeof(RowID));
             break;
         } else {
             column_vectors.push_back(column_vector);

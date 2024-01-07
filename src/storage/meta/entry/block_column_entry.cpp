@@ -41,7 +41,7 @@ UniquePtr<BlockColumnEntry>
 BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager, bool is_replay) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
 
-    block_column_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
+    block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
 
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
     DataType *column_type = block_column_entry->column_type_.get();
@@ -126,7 +126,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
         case kFloat:
         case kDouble:
         case kEmbedding: {
-            Memcpy(dst_p, src_p, data_size);
+            std::memcpy(dst_p, src_p, data_size);
             break;
         }
         case kVarchar: {
@@ -139,7 +139,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length_;
-                    Memcpy(short_info.data.data(), varchar_type->short_.data_, varchar_type->length_);
+                    std::memcpy(short_info.data.data(), varchar_type->short_.data_, varchar_type->length_);
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = this->outline_info_.get();
@@ -164,7 +164,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                     if (varchar_type->IsValue()) {
                         u32 outline_data_size = varchar_type->length_;
                         ptr_t outline_src_ptr = varchar_type->value_.ptr_;
-                        Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+                        std::memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
                     } else {
                         vector_buffer->fix_heap_mgr_->ReadFromHeap(outline_dst_ptr,
                                                                    varchar_type->vector_.chunk_id_,
@@ -173,7 +173,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                     }
 
                     varchar_layout->length_ = varchar_type->length_;
-                    Memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);
+                    std::memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);
                     long_info.file_idx_ = outline_info->next_file_idx - 1;
                     long_info.file_offset_ = current_buffer_offset;
                     current_buffer_offset += varchar_type->length_;

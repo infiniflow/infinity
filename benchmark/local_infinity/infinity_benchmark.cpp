@@ -102,7 +102,7 @@ int main() {
     {
         CreateDatabaseOptions create_db_opts;
         auto tims_costing_second = Measurement("Create Database", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-            __attribute__((unused)) auto ignored = infinity->CreateDatabase(ToStr(i), create_db_opts);
+            __attribute__((unused)) auto ignored = infinity->CreateDatabase(std::to_string(i), create_db_opts);
         });
         results.push_back(fmt::format("-> Create Database QPS: {}", total_times / tims_costing_second));
     }
@@ -110,7 +110,7 @@ int main() {
     {
         DropDatabaseOptions drop_db_opts;
         auto tims_costing_second = Measurement("Drop Database", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-            __attribute__((unused)) auto ignored = infinity->DropDatabase(ToStr(i), drop_db_opts);
+            __attribute__((unused)) auto ignored = infinity->DropDatabase(std::to_string(i), drop_db_opts);
         });
         results.push_back(fmt::format("-> Drop Database QPS: {}", total_times / tims_costing_second));
     }
@@ -175,13 +175,13 @@ int main() {
                 column_definitions.emplace_back(col_def_2);
 
                 __attribute__((unused)) auto ignored =
-                    infinity->GetDatabase("default")->CreateTable(ToStr(i), column_definitions, Vector<TableConstraint *>(), create_table_opts);
+                    infinity->GetDatabase("default")->CreateTable(std::to_string(i), column_definitions, Vector<TableConstraint *>(), create_table_opts);
             });
             results.push_back(fmt::format("-> Create Table QPS: {}", total_times / tims_costing_second));
         }
         {
             auto tims_costing_second = Measurement("Drop Table", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->DropTable(ToStr(i), drop_table_options);
+                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->DropTable(std::to_string(i), drop_table_options);
             });
             results.push_back(fmt::format("-> Drop Table QPS: {}", total_times / tims_costing_second));
         }

@@ -55,7 +55,7 @@ SizeT ByteSliceReader::Read(void *value, SizeT len) {
     }
 
     if (current_slice_offset_ + len <= GetSliceDataSize(current_slice_)) {
-        Memcpy(value, current_slice_->data_ + current_slice_offset_, len);
+        std::memcpy(value, current_slice_->data_ + current_slice_offset_, len);
         current_slice_offset_ += len;
         global_offset_ += len;
         return len;
@@ -68,7 +68,7 @@ SizeT ByteSliceReader::Read(void *value, SizeT len) {
     while (total_len > 0) {
         leftLen = GetSliceDataSize(current_slice_) - offset;
         if (leftLen < total_len) {
-            Memcpy(dest, current_slice_->data_ + offset, leftLen);
+            std::memcpy(dest, current_slice_->data_ + offset, leftLen);
             total_len -= leftLen;
             dest += leftLen;
 
@@ -78,7 +78,7 @@ SizeT ByteSliceReader::Read(void *value, SizeT len) {
                 break;
             }
         } else {
-            Memcpy(dest, current_slice_->data_ + offset, total_len);
+            std::memcpy(dest, current_slice_->data_ + offset, total_len);
             dest += total_len;
             offset += (SizeT)total_len;
             total_len = 0;

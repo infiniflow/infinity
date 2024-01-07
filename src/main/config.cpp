@@ -38,7 +38,7 @@ u64 Config::GetAvailableMem() {
 void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias) {
     parsed_time_zone = time_zone_str.substr(0, 3);
     ToUpper(parsed_time_zone);
-    parsed_time_zone_bias = StrToInt(time_zone_str.substr(3, String::npos));
+    parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
 }
 
 SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_size) {

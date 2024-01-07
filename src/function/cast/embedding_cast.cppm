@@ -102,15 +102,15 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
 struct EmbeddingTryCastToFixlen {
     template <typename SourceElemType, typename TargetElemType>
     static inline bool Run(const SourceElemType *source, TargetElemType *target, SizeT len) {
-        if constexpr (IsSame<SourceElemType, TinyIntT>() || IsSame<SourceElemType, SmallIntT>() || IsSame<SourceElemType, IntegerT>() ||
-                      IsSame<SourceElemType, BigIntT>()) {
+        if constexpr (std::is_same<SourceElemType, TinyIntT>() || std::is_same<SourceElemType, SmallIntT>() ||
+                      std::is_same<SourceElemType, IntegerT>() || std::is_same<SourceElemType, BigIntT>()) {
             for (SizeT i = 0; i < len; ++i) {
                 if (!IntegerTryCastToFixlen::Run(source[i], target[i])) {
                     return false;
                 }
             }
             return true;
-        } else if constexpr (IsSame<SourceElemType, FloatT>() || IsSame<SourceElemType, DoubleT>()) {
+        } else if constexpr (std::is_same<SourceElemType, FloatT>() || std::is_same<SourceElemType, DoubleT>()) {
             for (SizeT i = 0; i < len; ++i) {
                 if (!FloatTryCastToFixlen::Run(source[i], target[i])) {
                     return false;
@@ -125,11 +125,7 @@ struct EmbeddingTryCastToFixlen {
 
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &,
-                           const DataType &,
-                           TargetType &,
-                           const DataType &,
-                           const SharedPtr<ColumnVector> &) {
+    static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -157,14 +153,14 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     target.is_value_ = false;
     if (target.length_ <= VARCHAR_PREFIX_LEN) {
         // inline varchar
-        Memcpy(target.short_.data_, res.c_str(), target.length_);
+        std::memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             Error<TypeException>(fmt::format("Varchar column vector should use MemoryVectorBuffer."));
         }
 
         // Set varchar prefix
-        Memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
 
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(res.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;

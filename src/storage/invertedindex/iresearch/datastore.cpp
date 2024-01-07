@@ -477,7 +477,7 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
 
     SizeT topn(DEFAULT_TOPN);
     if (auto it = options.find("topn"); it != options.end()) {
-        topn = StrToInt(it->second);
+        topn = std::stoi(it->second);
     }
 
     sorted.reserve(topn);

@@ -179,7 +179,7 @@ TEST_F(CatalogTest, concurrent_test) {
 
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
-                String db_name = "db" + ToStr(db_id);
+                String db_name = "db" + std::to_string(db_id);
                 Status status = txn->CreateDatabase(db_name, ConflictType::kError);
                 EXPECT_TRUE(status.ok());
             }
@@ -202,7 +202,7 @@ TEST_F(CatalogTest, concurrent_test) {
 
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
-                String db_name = "db" + ToStr(db_id);
+                String db_name = "db" + std::to_string(db_id);
                 auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn->TxnID(), txn->BeginTS());
                 EXPECT_TRUE(status.ok());
                 // only read, don't need lock
@@ -226,7 +226,7 @@ TEST_F(CatalogTest, concurrent_test) {
 
         auto drop_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
-                String db_name = "db" + ToStr(db_id);
+                String db_name = "db" + std::to_string(db_id);
                 Status status = txn->DropDatabase(db_name, ConflictType::kError);
                 EXPECT_TRUE(status.ok());
             }
@@ -246,7 +246,7 @@ TEST_F(CatalogTest, concurrent_test) {
 
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {
-            String db_name = "db" + ToStr(db_id);
+            String db_name = "db" + std::to_string(db_id);
             auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
             EXPECT_TRUE(!status.ok());
         }

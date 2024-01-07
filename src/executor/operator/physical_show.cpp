@@ -1037,7 +1037,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(ToStr(global_config->worker_cpu_limit()));
+            Value value = Value::MakeVarchar(std::to_string(global_config->worker_cpu_limit()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -1550,7 +1550,7 @@ void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOpe
         {
             // option value
             SizeT query_count = query_context->current_session()->query_count();
-            Value value = Value::MakeVarchar(ToStr(query_count));
+            Value value = Value::MakeVarchar(std::to_string(query_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -1607,7 +1607,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
             // option value
             SessionManager *session_manager = query_context->session_manager();
             u64 session_count = session_manager->GetSessionCount();
-            Value value = Value::MakeVarchar(ToStr(session_count));
+            Value value = Value::MakeVarchar(std::to_string(session_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }

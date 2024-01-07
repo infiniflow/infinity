@@ -134,7 +134,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
 
             // Step3 Generate cross product on the root and subquery plan
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "cross_product" + ToStr(logical_node_id);
+            String alias = "cross_product" + std::to_string(logical_node_id);
             SharedPtr<LogicalCrossProduct> cross_product_node = MakeShared<LogicalCrossProduct>(logical_node_id, alias, root, aggregate_node);
 
             root = cross_product_node;
@@ -194,7 +194,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
 
             // 3. Generate mark join
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "logical_join" + ToStr(logical_node_id);
+            String alias = "logical_join" + std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> join_node = MakeShared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, conditions, root, subquery_plan);
             join_node->mark_index_ = bind_context->GenerateTableIndex();
             root = join_node;
@@ -254,7 +254,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             GenerateJoinConditions(query_context, join_conditions, correlated_columns, subplan_column_bindings, correlated_base_index);
 
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "logical_join" + ToStr(logical_node_id);
+            String alias = "logical_join" + std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> logical_join =
                 MakeShared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, join_conditions, root, dependent_join);
             logical_join->mark_index_ = bind_context->GenerateTableIndex();
@@ -281,7 +281,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             GenerateJoinConditions(query_context, join_conditions, correlated_columns, subplan_column_bindings, correlated_base_index);
 
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "logical_join" + ToStr(logical_node_id);
+            String alias = "logical_join" + std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> logical_join =
                 MakeShared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, join_conditions, root, dependent_join);
             logical_join->mark_index_ = bind_context->GenerateTableIndex();
@@ -347,7 +347,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             join_conditions.emplace_back(in_expression_ptr);
 
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "logical_join" + ToStr(logical_node_id);
+            String alias = "logical_join" + std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> logical_join =
                 MakeShared<LogicalJoin>(logical_node_id, JoinType::kMark, alias, join_conditions, root, dependent_join);
             logical_join->mark_index_ = bind_context->GenerateTableIndex();
@@ -374,7 +374,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             GenerateJoinConditions(query_context, join_conditions, correlated_columns, subplan_column_bindings, correlated_base_index);
 
             u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-            String alias = "logical_join" + ToStr(logical_node_id);
+            String alias = "logical_join" + std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> logical_join =
                 MakeShared<LogicalJoin>(logical_node_id, JoinType::kInner, alias, join_conditions, root, dependent_join);
             root = logical_join;

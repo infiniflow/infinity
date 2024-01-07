@@ -110,7 +110,7 @@ public:
 
     [[nodiscard]] u32 GetSize(SizeT q_id) const { return sizes[q_id]; }
 
-    void ReInitialize() { Fill(sizes.begin(), sizes.end(), 0); }
+    void ReInitialize() { std::fill(sizes.begin(), sizes.end(), 0); }
 
     void AddResult(SizeT q_id, DistType d, ID i) {
         u32 &size = sizes[q_id];
@@ -443,8 +443,8 @@ public:
     void Begin() {}
 
     void ReInitialize() {
-        Fill(sizes.begin(), sizes.end(), 0);
-        Fill(thresholds.begin(), thresholds.end(), Compare::InitialValue());
+        std::fill(sizes.begin(), sizes.end(), 0);
+        std::fill(thresholds.begin(), thresholds.end(), Compare::InitialValue());
     }
 
     [[nodiscard]] DistType GetThreshold(SizeT q_id) const { return thresholds[q_id]; }

@@ -65,7 +65,7 @@ void ByteSliceWriter::Write(const void *value, SizeT len) {
             slice_list_->Add(slice);
         }
         u32 copy_len = (last_slice_size_ - slice->size_) > left ? left : (last_slice_size_ - slice->size_);
-        Memcpy(slice->data_ + slice->size_, data, copy_len);
+        std::memcpy(slice->data_ + slice->size_, data, copy_len);
         data += copy_len;
         left -= copy_len;
         slice->size_ = slice->size_ + copy_len;

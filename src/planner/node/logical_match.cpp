@@ -97,7 +97,7 @@ String LogicalMatch::ToString(i64 &space) const {
     // Table index
     String table_index = String(space, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(this->TableIndex());
+    table_index += std::to_string(this->TableIndex());
     ss << table_index << std::endl;
 
     String match_info = String(space, ' ');

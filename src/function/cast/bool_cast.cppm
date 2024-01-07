@@ -40,13 +40,13 @@ export struct TryCastBoolean {
 // inline bool TryCastBoolean::Run(BooleanT source, VarcharT &target) {
 //    if (source) {
 //        constexpr u16 TRUE_LEN = 4;
-//        Memcpy(target.prefix, "true", TRUE_LEN);
-//        Memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
+//        std::memcpy(target.prefix, "true", TRUE_LEN);
+//        std::memset(target.prefix + TRUE_LEN, 0, VarcharT::INLINE_LENGTH - TRUE_LEN);
 //        target.length = TRUE_LEN;
 //    } else {
 //        constexpr u16 FALSE_LEN = 5;
-//        Memcpy(target.prefix, "false", FALSE_LEN);
-//        Memset(target.prefix + FALSE_LEN, 0, VarcharT::INLINE_LENGTH - FALSE_LEN);
+//        std::memcpy(target.prefix, "false", FALSE_LEN);
+//        std::memset(target.prefix + FALSE_LEN, 0, VarcharT::INLINE_LENGTH - FALSE_LEN);
 //        target.length = FALSE_LEN;
 //    }
 //    return true;

@@ -304,7 +304,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPt
             create_header_str = "CREATE INDEX ";
         }
 
-        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
+        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -743,7 +743,7 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     // Table index
     String table_index = String(intent_size, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(table_scan_node->TableIndex());
+    table_index += std::to_string(table_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns
@@ -789,7 +789,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     // Table index
     String table_index = String(intent_size, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(knn_scan_node->TableIndex());
+    table_index += std::to_string(knn_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     const auto &knn_expression = knn_scan_node->knn_expression_;
@@ -807,7 +807,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
 
     String embedding_dimension_str = String(intent_size + 2, ' ');
     embedding_dimension_str += " - dimension: ";
-    embedding_type_str += ToStr(knn_expr_raw->dimension_);
+    embedding_type_str += std::to_string(knn_expr_raw->dimension_);
     result->emplace_back(MakeShared<String>(embedding_dimension_str));
 
     String distance_type_str = String(intent_size + 2, ' ');
@@ -862,7 +862,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
         }
 
         agg_header += "(";
-        agg_header += ToStr(aggregate_node->node_id());
+        agg_header += std::to_string(aggregate_node->node_id());
         agg_header += ")";
         result->emplace_back(MakeShared<String>(agg_header));
     }
@@ -871,7 +871,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
     {
         String aggregate_table_index = String(intent_size, ' ');
         aggregate_table_index += " - aggregate table index: #";
-        aggregate_table_index += ToStr(aggregate_node->aggregate_index_);
+        aggregate_table_index += std::to_string(aggregate_node->aggregate_index_);
         result->emplace_back(MakeShared<String>(aggregate_table_index));
     }
 
@@ -895,7 +895,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
         // Group by table index
         String group_table_index = String(intent_size, ' ');
         group_table_index += " - group by table index: #";
-        group_table_index += ToStr(aggregate_node->groupby_index_);
+        group_table_index += std::to_string(aggregate_node->groupby_index_);
         result->emplace_back(MakeShared<String>(group_table_index));
 
         String group_by_expression_str = String(intent_size, ' ');
@@ -921,7 +921,7 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         }
 
         sort_header += "(";
-        sort_header += ToStr(sort_node->node_id());
+        sort_header += std::to_string(sort_node->node_id());
         sort_header += ")";
         result->emplace_back(MakeShared<String>(sort_header));
     }
@@ -974,7 +974,7 @@ void ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vecto
         }
 
         limit_header += "(";
-        limit_header += ToStr(limit_node->node_id());
+        limit_header += std::to_string(limit_node->node_id());
         limit_header += ")";
         result->emplace_back(MakeShared<String>(limit_header));
     }
@@ -1019,7 +1019,7 @@ void ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, 
             cross_product_header = "CROSS PRODUCT ";
         }
         cross_product_header += "(";
-        cross_product_header += ToStr(cross_product_node->node_id());
+        cross_product_header += std::to_string(cross_product_node->node_id());
         cross_product_header += ")";
         result->emplace_back(MakeShared<String>(cross_product_header));
     }
@@ -1049,7 +1049,7 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
         }
         join_header += JoinType2Str(join_node->join_type_);
         join_header += "(";
-        join_header += ToStr(join_node->node_id());
+        join_header += std::to_string(join_node->node_id());
         join_header += ")";
         result->emplace_back(MakeShared<String>(join_header));
     }
@@ -1099,7 +1099,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW TABLES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1117,7 +1117,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW VIEWS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1135,7 +1135,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "DESCRIBE TABLE/COLLECTION ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1163,7 +1163,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW DATABASES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1181,7 +1181,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW CONFIGS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1199,7 +1199,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW PROFILES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1218,7 +1218,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW INDEXES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1236,19 +1236,19 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW SEGMENTS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             if (show_node->segment_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
-                output_columns_str += " - segment: " + ToStr(*show_node->segment_id());
+                output_columns_str += " - segment: " + std::to_string(*show_node->segment_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
             }
 
             if (show_node->block_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
-                output_columns_str += " - block: " + ToStr(*show_node->block_id());
+                output_columns_str += " - block: " + std::to_string(*show_node->block_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
             }
 
@@ -1266,7 +1266,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW SESSION STATUS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1284,7 +1284,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW GLOBAL STATUS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1349,9 +1349,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             ColumnExpression *column_expression = (ColumnExpression *)base_expression;
             expr_str += column_expression->Name();
             expr_str += " (#";
-            expr_str += ToStr(column_expression->binding().table_idx);
+            expr_str += std::to_string(column_expression->binding().table_idx);
             expr_str += ".";
-            expr_str += ToStr(column_expression->binding().column_idx);
+            expr_str += std::to_string(column_expression->binding().column_idx);
             expr_str += ")";
             break;
         }
@@ -1427,7 +1427,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             ReferenceExpression *reference_expression = (ReferenceExpression *)base_expression;
             expr_str += reference_expression->Name();
             expr_str += " (#";
-            expr_str += ToStr(reference_expression->column_index());
+            expr_str += std::to_string(reference_expression->column_index());
             expr_str += ")";
             break;
         }
@@ -1451,7 +1451,7 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
         }
 
         import_header_str += "(";
-        import_header_str += ToStr(import_node->node_id());
+        import_header_str += std::to_string(import_node->node_id());
         import_header_str += ")";
         result->emplace_back(MakeShared<String>(import_header_str));
     }
@@ -1520,7 +1520,7 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
 
         export_header_str += "(";
-        export_header_str += ToStr(export_node->node_id());
+        export_header_str += std::to_string(export_node->node_id());
         export_header_str += ")";
         result->emplace_back(MakeShared<String>(export_header_str));
     }
@@ -1588,17 +1588,17 @@ void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vecto
     switch (flush_node->flush_type()) {
         case FlushType::kData:
             flush_header_str += "DATA (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
         case FlushType::kLog:
             flush_header_str += "LOG (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
         case FlushType::kBuffer:
             flush_header_str += "BUFFER (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
     }
@@ -1617,7 +1617,7 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
     switch (optimize_node->optimize_type()) {
         case OptimizeType::kIRS:
             optimize_header_str += "DATA (";
-            optimize_header_str += ToStr(optimize_node->node_id());
+            optimize_header_str += std::to_string(optimize_node->node_id());
             optimize_header_str += ")";
             break;
     }

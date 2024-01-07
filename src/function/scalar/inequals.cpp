@@ -48,13 +48,13 @@ inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
         return;
     }
     if (left.IsInlined()) {
-        result = (Memcmp(left.short_.data_, right.short_.data_, left.length_) != 0);
+        result = (std::memcmp(left.short_.data_, right.short_.data_, left.length_) != 0);
         return;
     } else {
         // Both left and right are not inline
         if(left.IsValue() && right.IsValue()) {
-            if (Memcmp(left.value_.prefix_, right.value_.prefix_, VARCHAR_PREFIX_LEN) != 0) {
-                result = (Memcmp(left.value_.ptr_, right.value_.ptr_, left.length_) != 0);
+            if (std::memcmp(left.value_.prefix_, right.value_.prefix_, VARCHAR_PREFIX_LEN) != 0) {
+                result = (std::memcmp(left.value_.ptr_, right.value_.ptr_, left.length_) != 0);
                 return;
             }
         } else {

@@ -35,13 +35,13 @@ void Codec::RemoveFixed8(String &key, u8 &i) {
 void Codec::RemoveFixed64(String &key, u64 &i) { key.erase(0, sizeof(i)); }
 
 void Codec::RemoveBuffer(String &key, char *buffer, u32 size) {
-    Memcpy(buffer, key.data(), size);
+    std::memcpy(buffer, key.data(), size);
     key.erase(size);
 }
 
 void Codec::AddInt(String &buf, u32 value) {
     u8 working[sizeof(value)];
-    Memcpy(working, &value, sizeof(value));
+    std::memcpy(working, &value, sizeof(value));
     buf.append(buf, sizeof(working));
 }
 
@@ -53,7 +53,7 @@ void Codec::AddVInt(String &buf, u32 value) {
 
 void Codec::AddLong(String &buf, u64 value) {
     u8 working[sizeof(value)];
-    Memcpy(working, &value, sizeof(value));
+    std::memcpy(working, &value, sizeof(value));
     buf.append(buf, sizeof(working));
 }
 
@@ -65,7 +65,7 @@ void Codec::AddVLong(String &buf, u64 value) {
 
 u32 DecodeInt(const u8 *ptr) {
     u32 result;
-    Memcpy(&result, ptr, sizeof(result));
+    std::memcpy(&result, ptr, sizeof(result));
     return result;
 }
 

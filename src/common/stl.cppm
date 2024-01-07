@@ -55,6 +55,20 @@ using std::move;
 using std::max;
 using std::min;
 
+using std::to_string;
+
+using std::stoi;
+using std::strtol;
+using std::strtof;
+using std::strtod;
+
+using std::memcpy;
+using std::memset;
+using std::memcmp;
+
+using std::is_same;
+using std::fill;
+
 } // namespace std
 
 namespace infinity {
@@ -148,26 +162,6 @@ export {
             return nullptr;
         }
     }
-
-    // ToStr()
-
-    template <typename T>
-    inline String ToStr(T value) {
-        return std::to_string(value);
-    }
-
-    // stoi
-    inline int StrToInt(const std::string &str, size_t *idx = 0, int base = 10) { return std::stoi(str, idx, base); }
-
-    // StrToL
-    inline long StrToL(const char *__restrict nptr, char **__restrict endptr, int base) { return std::strtol(nptr, endptr, base); }
-
-    // StrToF
-    inline float StrToF(const char *__restrict nptr, char **__restrict endptr) { return std::strtof(nptr, endptr); }
-
-    // StrToD
-    inline double StrToD(const char *__restrict nptr, char **__restrict endptr) { return std::strtod(nptr, endptr); }
-
     // Primitives
 
     using i8 = int8_t;
@@ -300,12 +294,6 @@ export {
 
     using StdException = std::exception;
 
-//    // std::move
-//    template <typename T>
-//    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&std::move(T && value) noexcept {
-//        return static_cast<typename std::remove_reference<T>::type &&>(value);
-//    }
-
     // Chrono
     using Clock = std::chrono::high_resolution_clock;
 
@@ -324,12 +312,6 @@ export {
         return std::chrono::duration_cast<T>(nano_seconds);
     }
 
-    // Memcpy
-    void *Memcpy(void *__restrict dest, const void *__restrict src, size_t n) { return memcpy(dest, src, n); }
-    void *Memset(void *__restrict dest, int value, size_t n) { return memset(dest, value, n); }
-
-    // Memcmp
-    int Memcmp(const void *__restrict s1, const void *__restrict s2, size_t n) { return memcmp(s1, s2, n); }
 
     // IsStandLayout
     template <typename T>
@@ -405,15 +387,15 @@ export {
         return std::copy(first, last, d_first);
     }
 
-    template <typename FI, typename T>
-    void Fill(FI first, FI last, const T &value) {
-        std::fill(first, last, value);
-    }
-
-    template <typename T1, typename T2>
-    constexpr bool IsSame() {
-        return std::is_same<T1, T2>();
-    }
+//    template <typename FI, typename T>
+//    void Fill(FI first, FI last, const T &value) {
+//        std::fill(first, last, value);
+//    }
+//
+//    template <typename T1, typename T2>
+//    constexpr bool IsSame() {
+//        return std::is_same<T1, T2>();
+//    }
 }
 
 export template <typename T1, typename T2>

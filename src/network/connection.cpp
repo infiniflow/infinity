@@ -334,7 +334,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             break;
         }
         default: {
-            message = fmt::format("SELECT {}", ToStr(query_result.result_table_->row_count()));
+            message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));
         }
     }
 

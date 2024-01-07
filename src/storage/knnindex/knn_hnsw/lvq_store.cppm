@@ -124,8 +124,8 @@ private:
 
     void Init() {
         // MeanType *mean = GetMeanMut();
-        // Fill(mean, mean + dim(), 0);
-        Fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
+        // std::fill(mean, mean + dim(), 0);
+        std::fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
     }
 
 public:
@@ -197,7 +197,7 @@ private:
         ScalarType scale = (upper - lower) / max_bucket_idx_;
         ScalarType bias = lower - LimitMin<CompressType>() * scale;
         if (scale == 0) {
-            Fill(compress, compress + dim(), 0);
+            std::fill(compress, compress + dim(), 0);
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {

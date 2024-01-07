@@ -61,7 +61,7 @@ void BitmaskBuffer::Initialize(const u64 *input_ptr, SizeT count) {
 
     void *target_ptr = data_ptr_.get();
     void *source_ptr = (void *)input_ptr;
-    Memcpy(target_ptr, source_ptr, unit_count * sizeof(u64));
+    std::memcpy(target_ptr, source_ptr, unit_count * sizeof(u64));
 }
 
 } // namespace infinity

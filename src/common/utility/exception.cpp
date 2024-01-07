@@ -41,7 +41,7 @@ void PrintStacktrace(const String &err_msg) {
 
 void Error(const String &message, const char *file_name, u32 line) {
     String err_msg = message;
-    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
     PrintStacktrace(err_msg);
     throw Exception(err_msg);
 }

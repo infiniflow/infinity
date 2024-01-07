@@ -249,7 +249,7 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
+        std::memcpy(dst.data(), column_vector->data(), size);
         output_column_field.column_vectors.emplace_back(std::move(dst));
     }
 
@@ -271,16 +271,16 @@ public:
             VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
             i32 length = varchar.length_;
             if (varchar.IsInlined()) {
-                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                Memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
             } else {
                 auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
                 column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
                                                                     varchar.vector_.chunk_id_,
                                                                     varchar.vector_.chunk_offset_,
                                                                     varchar.length_);
-                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                Memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
             }
             current_offset += sizeof(i32) + varchar.length_;
         }
@@ -298,7 +298,7 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
+        std::memcpy(dst.data(), column_vector->data(), size);
         output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
@@ -307,7 +307,7 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
+        std::memcpy(dst.data(), column_vector->data(), size);
         output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }

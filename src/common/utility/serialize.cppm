@@ -85,14 +85,14 @@ export template <>
 inline void WriteBuf<String>(char *const buf, const String &value) {
     i32 len = value.length();
     WriteBuf(buf, len);
-    Memcpy(buf + len, value.c_str(), len);
+    std::memcpy(buf + len, value.c_str(), len);
 }
 
 export template <>
 inline void WriteBufAdv<String>(char *&buf, const String &value) {
     i32 len = value.length();
     WriteBufAdv(buf, len);
-    Memcpy(buf, value.c_str(), len);
+    std::memcpy(buf, value.c_str(), len);
     buf += len;
 }
 

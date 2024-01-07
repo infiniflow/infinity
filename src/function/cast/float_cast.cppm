@@ -155,13 +155,13 @@ inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
 template <>
 inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     target.is_value_ = false;
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
 
     if (target.length_ <= VARCHAR_INLINE_LEN) {
-        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
         }
@@ -238,13 +238,13 @@ template <>
 inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
     // TODO: High-performance to_string implementation is needed.
     target.is_value_ = false;
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
 
     if (target.length_ <= VARCHAR_INLINE_LEN) {
-        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
         }
