@@ -35,8 +35,8 @@ public:
                                        SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
                                        SharedPtr<CreateViewInfo> create_view_info,
                                        SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id, load_metas), create_view_info_(Move(create_view_info)),
-          output_names_(Move(names_ptr)), output_types_(Move(types_ptr)) {}
+        : PhysicalOperator(PhysicalOperatorType::kCreateView, nullptr, nullptr, id, load_metas), create_view_info_(std::move(create_view_info)),
+          output_names_(std::move(names_ptr)), output_types_(std::move(types_ptr)) {}
 
     ~PhysicalCreateView() override = default;
 

@@ -52,7 +52,7 @@ PhysicalCreateIndexDo::PhysicalCreateIndexDo(u64 id,
                                              SharedPtr<Vector<String>> output_names,
                                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                              SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndexDo, Move(left), nullptr, id, load_metas), base_table_ref_(base_table_ref),
+    : PhysicalOperator(PhysicalOperatorType::kCreateIndexDo, std::move(left), nullptr, id, load_metas), base_table_ref_(base_table_ref),
       index_name_(index_name), output_names_(output_names), output_types_(output_types) {}
 
 void PhysicalCreateIndexDo::Init() {}
@@ -65,7 +65,7 @@ bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *
 
     auto status = txn->CreateIndexDo(*base_table_ref_->schema_name(), *base_table_ref_->table_name(), *index_name_, create_index_idxes);
     if (!status.ok()) {
-        operator_state->error_message_ = Move(status.msg_);
+        operator_state->error_message_ = std::move(status.msg_);
         return false;
     }
     operator_state->SetComplete();

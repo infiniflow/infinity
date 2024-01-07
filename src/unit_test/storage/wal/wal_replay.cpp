@@ -156,7 +156,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -166,7 +166,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
         auto *txn2 = txn_mgr->CreateTxn();
         txn2->Begin();
 
-        Status status2 = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
+        Status status2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
         EXPECT_TRUE(status2.ok());
         TxnTimeStamp txn2_ts = txn_mgr->CommitTxn(txn2);
 
@@ -184,7 +184,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->Begin();
             
-            Status status = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
+            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn3);
@@ -214,7 +214,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
             
-            Status status = txn->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn);
@@ -277,7 +277,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
             
-            Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn);
@@ -287,7 +287,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->Begin();
             
-            Status status = txn3->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
+            Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn3);
@@ -297,7 +297,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto *txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
             
-            Status status = txn4->CreateTable("default", Move(tbl4_def), ConflictType::kIgnore);
+            Status status = txn4->CreateTable("default", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn4);
@@ -369,7 +369,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
             
-            Status status = txn->CreateTable("default", Move(tbl5_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl5_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn);
@@ -474,7 +474,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
             
-            Status status = txn->CreateTable("default", Move(tbl1_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn);
@@ -484,7 +484,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
         auto *txn2 = txn_mgr->CreateTxn();
         txn2->Begin();
         
-        Status status = txn2->CreateTable("default", Move(tbl2_def), ConflictType::kIgnore);
+        Status status = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         
         TxnTimeStamp tx4_commit_ts = txn_mgr->CommitTxn(txn2);
@@ -502,7 +502,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             txn->Begin();
             
-            Status status = txn->CreateTable("default", Move(tbl3_def), ConflictType::kIgnore);
+            Status status = txn->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             
             txn_mgr->CommitTxn(txn);

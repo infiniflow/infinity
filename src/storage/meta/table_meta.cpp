@@ -63,13 +63,13 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
         // Insert a dummy entry.
         UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
         dummy_entry->deleted_ = true;
-        this->entry_list_.emplace_back(Move(dummy_entry));
+        this->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Insert the new table entry
         UniquePtr<TableEntry> table_entry =
             MakeUnique<TableEntry>(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
         table_entry_ptr = table_entry.get();
-        this->entry_list_.emplace_front(Move(table_entry));
+        this->entry_list_.emplace_front(std::move(table_entry));
 
         LOG_TRACE(fmt::format("New table entry is added: {}.", table_collection_name));
         return {table_entry_ptr, Status::OK()};
@@ -81,7 +81,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
             UniquePtr<TableEntry> table_entry =
                 MakeUnique<TableEntry>(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
             table_entry_ptr = table_entry.get();
-            this->entry_list_.emplace_front(Move(table_entry));
+            this->entry_list_.emplace_front(std::move(table_entry));
             return {table_entry_ptr, Status::OK()};
         }
 
@@ -94,20 +94,20 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     UniquePtr<TableEntry> table_entry =
                         MakeUnique<TableEntry>(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
                     table_entry_ptr = table_entry.get();
-                    this->entry_list_.emplace_front(Move(table_entry));
+                    this->entry_list_.emplace_front(std::move(table_entry));
                     return {table_entry_ptr, Status::OK()};
                 } else {
                     // Duplicated table
                     UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated table: {}.", table_collection_name));
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
                 }
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg = MakeUnique<String>(
                     fmt::format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
+                return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
             }
         } else {
 
@@ -127,17 +127,17 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                                                        txn_id,
                                                                                        begin_ts);
                             table_entry_ptr = table_entry.get();
-                            this->entry_list_.emplace_front(Move(table_entry));
+                            this->entry_list_.emplace_front(std::move(table_entry));
                             return {table_entry_ptr, Status::OK()};
                         } else {
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Create a duplicated table {}.", table_collection_name));
                             LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
+                            return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
                         }
                     } else {
                         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
-                        return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
+                        return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
                     }
                 }
                 case TxnState::kCommitting:
@@ -146,7 +146,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     UniquePtr<String> err_msg = MakeUnique<String>(
                         fmt::format("Write-write conflict: There is a committing/committed table which is later than current transaction."));
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -157,13 +157,13 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     UniquePtr<TableEntry> table_entry =
                         MakeUnique<TableEntry>(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
                     table_entry_ptr = table_entry.get();
-                    this->entry_list_.emplace_front(Move(table_entry));
+                    this->entry_list_.emplace_front(std::move(table_entry));
                     return {table_entry_ptr, Status::OK()};
                 }
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Invalid table entry txn state");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kUndefined, Move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kUndefined, std::move(err_msg))};
                 }
             }
         }
@@ -179,14 +179,14 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 
     BaseEntry *header_base_entry = this->entry_list_.front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 
     auto *header_table_entry = (TableEntry *)header_base_entry;
@@ -201,7 +201,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
                 }
                 UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped before.");
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+                return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
             }
 
             Vector<SharedPtr<ColumnDef>> dummy_columns;
@@ -209,7 +209,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
                 MakeUnique<TableEntry>(this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
             table_entry_ptr = table_entry.get();
             table_entry_ptr->deleted_ = true;
-            this->entry_list_.emplace_front(Move(table_entry));
+            this->entry_list_.emplace_front(std::move(table_entry));
 
             return {table_entry_ptr, Status::OK()};
         } else {
@@ -217,7 +217,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
+            return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -231,7 +231,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
             // Not same txn, issue WW conflict
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is another uncommitted table entry."));
             LOG_ERROR(*err_msg);
-            return {table_entry_ptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
+            return {table_entry_ptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
         }
     }
 }
@@ -267,14 +267,14 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_t
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 
     for (const auto &table_entry : this->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
         }
 
         u64 table_entry_commit_ts = table_entry->commit_ts_;
@@ -284,7 +284,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_t
                 if (table_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
                 } else {
                     return {static_cast<TableEntry *>(table_entry.get()), Status::OK()};
                 }
@@ -299,7 +299,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_t
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
 }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
@@ -353,13 +353,13 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-            res->entry_list_.emplace_back(Move(table_entry));
+            res->entry_list_.emplace_back(std::move(table_entry));
         }
     }
     res->entry_list_.sort([](const UniquePtr<BaseEntry> &ent1, const UniquePtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
     dummy_entry->deleted_ = true;
-    res->entry_list_.emplace_back(Move(dummy_entry));
+    res->entry_list_.emplace_back(std::move(dummy_entry));
 
     return res;
 }

@@ -25,7 +25,7 @@ module data_file_worker;
 namespace infinity {
 
 DataFileWorker::DataFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SizeT buffer_size)
-    : FileWorker(Move(file_dir), Move(file_name)), buffer_size_(buffer_size) {}
+    : FileWorker(std::move(file_dir), std::move(file_name)), buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {

@@ -24,7 +24,7 @@ namespace infinity {
 
 export class IndexDef {
 public:
-    explicit IndexDef(SharedPtr<String> index_name): index_name_(Move(index_name)) {}
+    explicit IndexDef(SharedPtr<String> index_name): index_name_(std::move(index_name)) {}
 
     virtual ~IndexDef() = default;
 

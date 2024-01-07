@@ -99,10 +99,10 @@ public:
     explicit IRSDataStore(const String &table_name, const String &directory);
     ~IRSDataStore();
     struct DataSnapshot {
-        DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
+        DataSnapshot(IRSDirectoryReader &&reader) : reader_(std::move(reader)) {}
         DataSnapshot &operator=(DataSnapshot &&rhs) noexcept {
             if (this != &rhs) {
-                reader_ = Move(rhs.reader_);
+                reader_ = std::move(rhs.reader_);
             }
             return *this;
         }

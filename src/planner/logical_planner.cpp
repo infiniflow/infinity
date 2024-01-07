@@ -450,7 +450,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     //        Error<NotImplementException>("Creating index only support single column now.");
     //    }
 
-    SharedPtr<String> index_name = MakeShared<String>(Move(create_index_info->index_name_));
+    SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     SharedPtr<IndexDef> index_def_ptr = MakeShared<IndexDef>(index_name);
 
     Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;

@@ -302,7 +302,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 /**
@@ -462,7 +462,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -516,7 +516,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -580,7 +580,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
         phase_cost_expr.AppendToChunk(output_block_ptr->column_vectors.back());
     }
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 /**
@@ -594,7 +594,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
-        show_operator_state->error_message_ = Move(status.msg_);
+        show_operator_state->error_message_ = std::move(status.msg_);
         Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }
@@ -663,7 +663,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     }
     output_block_ptr->Finalize();
 
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -671,7 +671,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
-        show_operator_state->error_message_ = Move(status.msg_);
+        show_operator_state->error_message_ = std::move(status.msg_);
         Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }
@@ -746,7 +746,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         }
     }
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 // Execute describe system table
@@ -1281,7 +1281,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1289,7 +1289,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
-        show_operator_state->error_message_ = Move(table_status.msg_);
+        show_operator_state->error_message_ = std::move(table_status.msg_);
         //        Error<ExecutorException>(table_status.message());
         return;
     }
@@ -1417,7 +1417,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
         }
     }
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_collecton_columns) {
@@ -1557,7 +1557,7 @@ void PhysicalShow::ExecuteShowSessionStatus(QueryContext *query_context, ShowOpe
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *show_operator_state) {
@@ -1614,7 +1614,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
     }
 
     output_block_ptr->Finalize();
-    show_operator_state->output_.emplace_back(Move(output_block_ptr));
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 } // namespace infinity

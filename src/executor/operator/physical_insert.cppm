@@ -37,7 +37,7 @@ public:
                             Vector<Vector<SharedPtr<BaseExpression>>> value_list,
                             SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kInsert, nullptr, nullptr, id, load_metas), table_entry_(table_entry),
-          table_index_(table_index), value_list_(Move(value_list)) {}
+          table_index_(table_index), value_list_(std::move(value_list)) {}
 
     ~PhysicalInsert() override = default;
 

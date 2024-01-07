@@ -74,7 +74,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
 
             if (explain_op->explain_type() == ExplainType::kPipeline) {
-                current_fragment_ptr->AddChild(Move(explain_child_fragment));
+                current_fragment_ptr->AddChild(std::move(explain_child_fragment));
             }
             break;
         }
@@ -140,7 +140,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputNames(),
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
-            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return;
         }
         case PhysicalOperatorType::kParallelAggregate:
@@ -187,7 +187,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputNames(),
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
-            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             if (phys_op->right() != nullptr) {
                 auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
                 next_plan_fragment->SetSinkNode(query_context_ptr_,
@@ -195,7 +195,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                                 phys_op->right()->GetOutputNames(),
                                                 phys_op->right()->GetOutputTypes());
                 BuildFragments(phys_op->right(), next_plan_fragment.get());
-                current_fragment_ptr->AddChild(Move(next_plan_fragment));
+                current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             }
             return;
         }
@@ -224,7 +224,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             //                                            phys_op->left()->GetOutputNames(),
             //                                            phys_op->left()->GetOutputTypes());
             //            BuildFragments(phys_op->left(), next_plan_fragment.get());
-            //            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            //            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             //            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 Error<SchedulerException>(fmt::format("{} shouldn't have child.", phys_op->GetName()));
@@ -286,7 +286,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
 
-            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return;
         }
         case PhysicalOperatorType::kCreateIndexFinish: {
@@ -304,7 +304,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                             phys_op->left()->GetOutputTypes());
             BuildFragments(phys_op->left(), next_plan_fragment.get());
 
-            current_fragment_ptr->AddChild(Move(next_plan_fragment));
+            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return;
         }
         default: {

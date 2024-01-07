@@ -38,7 +38,7 @@ friend struct NewCatalog;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, SharedPtr<String> name, DBEntry *db_entry)
-        : db_entry_dir_(db_entry_dir), table_name_(Move(name)), db_entry_(db_entry) {}
+        : db_entry_dir_(db_entry_dir), table_name_(std::move(name)), db_entry_(db_entry) {}
 
     SharedPtr<String> ToString();
 

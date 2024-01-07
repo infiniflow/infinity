@@ -29,7 +29,7 @@ module buffer_obj;
 namespace infinity {
 
 BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker)
-    : buffer_mgr_(buffer_mgr), file_worker_(Move(file_worker)) {
+    : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)) {
     // Init other info
     file_worker_->SetBaseTempDir(buffer_mgr->BaseDir(), buffer_mgr->GetTempDir());
 

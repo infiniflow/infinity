@@ -108,6 +108,9 @@ private:
             case ColumnVectorType::kHeterogeneous: {
                 return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
+            case ColumnVectorType::kCompactBit: {
+                Error<TypeException>("CompactBit isn't implemented.");
+            }
         }
     }
 
@@ -131,6 +134,9 @@ private:
             case ColumnVectorType::kHeterogeneous: {
                 return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
+            case ColumnVectorType::kCompactBit: {
+                Error<TypeException>("CompactBit isn't implemented.");
+            }
         }
     }
 
@@ -153,6 +159,9 @@ private:
             }
             case ColumnVectorType::kHeterogeneous: {
                 return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
+            }
+            case ColumnVectorType::kCompactBit: {
+                Error<TypeException>("CompactBit isn't implemented.");
             }
         }
     }

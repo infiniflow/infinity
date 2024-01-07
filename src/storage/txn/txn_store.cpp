@@ -99,7 +99,7 @@ TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id
     } else {
         TxnIndexStore index_store(table_index_entry);
         index_store.index_entry_map_[column_id][segment_id] = index;
-        txn_indexes_store_.emplace(index_name, Move(index_store));
+        txn_indexes_store_.emplace(index_name, std::move(index_store));
     }
     return nullptr;
 }

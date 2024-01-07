@@ -50,7 +50,7 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        u64 txn_id,
                        TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
-      table_name_(Move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type), table_meta_(table_meta) {
+      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type), table_meta_(table_meta) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
@@ -87,7 +87,7 @@ TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def, ConflictType confl
             table_index_meta = iter->second.get();
         } else {
 
-            this->index_meta_map_[*index_def->index_name_] = Move(new_table_index_meta);
+            this->index_meta_map_[*index_def->index_name_] = std::move(new_table_index_meta);
         }
         this->rw_locker_.unlock();
     }
@@ -132,7 +132,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -258,7 +258,7 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             Error<ExecutorException>(*err_msg);
-            return Status(ErrorCode::kNotFound, Move(err_msg));
+            return Status(ErrorCode::kNotFound, std::move(err_msg));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
@@ -311,7 +311,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
         Error<ExecutorException>(*err_msg);
-        return Status(ErrorCode::kNotFound, Move(err_msg));
+        return Status(ErrorCode::kNotFound, std::move(err_msg));
     }
 
     segment->min_row_ts_ = commit_ts;
@@ -328,7 +328,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 
     UniqueLock<RWMutex> rw_locker(this->rw_locker_);
     this->row_count_ = row_count;
-    this->segment_map_.emplace(segment->segment_id_, Move(segment));
+    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
 }
 
@@ -361,7 +361,7 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
-        return {0, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {0, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 }
 
@@ -511,7 +511,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
             UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
             String index_name = index_def_meta_json["index_name"];
-            table_entry->index_meta_map_.emplace(Move(index_name), Move(table_index_meta));
+            table_entry->index_meta_map_.emplace(std::move(index_name), std::move(table_index_meta));
         }
     }
 
@@ -569,7 +569,7 @@ void TableEntry::MergeFrom(BaseEntry &other) {
     for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {
         auto it = this->index_meta_map_.find(index_name);
         if (it == this->index_meta_map_.end()) {
-            this->index_meta_map_.emplace(index_name, Move(table_index_meta));
+            this->index_meta_map_.emplace(index_name, std::move(table_index_meta));
         } else {
             it->second->MergeFrom(*table_index_meta.get());
         }

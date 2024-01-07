@@ -38,7 +38,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                  u64 txn_id,
                                  TxnTimeStamp begin_ts,
                                  bool is_replay)
-    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_def_(Move(index_def)), index_dir_(Move(index_dir)) {
+    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_def_(std::move(index_def)), index_dir_(std::move(index_dir)) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 
@@ -62,7 +62,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
             SharedPtr<String> column_index_path = MakeShared<String>(fmt::format("{}/{}", *index_dir_, index_base->column_names_[0]));
             UniquePtr<ColumnIndexEntry> column_index_entry =
                 ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
-            column_index_map_[column_id] = Move(column_index_entry);
+            column_index_map_[column_id] = std::move(column_index_entry);
         }
     }
     if (!index_info_map.empty()) {
@@ -157,7 +157,7 @@ TableIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, TableIn
             UniquePtr<ColumnIndexEntry> column_index_entry =
                 ColumnIndexEntry::Deserialize(column_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
             u64 column_id = column_index_entry->column_id_;
-            table_index_entry->column_index_map_.emplace(column_id, Move(column_index_entry));
+            table_index_entry->column_index_map_.emplace(column_id, std::move(column_index_entry));
         }
     }
 

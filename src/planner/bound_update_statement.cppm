@@ -29,11 +29,11 @@ namespace infinity {
 export struct BoundUpdateStatement final : public BoundStatement {
 public:
     static inline UniquePtr<BoundUpdateStatement> Make(SharedPtr<BindContext> bind_context) {
-        return MakeUnique<BoundUpdateStatement>(Move(bind_context));
+        return MakeUnique<BoundUpdateStatement>(std::move(bind_context));
     }
 
 public:
-    inline explicit BoundUpdateStatement(SharedPtr<BindContext> bind_context) : bind_context_(Move(bind_context)) {}
+    inline explicit BoundUpdateStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
     SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 

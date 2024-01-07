@@ -38,8 +38,8 @@ public:
                                     SharedPtr<Vector<String>> output_names,
                                     SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                     SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeAggregate, Move(left), nullptr, id, load_metas), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), table_ref_(Move(table_ref)) {}
+        : PhysicalOperator(PhysicalOperatorType::kMergeAggregate, std::move(left), nullptr, id, load_metas), output_names_(std::move(output_names)),
+          output_types_(std::move(output_types)), table_ref_(std::move(table_ref)) {}
 
     ~PhysicalMergeAggregate() override = default;
 

@@ -72,7 +72,7 @@ export struct WalCmd {
 };
 
 export struct WalCmdCreateDatabase : public WalCmd {
-    explicit WalCmdCreateDatabase(String db_name_) : db_name(Move(db_name_)) {}
+    explicit WalCmdCreateDatabase(String db_name_) : db_name(std::move(db_name_)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_DATABASE; }
     bool operator==(const WalCmd &other) const override {
@@ -86,7 +86,7 @@ export struct WalCmdCreateDatabase : public WalCmd {
 };
 
 export struct WalCmdDropDatabase : public WalCmd {
-    explicit WalCmdDropDatabase(String db_name_) : db_name(Move(db_name_)) {}
+    explicit WalCmdDropDatabase(String db_name_) : db_name(std::move(db_name_)) {}
 
     WalCommandType GetType() override { return WalCommandType::DROP_DATABASE; }
     bool operator==(const WalCmd &other) const override {
@@ -100,7 +100,7 @@ export struct WalCmdDropDatabase : public WalCmd {
 };
 
 export struct WalCmdCreateTable : public WalCmd {
-    WalCmdCreateTable(String db_name_, const SharedPtr<TableDef> &table_def_) : db_name(Move(db_name_)), table_def(table_def_) {}
+    WalCmdCreateTable(String db_name_, const SharedPtr<TableDef> &table_def_) : db_name(std::move(db_name_)), table_def(table_def_) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const override;
@@ -113,7 +113,7 @@ export struct WalCmdCreateTable : public WalCmd {
 
 export struct WalCmdCreateIndex : public WalCmd {
     WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexDef> index_def)
-        : db_name_(Move(db_name)), table_name_(Move(table_name)), index_def_(Move(index_def)) {}
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_def_(std::move(index_def)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
 
@@ -162,7 +162,7 @@ export struct WalCmdDropIndex : public WalCmd {
 
 export struct WalCmdImport : public WalCmd {
     WalCmdImport(String db_name_, String table_name_, String segment_dir_, u32 segment_id_, u16 block_entries_size_, Vector<u16> &row_counts_)
-        : db_name(Move(db_name_)), table_name(Move(table_name_)), segment_dir(Move(segment_dir_)), segment_id(segment_id_),
+        : db_name(std::move(db_name_)), table_name(std::move(table_name_)), segment_dir(std::move(segment_dir_)), segment_id(segment_id_),
           block_entries_size(block_entries_size_), row_counts_(row_counts_) {}
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
@@ -181,7 +181,7 @@ export struct WalCmdImport : public WalCmd {
 
 export struct WalCmdAppend : public WalCmd {
     WalCmdAppend(String db_name_, String table_name_, const SharedPtr<DataBlock> &block_)
-        : db_name(Move(db_name_)), table_name(Move(table_name_)), block(block_) {}
+        : db_name(std::move(db_name_)), table_name(std::move(table_name_)), block(block_) {}
 
     WalCommandType GetType() override { return WalCommandType::APPEND; }
     bool operator==(const WalCmd &other) const override;
@@ -195,7 +195,7 @@ export struct WalCmdAppend : public WalCmd {
 
 export struct WalCmdDelete : public WalCmd {
     WalCmdDelete(String db_name_, String table_name_, const Vector<RowID> &row_ids_)
-        : db_name(Move(db_name_)), table_name(Move(table_name_)), row_ids(row_ids_) {}
+        : db_name(std::move(db_name_)), table_name(std::move(table_name_)), row_ids(row_ids_) {}
 
     WalCommandType GetType() override { return WalCommandType::DELETE; }
     bool operator==(const WalCmd &other) const override;
@@ -265,7 +265,7 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    WalEntryIterator(Vector<char> &&buf, StreamSize wal_size) : buf_(Move(buf)), wal_size_(wal_size) {
+    WalEntryIterator(Vector<char> &&buf, StreamSize wal_size) : buf_(std::move(buf)), wal_size_(wal_size) {
         end_ = buf_.data() + wal_size_;
     }
 

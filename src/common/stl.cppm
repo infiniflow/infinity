@@ -49,6 +49,8 @@ export namespace std {
 
 using std::experimental::source_location;
 // using std::stringstream;
+using std::forward;
+using std::move;
 
 } // namespace std
 
@@ -305,17 +307,11 @@ export {
 
     using StdException = std::exception;
 
-    // Move
-    template <typename T>
-    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&Move(T && value) noexcept {
-        return static_cast<typename std::remove_reference<T>::type &&>(value);
-    }
-
-    // Forward
-    template <typename T>
-    [[nodiscard]] constexpr T &&Forward(typename std::remove_reference<T>::type & value) noexcept {
-        return static_cast<T &&>(value);
-    }
+//    // std::move
+//    template <typename T>
+//    [[nodiscard]] constexpr typename std::remove_reference<T>::type &&std::move(T && value) noexcept {
+//        return static_cast<typename std::remove_reference<T>::type &&>(value);
+//    }
 
     // Chrono
     using Clock = std::chrono::high_resolution_clock;

@@ -73,7 +73,7 @@ Pair<u64, u64> VarHeapManager::Allocate(SizeT nbytes) {
                 if (current_chunk_size_ > chunks_[current_chunk_idx_]->capacity_) {
                     UniquePtr<VectorHeapChunk> new_chunk = MakeUnique<VectorHeapChunk>(current_chunk_size_);
                     Memcpy(new_chunk->ptr_, chunks_[current_chunk_idx_]->ptr_, current_chunk_offset_);
-                    chunks_[current_chunk_idx_] = Move(new_chunk);
+                    chunks_[current_chunk_idx_] = std::move(new_chunk);
                 }
 
                 if(current_chunk_offset_ + nbytes < current_chunk_size_) {

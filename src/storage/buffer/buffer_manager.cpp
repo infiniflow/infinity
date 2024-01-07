@@ -27,7 +27,7 @@ module buffer_manager;
 
 namespace infinity {
 BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, SharedPtr<String> temp_dir)
-    : base_dir_(Move(base_dir)), temp_dir_(Move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
+    : base_dir_(std::move(base_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
     LocalFileSystem fs;
     if (!fs.Exists(*base_dir_)) {
         fs.CreateDirectory(*base_dir_);
@@ -39,7 +39,7 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> base_dir, Share
 
 BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-    auto buffer_obj = MakeUnique<BufferObj>(this, true, Move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
 
     auto res = buffer_obj.get();
     UniqueLock<RWMutex> w_locker(rw_locker_);
@@ -48,7 +48,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
         LOG_ERROR(*err_msg);
         Error<StorageException>(*err_msg);
     }
-    buffer_map_.emplace(file_path, Move(buffer_obj));
+    buffer_map_.emplace(file_path, std::move(buffer_obj));
     return res;
 }
 
@@ -64,10 +64,10 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     }
 
     // Cannot find BufferHandle in buffer_map, read from disk
-    auto buffer_obj = MakeUnique<BufferObj>(this, false, Move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker));
 
     rw_locker_.lock();
-    auto [iter2, insert_ok] = buffer_map_.emplace(Move(file_path), Move(buffer_obj));
+    auto [iter2, insert_ok] = buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
     // If insert_ok is false, it means another thread has inserted the same buffer handle. Return it.
     rw_locker_.unlock();
 

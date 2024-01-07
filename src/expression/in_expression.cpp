@@ -25,7 +25,7 @@ module in_expression;
 namespace infinity {
 
 InExpression::InExpression(InType in_type, SharedPtr<BaseExpression> left_operand, const Vector<SharedPtr<BaseExpression>> &value_list)
-    : BaseExpression(ExpressionType::kIn, value_list), left_operand_ptr_(Move(left_operand)), in_type_(in_type) {}
+    : BaseExpression(ExpressionType::kIn, value_list), left_operand_ptr_(std::move(left_operand)), in_type_(in_type) {}
 
 String InExpression::ToString() const {
 

@@ -117,7 +117,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), table_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(table_scan.base_table_ref_->table_index_);
-            table_scan.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
+            table_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             table_scan.add_row_id_ = true;
             break;
         }
@@ -126,7 +126,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), knn_scan.base_table_ref_.get());
 
             scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
-            knn_scan.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
+            knn_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
         }
         case LogicalNodeType::kMatch: {
@@ -134,7 +134,7 @@ void CleanScan::VisitNode(LogicalNode &op) {
             Vector<SizeT> project_idxs = LoadedColumn(last_op_load_metas_.get(), match.base_table_ref_.get());
 
             scan_table_indexes_.push_back(match.base_table_ref_->table_index_);
-            match.base_table_ref_->RetainColumnByIndices(Move(project_idxs));
+            match.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
         }
         case LogicalNodeType::kLimit:

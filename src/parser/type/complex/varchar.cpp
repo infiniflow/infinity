@@ -31,7 +31,7 @@ Varchar::~Varchar() { Reset(); }
 Varchar::Varchar(const Varchar &other) { DeepCopy(other); }
 
 // Varchar::Varchar(Varchar &&other) noexcept {
-//     //    LOG_TRACE("Move constructor");
+//     //    LOG_TRACE("std::move constructor");
 //     this->length_ = other.length_;
 //     if (other.IsInlined()) {
 //         memcpy(this->short_.data_, other.short_.data_, length_);
@@ -59,7 +59,7 @@ Varchar &Varchar::operator=(const Varchar &other) {
 }
 
 Varchar &Varchar::operator=(Varchar &&other) noexcept {
-    //    LOG_TRACE("Move assignment");
+    //    LOG_TRACE("std::move assignment");
     if(this->IsValue()) {
         // Free memory
         Reset();

@@ -88,7 +88,7 @@ WalManager::WalManager(Storage *storage,
                        u64 delta_checkpoint_interval_wal_bytes)
     : wal_size_threshold_(wal_size_threshold), full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
       delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec), delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes),
-      wal_path_(Move(wal_path)), storage_(storage), running_(false) {}
+      wal_path_(std::move(wal_path)), storage_(storage), running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -688,7 +688,7 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
                                                   commit_ts,
                                                   commit_ts);
 
-        segment_entry->AppendBlockEntry(Move(block_entry));
+        segment_entry->AppendBlockEntry(std::move(block_entry));
         segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
     }
 
@@ -720,7 +720,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     table_store->Append(cmd.block);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
-    table_store->append_state_ = Move(append_state);
+    table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());

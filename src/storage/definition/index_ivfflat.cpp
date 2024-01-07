@@ -44,7 +44,7 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
     if (metric_type == MetricType::kInvalid) {
         Error<StorageException>("Lack index parameter metric_type");
     }
-    return MakeShared<IndexIVFFlat>(Move(file_name), Move(column_names), centroids_count, metric_type);
+    return MakeShared<IndexIVFFlat>(std::move(file_name), std::move(column_names), centroids_count, metric_type);
 }
 
 bool IndexIVFFlat::operator==(const IndexIVFFlat &other) const {

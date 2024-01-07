@@ -33,7 +33,7 @@ module logical_table_scan;
 namespace infinity {
 
 LogicalTableScan::LogicalTableScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, bool add_row_id)
-    : LogicalNode(node_id, LogicalNodeType::kTableScan), base_table_ref_(Move(base_table_ref)), add_row_id_(add_row_id) {}
+    : LogicalNode(node_id, LogicalNodeType::kTableScan), base_table_ref_(std::move(base_table_ref)), add_row_id_(add_row_id) {}
 
 Vector<ColumnBinding> LogicalTableScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;

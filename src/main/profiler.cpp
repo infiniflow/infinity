@@ -123,7 +123,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
 
     OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
 
-    timings_.push_back(Move(info));
+    timings_.push_back(std::move(info));
     active_operator_ = nullptr;
 }
 

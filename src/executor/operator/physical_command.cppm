@@ -35,8 +35,8 @@ public:
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCommand, nullptr, nullptr, id, load_metas), command_info_(Move(command_info)),
-          output_names_(Move(output_names)), output_types_(Move(output_types)) {}
+        : PhysicalOperator(PhysicalOperatorType::kCommand, nullptr, nullptr, id, load_metas), command_info_(std::move(command_info)),
+          output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalCommand() override = default;
 

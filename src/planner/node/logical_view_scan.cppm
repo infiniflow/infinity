@@ -29,7 +29,7 @@ export class LogicalViewScan : public LogicalNode {
 
 public:
     explicit LogicalViewScan(u64 node_id, SharedPtr<View> view_ptr)
-        : LogicalNode(node_id, LogicalNodeType::kViewScan), view_ptr_(Move(view_ptr)) {}
+        : LogicalNode(node_id, LogicalNodeType::kViewScan), view_ptr_(std::move(view_ptr)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

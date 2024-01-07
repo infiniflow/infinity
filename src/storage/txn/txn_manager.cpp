@@ -42,7 +42,7 @@ Txn *TxnManager::CreateTxn() {
     u64 new_txn_id = GetNewTxnID();
     UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, catalog_, new_txn_id);
     Txn *res = new_txn.get();
-    txn_map_[new_txn_id] = Move(new_txn);
+    txn_map_[new_txn_id] = std::move(new_txn);
     rw_locker_.unlock();
     return res;
 }

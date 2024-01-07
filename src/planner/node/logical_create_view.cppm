@@ -38,8 +38,8 @@ public:
                       SharedPtr<Vector<String>> names_ptr,
                       SharedPtr<Vector<SharedPtr<DataType>>> types_ptr,
                       SharedPtr<CreateViewInfo> create_view_info)
-        : LogicalNode(node_id, LogicalNodeType::kCreateView), names_ptr_(Move(names_ptr)), types_ptr_(Move(types_ptr)),
-          create_view_info_(Move(create_view_info)) {}
+        : LogicalNode(node_id, LogicalNodeType::kCreateView), names_ptr_(std::move(names_ptr)), types_ptr_(std::move(types_ptr)),
+          create_view_info_(std::move(create_view_info)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

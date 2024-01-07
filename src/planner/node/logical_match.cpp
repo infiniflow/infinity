@@ -31,7 +31,7 @@ module logical_match;
 namespace infinity {
 
 LogicalMatch::LogicalMatch(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr)
-    : LogicalNode(node_id, LogicalNodeType::kMatch), base_table_ref_(base_table_ref), match_expr_(Move(match_expr)) {}
+    : LogicalNode(node_id, LogicalNodeType::kMatch), base_table_ref_(base_table_ref), match_expr_(std::move(match_expr)) {}
 
 Vector<ColumnBinding> LogicalMatch::GetColumnBindings() const {
     Vector<ColumnBinding> result;

@@ -42,10 +42,10 @@ export struct SourcePosition {
 
 export class BaseExpression : public EnableSharedFromThis<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(Move(arguments)){};
+    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)){};
 
     explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments, String alias)
-        : alias_(Move(alias)), type_(type), arguments_(Move(arguments)){};
+        : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)){};
 
     virtual ~BaseExpression() = default;
 

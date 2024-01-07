@@ -106,7 +106,7 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kNotFound, Move(err_msg));
+            return Status(ErrorCode::kNotFound, std::move(err_msg));
         }
 
         if (entry->commit_ts_ < UNCOMMIT_TS) {
@@ -115,7 +115,7 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
                 if (entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kNotFound, Move(err_msg));
+                    return Status(ErrorCode::kNotFound, std::move(err_msg));
                 } else {
                     base_entry = entry.get();
                     return Status::OK();
@@ -129,7 +129,7 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return Status(ErrorCode::kNotFound, Move(err_msg));
+    return Status(ErrorCode::kNotFound, std::move(err_msg));
 }
 } // namespace infinity
 

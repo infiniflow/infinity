@@ -228,7 +228,7 @@ public:
 public:
     // Profile related methods
 
-    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { history.Enqueue(Move(profiler)); }
+    void AppendProfilerRecord(SharedPtr<QueryProfiler> profiler) { history.Enqueue(std::move(profiler)); }
 
     const QueryProfiler *GetProfilerRecord(SizeT index) { return history.GetElement(index); }
 

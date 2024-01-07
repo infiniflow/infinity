@@ -42,7 +42,7 @@ SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column
             analyzer = parameter->param_value_;
         }
     }
-    return MakeShared<IndexFullText>(file_name, Move(column_names), analyzer);
+    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {

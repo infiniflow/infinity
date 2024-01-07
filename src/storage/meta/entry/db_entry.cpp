@@ -65,7 +65,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         if (table_iter2 != this->tables_.end()) {
             table_meta = table_iter2->second.get();
         } else {
-            this->tables_[table_name] = Move(new_table_meta);
+            this->tables_[table_name] = std::move(new_table_meta);
         }
         this->rw_locker_.unlock();
 
@@ -92,7 +92,7 @@ DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_ty
 
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
@@ -112,7 +112,7 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_coll
     if (table_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid db meta.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
     return table_meta->GetEntry(txn_id, begin_ts);
 }
@@ -222,7 +222,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
             UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-            res->tables_.emplace(*table_meta->table_name_, Move(table_meta));
+            res->tables_.emplace(*table_meta->table_name_, std::move(table_meta));
         }
     }
 
@@ -246,7 +246,7 @@ void DBEntry::MergeFrom(BaseEntry &other) {
         auto it = this->tables_.find(table_name);
         if (it == this->tables_.end()) {
             table_meta2->db_entry_ = this;
-            this->tables_.emplace(table_name, Move(table_meta2));
+            this->tables_.emplace(table_name, std::move(table_meta2));
         } else {
             it->second->MergeFrom(*table_meta2.get());
         }

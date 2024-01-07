@@ -31,7 +31,7 @@ namespace infinity {
 export class PhysicalCrossProduct final : public PhysicalOperator {
 public:
     explicit PhysicalCrossProduct(u64 id, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCrossProduct, Move(left), Move(right), id, load_metas) {}
+        : PhysicalOperator(PhysicalOperatorType::kCrossProduct, std::move(left), std::move(right), id, load_metas) {}
 
     ~PhysicalCrossProduct() override = default;
 

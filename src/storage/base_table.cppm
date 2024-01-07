@@ -48,7 +48,7 @@ inline String ToString(BaseTableType type) {
 export class BaseTable {
 public:
     explicit BaseTable(TableEntryType kind, SharedPtr<String> schema_name, SharedPtr<String> table_name)
-            : kind_(kind), schema_name_(Move(schema_name)), table_name_(Move(table_name)) {}
+            : kind_(kind), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
     [[nodiscard]] inline TableEntryType kind() const { return kind_; }
 

@@ -83,10 +83,10 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
         Vector<SharedPtr<ColumnDef>> column_defs;
         SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
         output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
-        output_->SetResultMsg(Move(result_msg));
+        output_->SetResultMsg(std::move(result_msg));
     } else {
         InsertOperatorState *insert_operator_state = static_cast<InsertOperatorState *>(operator_state);
-        insert_operator_state->result_msg_ = Move(result_msg);
+        insert_operator_state->result_msg_ = std::move(result_msg);
     }
     operator_state->SetComplete();
     return true;

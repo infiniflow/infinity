@@ -25,7 +25,7 @@ module aggregate_expression;
 namespace infinity {
 
 AggregateExpression::AggregateExpression(AggregateFunction aggregate_function, Vector<SharedPtr<BaseExpression>> arguments)
-    : BaseExpression(ExpressionType::kAggregate, Move(arguments)), aggregate_function_(Move(aggregate_function)) {}
+    : BaseExpression(ExpressionType::kAggregate, std::move(arguments)), aggregate_function_(std::move(aggregate_function)) {}
 
 bool AggregateExpression::IsCountStar() const { return false; }
 

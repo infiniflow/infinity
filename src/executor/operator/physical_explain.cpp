@@ -153,7 +153,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     output_data_block->Init(column_vectors);
 
     ExplainOperatorState *explain_operator_state = static_cast<ExplainOperatorState *>(operator_state);
-    explain_operator_state->data_block_array_.emplace_back(Move(output_data_block));
+    explain_operator_state->data_block_array_.emplace_back(std::move(output_data_block));
     operator_state->SetComplete();
     return true;
 }

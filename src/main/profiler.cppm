@@ -25,7 +25,7 @@ export class BaseProfiler {
 public:
     BaseProfiler() = default;
 
-    explicit BaseProfiler(String name) : name_(Move(name)) {}
+    explicit BaseProfiler(String name) : name_(std::move(name)) {}
 
     // Start the profiler
     void Begin();
@@ -89,19 +89,19 @@ struct OperatorInformation {
     }
 
     OperatorInformation(OperatorInformation&& other)
-        : name_(Move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
+        : name_(std::move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
           output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {
     }
 
     OperatorInformation(String name, i64 start, i64 end, i64 elapsed, u16 input_rows, i32 output_data_size, u16 output_rows)
-        : name_(Move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), output_data_size_(output_data_size), output_rows_(output_rows) {
+        : name_(std::move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), output_data_size_(output_data_size), output_rows_(output_rows) {
     }
 
     OperatorInformation& operator=(OperatorInformation&& other) {
         if (this != &other) {
-            name_ = Move(other.name_);
-            start_ = Move(other.start_);
-            end_ = Move(other.end_);
+            name_ = std::move(other.name_);
+            start_ = std::move(other.start_);
+            end_ = std::move(other.end_);
             elapsed_ = other.elapsed_;
             input_rows_ = other.input_rows_;
             output_rows_ = other.output_rows_;

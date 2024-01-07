@@ -458,7 +458,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
                                                                         parsed_knn_expr.dimension_,
                                                                         parsed_knn_expr.distance_type_,
-                                                                        Move(query_embedding),
+                                                                        std::move(query_embedding),
                                                                         arguments,
                                                                         parsed_knn_expr.topn_,
                                                                         parsed_knn_expr.opt_params_);
@@ -496,7 +496,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
             UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
+            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
             in_subquery_expr->left_ = bound_left_expr;
             in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return in_subquery_expr;
@@ -508,7 +508,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
             UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
+            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
 
             subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return subquery_expr;

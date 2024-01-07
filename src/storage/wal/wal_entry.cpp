@@ -484,7 +484,7 @@ WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
     ifs.read(buf.data(), wal_size);
     ifs.close();
 
-    return WalEntryIterator(Move(buf), wal_size);
+    return WalEntryIterator(std::move(buf), wal_size);
 }
 
 SharedPtr<WalEntry> WalEntryIterator::Next() {

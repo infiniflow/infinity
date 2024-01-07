@@ -58,7 +58,7 @@ public:
                             CopyFileType type,
                             SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_entry_(table_entry),
-          file_type_(type), file_path_(Move(file_path)), header_(header), delimiter_(delimiter) {}
+          file_type_(type), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
 
     ~PhysicalImport() override = default;
 

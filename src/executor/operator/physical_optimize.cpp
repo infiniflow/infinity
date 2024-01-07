@@ -55,7 +55,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
-        operator_state->error_message_ = Move(table_status.msg_);
+        operator_state->error_message_ = std::move(table_status.msg_);
         Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }

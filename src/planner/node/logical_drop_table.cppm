@@ -27,7 +27,7 @@ namespace infinity {
 export class LogicalDropTable : public LogicalNode {
 public:
     LogicalDropTable(u64 node_id, SharedPtr<String> schema_name, SharedPtr<String> table_name, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kDropTable), schema_name_(Move(schema_name)), table_name_(Move(table_name)),
+        : LogicalNode(node_id, LogicalNodeType::kDropTable), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
           conflict_type_(conflict_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;

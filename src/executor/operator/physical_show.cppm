@@ -39,8 +39,8 @@ public:
                           Optional<u32> segment_id,
                           Optional<u16> block_id,
                           SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(Move(db_name)),
-          object_name_(Move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
+        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
+          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
 
     ~PhysicalShow() override = default;
 

@@ -49,7 +49,7 @@ public:
 
         UniqueLock<Mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
-        queue_.push_back(Forward<T>(task));
+        queue_.push_back(std::forward<T>(task));
         empty_cv_.notify_one();
         return true;
     }
@@ -72,7 +72,7 @@ public:
     T DequeueReturn() {
         UniqueLock<Mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
-        T res = Move(queue_.front());
+        T res = std::move(queue_.front());
         queue_.pop_front();
         full_cv_.notify_one();
         return res;

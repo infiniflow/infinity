@@ -50,7 +50,7 @@ export enum class ColumnVectorType : i8 {
 // Basic unit of column data vector
 export struct ColumnVector {
 public:
-    static inline SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type) { return MakeShared<ColumnVector>(Move(data_type)); }
+    static inline SharedPtr<ColumnVector> Make(SharedPtr<DataType> data_type) { return MakeShared<ColumnVector>(std::move(data_type)); }
 
 public:
     SizeT data_type_size_{0};
@@ -77,7 +77,7 @@ private:
 
 public:
     // Construct a column vector without initialization;
-    explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(Move(data_type)) {
+    explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(std::move(data_type)) {
         GlobalResourceUsage::IncrObjectCount();
     }
 

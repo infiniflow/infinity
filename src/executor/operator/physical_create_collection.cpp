@@ -36,9 +36,9 @@ PhysicalCreateCollection::PhysicalCreateCollection(SharedPtr<String> schema_name
                                                    u64 table_index,
                                                    u64 id,
                                                    SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-      collection_name_(Move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(Move(output_names)),
-      output_types_(Move(output_types)) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateCollection, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
+      collection_name_(std::move(collection_name)), conflict_type_(conflict_type), table_index_(table_index), output_names_(std::move(output_names)),
+      output_types_(std::move(output_types)) {}
 
 void PhysicalCreateCollection::Init() {}
 

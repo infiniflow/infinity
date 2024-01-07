@@ -27,7 +27,7 @@ namespace infinity {
 export class LogicalOptimize : public LogicalNode {
 public:
     explicit LogicalOptimize(u64 node_id, String schema_name, String object_name)
-        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(Move(schema_name)), object_name_(Move(object_name)) {}
+        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

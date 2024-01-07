@@ -24,7 +24,7 @@ namespace infinity {
 
 export class LocalFileHandler : public FileHandler {
 public:
-    LocalFileHandler(FileSystem &file_system, String path, i32 fd) : FileHandler(file_system, Move(path)), fd_(fd) {}
+    LocalFileHandler(FileSystem &file_system, String path, i32 fd) : FileHandler(file_system, std::move(path)), fd_(fd) {}
 
     ~LocalFileHandler() override;
 

@@ -34,7 +34,7 @@ bool PhysicalDropIndex::Execute(QueryContext *query_context, OperatorState *oper
     Status status = txn->DropIndexByName(*schema_name_, *table_name_, *index_name_, conflict_type_);
 
     auto drop_index_operator_state = static_cast<DropIndexOperatorState *>(operator_state);
-    drop_index_operator_state->error_message_ = Move(status.msg_);
+    drop_index_operator_state->error_message_ = std::move(status.msg_);
 
     // Generate the result
     Vector<SharedPtr<ColumnDef>> column_defs = {

@@ -131,7 +131,7 @@ void BindContext::AddSubqueryBinding(const String &name,
                                      u64 table_index,
                                      SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                      SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
     // Consider the subquery as the table
     table_names_.emplace_back(name);
@@ -143,7 +143,7 @@ void BindContext::AddCTEBinding(const String &name,
                                 u64 table_index,
                                 SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                 SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
     // Consider the CTE as the table
     table_names_.emplace_back(name);
@@ -155,7 +155,7 @@ void BindContext::AddViewBinding(const String &name,
                                  u64 table_index,
                                  SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                  SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
 }
 
@@ -169,9 +169,9 @@ void BindContext::AddTableBinding(const String &table_alias,
                                         table_alias,
                                         table_index,
                                         table_collection_entry_ptr,
-                                        Move(column_types),
-                                        Move(column_names),
-                                        Move(block_index));
+                                        std::move(column_types),
+                                        std::move(column_names),
+                                        std::move(block_index));
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
     table_name2table_index_[table_alias] = table_index;

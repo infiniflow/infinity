@@ -37,7 +37,7 @@ Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query
     AddRule(MakeUnique<ColumnRemapper>());
 }
 
-void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(Move(rule)); }
+void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std::move(rule)); }
 
 void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan) {
     SizeT rule_count = rules_.size();

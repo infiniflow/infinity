@@ -76,7 +76,7 @@ SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_nam
     if (metric_type == MetricType::kInvalid || encode_type == HnswEncodeType::kInvalid) {
         Error<StorageException>("Lack index parameters");
     }
-    return MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, encode_type, M, ef_construction, ef);
+    return MakeShared<IndexHnsw>(file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {

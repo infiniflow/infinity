@@ -34,7 +34,7 @@ public:
                              SharedPtr<Vector<SharedPtr<String>>> text_array,
                              UniquePtr<PhysicalOperator> left,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kExplain, Move(left), nullptr, id, load_metas), explain_type_(type), texts_(Move(text_array)) {}
+        : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id, load_metas), explain_type_(type), texts_(std::move(text_array)) {}
 
     ~PhysicalExplain() override = default;
 
@@ -42,9 +42,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = Move(text); }
+    void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = std::move(text); }
 
-    void SetExplainTaskText(SharedPtr<Vector<SharedPtr<String>>> text) { task_texts_ = Move(text); }
+    void SetExplainTaskText(SharedPtr<Vector<SharedPtr<String>>> text) { task_texts_ = std::move(text); }
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 

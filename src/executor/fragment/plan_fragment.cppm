@@ -59,7 +59,7 @@ public:
 
     inline void AddChild(UniquePtr<PlanFragment> child_fragment) {
         child_fragment->parent_ = this;
-        children_.emplace_back(Move(child_fragment));
+        children_.emplace_back(std::move(child_fragment));
     }
 
     inline Vector<UniquePtr<PlanFragment>> &Children() { return children_; }
@@ -70,7 +70,7 @@ public:
 
     [[nodiscard]] inline u64 FragmentID() const { return fragment_id_; }
 
-    inline void SetContext(UniquePtr<FragmentContext> context) { context_ = Move(context); }
+    inline void SetContext(UniquePtr<FragmentContext> context) { context_ = std::move(context); }
 
     inline FragmentContext *GetContext() { return context_.get(); }
 

@@ -28,7 +28,7 @@ namespace infinity {
 
 export class ValueExpression : public BaseExpression {
 public:
-    explicit ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(Move(value)) {}
+    explicit ValueExpression(Value value) : BaseExpression(ExpressionType::kValue, {}), value_(std::move(value)) {}
 
     String ToString() const override;
 

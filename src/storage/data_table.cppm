@@ -82,7 +82,7 @@ public:
 
     inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
 
-    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = Move(result_msg); }
+    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = std::move(result_msg); }
 
     [[nodiscard]] inline String *result_msg() const { return result_msg_.get(); }
 

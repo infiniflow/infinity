@@ -114,7 +114,7 @@ public:
 
 private:
     LVQStore(DataStoreMeta meta, This::InitArgs init_args)
-        : meta_(Move(meta)),                                                                                                                      //
+        : meta_(std::move(meta)),                                                                                                                      //
           compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), PADDING_SIZE)),                                                  //
           compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), PADDING_SIZE)),                                        //
           ptr_(static_cast<char *>(operator new[](compress_data_offset_ + compress_data_size_ * max_vec_num(), std::align_val_t(PADDING_SIZE)))), //
@@ -131,7 +131,7 @@ private:
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
         DataStoreMeta meta(max_vec_num, dim);
-        auto ret = This(Move(meta), Move(init_args));
+        auto ret = This(std::move(meta), std::move(init_args));
         ret.Init();
         return ret;
     }
@@ -141,12 +141,12 @@ public:
     LVQStore &operator=(This &&other) = delete;
 
     LVQStore(This &&other)
-        : meta_(Move(other.meta_)),                         //
+        : meta_(std::move(other.meta_)),                         //
           compress_data_offset_(other.compress_data_size_), //
           compress_data_size_(other.compress_data_offset_), //
           ptr_(other.ptr_),                                 //
           buffer_plain_size_(other.buffer_plain_size_),     //
-          plain_data_(Move(other.plain_data_))              //
+          plain_data_(std::move(other.plain_data_))              //
     {
         const_cast<char *&>(other.ptr_) = nullptr;
     }
@@ -165,7 +165,7 @@ public:
 
     static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
         DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
-        auto ret = This(Move(meta), Move(init_args));
+        auto ret = This(std::move(meta), std::move(init_args));
         file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
         return ret;
     }
@@ -274,7 +274,7 @@ public:
     SizeT AddVec(Iterator query_iter, SizeT vec_num) {
         if (SizeT idx = plain_data_.AddVec(query_iter, vec_num); idx != DataStoreMeta::ERR_IDX) {
             return meta_.cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(Move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
+        } else if (SizeT idx = MergeCompress(std::move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
             return idx;
         } else {
             return ERR_IDX;
@@ -299,7 +299,7 @@ public:
     QueryType MakeQuery(const DataType *vec) const {
         auto ptr = MakeUnique<char[]>(compress_data_size_);
         CompressVec(vec, LVQData(ptr.get()));
-        return QueryType{Move(ptr)};
+        return QueryType{std::move(ptr)};
     }
 
     void Compress() {

@@ -43,9 +43,9 @@ public:
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(Move(base_table_ref)),
-          knn_expression_(Move(knn_expression)), filter_expression_(Move(filter_expression)), output_names_(Move(output_names)),
-          output_types_(Move(output_types)), knn_table_index_(knn_table_index) {}
+        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
+          knn_expression_(std::move(knn_expression)), filter_expression_(std::move(filter_expression)), output_names_(std::move(output_names)),
+          output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 

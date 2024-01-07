@@ -39,7 +39,7 @@ export struct FragmentError : public FragmentDataBase {
     UniquePtr<String> error_message_{};
 
     FragmentError(u64 fragment_id, UniquePtr<String> error_message)
-        : FragmentDataBase(FragmentDataType::kError, fragment_id), error_message_(Move(error_message)) {}
+        : FragmentDataBase(FragmentDataType::kError, fragment_id), error_message_(std::move(error_message)) {}
 };
 
 export struct FragmentData : public FragmentDataBase {
@@ -49,7 +49,7 @@ export struct FragmentData : public FragmentDataBase {
     SizeT data_count_{u64_max};
 
     FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, SizeT data_idx, SizeT data_count)
-        : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(Move(data_block)), task_id_(task_id), data_idx_(data_idx),
+        : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), data_idx_(data_idx),
           data_count_(data_count) {}
 };
 

@@ -74,11 +74,11 @@ constexpr SizeT DEFAULT_CONSOLIDATION_INTERVAL_MSEC = 1000;
 
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
-    T t = Move(fn);
+    T t = std::move(fn);
     if (0 == id)
-        pool_0_.push(Move(t));
+        pool_0_.push(std::move(t));
     else if (1 == id)
-        pool_1_.push(Move(t));
+        pool_1_.push(std::move(t));
 }
 
 void IRSAsync::ClearQueue() {
@@ -145,7 +145,7 @@ void ConsolidationTask::operator()(int id) {
         if (count > 0) {
             if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
                 ConsolidationTask task(*this);
-                async_->Queue(1, Move(task));
+                async_->Queue(1, std::move(task));
             }
         }
     }
@@ -182,7 +182,7 @@ void CommitTask::Finalize() {
     constexpr size_t kMaxPendingConsolidations = 3;
     CommitTask task(*this);
     state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue(0, Move(task));
+    async_->Queue(0, std::move(task));
     if (state_->pending_consolidations_.load(MemoryOrderRelease) < kMaxPendingConsolidations) {
         store_->ScheduleConsolidation();
     }
@@ -224,9 +224,9 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
         return std::make_pair(info, irs::FeatureWriterFactory{});
     };
 
-    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
+    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), std::move(format), OpenMode(open_mode), options);
     auto reader = index_writer_->GetSnapshot();
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
 
     AnalyzerPool::instance().Set(SEGMENT);
     AnalyzerPool::instance().Set(JIEBA);
@@ -236,7 +236,7 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
 
 IRSDataStore::~IRSDataStore() { StopSchedule(); }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), MemoryOrderRelease); }
 
 IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, MemoryOrderAcquire); }
 
@@ -245,7 +245,7 @@ void IRSDataStore::Commit() {
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
     StoreSnapshot(data);
 }
 
@@ -256,7 +256,7 @@ void IRSDataStore::ScheduleCommit() {
     task.store_ = this;
     task.commit_interval_ = std::chrono::milliseconds(DEFAULT_COMMIT_INTERVAL);
     maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<CommitTask>(0, Move(task));
+    async_->Queue<CommitTask>(0, std::move(task));
 }
 
 void IRSDataStore::ScheduleConsolidation() {
@@ -267,7 +267,7 @@ void IRSDataStore::ScheduleConsolidation() {
     task.optimize_ = false;
     task.consolidation_interval_ = std::chrono::milliseconds{DEFAULT_CONSOLIDATION_INTERVAL_MSEC};
     maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(1, Move(task));
+    async_->Queue<ConsolidationTask>(1, std::move(task));
 }
 
 void IRSDataStore::ScheduleOptimize() {
@@ -277,7 +277,7 @@ void IRSDataStore::ScheduleOptimize() {
     task.store_ = this;
     task.optimize_ = true;
     maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(1, Move(task));
+    async_->Queue<ConsolidationTask>(1, std::move(task));
 }
 
 void IRSDataStore::StopSchedule() {
@@ -302,14 +302,14 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
             if (!stream.get()) {
                 throw StorageException("Dict path of Jieba analyzer is not valid");
             }
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else if (index_base->analyzer_ == SEGMENT) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else if (index_base->analyzer_.empty()) {
             // TODO use segmentation analyzer if analyzer is not set
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else {
             throw StorageException("Non existing analyzer");
         }
@@ -438,7 +438,7 @@ ViewSnapshot *IRSDataStore::GetViewSnapshot() {
 ViewSnapshot::ViewSnapshot(IRSDirectoryReader *reader) : reader_(reader) {
     segments_.reserve(reader_->size());
     for (auto &subreader : *reader_) {
-        segments_.emplace_back(Move(ViewSegment(subreader)));
+        segments_.emplace_back(std::move(ViewSegment(subreader)));
     }
 }
 

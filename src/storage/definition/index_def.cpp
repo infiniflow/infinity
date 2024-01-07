@@ -119,7 +119,7 @@ SharedPtr<IndexDef> IndexDef::Deserialize(const nlohmann::json &index_def_json) 
     SharedPtr<IndexDef> res = MakeShared<IndexDef>(index_name);
     for (const auto &index : index_def_json["indexes"]) {
         SharedPtr<IndexBase> index_base = IndexBase::Deserialize(index);
-        res->index_array_.emplace_back(Move(index_base));
+        res->index_array_.emplace_back(std::move(index_base));
     }
     return res;
 }

@@ -34,7 +34,7 @@ public:
 
 public:
     LogicalCreateTable(u64 node_id, SharedPtr<String> schema_name, SharedPtr<TableDef> table_def_ptr, u64 table_index, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kCreateTable), schema_name_(Move(schema_name)), table_definition_(Move(table_def_ptr)),
+        : LogicalNode(node_id, LogicalNodeType::kCreateTable), schema_name_(std::move(schema_name)), table_definition_(std::move(table_def_ptr)),
           table_index_(table_index), conflict_type_(conflict_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;

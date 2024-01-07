@@ -54,7 +54,7 @@ PhysicalFusion::PhysicalFusion(u64 id,
                                UniquePtr<PhysicalOperator> right,
                                SharedPtr<FusionExpression> fusion_expr,
                                SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kFusion, Move(left), Move(right), id, load_metas), fusion_expr_(fusion_expr) {}
+    : PhysicalOperator(PhysicalOperatorType::kFusion, std::move(left), std::move(right), id, load_metas), fusion_expr_(fusion_expr) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 
@@ -123,15 +123,15 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
     std::sort(std::begin(rrf_vec), std::end(rrf_vec), [](const RRFRankDoc &lhs, const RRFRankDoc &rhs) noexcept { return lhs.score > rhs.score; });
 
     // 4 generate output data blocks
-    UniquePtr<DataBlock> output_data_block = Move(DataBlock::MakeUniquePtr());
+    UniquePtr<DataBlock> output_data_block = std::move(DataBlock::MakeUniquePtr());
     output_data_block->Init(*GetOutputTypes());
     SizeT row_count = 0;
     for (RRFRankDoc &doc : rrf_vec) {
         // 4.1 get every doc's columns from input data blocks
         if (row_count == output_data_block->capacity()) {
             output_data_block->Finalize();
-            operator_state->data_block_array_.push_back(Move(output_data_block));
-            output_data_block = Move(DataBlock::MakeUniquePtr());
+            operator_state->data_block_array_.push_back(std::move(output_data_block));
+            output_data_block = std::move(DataBlock::MakeUniquePtr());
             row_count = 0;
         }
         SizeT fragment_idx = 0;
@@ -166,7 +166,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         row_count++;
     }
     output_data_block->Finalize();
-    operator_state->data_block_array_.push_back(Move(output_data_block));
+    operator_state->data_block_array_.push_back(std::move(output_data_block));
     fusion_operator_state->input_data_blocks_.clear();
     operator_state->SetComplete();
     return true;

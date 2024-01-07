@@ -47,8 +47,8 @@ public:
                       void *query_embedding,
                       EmbeddingDataType elem_type,
                       KnnDistanceType knn_distance_type)
-        : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(Move(block_column_entries)),
-          index_entries_(Move(index_entries)), opt_params_(Move(opt_params)), topk_(topk), dimension_(dimension),
+        : table_ref_(table_ref), filter_expression_(filter_expression), block_column_entries_(std::move(block_column_entries)),
+          index_entries_(std::move(index_entries)), opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension),
           query_count_(query_embedding_count), query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:

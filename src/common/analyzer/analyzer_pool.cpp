@@ -42,18 +42,18 @@ void AnalyzerPool::Set(const StringView &name) {
         switch (Str2Int(name.data())) {
             case Str2Int(CHINESE.data()): {
                 String path = InfinityContext::instance().config()->resource_dict_path();
-                UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(Move(path));
+                UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
                 if (analyzer->Load())
-                    cache_[CHINESE] = Move(analyzer);
+                    cache_[CHINESE] = std::move(analyzer);
             } break;
             case Str2Int(STANDARD.data()): {
                 UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();
-                cache_[STANDARD] = Move(analyzer);
+                cache_[STANDARD] = std::move(analyzer);
             } break;
             case Str2Int(NGRAM.data()): {
                 u32 ngram = 2; /// TODO config
                 UniquePtr<NGramAnalyzer> analyzer = MakeUnique<NGramAnalyzer>(ngram);
-                cache_[NGRAM] = Move(analyzer);
+                cache_[NGRAM] = std::move(analyzer);
             } break;
             default:
                 break;

@@ -27,7 +27,7 @@ class BindContext;
 
 export class JoinTableRef : public TableRef {
 public:
-    explicit JoinTableRef(String alias) : TableRef(TableRefType::kJoin, Move(alias)) {}
+    explicit JoinTableRef(String alias) : TableRef(TableRefType::kJoin, std::move(alias)) {}
 
     SharedPtr<BindContext> left_bind_context_;
     SharedPtr<BindContext> right_bind_context_;

@@ -34,7 +34,7 @@ public:
                            u64 id,
                            SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas),
-          output_names_(Move(output_names)), output_types_(Move(output_types)) {}
+          output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalAlter() override = default;
 

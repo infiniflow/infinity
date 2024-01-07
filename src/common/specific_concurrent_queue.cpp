@@ -16,7 +16,7 @@ void SpecificConcurrentQueue<FloatDistHeap>::Enqueue(const FloatDistHeap &item) 
 
 template <>
 void SpecificConcurrentQueue<FloatDistHeap>::Enqueue(FloatDistHeap &&item) {
-    queue_.enqueue(Move(item));
+    queue_.enqueue(std::move(item));
 }
 
 template <>
@@ -31,7 +31,7 @@ void SpecificConcurrentQueue<BufferObj *>::Enqueue(BufferObj *const &item) {
 
 template <>
 void SpecificConcurrentQueue<BufferObj *>::Enqueue(BufferObj * &&item) {
-    queue_.enqueue(Move(item));
+    queue_.enqueue(std::move(item));
 }
 
 template <>
@@ -46,7 +46,7 @@ void SpecificConcurrentQueue<Vector<bool>>::Enqueue(const Vector<bool> &item) {
 
 template <>
 void SpecificConcurrentQueue<Vector<bool>>::Enqueue(Vector<bool> &&item) {
-    queue_.enqueue(Move(item));
+    queue_.enqueue(std::move(item));
 }
 
 template <>

@@ -33,7 +33,7 @@ export enum class SpecialType {
 export class SpecialFunction final : public Function {
 public:
     SpecialFunction(const String func_name, DataType data_type, SizeT extra_idx, SpecialType special_type)
-        : Function(Move(func_name), FunctionType::kSpecial), data_type_(Move(data_type)), special_type_(special_type), extra_idx_(extra_idx) {}
+        : Function(std::move(func_name), FunctionType::kSpecial), data_type_(std::move(data_type)), special_type_(special_type), extra_idx_(extra_idx) {}
 
     const String &name() const { return name_; }
 

@@ -88,13 +88,13 @@ void FragmentTask::OnExecute(i64) {
         fragment_context->FlushProfiler(profiler);
 
         if (err_msg.get() != nullptr) {
-            sink_state_->error_message_ = Move(err_msg);
+            sink_state_->error_message_ = std::move(err_msg);
             this->set_status(FragmentTaskStatus::kError);
         }
     }
 
     if(source_complete && source_state_->error_message_.get() != nullptr) {
-        sink_state_->error_message_ = Move(source_state_->error_message_);
+        sink_state_->error_message_ = std::move(source_state_->error_message_);
         this->set_status(FragmentTaskStatus::kError);
     }
 

@@ -42,7 +42,7 @@ import data_access_state;
 
 namespace infinity {
 
-NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(Move(dir)) {
+NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
     if (create_default_db) {
         // db current dir is same level as catalog
         Path catalog_path(*this->current_dir_);
@@ -51,10 +51,10 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
         db_entry->commit_ts_ = 0;
-        DBMeta::AddEntry(db_meta.get(), Move(db_entry));
+        DBMeta::AddEntry(db_meta.get(), std::move(db_entry));
 
         this->rw_locker_.lock();
-        this->databases_["default"] = Move(db_meta);
+        this->databases_["default"] = std::move(db_meta);
         this->rw_locker_.unlock();
     }
 }
@@ -89,7 +89,7 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         this->rw_locker_.lock();
         auto db_iter2 = this->databases_.find(db_name);
         if (db_iter2 == this->databases_.end()) {
-            this->databases_[db_name] = Move(new_db_meta);
+            this->databases_[db_name] = std::move(new_db_meta);
         } else {
             db_meta = db_iter2->second.get();
         }
@@ -116,7 +116,7 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
@@ -135,7 +135,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
     }
     return db_meta->GetEntry(txn_id, begin_ts);
 }
@@ -316,7 +316,7 @@ u32 NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return TableEntry::G
 u32 NewCatalog::GetMaxSegmentID(const TableEntry *table_entry) { return TableEntry::GetMaxSegmentID(table_entry); }
 
 void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
-    table_entry->segment_map_.emplace(segment_id, Move(segment_entry));
+    table_entry->segment_map_.emplace(segment_id, std::move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }
@@ -461,7 +461,7 @@ void NewCatalog::MergeFrom(NewCatalog &other) {
     for (auto &[db_name, db_meta2] : other.databases_) {
         auto it = this->databases_.find(db_name);
         if (it == this->databases_.end()) {
-            this->databases_.emplace(db_name, Move(db_meta2));
+            this->databases_.emplace(db_name, std::move(db_meta2));
         } else {
             it->second->MergeFrom(*db_meta2.get());
         }
@@ -494,7 +494,7 @@ void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-            catalog->databases_.emplace(*db_meta->db_name(), Move(db_meta));
+            catalog->databases_.emplace(*db_meta->db_name(), std::move(db_meta));
         }
     }
 }

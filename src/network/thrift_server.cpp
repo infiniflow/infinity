@@ -250,7 +250,7 @@ public:
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(std::move(dst));
     }
 
     void
@@ -289,7 +289,7 @@ public:
             Error<NetworkException>("Bug");
         }
 
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
@@ -299,7 +299,7 @@ public:
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
@@ -308,7 +308,7 @@ public:
         String dst;
         dst.resize(size);
         Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 

@@ -88,10 +88,10 @@ private:
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
           mult_(1 / std::log(1.0 * M_)),                                                 //
-          data_store_(Move(data_store)),                                                 //
-          graph_store_(Move(graph_store)),                                               //
-          distance_(Move(distance)),                                                     //
-          labels_(Move(labels)),                                                         //
+          data_store_(std::move(data_store)),                                                 //
+          graph_store_(std::move(graph_store)),                                               //
+          distance_(std::move(distance)),                                                     //
+          labels_(std::move(labels)),                                                         //
           vertex_mutex_(data_store_.max_vec_num()) {
         if (ef == 0) {
             ef = ef_construction_;
@@ -105,16 +105,16 @@ private:
 public:
     static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
         auto [Mmax, Mmax0] = This::GetMmax(M);
-        auto data_store = DataStore::Make(max_vertex, dim, Move(args));
+        auto data_store = DataStore::Make(max_vertex, dim, std::move(args));
         auto graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
         Distance distance(data_store.dim());
         return UniquePtr<This>(new This(M,
                                         Mmax,
                                         Mmax0,
                                         ef_construction,
-                                        Move(data_store),
-                                        Move(graph_store),
-                                        Move(distance),
+                                        std::move(data_store),
+                                        std::move(graph_store),
+                                        std::move(distance),
                                         MakeUnique<LabelType[]>(max_vertex),
                                         0,
                                         0));
@@ -189,7 +189,7 @@ private:
             }
         }
         result_handler.EndWithoutSort();
-        return {result_handler.GetSize(0), Move(d_ptr), Move(i_ptr)};
+        return {result_handler.GetSize(0), std::move(d_ptr), std::move(i_ptr)};
     }
 
     template <bool WithLock = false>
@@ -280,7 +280,7 @@ private:
                 candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_), n_neighbors_p[i]);
             }
 
-            SelectNeighborsHeuristic(Move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
+            SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
         }
     }
 
@@ -355,7 +355,7 @@ public:
             }
 
             const auto [q_neighbors_p, q_neighbor_size_p] = graph_store_.GetNeighborsMut(vertex_i, cur_layer);
-            SelectNeighborsHeuristic(Move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
+            SelectNeighborsHeuristic(std::move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
             ep = q_neighbors_p[0];
             ConnectNeighbors<WithLock>(vertex_i, q_neighbors_p, *q_neighbor_size_p, cur_layer);
         }
@@ -410,7 +410,7 @@ public:
 
         auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
         file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
-        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), Move(distance), Move(labels), 0, 0));
+        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), std::move(labels), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

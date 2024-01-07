@@ -46,7 +46,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
                                                                           CreateIndexParam *param) {
     // FIXME: estimate index size.
     UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Allocate(Move(file_worker));
+    auto buffer = buffer_manager->Allocate(std::move(file_worker));
     auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
     segment_column_index_entry->min_ts_ = create_ts;
     segment_column_index_entry->max_ts_ = create_ts;
@@ -58,7 +58,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
                                                                            BufferManager *buffer_manager,
                                                                            CreateIndexParam *param) {
     UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Get(Move(file_worker));
+    auto buffer = buffer_manager->Get(std::move(file_worker));
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
 

@@ -35,7 +35,7 @@ class ExpressionBinder;
 
 export struct CommonTableExpressionInfo {
     CommonTableExpressionInfo(String alias, SelectStatement *select_stmt, HashSet<String> masked_name_set)
-        : alias_(Move(alias)), select_statement_(select_stmt), masked_name_set_(Move(masked_name_set)) {}
+        : alias_(std::move(alias)), select_statement_(select_stmt), masked_name_set_(std::move(masked_name_set)) {}
 
     String alias_;
     SelectStatement *select_statement_;

@@ -66,7 +66,7 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
         if (IsEqual(function_set_ptr->name(), String("AVG")) && function_expression.arguments_->size() == 1 &&
             (*function_expression.arguments_)[0]->type_ == ParsedExprType::kColumn) {
             auto column_expr = (ColumnExpr *)(*function_expression.arguments_)[0];
-            Vector<String> column_names(Move(column_expr->names_));
+            Vector<String> column_names(std::move(column_expr->names_));
             delete column_expr;
             ConvertAvgToSumDivideCount(function_expression, column_names);
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);

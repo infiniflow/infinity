@@ -49,7 +49,7 @@ public:
                          u64 table_index,
                          Optional<u32> segment_id = None,
                          Optional<u16> block_id = None)
-        : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(Move(schema_name)), object_name_(Move(object_name)),
+        : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
           table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;

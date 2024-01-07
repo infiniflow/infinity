@@ -35,14 +35,14 @@ void AnalyzerPool::Set(const StringView &name) {
             case Str2Int(JIEBA.data()): {
                 IRSJiebaAnalyzer::options_t opt;
                 opt.path_ = InfinityContext::instance().config()->resource_dict_path();
-                UniquePtr<IRSJiebaAnalyzer> analyzer = MakeUnique<IRSJiebaAnalyzer>(Move(opt));
+                UniquePtr<IRSJiebaAnalyzer> analyzer = MakeUnique<IRSJiebaAnalyzer>(std::move(opt));
                 if (analyzer->load())
-                    cache_[JIEBA] = Move(analyzer);
+                    cache_[JIEBA] = std::move(analyzer);
             } break;
             case Str2Int(SEGMENT.data()): {
                 IRSSegmentationAnalyzer::options_t opt;
-                UniquePtr<IRSAnalyzer> analyzer = MakeUnique<IRSSegmentationAnalyzer>(Move(opt));
-                cache_[SEGMENT] = Move(analyzer);
+                UniquePtr<IRSAnalyzer> analyzer = MakeUnique<IRSSegmentationAnalyzer>(std::move(opt));
+                cache_[SEGMENT] = std::move(analyzer);
             } break;
             default:
                 break;

@@ -60,7 +60,7 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
 
 void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
     UniqueLock<RWMutex> w_locker(this->rw_locker_);
-    this->index_by_segment_.emplace(segment_id, Move(index_entry));
+    this->index_by_segment_.emplace(segment_id, std::move(index_entry));
 }
 
 nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
@@ -118,7 +118,7 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
         for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
             UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
                 SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_entry);
-            column_index_entry->index_by_segment_.emplace(segment_column_index_entry->segment_id(), Move(segment_column_index_entry));
+            column_index_entry->index_by_segment_.emplace(segment_column_index_entry->segment_id(), std::move(segment_column_index_entry));
         }
     }
 

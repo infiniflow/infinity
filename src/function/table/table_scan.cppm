@@ -31,7 +31,7 @@ public:
     static SharedPtr<TableScanFunction> Make(NewCatalog *catalog, const String &func_name);
 
 public:
-    explicit TableScanFunction(String name, TableFunctionType function) : TableFunction(Move(name), {}, Move(function)) {}
+    explicit TableScanFunction(String name, TableFunctionType function) : TableFunction(std::move(name), {}, std::move(function)) {}
 
 private:
 };

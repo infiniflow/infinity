@@ -330,7 +330,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
     this->bind_context_ptr_->AddSubqueryBinding(binding_name, subquery_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), subquery_table_index, binding_name);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), subquery_table_index, binding_name);
 
     // TODO: Not care about the correlated expression
 
@@ -365,7 +365,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     this->bind_context_ptr_->AddCTEBinding(name, cte_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
-    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), cte_table_index, name);
+    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), cte_table_index, name);
 
     // TODO: Not care about the correlated expression
 
@@ -411,7 +411,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_id, begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
+    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, std::move(block_index), alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
     this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr, block_index);
@@ -451,7 +451,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
 
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr =
-        MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
 
     // TODO: Not care about the correlated expression
 
@@ -506,7 +506,7 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
         cross_product_table_ref->right_table_ref_ = right_table_ref;
 
         left_bind_context = cross_product_bind_context;
-        left_query_binder = Move(cross_product_query_binder);
+        left_query_binder = std::move(cross_product_query_binder);
         left_table_ref = cross_product_table_ref;
     }
 

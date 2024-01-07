@@ -30,7 +30,7 @@ class DBEntry;
 
 export struct ViewMeta {
 public:
-    explicit ViewMeta(SharedPtr<String> name, DBEntry *db_entry) : view_name_(Move(name)), db_entry_(db_entry) {}
+    explicit ViewMeta(SharedPtr<String> name, DBEntry *db_entry) : view_name_(std::move(name)), db_entry_(db_entry) {}
 
 public:
     static Status CreateNewEntry(ViewMeta *table_meta,

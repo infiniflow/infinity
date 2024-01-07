@@ -26,12 +26,12 @@ export class TableDef {
 
 public:
     static inline SharedPtr<TableDef> Make(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns) {
-        return MakeShared<TableDef>(Move(schema), Move(table_name), Move(columns));
+        return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(columns));
     }
 
 public:
     explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns)
-            : schema_name_(Move(schema)), table_name_(Move(table_name)), columns_(Move(columns)) {
+            : schema_name_(std::move(schema)), table_name_(std::move(table_name)), columns_(std::move(columns)) {
         SizeT column_count = columns_.size();
         for (SizeT idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;

@@ -51,9 +51,9 @@ BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 col
 
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
     if (!is_replay) {
-        block_column_entry->buffer_ = buffer_manager->Allocate(Move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
     } else {
-        block_column_entry->buffer_ = buffer_manager->Get(Move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     if (block_column_entry->column_type_->type() == kVarchar) {
@@ -67,7 +67,7 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BufferManager *buffer_manager) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
-        this->buffer_ = buffer_manager->Get(Move(file_worker));
+        this->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     bool outline = this->column_type_->type() == kVarchar;
@@ -155,7 +155,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                                                        file_name,
                                                        DEFAULT_BASE_NUM * Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
 
-                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
+                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
@@ -286,7 +286,7 @@ Vector<String> BlockColumnEntry::OutlinePaths() const {
         for (SizeT i = 0; i < outline_info_->next_file_idx; ++i) {
             auto outline_file = BlockColumnEntry::OutlineFilename(column_id_, i);
 
-            outline_paths.push_back(Move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));
+            outline_paths.push_back(std::move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));
         }
     }
     return outline_paths;

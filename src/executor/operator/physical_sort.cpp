@@ -182,8 +182,8 @@ Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &indexes_group,
     if (l > r)
         return Vector<BlockRawIndex>();
     SizeT mid = (l + r) >> 1;
-    return MergeTwoIndexes(Move(MergeIndexes(indexes_group, l, mid, comparator)),
-                           Move(MergeIndexes(indexes_group, mid + 1, r, comparator)),
+    return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator),
+                           MergeIndexes(indexes_group, mid + 1, r, comparator),
                            comparator);
 }
 
@@ -202,7 +202,7 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
         auto sorted_datablock = DataBlock::MakeUniquePtr();
         sorted_datablock->Init(input_blocks[0]->types());
 
-        output_blocks.push_back(Move(sorted_datablock));
+        output_blocks.push_back(std::move(sorted_datablock));
     }
     for (SizeT index_idx = 0; index_idx < block_indexes.size(); ++index_idx) {
         auto &block_index = block_indexes[index_idx];

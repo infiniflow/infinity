@@ -164,7 +164,7 @@ Value Value::MakeCircle(CircleT input) {
 
 Value Value::MakeUuid(UuidT input) {
     Value value(LogicalType::kUuid);
-    value.value_.uuid = Move(input);
+    value.value_.uuid = std::move(input);
     return value;
 }
 
@@ -191,10 +191,10 @@ Value Value::MakeVarchar(const VarcharT &input) {
     Value value(LogicalType::kVarchar);
     if (input.IsInlined()) {
         String tmp_str(input.short_.data_, input.length_);
-        value.value_info_ = MakeShared<StringValueInfo>(Move(tmp_str));
+        value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
     } else if (input.IsValue()) {
         String tmp_str(input.value_.ptr_, input.length_);
-        value.value_info_ = MakeShared<StringValueInfo>(Move(tmp_str));
+        value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
     } else {
         throw TypeException("Value::MakeVarchar(VectorVarchar) is unsupported!");
     }
@@ -388,7 +388,7 @@ Value::~Value() { GlobalResourceUsage::DecrObjectCount(); }
 
 Value::Value(const DataType &data_type) : type_(data_type) { GlobalResourceUsage::IncrObjectCount(); }
 
-Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, Move(typeinfo_ptr)) {
+Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
     GlobalResourceUsage::IncrObjectCount();
 }
 
@@ -399,7 +399,7 @@ Value::Value(const Value &other) : type_(other.type_) {
 
 Value::Value(Value &&other) noexcept : type_(other.type_) {
     GlobalResourceUsage::IncrObjectCount();
-    MoveUnionValue(Forward<Value>(other));
+    MoveUnionValue(std::forward<Value>(other));
 }
 
 Value &Value::operator=(const Value &other) {
@@ -412,7 +412,7 @@ Value &Value::operator=(const Value &other) {
 
 Value &Value::operator=(Value &&other) noexcept {
     this->Reset();
-    MoveUnionValue(Forward<Value>(other));
+    MoveUnionValue(std::forward<Value>(other));
     return *this;
 }
 
@@ -599,7 +599,7 @@ void Value::CopyUnionValue(const Value &other) {
 }
 
 void Value::MoveUnionValue(Value &&other) noexcept {
-    this->type_ = Move(other.type_);
+    this->type_ = std::move(other.type_);
     switch (this->type_.type()) {
         case kBoolean: {
             this->value_.boolean = other.value_.boolean;
@@ -678,7 +678,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             break;
         }
         case kUuid: {
-            this->value_.uuid = Move(other.value_.uuid);
+            this->value_.uuid = std::move(other.value_.uuid);
             break;
         }
         case kRowID: {
@@ -691,7 +691,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         }
         case kVarchar:
         case kEmbedding: {
-            this->value_info_ = Move(other.value_info_);
+            this->value_info_ = std::move(other.value_info_);
             break;
         }
         case kMissing:

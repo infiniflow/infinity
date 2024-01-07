@@ -34,8 +34,8 @@ public:
                                     ConflictType conflict_type,
                                     u64 id,
                                     SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kDropCollection, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-          collection_name_(Move(collection_name)), conflict_type_(conflict_type) {}
+        : PhysicalOperator(PhysicalOperatorType::kDropCollection, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
+          collection_name_(std::move(collection_name)), conflict_type_(conflict_type) {}
 
     ~PhysicalDropCollection() override = default;
 

@@ -390,7 +390,7 @@ export struct AggregateSourceState : public SourceState {
 
 export struct TableScanSourceState : public SourceState {
     explicit TableScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kTableScan), global_ids_(Move(global_ids)) {}
+        : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };

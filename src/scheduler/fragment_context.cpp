@@ -412,7 +412,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
                 }
             }
 
-            task->operator_states_[operator_id] = Move(operator_state);
+            task->operator_states_[operator_id] = std::move(operator_state);
         }
     }
 
@@ -442,7 +442,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
         task_array.emplace_back(task.get());
     }
 
-    fragment_ptr->SetContext(Move(fragment_context));
+    fragment_ptr->SetContext(std::move(fragment_context));
 }
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
@@ -475,9 +475,9 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
             serial_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                                                                    knn_scan_operator->filter_expression_,
-                                                                                                   Move(knn_scan_operator->block_column_entries_),
-                                                                                                   Move(knn_scan_operator->index_entries_),
-                                                                                                   Move(knn_expr->opt_params_),
+                                                                                                   std::move(knn_scan_operator->block_column_entries_),
+                                                                                                   std::move(knn_scan_operator->index_entries_),
+                                                                                                   std::move(knn_expr->opt_params_),
                                                                                                    knn_expr->topn_,
                                                                                                    knn_expr->dimension_,
                                                                                                    1,
@@ -490,9 +490,9 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
             parallel_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
                                                                                                      knn_scan_operator->filter_expression_,
-                                                                                                     Move(knn_scan_operator->block_column_entries_),
-                                                                                                     Move(knn_scan_operator->index_entries_),
-                                                                                                     Move(knn_expr->opt_params_),
+                                                                                                     std::move(knn_scan_operator->block_column_entries_),
+                                                                                                     std::move(knn_scan_operator->index_entries_),
+                                                                                                     std::move(knn_expr->opt_params_),
                                                                                                      knn_expr->topn_,
                                                                                                      knn_expr->dimension_,
                                                                                                      1,
@@ -686,7 +686,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
                 auto sink_state = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
 
-                tasks_[task_id]->sink_state_ = Move(sink_state);
+                tasks_[task_id]->sink_state_ = std::move(sink_state);
             }
             break;
         }
@@ -706,7 +706,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
                 sink_state->column_types_ = last_operator->GetOutputTypes();
                 sink_state->column_names_ = last_operator->GetOutputNames();
 
-                tasks_[task_id]->sink_state_ = Move(sink_state);
+                tasks_[task_id]->sink_state_ = std::move(sink_state);
             }
             break;
         }
@@ -722,7 +722,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
                 auto sink_state = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), task_id);
 
-                tasks_[task_id]->sink_state_ = Move(sink_state);
+                tasks_[task_id]->sink_state_ = std::move(sink_state);
             }
             break;
         }
@@ -1000,9 +1000,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             SharedPtr<DataTable> result_table = DataTable::MakeResultTable(column_defs);
             for (auto &data_block : materialize_sink_state->data_block_array_) {
                 result_table->UpdateRowCount(data_block->row_count());
-                result_table->data_blocks_.emplace_back(Move(data_block));
+                result_table->data_blocks_.emplace_back(std::move(data_block));
             }
-            //            result_table->data_blocks_ = Move(materialize_sink_state->data_block_array_);
+            //            result_table->data_blocks_ = std::move(materialize_sink_state->data_block_array_);
             return result_table;
         }
         case SinkStateType::kResult: {
@@ -1017,7 +1017,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
-            result_table->SetResultMsg(Move(message_sink_state->message_));
+            result_table->SetResultMsg(std::move(message_sink_state->message_));
             return result_table;
         }
         case SinkStateType::kSummary: {
@@ -1078,7 +1078,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
-            result_table->Append(Move(result_data_block));
+            result_table->Append(std::move(result_data_block));
         }
     }
 
@@ -1126,7 +1126,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
         }
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
-            result_table->Append(Move(result_data_block));
+            result_table->Append(std::move(result_data_block));
         }
     }
 

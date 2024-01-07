@@ -182,7 +182,7 @@ inline UuidT NullValue() {
 template <>
 inline EmbeddingT NullValue() {
     ptr_t ptr = ptr_inf;
-    EmbeddingT embedding(Move(ptr), false);
+    EmbeddingT embedding(std::move(ptr), false);
     return embedding;
 }
 

@@ -20,7 +20,7 @@ namespace infinity {
 BlobType::BlobType(const BlobType &other) { this->Copy(other.ptr, other.size); }
 
 BlobType::BlobType(BlobType &&other) noexcept {
-    Move(other.ptr, other.size);
+    std::move(other.ptr, other.size);
     other.ptr = nullptr;
     other.size = 0;
 }
@@ -35,7 +35,7 @@ BlobType &BlobType::operator=(const BlobType &other) {
 BlobType &BlobType::operator=(BlobType &&other) noexcept {
     if (this == &other)
         return *this;
-    this->Move(other.ptr, other.size);
+    this->std::move(other.ptr, other.size);
     other.ptr = nullptr;
     other.size = 0;
     return *this;
@@ -62,7 +62,7 @@ void BlobType::Copy(char *blob_ptr, uint64_t blob_size) {
     this->size = blob_size;
 }
 
-void BlobType::Move(char *blob_ptr, uint64_t blob_size) {
+void BlobType::std::move(char *blob_ptr, uint64_t blob_size) {
     Reset();
     this->ptr = blob_ptr;
     this->size = blob_size;

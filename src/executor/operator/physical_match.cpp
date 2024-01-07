@@ -54,7 +54,7 @@ PhysicalMatch::PhysicalMatch(u64 id,
                              u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
-      base_table_ref_(Move(base_table_ref)), match_expr_(Move(match_expr)) {}
+      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
@@ -135,7 +135,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         output_data_block->column_vectors[column_id]->AppendWith(row_id, 1);
     }
     output_data_block->Finalize();
-    operator_state->data_block_array_.emplace_back(Move(output_data_block));
+    operator_state->data_block_array_.emplace_back(std::move(output_data_block));
 
     operator_state->SetComplete();
     return true;

@@ -40,15 +40,15 @@ private:
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs = {}) {
         DataStoreMeta data_store(max_vec_num, dim);
-        return This(Move(data_store));
+        return This(std::move(data_store));
     }
 
-    PlainStore(DataStoreMeta meta) : meta_(Move(meta)), ptr_(MakeUnique<DataType[]>(meta_.max_vec_num_ * meta_.dim_)) {}
+    PlainStore(DataStoreMeta meta) : meta_(std::move(meta)), ptr_(MakeUnique<DataType[]>(meta_.max_vec_num_ * meta_.dim_)) {}
 
-    PlainStore(This &&other) : meta_(Move(other.meta_)), ptr_(Move(const_cast<UniquePtr<DataType[]> &>(other.ptr_))) {}
+    PlainStore(This &&other) : meta_(std::move(other.meta_)), ptr_(std::move(const_cast<UniquePtr<DataType[]> &>(other.ptr_))) {}
     PlainStore &operator=(This &&other) {
-        meta_ = Move(other.meta_);
-        const_cast<UniquePtr<DataType[]> &>(ptr_) = Move(const_cast<UniquePtr<DataType[]> &>(other.ptr_));
+        meta_ = std::move(other.meta_);
+        const_cast<UniquePtr<DataType[]> &>(ptr_) = std::move(const_cast<UniquePtr<DataType[]> &>(other.ptr_));
         return *this;
     }
 
@@ -61,7 +61,7 @@ public:
 
     static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs = {}) {
         DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
-        This ret(Move(meta));
+        This ret(std::move(meta));
         file_handler.Read(ret.ptr_.get(), sizeof(DataType) * ret.cur_vec_num() * ret.dim());
         return ret;
     }

@@ -28,7 +28,7 @@ public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
     IndexIVFFlat(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexBase(file_name, IndexType::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+        : IndexBase(file_name, IndexType::kIVFFlat, std::move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
     ~IndexIVFFlat() final = default;
 

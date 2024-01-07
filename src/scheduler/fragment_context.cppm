@@ -55,7 +55,7 @@ public:
         if(!query_context_->is_enable_profiling()) {
             return ;
         }
-        query_context_->FlushProfiler(Move(profiler));
+        query_context_->FlushProfiler(std::move(profiler));
     }
 
     void FinishTask();

@@ -95,7 +95,7 @@ void DataTable::Append(const SharedPtr<DataBlock> &data_block) {
     UpdateRowCount(data_block->row_count());
 }
 
-SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<DataTable>(Move(table_def_ptr), type); }
+SharedPtr<DataTable> DataTable::Make(SharedPtr<TableDef> table_def_ptr, TableType type) { return MakeShared<DataTable>(std::move(table_def_ptr), type); }
 
 SharedPtr<DataTable> DataTable::MakeResultTable(const Vector<SharedPtr<ColumnDef>> &column_defs) {
     SharedPtr<TableDef> result_table_def_ptr = TableDef::Make(nullptr, nullptr, column_defs);
@@ -127,7 +127,7 @@ SharedPtr<DataTable> DataTable::MakeSummaryResultTable(u64 count, u64 sum) {
 }
 
 DataTable::DataTable(SharedPtr<TableDef> table_def_ptr, TableType type)
-    : BaseTable(TableEntryType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(Move(table_def_ptr)),
+    : BaseTable(TableEntryType::kTableEntry, table_def_ptr->schema_name(), table_def_ptr->table_name()), definition_ptr_(std::move(table_def_ptr)),
       row_count_(0), type_(type) {}
 
 SizeT DataTable::ColumnCount() const { return definition_ptr_->column_count(); }

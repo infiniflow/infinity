@@ -169,7 +169,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         }
     }
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
-    import_op_state->result_msg_ = Move(result_msg);
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -224,7 +224,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     NewCatalog::IncreaseTableRowCount(table_entry_, parser_context->row_count_);
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context->row_count_));
-    import_op_state->result_msg_ = Move(result_msg);
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -284,7 +284,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     }
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
-    import_op_state->result_msg_ = Move(result_msg);
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) { Error<NotImplementException>("Import JSON is not implemented yet."); }

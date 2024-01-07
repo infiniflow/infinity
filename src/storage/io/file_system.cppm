@@ -25,7 +25,7 @@ export class FileSystem;
 
 export class FileHandler {
 public:
-    FileHandler(FileSystem &file_system, String path) : file_system_(file_system), path_(Move(path)) {}
+    FileHandler(FileSystem &file_system, String path) : file_system_(file_system), path_(std::move(path)) {}
 
     FileHandler(const FileHandler &) = delete;
 

@@ -27,8 +27,8 @@ namespace infinity {
 export class LogicalExport : public LogicalNode {
 public:
     explicit LogicalExport(u64 node_id, String schema_name, String table_name, String file_path, bool header, char delimiter, CopyFileType type)
-        : LogicalNode(node_id, LogicalNodeType::kExport), schema_name_(Move(schema_name)), table_name_(Move(table_name)),
-          file_path_(Move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
+        : LogicalNode(node_id, LogicalNodeType::kExport), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
+          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

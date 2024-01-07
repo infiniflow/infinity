@@ -51,7 +51,7 @@ void TaskScheduler::Init(const Config *config_ptr) {
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id % cpu_count);
 
-        worker_array_.emplace_back(cpu_id, Move(worker_queue), Move(worker_thread));
+        worker_array_.emplace_back(cpu_id, std::move(worker_queue), std::move(worker_thread));
         worker_workloads_[cpu_id] = 0;
     }
 

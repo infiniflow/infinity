@@ -31,7 +31,7 @@ export struct DBMeta {
 friend struct NewCatalog;
 
 public:
-    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(Move(name)), data_dir_(data_dir) {}
+    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(std::move(name)), data_dir_(data_dir) {}
 
     SharedPtr<String> ToString();
 

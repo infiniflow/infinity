@@ -31,8 +31,8 @@ namespace infinity {
 export class PhysicalOptimize final : public PhysicalOperator {
 public:
     explicit PhysicalOptimize(u64 id, String db_name, String object_name, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas), db_name_(Move(db_name)),
-          object_name_(Move(object_name)) {}
+        : PhysicalOperator(PhysicalOperatorType::kOptimize, nullptr, nullptr, id, load_metas), db_name_(std::move(db_name)),
+          object_name_(std::move(object_name)) {}
 
     ~PhysicalOptimize() override = default;
 
