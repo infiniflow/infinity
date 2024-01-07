@@ -215,58 +215,6 @@ export {
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
 
-//    constexpr u64 u64_min = std::numeric_limits<u64>::min();
-//    constexpr i64 std::numeric_limits<i64>::min() = std::numeric_limits<i64>::min();
-//    constexpr u32 u32_min = std::numeric_limits<u32>::min();
-//    constexpr i32 std::numeric_limits<i32>::min() = std::numeric_limits<i32>::min();
-//    constexpr i16 std::numeric_limits<i16>::min() = std::numeric_limits<i16>::min();
-//    constexpr u16 u16_min = std::numeric_limits<u16>::min();
-//    constexpr i8 std::numeric_limits<i8>::min() = std::numeric_limits<i8>::min();
-//    constexpr u8 u8_min = std::numeric_limits<u8>::min();
-//
-//    constexpr u64 std::numeric_limits<u64>::max(); = std::numeric_limits<u64>::max();
-//    constexpr i64 std::numeric_limits<i64>::max(); = std::numeric_limits<i64>::max();
-//    constexpr u32 u32_max = std::numeric_limits<u32>::max();
-//    constexpr i32 std::numeric_limits<i32>::max(); = std::numeric_limits<i32>::max();
-//    constexpr i16 std::numeric_limits<i16>::max() = std::numeric_limits<i16>::max();
-//    constexpr u16 std::numeric_limits<u16>::max() = std::numeric_limits<u16>::max();
-//    constexpr i8 std::numeric_limits<i8>::max() = std::numeric_limits<i8>::max();
-//    constexpr u8 u8_max = std::numeric_limits<u8>::max();
-//
-//    constexpr f32 std::numeric_limits<f32>::infinity() = std::numeric_limits<f32>::infinity();
-//    constexpr f32 std::numeric_limits<f32>::min() = std::numeric_limits<f32>::min();
-//    constexpr f32 std::numeric_limits<f32>::max() = std::numeric_limits<f32>::max();
-//    constexpr f64 std::numeric_limits<f64>::infinity() = std::numeric_limits<f64>::infinity();
-//    constexpr f64 std::numeric_limits<f64>::min() = std::numeric_limits<f64>::min();
-//    constexpr f64 std::numeric_limits<f64>::max() = std::numeric_limits<f64>::max();
-//
-//    constexpr u64 u64_inf = std::numeric_limits<u64>::infinity();
-//    constexpr i64 std::numeric_limits<i64>::infinity() = std::numeric_limits<i64>::infinity();
-//    constexpr u32 std::numeric_limits<u32>::infinity() = std::numeric_limits<u32>::infinity();
-//    constexpr i32 std::numeric_limits<i32>::infinity() = std::numeric_limits<i32>::infinity();
-//    constexpr i16 std::numeric_limits<i16>::infinity() = std::numeric_limits<i16>::infinity();
-//    constexpr u16 u16_inf = std::numeric_limits<u16>::infinity();
-//    constexpr i8 std::numeric_limits<i8>::infinity() = std::numeric_limits<i8>::infinity();
-//    constexpr u8 u8_inf = std::numeric_limits<u8>::infinity();
-//
-//    constexpr ptr_t std::numeric_limits<ptr_t>::infinity() = std::numeric_limits<ptr_t>::infinity();
-//    constexpr u64 *u64_ptr_inf = std::numeric_limits<u64 *>::infinity();
-
-    template <typename T>
-    constexpr T LimitMax() {
-        return std::numeric_limits<T>::max();
-    }
-
-    template <typename T>
-    constexpr T LimitMin() {
-        return std::numeric_limits<T>::min();
-    }
-
-    template <typename T>
-    constexpr T LimitLowest() {
-        return std::numeric_limits<T>::lowest();
-    }
-
     template <typename T>
     using Atomic = std::atomic<T>;
 

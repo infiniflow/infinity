@@ -177,7 +177,7 @@ public:
 
                             *ip_line = dis;
                         } else {
-                            *ip_line = LimitMax<DistType>();
+                            *ip_line = std::numeric_limits<DistType>::max();
                         }
                         ip_line++;
                     }

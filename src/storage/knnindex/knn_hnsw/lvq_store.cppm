@@ -45,7 +45,7 @@ public:
     static constexpr SizeT PADDING_SIZE = 32;
 
 private:
-    constexpr static SizeT max_bucket_idx_ = LimitMax<CompressType>() - LimitMin<CompressType>(); // 255 for i8
+    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
 
     // Decompress: Q = scale * C + bias + Mean
     using ScalarType = DataType; // type for scale and bias
@@ -187,22 +187,22 @@ private:
         auto [scale_p, bias_p] = lvq.GetScalarMut();
         CompressType *compress = lvq.GetCompressVecMut();
 
-        ScalarType lower = LimitMax<ScalarType>();
-        ScalarType upper = -LimitMax<ScalarType>();
+        ScalarType lower = std::numeric_limits<ScalarType>::max();
+        ScalarType upper = -std::numeric_limits<ScalarType>::max();
         for (SizeT j = 0; j < dim(); ++j) {
             auto x = static_cast<ScalarType>(vec[j] - mean[j]);
             lower = std::min(lower, x);
             upper = std::max(upper, x);
         }
         ScalarType scale = (upper - lower) / max_bucket_idx_;
-        ScalarType bias = lower - LimitMin<CompressType>() * scale;
+        ScalarType bias = lower - std::numeric_limits<CompressType>::min() * scale;
         if (scale == 0) {
             std::fill(compress, compress + dim(), 0);
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                if(!(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>())) {
+                if(!(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min())) {
                     Error<StorageException>("CompressVec error");
                 }
                 compress[j] = c;

@@ -41,7 +41,7 @@ void search_top_1_with_sgemm(u32 dimension,
         distances_holder = MakeUniqueForOverwrite<f32[]>(nx);
         distances = distances_holder.get();
     }
-    std::fill_n(distances, nx, LimitMax<f32>());
+    std::fill_n(distances, nx, std::numeric_limits<f32>::max());
     auto square_x = MakeUniqueForOverwrite<f32[]>(nx);
     auto square_y = MakeUniqueForOverwrite<f32[]>(ny);
     auto x_y_inner_product_buffer = MakeUniqueForOverwrite<f32[]>(block_size_x * block_size_y);

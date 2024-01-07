@@ -34,7 +34,7 @@ struct CompareMin {
     using CompareReverse = CompareMax<DistanceType, IDType>;
     static bool Compare(DistanceType a, DistanceType b) { return a < b; }
     static bool Compare(DistanceType a, DistanceType b, IDType i, IDType j) { return (a < b) || ((a == b) && (i > j)); }
-    static constexpr DistanceType InitialValue() { return LimitLowest<DistanceType>(); }
+    static constexpr DistanceType InitialValue() { return std::numeric_limits<DistanceType>::lowest(); }
     static constexpr bool IsMax = false;
 };
 
@@ -45,7 +45,7 @@ struct CompareMax {
     using CompareReverse = CompareMin<DistanceType, IDType>;
     static bool Compare(DistanceType a, DistanceType b) { return a > b; }
     static bool Compare(DistanceType a, DistanceType b, IDType i, IDType j) { return (a > b) || ((a == b) && (i > j)); }
-    static constexpr DistanceType InitialValue() { return LimitMax<DistanceType>(); }
+    static constexpr DistanceType InitialValue() { return std::numeric_limits<DistanceType>::max(); }
     static constexpr bool IsMax = true;
 };
 
@@ -277,14 +277,14 @@ public:
             auto &min_distance = this->distance_ptr[i];
             auto &min_index = this->id_ptr[i];
             auto tmp_min_distance = min_distance;
-            auto tmp_min_j = LimitMax<SizeT>();
+            auto tmp_min_j = std::numeric_limits<SizeT>::max();
             for (u32 j = j0; j < j1; ++j) {
                 if (const DistType distance = dis_tab_i[j]; Compare::Compare(tmp_min_distance, distance)) {
                     tmp_min_distance = distance;
                     tmp_min_j = j;
                 }
             }
-            if (tmp_min_j != LimitMax<SizeT>()) {
+            if (tmp_min_j != std::numeric_limits<SizeT>::max()) {
                 min_distance = tmp_min_distance;
                 min_index = RowID(segment_id, segment_offset_start + tmp_min_j);
             }
