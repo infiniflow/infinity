@@ -174,7 +174,7 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
     } else {
         if (SizeT start_offset = dest_start_idx % 8; start_offset != 0) {
             // head part
-            SizeT start_todo = Min(count, 8 - start_offset);
+            SizeT start_todo = std::min(count, 8 - start_offset);
             for (SizeT i = 0; i < start_todo; ++i) {
                 RawPointerSetCompactBit(dst_ptr_u8, dest_start_idx++, RawPointerGetCompactBit(src_ptr_u8, source_start_idx++));
             }

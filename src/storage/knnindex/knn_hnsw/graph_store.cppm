@@ -246,7 +246,7 @@ public:
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             VertexL0 vertex = GetLevel0(vertex_i);
             int cur_max_layer = vertex.GetLayers().second;
-            max_layer = Max(cur_max_layer, max_layer);
+            max_layer = std::max(cur_max_layer, max_layer);
             assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
             auto [neighbors, neighbor_n] = vertex.GetNeighbors();
             assert(neighbor_n <= int(Mmax0));

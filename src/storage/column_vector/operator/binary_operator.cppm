@@ -620,7 +620,7 @@ private:
         auto result_u8 = reinterpret_cast<u8 *>(result->data());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 const SizeT e = end_index / 8, tail = end_index % 8;
@@ -672,7 +672,7 @@ private:
         auto result_u8 = reinterpret_cast<u8 *>(result->data());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 const SizeT e = end_index / 8, tail = end_index % 8;
@@ -724,7 +724,7 @@ private:
         auto result_u8 = reinterpret_cast<u8 *>(result->data());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 const SizeT e = end_index / 8, tail = end_index % 8;
@@ -890,7 +890,7 @@ private:
         BooleanPointer result_ptr(result->buffer_.get());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {
@@ -931,7 +931,7 @@ private:
         BooleanPointer result_ptr(result->buffer_.get());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {
@@ -972,7 +972,7 @@ private:
         BooleanPointer result_ptr(result->buffer_.get());
         static_assert(BitmaskBuffer::UNIT_BITS % 8 == 0, "static_assert: BitmaskBuffer::UNIT_BITS % 8 == 0");
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {

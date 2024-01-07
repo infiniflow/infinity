@@ -191,8 +191,8 @@ private:
         ScalarType upper = -LimitMax<ScalarType>();
         for (SizeT j = 0; j < dim(); ++j) {
             auto x = static_cast<ScalarType>(vec[j] - mean[j]);
-            lower = Min(lower, x);
-            upper = Max(upper, x);
+            lower = std::min(lower, x);
+            upper = std::max(upper, x);
         }
         ScalarType scale = (upper - lower) / max_bucket_idx_;
         ScalarType bias = lower - LimitMin<CompressType>() * scale;
@@ -262,7 +262,7 @@ private:
             ++vec_i;
         }
         *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
-        plain_data_ = PlainStore<DataType>::Make(Min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
+        plain_data_ = PlainStore<DataType>::Make(std::min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
         return cur_vec_num() - vec_num;
     }
 

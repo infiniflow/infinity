@@ -222,7 +222,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     if (this->min_row_ts_ == 0) {
         this->min_row_ts_ = commit_ts;
     }
-    this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+    this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
 
     auto &block_version = this->block_version_;
     block_version->created_.push_back({commit_ts, int32_t(this->row_count_)});
@@ -244,7 +244,7 @@ void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
     if (this->min_row_ts_ == 0) {
         this->min_row_ts_ = commit_ts;
     }
-    this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+    this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
 }
 
 void BlockEntry::FlushData(int64_t checkpoint_row_count) {

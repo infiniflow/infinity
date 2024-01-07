@@ -111,7 +111,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
 
         u64 output_row_count{0};
-        i64 result_n = Min(merge_knn_data.topk_, merge_knn->total_count());
+        i64 result_n = std::min(merge_knn_data.topk_, merge_knn->total_count());
         for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
             DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
             RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);

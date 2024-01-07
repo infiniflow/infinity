@@ -25,7 +25,7 @@ import hnsw_alg;
 using namespace infinity;
 
 #define EXPECT_VALUE_EQ(a, b)                                                                                                                        \
-    if (auto f = f64(a) - f64(b); Max(f, -f) > 1e-4) {                                                                                               \
+    if (auto f = f64(a) - f64(b); std::max(f, -f) > 1e-4) {                                                                                               \
         std::cerr << "values aren't equal at line\t" << __LINE__ << "\tvalues: " << a << " != " << b << std::endl;                                   \
     }
 

@@ -282,8 +282,8 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
             i64 task_start = std::numeric_limits<i64>::max();
             i64 task_end = 0;
             for (const auto &operators : task.second) {
-                task_start = Min(task_start, operators.task_profiler_.GetBegin());
-                task_end = Max(task_end, operators.task_profiler_.GetEnd());
+                task_start = std::min(task_start, operators.task_profiler_.GetBegin());
+                task_end = std::max(task_end, operators.task_profiler_.GetEnd());
 
                 nlohmann::json json_operators;
                 json_operators["times"] = times;
@@ -305,8 +305,8 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
             json_tasks["task_end"] = task_end;
             json_tasks["task_total"] = task_end - task_start;
 
-            fragment_start = Min(fragment_start, task_start);
-            fragment_end = Max(fragment_end, task_end);
+            fragment_start = std::min(fragment_start, task_start);
+            fragment_end = std::max(fragment_end, task_end);
 
             json_fragments["tasks"].push_back(json_tasks);
         }
@@ -316,8 +316,8 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
         json_fragments["fragment_end"] = fragment_end;
         json_fragments["fragment_total"] = fragment_total;
 
-        start = Min(start, fragment_start);
-        end = Max(end, fragment_end);
+        start = std::min(start, fragment_start);
+        end = std::max(end, fragment_end);
 
         json["fragments"].push_back(json_fragments);
     }

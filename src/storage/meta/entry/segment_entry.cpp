@@ -313,7 +313,7 @@ void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id
         if (this->min_row_ts_ == 0) {
             this->min_row_ts_ = commit_ts;
         }
-        this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
         block_entry = this->block_entries_[block_id];
     }
     block_entry->CommitAppend(txn_id, commit_ts);
@@ -331,7 +331,7 @@ void SegmentEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMa
         }
 
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
     }
 }
 
@@ -401,7 +401,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             auto block_entries_size = segment_entry->block_entries_.size();
-            segment_entry->block_entries_.resize(Max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
+            segment_entry->block_entries_.resize(std::max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
             segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
         }
     }
@@ -444,9 +444,9 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
         Error<StorageException>("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
     }
 
-    this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);
-    this->row_capacity_ = Max(this->row_capacity_, segment_entry2->row_capacity_);
+    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
+    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
+    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
 
     SizeT block_count = this->block_entries_.size();
     SizeT idx = 0;

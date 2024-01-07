@@ -86,7 +86,7 @@ private:
             UniquePtr<LabelType[]> labels,
             SizeT ef,
             SizeT random_seed)
-        : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
+        : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(std::max(M_, ef_construction)), //
           mult_(1 / std::log(1.0 * M_)),                                                 //
           data_store_(std::move(data_store)),                                                 //
           graph_store_(std::move(graph_store)),                                               //
@@ -173,7 +173,7 @@ private:
                 }
                 visited[n_idx] = true;
                 if (prefetch_start >= 0) {
-                    int lower = Max(0, prefetch_start - prefetch_step_);
+                    int lower = std::max(0, prefetch_start - prefetch_step_);
                     for (int i = prefetch_start; i >= lower; --i) {
                         data_store_.Prefetch(neighbors_p[i]);
                     }
@@ -347,7 +347,7 @@ public:
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
+        for (i32 cur_layer = std::min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
             auto [result_n, d_ptr, v_ptr] = SearchLayer<WithLock>(ep, query, cur_layer, ef_construction_, None);
             auto search_result = Vector<PDV>(result_n);
             for (SizeT i = 0; i < result_n; ++i) {
@@ -368,7 +368,7 @@ public:
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        return SearchLayer<WithLock>(ep, query, 0, Max(k, ef_), bitmask);
+        return SearchLayer<WithLock>(ep, query, 0, std::max(k, ef_), bitmask);
     }
 
     // function for test

@@ -95,9 +95,9 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager *src_heap_mgr, 
         SizeT copy_size{0};
         if (nbytes > src_chunk_remain_size) {
             // not all data will be copied in this chunk
-            copy_size = Min(current_chunk_remain_size, src_chunk_remain_size);
+            copy_size = std::min(current_chunk_remain_size, src_chunk_remain_size);
         } else {
-            copy_size = Min(current_chunk_remain_size, nbytes);
+            copy_size = std::min(current_chunk_remain_size, nbytes);
         }
 
         char *src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;

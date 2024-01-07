@@ -95,7 +95,7 @@ void ExpressionSelector::Select(const SharedPtr<ColumnVector> &bool_column, Size
         const u64 *result_null_data = null_mask->GetData();
         SizeT unit_count = BitmaskBuffer::UnitCount(count);
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count; ++i, end_index += BitmaskBuffer::UNIT_BITS) {
-            end_index = Min(end_index, count);
+            end_index = std::min(end_index, count);
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (; start_index < end_index; ++start_index) {

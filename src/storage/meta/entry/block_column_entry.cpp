@@ -144,7 +144,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = this->outline_info_.get();
                     auto base_file_size =
-                        Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                        std::min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
@@ -153,7 +153,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                         auto file_worker =
                             MakeUnique<DataFileWorker>(this->base_dir_,
                                                        file_name,
-                                                       DEFAULT_BASE_NUM * Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
+                                                       DEFAULT_BASE_NUM * std::max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
 
                         BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
@@ -286,7 +286,7 @@ Vector<String> BlockColumnEntry::OutlinePaths() const {
         for (SizeT i = 0; i < outline_info_->next_file_idx; ++i) {
             auto outline_file = BlockColumnEntry::OutlineFilename(column_id_, i);
 
-            outline_paths.push_back(std::move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));
+            outline_paths.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file));
         }
     }
     return outline_paths;

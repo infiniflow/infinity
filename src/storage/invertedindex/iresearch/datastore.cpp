@@ -438,7 +438,7 @@ ViewSnapshot *IRSDataStore::GetViewSnapshot() {
 ViewSnapshot::ViewSnapshot(IRSDirectoryReader *reader) : reader_(reader) {
     segments_.reserve(reader_->size());
     for (auto &subreader : *reader_) {
-        segments_.emplace_back(std::move(ViewSegment(subreader)));
+        segments_.emplace_back(ViewSegment(subreader));
     }
 }
 

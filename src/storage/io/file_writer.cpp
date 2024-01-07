@@ -70,7 +70,7 @@ void FileWriter::Write(const char_t *buffer, SizeT bytes_count) {
     while (start_pos < end_pos) {
         i64 byte_count1 = end_pos - start_pos;
         i64 byte_count2 = buffer_size_ - offset_;
-        i64 to_write = Min(byte_count1, byte_count2);
+        i64 to_write = std::min(byte_count1, byte_count2);
         Memcpy(data_.get() + offset_, start_pos, to_write);
         offset_ += to_write;
         start_pos += to_write;

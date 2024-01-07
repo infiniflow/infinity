@@ -52,6 +52,9 @@ using std::experimental::source_location;
 using std::forward;
 using std::move;
 
+using std::max;
+using std::min;
+
 } // namespace std
 
 namespace infinity {
@@ -144,16 +147,6 @@ export {
         } else {
             return nullptr;
         }
-    }
-
-    template <typename T>
-    inline const T &Min(const T &a, const T &b) {
-        return std::min(a, b);
-    }
-
-    template <typename T>
-    inline const T &Max(const T &a, const T &b) {
-        return std::max(a, b);
     }
 
     // ToStr()

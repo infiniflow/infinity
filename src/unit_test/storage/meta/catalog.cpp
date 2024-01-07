@@ -177,9 +177,6 @@ TEST_F(CatalogTest, concurrent_test) {
         auto *txn2 = txn_mgr->CreateTxn();
         txn2->Begin();
 
-        // lock protect databases
-        std::mutex lock;
-
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
                 String db_name = "db" + ToStr(db_id);

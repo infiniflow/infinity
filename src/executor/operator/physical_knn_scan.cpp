@@ -103,7 +103,7 @@ void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
         bool bitmask_use_unit = (bitmask_offset % BitmaskBuffer::UNIT_BITS) == 0;
         SizeT bitmask_unit_offset = bitmask_offset / BitmaskBuffer::UNIT_BITS;
         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count;
-             ++i, end_index = Min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
+             ++i, end_index = std::min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (; start_index < end_index; ++start_index) {
@@ -467,7 +467,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
         merge_heap->End();
-        i64 result_n = Min(knn_scan_shared_data->topk_, merge_heap->total_count());
+        i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
         if (!operator_state->data_block_array_.empty()) {
             Error<ExecutorException>("In physical_knn_scan : operator_state->data_block_array_ is not empty.");

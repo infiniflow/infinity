@@ -123,7 +123,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
     std::sort(std::begin(rrf_vec), std::end(rrf_vec), [](const RRFRankDoc &lhs, const RRFRankDoc &rhs) noexcept { return lhs.score > rhs.score; });
 
     // 4 generate output data blocks
-    UniquePtr<DataBlock> output_data_block = std::move(DataBlock::MakeUniquePtr());
+    UniquePtr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
     output_data_block->Init(*GetOutputTypes());
     SizeT row_count = 0;
     for (RRFRankDoc &doc : rrf_vec) {
@@ -131,7 +131,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         if (row_count == output_data_block->capacity()) {
             output_data_block->Finalize();
             operator_state->data_block_array_.push_back(std::move(output_data_block));
-            output_data_block = std::move(DataBlock::MakeUniquePtr());
+            output_data_block = DataBlock::MakeUniquePtr();
             row_count = 0;
         }
         SizeT fragment_idx = 0;
