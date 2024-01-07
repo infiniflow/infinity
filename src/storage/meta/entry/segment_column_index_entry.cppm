@@ -49,10 +49,10 @@ public:
 
     [[nodiscard]] BufferHandle GetIndex();
 
-    Json Serialize();
+    nlohmann::json Serialize();
 
     static UniquePtr<SegmentColumnIndexEntry>
-    Deserialize(const Json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
+    Deserialize(const nlohmann::json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
     void MergeFrom(BaseEntry &other);
 

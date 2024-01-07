@@ -72,7 +72,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr<String> result;
 
     // Default general config
-    String default_version = Format("{}.{}.{}", version_major(), version_minor(), version_patch());
+    String default_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
 
     String default_time_zone = "UTC";
     i32 default_time_zone_bias = 8;
@@ -125,7 +125,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        Printf("No config file is given, use default configs.\n");
+        fmt::print("No config file is given, use default configs.\n");
 
         // General
         {
@@ -160,7 +160,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             system_option_.log_filename = default_log_filename;
             system_option_.log_dir = default_log_dir;
-            system_option_.log_file_path = MakeShared<String>(Format("{}/{}", *system_option_.log_dir, *system_option_.log_filename));
+            system_option_.log_file_path = MakeShared<String>(fmt::format("{}/{}", *system_option_.log_dir, *system_option_.log_filename));
             system_option_.log_to_stdout = default_log_to_stdout;
             system_option_.log_max_size = default_log_max_size; // 1Gib
             system_option_.log_file_rotate_count = default_log_file_rotate_count;
@@ -191,8 +191,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Resource
         { system_option_.resource_dict_path_ = default_resource_dict_path; }
     } else {
-        Printf("Read config from: {}\n", *config_path);
-        TomlTable config = TomlParseFile(*config_path);
+        fmt::print("Read config from: {}\n", *config_path);
+        toml::table config = toml::parse_file(*config_path);
         // General
         {
             auto general_config = config["general"];
@@ -212,7 +212,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             try {
                 ParseTimeZoneStr(time_zone_str, system_option_.time_zone, system_option_.time_zone_bias);
             } catch (...) {
-                result = MakeShared<String>(Format("Timezone can't be recognized: {}", time_zone_str));
+                result = MakeShared<String>(fmt::format("Timezone can't be recognized: {}", time_zone_str));
                 return result;
             }
         }
@@ -221,13 +221,13 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             auto system_config = config["system"];
             system_option_.worker_cpu_limit = system_config["worker_cpu_limit"].value_or(default_total_cpu_number);
-            if(system_option_.worker_cpu_limit == 0) {
+            if (system_option_.worker_cpu_limit == 0) {
                 system_option_.worker_cpu_limit = default_total_cpu_number;
             }
 
-            if(system_config["total_memory_size"].as_integer() != 0) {
+            if (system_config["total_memory_size"].as_integer() != 0) {
                 i64 total_memory_size_int = system_config["total_memory_size"].value_or(default_total_memory_size);
-                if(total_memory_size_int <= 0) {
+                if (total_memory_size_int <= 0) {
                     system_option_.total_memory_size = default_total_memory_size;
                 } else {
                     system_option_.total_memory_size = total_memory_size_int;
@@ -245,18 +245,18 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             }
 
             system_option_.query_cpu_limit = system_config["query_cpu_limit"].value_or(default_query_cpu_limit);
-            if(system_option_.query_cpu_limit == 0) {
+            if (system_option_.query_cpu_limit == 0) {
                 system_option_.query_cpu_limit = default_query_cpu_limit;
             }
 
             system_option_.query_memory_limit = system_config["query_memory_limit"].value_or(default_query_memory_limit);
-            if(system_option_.query_memory_limit == 0) {
+            if (system_option_.query_memory_limit == 0) {
                 system_option_.query_memory_limit = default_query_memory_limit;
             }
 
-            if(system_config["query_memory_limit"].as_integer() != 0) {
+            if (system_config["query_memory_limit"].as_integer() != 0) {
                 i64 query_memory_size_int = system_config["query_memory_limit"].value_or(default_query_memory_limit);
-                if(query_memory_size_int <= 0) {
+                if (query_memory_size_int <= 0) {
                     system_option_.query_memory_limit = default_query_memory_limit;
                 } else {
                     system_option_.query_memory_limit = query_memory_size_int;
@@ -290,7 +290,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             BoostErrorCode error;
             asio_make_address(system_option_.listen_address, error);
             if (error) {
-                String err_msg = Format("Not a valid IPv4 address: {}", system_option_.listen_address);
+                String err_msg = fmt::format("Not a valid IPv4 address: {}", system_option_.listen_address);
                 result = MakeShared<String>(err_msg);
                 return result;
             }
@@ -306,7 +306,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.log_filename = MakeShared<String>(log_config["log_filename"].value_or(*default_log_filename));
             system_option_.log_dir = MakeShared<String>(log_config["log_dir"].value_or(*default_log_dir));
 
-            String log_file_path = Format("{}/{}", *system_option_.log_dir, *system_option_.log_filename);
+            String log_file_path = fmt::format("{}/{}", *system_option_.log_dir, *system_option_.log_filename);
             system_option_.log_file_path = MakeShared<String>(log_file_path);
             system_option_.log_to_stdout = log_config["log_to_stdout"].value_or(default_log_to_stdout);
 
@@ -379,53 +379,53 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 }
 
 void Config::PrintAll() const {
-    Printf("Infinity system parameters: \n");
+    fmt::print("Infinity system parameters: \n");
 
     // General
-    Printf(" - version: {}\n", system_option_.version);
-    Printf(" - timezone: {}{}\n", system_option_.time_zone, system_option_.time_zone_bias);
+    fmt::print(" - version: {}\n", system_option_.version);
+    fmt::print(" - timezone: {}{}\n", system_option_.time_zone, system_option_.time_zone_bias);
 
     // System
-    Printf(" - worker_cpu_limit: {}\n", system_option_.worker_cpu_limit);
-    Printf(" - total_memory_size: {}\n", Utility::FormatByteSize(system_option_.total_memory_size));
-    Printf(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
-    Printf(" - query_memory_limit: {}\n", Utility::FormatByteSize(system_option_.query_memory_limit));
+    fmt::print(" - worker_cpu_limit: {}\n", system_option_.worker_cpu_limit);
+    fmt::print(" - total_memory_size: {}\n", Utility::FormatByteSize(system_option_.total_memory_size));
+    fmt::print(" - query_cpu_limit: {}\n", system_option_.query_cpu_limit);
+    fmt::print(" - query_memory_limit: {}\n", Utility::FormatByteSize(system_option_.query_memory_limit));
 
     // Profiler
-    Printf(" - enable_profiler: {}\n", system_option_.enable_profiler);
-    Printf(" - profile_record_capacity: {}\n", system_option_.profile_record_capacity);
+    fmt::print(" - enable_profiler: {}\n", system_option_.enable_profiler);
+    fmt::print(" - profile_record_capacity: {}\n", system_option_.profile_record_capacity);
 
     // Network
-    Printf(" - listen address: {}\n", system_option_.listen_address);
-    Printf(" - postgres port: {}\n", system_option_.pg_port);
-    Printf(" - http port: {}\n", system_option_.http_port);
-    Printf(" - sdk port: {}\n", system_option_.sdk_port);
+    fmt::print(" - listen address: {}\n", system_option_.listen_address);
+    fmt::print(" - postgres port: {}\n", system_option_.pg_port);
+    fmt::print(" - http port: {}\n", system_option_.http_port);
+    fmt::print(" - sdk port: {}\n", system_option_.sdk_port);
 
     // Log
-    Printf(" - log_file_path: {}\n", system_option_.log_file_path->c_str());
-    Printf(" - log_to_stdout: {}\n", system_option_.log_to_stdout);
-    Printf(" - log_max_size: {}\n", Utility::FormatByteSize(system_option_.log_max_size));
-    Printf(" - log_file_rotate_count: {}\n", system_option_.log_file_rotate_count);
-    Printf(" - log_level: {}\n", LogLevel2Str(system_option_.log_level));
+    fmt::print(" - log_file_path: {}\n", system_option_.log_file_path->c_str());
+    fmt::print(" - log_to_stdout: {}\n", system_option_.log_to_stdout);
+    fmt::print(" - log_max_size: {}\n", Utility::FormatByteSize(system_option_.log_max_size));
+    fmt::print(" - log_file_rotate_count: {}\n", system_option_.log_file_rotate_count);
+    fmt::print(" - log_level: {}\n", LogLevel2Str(system_option_.log_level));
 
     // Storage
-    Printf(" - data_dir: {}\n", system_option_.data_dir->c_str());
-    Printf(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
-    Printf(" - default_row_size: {}\n", system_option_.default_row_size);
+    fmt::print(" - data_dir: {}\n", system_option_.data_dir->c_str());
+    fmt::print(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
+    fmt::print(" - default_row_size: {}\n", system_option_.default_row_size);
 
     // Buffer
-    Printf(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
-    Printf(" - temp_dir: {}\n", system_option_.temp_dir->c_str());
+    fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
+    fmt::print(" - temp_dir: {}\n", system_option_.temp_dir->c_str());
 
     // Wal
-    Printf(" - full_checkpoint_interval_sec: {}\n", system_option_.full_checkpoint_interval_sec_);
-    Printf(" - full_checkpoint_txn_interval: {}\n", system_option_.full_checkpoint_txn_interval_);
-    Printf(" - delta_checkpoint_interval_sec: {}\n", system_option_.delta_checkpoint_interval_sec_);
-    Printf(" - delta_checkpoint_interval_wal_bytes: {}\n", system_option_.delta_checkpoint_interval_wal_bytes_);
-    Printf(" - wal_size_threshold: {}\n", system_option_.wal_size_threshold_);
+    fmt::print(" - full_checkpoint_interval_sec: {}\n", system_option_.full_checkpoint_interval_sec_);
+    fmt::print(" - full_checkpoint_txn_interval: {}\n", system_option_.full_checkpoint_txn_interval_);
+    fmt::print(" - delta_checkpoint_interval_sec: {}\n", system_option_.delta_checkpoint_interval_sec_);
+    fmt::print(" - delta_checkpoint_interval_wal_bytes: {}\n", system_option_.delta_checkpoint_interval_wal_bytes_);
+    fmt::print(" - wal_size_threshold: {}\n", system_option_.wal_size_threshold_);
 
     // Resource
-    Printf(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
+    fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
 }
 
 } // namespace infinity

@@ -48,7 +48,7 @@ String ColumnExpression::ToString() const {
             }
         }
         if (all_digits) {
-            return Format("{}.{}", table_name_, column_name_);
+            return fmt::format("{}.{}", table_name_, column_name_);
         } else {
             return column_name_;
         }

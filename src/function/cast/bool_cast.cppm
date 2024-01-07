@@ -30,7 +30,7 @@ export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
-            Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -54,7 +54,7 @@ export struct TryCastBoolean {
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
-        Error<TypeException>(Format("Expect boolean type, but it is {}", source.ToString()));
+        Error<TypeException>(fmt::format("Expect boolean type, but it is {}", source.ToString()));
     }
 
     switch (target.type()) {
@@ -62,7 +62,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Boolean to {}", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from Boolean to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);

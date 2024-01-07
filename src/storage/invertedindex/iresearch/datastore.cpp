@@ -125,14 +125,14 @@ struct ConsolidationTask : Task {
 };
 
 void ConsolidationTask::operator()(int id) {
-    LOG_INFO(Format("ConsolidationTask id {}", id));
+    LOG_INFO(fmt::format("ConsolidationTask id {}", id));
     if ((true == state_->cancel_.load(MemoryOrderRelease)) && (false == optimize_))
         return;
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
     state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
 
     if (optimize_) {
-        LOG_INFO(Format("ConsolidationTask optimize {}", id));
+        LOG_INFO(fmt::format("ConsolidationTask optimize {}", id));
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
         store_->GetWriter()->Commit();
     } else {
@@ -171,7 +171,7 @@ struct CommitTask : Task {
 void CommitTask::operator()(int id) {
     if (true == state_->cancel_.load(MemoryOrderRelease))
         return;
-    LOG_INFO(Format("CommitTask id {}", id));
+    LOG_INFO(fmt::format("CommitTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(commit_interval_));
     state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
     Finalize();
@@ -462,12 +462,12 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
     auto arg_format = irs::type<irs::text_format::csv>::get();
     auto scr = irs::scorers::get(scorer, arg_format, scorer_arg);
     if (!scr) {
-        LOG_ERROR(Format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
+        LOG_ERROR(fmt::format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
         return -1;
     }
 
     const IRSDirectoryReader &reader = GetDirectoryReader();
-    LOG_INFO(Format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
+    LOG_INFO(fmt::format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
     irs::Scorers order = irs::Scorers::Prepare(scr.get());
 
     irs::filter::prepared::ptr filter = flt->prepare({

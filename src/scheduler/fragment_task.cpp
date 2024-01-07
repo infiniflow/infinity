@@ -123,7 +123,7 @@ TaskBinding FragmentTask::TaskBinding() const {
 
 void FragmentTask::TryCompleteFragment() {
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    LOG_TRACE(Format("Task: {} of Fragment: {} is completed", task_id_, fragment_context->fragment_ptr()->FragmentID()));
+    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, fragment_context->fragment_ptr()->FragmentID()));
     fragment_context->FinishTask();
 }
 

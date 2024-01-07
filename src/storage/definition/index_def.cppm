@@ -44,9 +44,9 @@ public:
 
     String ToString() const;
 
-    Json Serialize() const;
+    nlohmann::json Serialize() const;
 
-    static SharedPtr<IndexDef> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexDef> Deserialize(const nlohmann::json &index_def_json);
 
 public:
     SharedPtr<String> index_name_{};

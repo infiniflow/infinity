@@ -41,11 +41,11 @@ inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVe
     Error<NotImplementException>("Not implement");
 
 //    if (second < 0) {
-//        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second));
+//        Error<ExecutorException>(fmt::format("substring start offset should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third < 0) {
-//        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second));
+//        Error<ExecutorException>(fmt::format("substring length should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third == 0) {

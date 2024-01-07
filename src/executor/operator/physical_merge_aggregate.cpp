@@ -120,7 +120,7 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
     } else if (function_name == "COUNT_STAR") {
         // no action for "COUNT_STAR"
     } else {
-        Error<NotImplementException>(Format("Function type {} not Implement.", function_name));
+        Error<NotImplementException>(fmt::format("Function type {} not Implement.", function_name));
     }
 }
 

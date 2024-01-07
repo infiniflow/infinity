@@ -79,13 +79,13 @@ String IndexFullText::ToString() const {
     return output_str;
 }
 
-Json IndexFullText::Serialize() const {
-    Json res = IndexBase::Serialize();
+nlohmann::json IndexFullText::Serialize() const {
+    nlohmann::json res = IndexBase::Serialize();
     res["analyzer"] = analyzer_;
     return res;
 }
 
-SharedPtr<IndexFullText> IndexFullText::Deserialize(const Json &) {
+SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
     Error<StorageException>("Not implemented");
     return nullptr;
 }

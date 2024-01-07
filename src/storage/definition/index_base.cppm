@@ -57,9 +57,9 @@ public:
 
     virtual String ToString() const;
 
-    virtual Json Serialize() const;
+    virtual nlohmann::json Serialize() const;
 
-    static SharedPtr<IndexBase> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);
 
     inline String column_name() { return column_names_[0]; }
 

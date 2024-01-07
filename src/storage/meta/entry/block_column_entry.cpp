@@ -248,19 +248,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
             //        case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR(Format("{} isn't supported", column_type->ToString()));
+            LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
             Error<NotImplementException>("Invalid data type.");
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR(Format("Invalid data type {}", column_type->ToString()));
+            LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
             Error<StorageException>("Invalid data type.");
         }
     }
 }
 
-Json BlockColumnEntry::Serialize() {
-    Json json_res;
+nlohmann::json BlockColumnEntry::Serialize() {
+    nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;
     if (this->outline_info_) {
         auto &outline_info = this->outline_info_;
@@ -269,7 +269,7 @@ Json BlockColumnEntry::Serialize() {
     return json_res;
 }
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockColumnEntry> BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
     UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr, true);
     if (block_column_entry->outline_info_.get() != nullptr) {

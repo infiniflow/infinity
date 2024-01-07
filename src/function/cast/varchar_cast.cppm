@@ -34,7 +34,7 @@ export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kVarchar) {
-        Error<TypeException>(Format("Expect Varchar type, but it is {}", source.ToString()));
+        Error<TypeException>(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
     }
     switch (target.type()) {
         case kBoolean: {
@@ -62,7 +62,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
         case kDecimal: {
-            Error<NotImplementException>(Format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
+            Error<NotImplementException>(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case kVarchar: {
             Error<TypeException>("Attempt to cast from varchar to varchar");
@@ -138,7 +138,7 @@ struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &) {
         Error<FunctionException>(
-            Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

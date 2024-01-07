@@ -65,7 +65,7 @@ inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
             Error<FunctionException>("Not implemented");
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Decimal type to {}", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from Decimal type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -75,7 +75,7 @@ struct DecimalTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -84,7 +84,7 @@ struct DecimalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

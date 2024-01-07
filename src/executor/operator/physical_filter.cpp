@@ -80,7 +80,7 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
                                                 output_data_block,
                                                 input_data_block->row_count());
 
-        LOG_TRACE(Format("{} rows after filter", selected_count));
+        LOG_TRACE(fmt::format("{} rows after filter", selected_count));
     }
 
     // Clean input data block array;

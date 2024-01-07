@@ -137,7 +137,7 @@ void Connection::HandleRequest() {
 
 void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     const String &query = pg_handler_->read_command_body();
-    LOG_TRACE(Format("Query: {}", query));
+    LOG_TRACE(fmt::format("Query: {}", query));
 
     // Start to execute the query.
     QueryResult result = query_context->Query(query);
@@ -334,7 +334,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             break;
         }
         default: {
-            message = Format("SELECT {}", ToStr(query_result.result_table_->row_count()));
+            message = fmt::format("SELECT {}", ToStr(query_result.result_table_->row_count()));
         }
     }
 

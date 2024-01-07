@@ -120,11 +120,11 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 u32 segment_offset = result_row_ids[top_idx].segment_offset_;
                 u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
                 u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-                // LOG_TRACE(Format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
+                // LOG_TRACE(fmt::format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    Error<ExecutorException>(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();
@@ -159,7 +159,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 ++output_row_count;
             }
             // for (SizeT i = 0; i < column_n; ++i) {
-            //  LOG_TRACE(Format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
+            //  LOG_TRACE(fmt::format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
             //}
         }
 

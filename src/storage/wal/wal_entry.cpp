@@ -113,7 +113,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             break;
         }
         default:
-            Error<StorageException>(Format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+            Error<StorageException>(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {

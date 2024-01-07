@@ -224,7 +224,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
         }
     }
-    LOG_TRACE(Format("KnnScan: brute force task: {}, index task: {}", block_column_entries_->size(), index_entries_->size()));
+    LOG_TRACE(fmt::format("KnnScan: brute force task: {}, index task: {}", block_column_entries_->size(), index_entries_->size()));
 }
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
@@ -242,7 +242,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
 
     if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
-        LOG_TRACE(Format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
+        LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
         const BlockEntry *block_entry = block_column_entry->block_entry();
@@ -280,7 +280,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                            block_entry->block_id(),
                            bitmask);
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
-        LOG_TRACE(Format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
+        LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
         SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -289,7 +289,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         SegmentEntry *segment_entry = nullptr;
         auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            Error<ExecutorException>(Format("Cannot find SegmentEntry for segment id: {}", segment_id));
+            Error<ExecutorException>(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
             segment_entry = iter->second;
         }
@@ -318,7 +318,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 bool_column->Reset();
             }
             if (segment_row_count_real != segment_row_count) {
-                Error<ExecutorException>(Format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                Error<ExecutorException>(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
                                                 segment_id,
                                                 segment_row_count_real,
                                                 segment_row_count));
@@ -462,7 +462,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
     }
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {
-        LOG_TRACE(Format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
+        LOG_TRACE(fmt::format("KnnScan: {} task finished", knn_scan_function_data->task_id_));
         // all task Complete
         BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
@@ -500,7 +500,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(Format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    Error<ExecutorException>(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {

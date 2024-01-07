@@ -80,7 +80,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    Printf("Shutdown storage ...\n");
+    fmt::print("Shutdown storage ...\n");
     bg_processor_->Stop();
 
     wal_mgr_->Stop();
@@ -94,7 +94,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
 
     config_ptr_ = nullptr;
-    Printf("Shutdown storage successfully\n");
+    fmt::print("Shutdown storage successfully\n");
 }
 
 SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
@@ -109,7 +109,7 @@ SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
     int64_t latest_version_number = -1;
     const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
     for (const auto &dir_entry_ptr : dir_array) {
-        LOG_TRACE(Format("Candidate file name: {}", dir_entry_ptr->path().c_str()));
+        LOG_TRACE(fmt::format("Candidate file name: {}", dir_entry_ptr->path().c_str()));
         if (dir_entry_ptr->is_regular_file()) {
             String current_file_name = dir_entry_ptr->path().filename();
             if (std::regex_match(current_file_name, catalog_file_regex)) {
@@ -138,9 +138,9 @@ void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
 }
 
 void Storage::AttachCatalog(const Vector<String> &catalog_files) {
-    LOG_INFO(Format("Attach catalogs from {} files", catalog_files.size()));
+    LOG_INFO(fmt::format("Attach catalogs from {} files", catalog_files.size()));
     for (const auto &catalog_file : catalog_files) {
-        LOG_TRACE(Format("Catalog file: {}", catalog_file.c_str()));
+        LOG_TRACE(fmt::format("Catalog file: {}", catalog_file.c_str()));
     }
     new_catalog_ = NewCatalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
 }

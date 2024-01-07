@@ -53,7 +53,7 @@ Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const Stri
         db_name_ = db_name;
     } else {
         if (!IsEqual(db_name_, db_name)) {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to get table {} from another database {}", db_name, table_name));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
         }
@@ -449,7 +449,7 @@ void Txn::CommitBottom() {
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
     }
-    LOG_TRACE(Format("Txn: {} is committed.", txn_id_));
+    LOG_TRACE(fmt::format("Txn: {} is committed.", txn_id_));
 
     // Notify the top half
     UniqueLock<Mutex> lk(lock_);
@@ -496,7 +496,7 @@ void Txn::Rollback() {
 
     txn_context_.SetTxnRollbacked();
 
-    LOG_TRACE(Format("Txn: {} is dropped.", txn_id_));
+    LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds.push_back(cmd); }

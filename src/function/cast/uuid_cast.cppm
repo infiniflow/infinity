@@ -36,7 +36,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Uuid type to {}", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from Uuid type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -46,7 +46,7 @@ struct UuidTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

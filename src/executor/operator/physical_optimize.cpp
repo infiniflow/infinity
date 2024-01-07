@@ -51,12 +51,12 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     // Get tables from catalog
     auto txn = query_context->GetTxn();
     u64 txn_id = txn->TxnID();
-    LOG_INFO(Format("OptimizeIndex {} {}", db_name_, object_name_));
+    LOG_INFO(fmt::format("OptimizeIndex {} {}", db_name_, object_name_));
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
         operator_state->error_message_ = Move(table_status.msg_);
-        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }
 
@@ -69,7 +69,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
         irs_index_entry = table_index_entry->irs_index_entry();
     }
     if (irs_index_entry) {
-        LOG_INFO(Format("ScheduleOptimize"));
+        LOG_INFO(fmt::format("ScheduleOptimize"));
         irs_index_entry->irs_index_->ScheduleOptimize();
     }
     LOG_TRACE("Optimize index");

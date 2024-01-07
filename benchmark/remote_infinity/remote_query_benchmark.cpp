@@ -244,7 +244,7 @@ int main() {
         ParallelFor(0, query_count, thread_num, query_function);
         profiler.End();
 
-        results.push_back(infinity::Format("Total cost: {}", profiler.ElapsedToString(1000)));
+        results.push_back(infinity::fmt::format("Total cost: {}", profiler.ElapsedToString(1000)));
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
             for (size_t query_idx = 0; query_idx < query_count; ++query_idx) {
@@ -265,9 +265,9 @@ int main() {
                     }
                 }
             }
-            results.push_back(infinity::Format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
-            results.push_back(infinity::Format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
-            results.push_back(infinity::Format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
+            results.push_back(infinity::fmt::format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
+            results.push_back(infinity::fmt::format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
+            results.push_back(infinity::fmt::format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
         }
     } while (--total_times);
 

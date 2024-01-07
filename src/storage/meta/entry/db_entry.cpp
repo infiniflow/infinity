@@ -51,12 +51,12 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         table_meta = table_iter->second.get();
         this->rw_locker_.unlock_shared();
 
-        LOG_TRACE(Format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *this->db_entry_dir_));
+        LOG_TRACE(fmt::format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *this->db_entry_dir_));
 
     } else {
         this->rw_locker_.unlock_shared();
 
-        LOG_TRACE(Format("Create new table/collection: {}", table_name));
+        LOG_TRACE(fmt::format("Create new table/collection: {}", table_name));
         UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(this->db_entry_dir_, table_collection_name, this);
         table_meta = new_table_meta.get();
 
@@ -69,7 +69,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         }
         this->rw_locker_.unlock();
 
-        LOG_TRACE(Format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
+        LOG_TRACE(fmt::format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
     }
 
     return table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
@@ -86,16 +86,16 @@ DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_ty
     this->rw_locker_.unlock_shared();
     if (table_meta == nullptr) {
         if (conflict_type == ConflictType::kIgnore) {
-            LOG_TRACE(Format("Ignore drop a not existed table/collection entry {}", table_collection_name));
+            LOG_TRACE(fmt::format("Ignore drop a not existed table/collection entry {}", table_collection_name));
             return {nullptr, Status::OK()};
         }
 
-        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed table/collection entry {}", table_collection_name));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
-    LOG_TRACE(Format("Drop a table/collection entry {}", table_collection_name));
+    LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
     return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
@@ -126,7 +126,7 @@ void DBEntry::RemoveTableEntry(const String &table_collection_name, u64 txn_id, 
     }
     this->rw_locker_.unlock_shared();
 
-    LOG_TRACE(Format("Remove a table/collection entry: {}", table_collection_name));
+    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_collection_name));
     table_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
@@ -140,7 +140,7 @@ Vector<TableEntry *> DBEntry::TableCollections(u64 txn_id, TxnTimeStamp begin_ts
         TableMeta *table_meta = table_collection_meta_pair.second.get();
         auto [table_entry, status] = table_meta->GetEntry(txn_id, begin_ts);
         if (!status.ok()) {
-            LOG_TRACE(Format("error when get table/collection entry: {}", status.message()));
+            LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
         } else {
             results.emplace_back((TableEntry *)table_entry);
         }
@@ -174,12 +174,12 @@ Status DBEntry::GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableD
 SharedPtr<String> DBEntry::ToString() {
     SharedLock<RWMutex> r_locker(rw_locker_);
     SharedPtr<String> res =
-        MakeShared<String>(Format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, tables_.size()));
+        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, tables_.size()));
     return res;
 }
 
-Json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
 
     Vector<TableMeta *> table_metas;
     {
@@ -202,8 +202,8 @@ Json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     return json_res;
 }
 
-UniquePtr<DBEntry> DBEntry::Deserialize(const Json &db_entry_json, BufferManager *buffer_mgr) {
-    Json json_res;
+UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr) {
+    nlohmann::json json_res;
 
     SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);

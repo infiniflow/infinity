@@ -37,7 +37,7 @@ TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_e
 UniquePtr<String> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
     SizeT column_count = table_entry_->ColumnCount();
     if (input_block->column_count() != column_count) {
-        String err_msg = Format("Attempt to insert different column count data block into transaction table store");
+        String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
         LOG_ERROR(err_msg);
         return MakeUnique<String>(err_msg);
     }
@@ -46,7 +46,7 @@ UniquePtr<String> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block)
     for (SizeT col_id = 0; col_id < column_count; ++col_id) {
         column_types.emplace_back(table_entry_->GetColumnDefByID(col_id)->type());
         if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
-            String err_msg = Format("Attempt to insert different type data into transaction table store");
+            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
             return MakeUnique<String>(err_msg);
         }
@@ -134,7 +134,7 @@ void TxnTableStore::Rollback() {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         NewCatalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
-        LOG_TRACE(Format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
+        LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
 
     blocks_.clear();
@@ -145,7 +145,7 @@ void TxnTableStore::PrepareCommit() {
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
-    LOG_TRACE(Format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
+    LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
     Txn *txn_ptr = (Txn *)txn_;
     NewCatalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
 
@@ -159,7 +159,7 @@ void TxnTableStore::PrepareCommit() {
     NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
     NewCatalog::CommitCreateIndex(txn_indexes_store_);
 
-    LOG_TRACE(Format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
+    LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
 
 /**

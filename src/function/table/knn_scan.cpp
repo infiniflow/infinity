@@ -81,7 +81,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
     //                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
     //                                 LOG_TRACE(
-    //                                     Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
+    //                                     fmt::format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
     //                                     top_distance[id]));
     //                             }
     //                         }
@@ -235,7 +235,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
     //                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
     //                                 LOG_TRACE(
-    //                                     Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
+    //                                     fmt::format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
     //                                     top_distance[id]));
     //                             }
     //                         }

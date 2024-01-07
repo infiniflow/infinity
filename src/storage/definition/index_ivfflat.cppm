@@ -45,9 +45,9 @@ public:
 
     virtual String ToString() const override;
 
-    virtual Json Serialize() const override;
+    virtual nlohmann::json Serialize() const override;
 
-    static SharedPtr<IndexIVFFlat> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexIVFFlat> Deserialize(const nlohmann::json &index_def_json);
 
 public:
     const SizeT centroids_count_{};

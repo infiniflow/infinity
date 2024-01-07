@@ -231,7 +231,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
             if (value_list.size() != table_column_count) {
-                Error<PlannerException>(Format("INSERT: Table column count ({}) and "
+                Error<PlannerException>(fmt::format("INSERT: Table column count ({}) and "
                                                "input value count mismatch ({})",
                                                table_column_count,
                                                value_list.size()));
@@ -567,7 +567,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
     if (drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
-        Error<PlannerException>(Format("Can't drop using database: {}", drop_schema_info->schema_name_));
+        Error<PlannerException>(fmt::format("Can't drop using database: {}", drop_schema_info->schema_name_));
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
@@ -649,7 +649,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Error<PlannerException>(Format("File: {} doesn't exist.", statement->file_path_));
+        Error<PlannerException>(fmt::format("File: {} doesn't exist.", statement->file_path_));
     }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -677,7 +677,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Error<PlannerException>(Format("File: {} doesn't exist.", fs.GetAbsolutePath(statement->file_path_)));
+        Error<PlannerException>(fmt::format("File: {} doesn't exist.", fs.GetAbsolutePath(statement->file_path_)));
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -709,7 +709,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 
                 this->logical_plan_ = logical_command;
             } else {
-                Error<PlannerException>(Format("Unknown database name:{}.", use_command_info->db_name()));
+                Error<PlannerException>(fmt::format("Unknown database name:{}.", use_command_info->db_name()));
             }
             break;
         }

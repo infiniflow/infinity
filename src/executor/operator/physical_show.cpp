@@ -559,7 +559,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
     for (SizeT i = 0; i < records.size(); ++i) {
 
         // Output record no
-        ValueExpression record_no_expr(Value::MakeVarchar(Format("{}", i)));
+        ValueExpression record_no_expr(Value::MakeVarchar(fmt::format("{}", i)));
         record_no_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
 
         // Output each query phase
@@ -595,7 +595,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
-        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }
 
@@ -638,7 +638,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             if (column->type()->type() == kEmbedding) {
                 auto type = column->type();
                 auto embedding_type = type->type_info()->ToString();
-                column_type = Format("{}({})", type->ToString(), embedding_type);
+                column_type = fmt::format("{}({})", type->ToString(), embedding_type);
 
             } else {
                 column_type = column->type()->ToString();
@@ -672,7 +672,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->error_message_ = Move(status.msg_);
-        Error<ExecutorException>(Format("{} isn't found", object_name_));
+        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
         return;
     }
 
@@ -806,7 +806,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(Format("{}-{}", global_config->time_zone(), global_config->time_zone_bias()));
+            Value value = Value::MakeVarchar(fmt::format("{}-{}", global_config->time_zone(), global_config->time_zone_bias()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -1370,7 +1370,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 // Append Index segment
                 SizeT segment_count = table_entry->segment_map().size();
                 SizeT index_segment_count = column_index_entry->index_by_segment().size();
-                String result_value = Format("{}/{}", index_segment_count, segment_count);
+                String result_value = fmt::format("{}/{}", index_segment_count, segment_count);
                 Value value = Value::MakeVarchar(result_value);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1382,14 +1382,14 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                 switch (index_base->index_type_) {
                     case IndexType::kIVFFlat: {
                         const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base);
-                        other_parameters = Format("metric = {}, centroids_count = {}",
+                        other_parameters = fmt::format("metric = {}, centroids_count = {}",
                                                   MetricTypeToString(index_ivfflat->metric_type_),
                                                   index_ivfflat->centroids_count_);
                         break;
                     }
                     case IndexType::kHnsw: {
                         const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base);
-                        other_parameters = Format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
+                        other_parameters = fmt::format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
                                                   MetricTypeToString(index_hnsw->metric_type_),
                                                   HnswEncodeTypeToString(index_hnsw->encode_type_),
                                                   index_hnsw->M_,
@@ -1399,7 +1399,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                     }
                     case IndexType::kIRSFullText: {
                         const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
-                        other_parameters = Format("analyzer = {}", index_full_text->analyzer_);
+                        other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
                         break;
                     }
                     case IndexType::kInvalid: {
@@ -1590,7 +1590,7 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
             BufferManager *buffer_manager = query_context->storage()->buffer_manager();
             u64 memory_limit = buffer_manager->memory_limit();
             u64 memory_usage = buffer_manager->memory_usage();
-            Value value = Value::MakeVarchar(Format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+            Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }

@@ -105,7 +105,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     try {
         this->CreateTxn();
         this->BeginTxn();
-//        LOG_INFO(Format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+//        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
 //                        statement->ToString()));

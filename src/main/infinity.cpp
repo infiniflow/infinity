@@ -80,7 +80,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
 }
 
 void Infinity::LocalDisconnect() {
-//    Printf("To disconnect the database.\n");
+//    fmt::print("To disconnect the database.\n");
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {

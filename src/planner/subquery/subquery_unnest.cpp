@@ -410,7 +410,7 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            Error<PlannerException>(Format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
+            Error<PlannerException>(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
         }
 
         // Generate new correlated column expression

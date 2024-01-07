@@ -45,6 +45,6 @@ TEST_F(JsonTest, test1) {
     String json_path = String(test_data_path()) + "/json/twitter.json";
     std::ifstream f(json_path);
 
-    Json data = Json::parse(f);
+    nlohmann::json data = nlohmann::json::parse(f);
     EXPECT_EQ(data["search_metadata"]["count"], 100);
 }

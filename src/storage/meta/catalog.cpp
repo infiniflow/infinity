@@ -78,7 +78,7 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
     } else {
         this->rw_locker_.unlock_shared();
 
-        LOG_TRACE(Format("Create new database: {}", db_name));
+        LOG_TRACE(fmt::format("Create new database: {}", db_name));
         // Not find the db and create new db meta
         Path catalog_path(*this->current_dir_);
         Path parent_path = catalog_path.parent_path();
@@ -96,7 +96,7 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         this->rw_locker_.unlock();
     }
 
-    LOG_TRACE(Format("Add new database entry: {}", db_name));
+    LOG_TRACE(fmt::format("Add new database entry: {}", db_name));
     return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
@@ -114,12 +114,12 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn
     }
     this->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to drop not existed database entry {}", db_name));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
 
-    LOG_TRACE(Format("Drop a database entry {}", db_name));
+    LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
     return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr);
 }
 
@@ -133,7 +133,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_
     }
     this->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to get not existed database {}", db_name));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
@@ -149,7 +149,7 @@ void NewCatalog::RemoveDBEntry(const String &db_name, u64 txn_id, TxnManager *tx
     }
     this->rw_locker_.unlock_shared();
 
-    LOG_TRACE(Format("Remove a database entry {}", db_name));
+    LOG_TRACE(fmt::format("Remove a database entry {}", db_name));
     db_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
@@ -178,7 +178,7 @@ Tuple<TableEntry *, Status> NewCatalog::CreateTable(const String &db_name,
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
-        LOG_ERROR(Format("Database: {} is invalid.", db_name));
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return {nullptr, status};
     }
 
@@ -194,7 +194,7 @@ Tuple<TableEntry *, Status> NewCatalog::DropTableByName(const String &db_name,
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
-        LOG_ERROR(Format("Database: {} is invalid.", db_name));
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return {nullptr, status};
     }
     return db_entry->DropTable(table_name, conflict_type, txn_id, begin_ts, txn_mgr);
@@ -205,7 +205,7 @@ Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
-        LOG_ERROR(Format("Database: {} is invalid.", db_name));
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return status;
     }
     return db_entry->GetTablesDetail(txn_id, begin_ts, output_table_array);
@@ -216,7 +216,7 @@ Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, co
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
-        LOG_ERROR(Format("Database: {} is invalid.", db_name));
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
         return {nullptr, status};
     }
 
@@ -225,7 +225,7 @@ Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, co
 
 Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnManager *txn_mgr) {
     TableMeta *table_meta = table_entry->GetTableMeta();
-    LOG_TRACE(Format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
+    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
     table_meta->DeleteNewEntry(txn_id, txn_mgr);
 
     return Status::OK();
@@ -240,7 +240,7 @@ Tuple<TableEntry *, TableIndexEntry *, Status> NewCatalog::CreateIndex(const Str
                                                                        TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
-        LOG_ERROR(Format("Database: {}, Table: {} is invalid", db_name, table_name));
+        LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));
         return {nullptr, nullptr, table_status};
     }
 
@@ -258,7 +258,7 @@ Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,
                                                        TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
-        LOG_ERROR(Format("Database: {}, Table: {} is invalid", db_name, table_name));
+        LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));
         return {nullptr, table_status};
     }
 
@@ -328,7 +328,7 @@ SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, Str
     StringToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(Format("No function name: {}", function_name));
+        Error<CatalogException>(fmt::format("No function name: {}", function_name));
     }
     return catalog->function_sets_[function_name];
 }
@@ -337,7 +337,7 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        Error<CatalogException>(Format("Trying to add duplicated function table_name into catalog: {}", name));
+        Error<CatalogException>(fmt::format("Trying to add duplicated function table_name into catalog: {}", name));
     }
     catalog->function_sets_.emplace(name, function_set);
 }
@@ -346,7 +346,7 @@ void NewCatalog::DeleteFunctionSet(NewCatalog *catalog, String function_name) {
     // Unused now.
     StringToLower(function_name);
     if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(Format("Delete not exist function: {}", function_name));
+        Error<CatalogException>(fmt::format("Delete not exist function: {}", function_name));
     }
     catalog->function_sets_.erase(function_name);
 }
@@ -355,7 +355,7 @@ void NewCatalog::DeleteFunctionSet(NewCatalog *catalog, String function_name) {
 SharedPtr<TableFunction> NewCatalog::GetTableFunctionByName(NewCatalog *catalog, String function_name) {
     StringToLower(function_name);
     if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(Format("No table function table_name: {}", function_name));
+        Error<CatalogException>(fmt::format("No table function table_name: {}", function_name));
     }
     return catalog->table_functions_[function_name];
 }
@@ -364,7 +364,7 @@ void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunc
     String name = table_function->name();
     StringToLower(name);
     if (catalog->table_functions_.contains(name)) {
-        Error<CatalogException>(Format("Trying to add duplicated table function into catalog: {}", name));
+        Error<CatalogException>(fmt::format("Trying to add duplicated table function into catalog: {}", name));
     }
     catalog->table_functions_.emplace(name, table_function);
 }
@@ -373,7 +373,7 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<Special
     String name = special_function->name();
     StringToLower(name);
     if (catalog->table_functions_.contains(name)) {
-        Error<CatalogException>(Format("Trying to add duplicated special function into catalog: {}", name));
+        Error<CatalogException>(fmt::format("Trying to add duplicated special function into catalog: {}", name));
     }
     catalog->special_functions_.emplace(name, special_function);
 }
@@ -390,13 +390,13 @@ void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) 
     // Unused now.
     StringToLower(function_name);
     if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(Format("Delete not exist table function: {}", function_name));
+        Error<CatalogException>(fmt::format("Delete not exist table function: {}", function_name));
     }
     catalog->table_functions_.erase(function_name);
 }
 
-Json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
     Vector<DBMeta *> databases;
     {
         SharedLock<RWMutex> lck(this->rw_locker_);
@@ -443,12 +443,12 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
         Error<CatalogException>("Catalog paths is empty");
     }
     // Load the latest full checkpoint.
-    LOG_INFO(Format("Load base catalog1 from: {}", catalog_paths[0]));
+    LOG_INFO(fmt::format("Load base catalog1 from: {}", catalog_paths[0]));
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     for (SizeT i = 1; i < catalog_paths.size(); i++) {
-        LOG_INFO(Format("Load delta catalog1 from: {}", catalog_paths[i]));
+        LOG_INFO(fmt::format("Load delta catalog1 from: {}", catalog_paths[i]));
         UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
         catalog1->MergeFrom(*catalog2);
     }
@@ -476,15 +476,15 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, Buffe
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        Error<StorageException>(Format("Catalog file {}, read error.", catalog_path));
+        Error<StorageException>(fmt::format("Catalog file {}, read error.", catalog_path));
     }
 
-    Json catalog_json = Json::parse(json_str);
+    nlohmann::json catalog_json = nlohmann::json::parse(json_str);
     Deserialize(catalog_json, buffer_mgr, catalog);
     return catalog;
 }
 
-void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog) {
+void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog) {
     SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
@@ -500,7 +500,7 @@ void NewCatalog::Deserialize(const Json &catalog_json, BufferManager *buffer_mgr
 }
 
 String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json catalog_json = Serialize(max_commit_ts, is_full_checkpoint);
+    nlohmann::json catalog_json = Serialize(max_commit_ts, is_full_checkpoint);
     String catalog_str = catalog_json.dump();
 
     // FIXME: Temp implementation, will be replaced by async task.
@@ -510,12 +510,12 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
         fs.CreateDirectory(dir);
     }
 
-    String file_name = Format("META_{}", max_commit_ts);
+    String file_name = fmt::format("META_{}", max_commit_ts);
     if (is_full_checkpoint)
         file_name += ".full.json";
     else
         file_name += ".delta.json";
-    String file_path = Format("{}/{}", dir, file_name);
+    String file_path = fmt::format("{}/{}", dir, file_name);
 
     u8 fileflags = FileFlags::WRITE_FLAG;
     if (!fs.Exists(file_path)) {
@@ -527,12 +527,12 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (nbytes != catalog_str.size()) {
-        Error<StorageException>(Format("Catalog file {}, saving error.", file_path));
+        Error<StorageException>(fmt::format("Catalog file {}, saving error.", file_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();
 
-    LOG_INFO(Format("Saved catalog to: {}", file_path));
+    LOG_INFO(fmt::format("Saved catalog to: {}", file_path));
     return file_path;
 }
 

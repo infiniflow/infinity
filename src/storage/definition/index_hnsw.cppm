@@ -61,7 +61,7 @@ public:
 
     virtual String ToString() const override;
 
-    virtual Json Serialize() const override;
+    virtual nlohmann::json Serialize() const override;
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};

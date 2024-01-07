@@ -134,7 +134,7 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
             break;
         }
         default: {
-//            LOG_TRACE(Format("Visit logical node: {}", op.name()));
+//            LOG_TRACE(fmt::format("Visit logical node: {}", op.name()));
         }
     }
 }
@@ -272,7 +272,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         default: {
-            Error<PlannerException>(Format("Unexpected expression type: {}", expression->Name()));
+            Error<PlannerException>(fmt::format("Unexpected expression type: {}", expression->Name()));
         }
     }
 }

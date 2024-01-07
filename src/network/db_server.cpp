@@ -42,7 +42,7 @@ void DBServer::Run() {
     BoostErrorCode error;
     AsioIpAddr address = asio_make_address(pg_listen_addr, error);
     if (error) {
-        Printf("{} isn't a valid IPv4 address.\n", pg_listen_addr);
+        fmt::print("{} isn't a valid IPv4 address.\n", pg_listen_addr);
         infinity::InfinityContext::instance().UnInit();
         return ;
     }
@@ -50,13 +50,13 @@ void DBServer::Run() {
     acceptor_ptr_ = MakeUnique<AsioAcceptor>(io_service_, AsioEndPoint(address, pg_port));
     CreateConnection();
 
-    Printf("Run 'psql -h {} -p {}' to connect to the server.\n", pg_listen_addr, pg_port);
+    fmt::print("Run 'psql -h {} -p {}' to connect to the server.\n", pg_listen_addr, pg_port);
 
     io_service_.run();
 }
 
 void DBServer::Shutdown() {
-    Printf("Shutdown infinity server ...\n");
+    fmt::print("Shutdown infinity server ...\n");
     while (running_connection_count_ > 0) {
         // Running connection exists.
         std::this_thread::yield();
@@ -67,7 +67,7 @@ void DBServer::Shutdown() {
     acceptor_ptr_->close();
 
     infinity::InfinityContext::instance().UnInit();
-    Printf("Shutdown infinity server successfully\n");
+    fmt::print("Shutdown infinity server successfully\n");
 }
 
 void DBServer::CreateConnection() {

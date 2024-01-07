@@ -62,7 +62,7 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) {
 void BlockVersion::LoadFromFile(const String &version_path) {
     std::ifstream ifs(version_path);
     if (!ifs.is_open()) {
-        LOG_WARN(Format("Failed to open block_version file: {}", version_path));
+        LOG_WARN(fmt::format("Failed to open block_version file: {}", version_path));
         // load the block_version file not exist return and create version
         return;
     }
@@ -162,7 +162,7 @@ u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_bl
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
-            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
+            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     this->using_txn_id_ = txn_id;
@@ -179,7 +179,7 @@ u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_bl
                                  input_block_offset,
                                  actual_copied);
 
-        LOG_TRACE(Format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
+        LOG_TRACE(fmt::format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
                          this->segment_entry_->segment_id(),
                          this->block_id_,
                          column_id,
@@ -194,7 +194,7 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
-            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
+            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     this->using_txn_id_ = txn_id;
@@ -208,7 +208,7 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
         block_version->deleted_[block_offset] = commit_ts;
     }
 
-    LOG_TRACE(Format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
+    LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
 }
 
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
@@ -216,7 +216,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != txn_id) {
         Error<StorageException>(
-            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
+            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
     this->using_txn_id_ = 0;
     if (this->min_row_ts_ == 0) {
@@ -232,7 +232,7 @@ void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
     UniqueLock<RWMutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
-            Format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
+            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
     if (this->using_txn_id_ == 0) {
@@ -253,7 +253,7 @@ void BlockEntry::FlushData(int64_t checkpoint_row_count) {
     while (column_idx < column_count) {
         BlockColumnEntry *block_column_entry = this->columns_[column_idx].get();
         BlockColumnEntry::Flush(block_column_entry, checkpoint_row_count);
-        LOG_TRACE(Format("ColumnData {} is flushed", block_column_entry->column_id()));
+        LOG_TRACE(fmt::format("ColumnData {} is flushed", block_column_entry->column_id()));
         ++column_idx;
     }
 }
@@ -261,10 +261,10 @@ void BlockEntry::FlushData(int64_t checkpoint_row_count) {
 void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_version.SaveToFile(this->VersionFilePath()); }
 
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
-    LOG_TRACE(Format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
+    LOG_TRACE(fmt::format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
         Error<StorageException>(
-            Format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, this->checkpoint_ts_: {}", checkpoint_ts, this->checkpoint_ts_));
+            fmt::format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, this->checkpoint_ts_: {}", checkpoint_ts, this->checkpoint_ts_));
     }
     int checkpoint_row_count = 0;
 
@@ -306,13 +306,13 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     FlushData(checkpoint_row_count);
     this->checkpoint_ts_ = checkpoint_ts;
     this->checkpoint_row_count_ = checkpoint_row_count;
-    LOG_TRACE(Format("Segment: {}, Block {} is flushed", this->segment_entry_->segment_id(), this->block_id_));
+    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed", this->segment_entry_->segment_id(), this->block_id_));
     return;
 }
 
 // TODO: introduce BlockColumnMeta
-Json BlockEntry::Serialize(TxnTimeStamp) {
-    Json json_res;
+nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
+    nlohmann::json json_res;
     SharedLock<RWMutex> lck(this->rw_locker_);
 
     json_res["block_id"] = this->block_id_;
@@ -328,7 +328,7 @@ Json BlockEntry::Serialize(TxnTimeStamp) {
     return json_res;
 }
 
-UniquePtr<BlockEntry> BlockEntry::Deserialize(const Json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
     TxnTimeStamp checkpoint_ts = block_entry_json["checkpoint_ts"];
     UniquePtr<BlockEntry> block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts, 0, buffer_mgr);
@@ -362,7 +362,7 @@ i32 BlockEntry::GetAvailableCapacity() {
 SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, u64 block_id) {
     LocalFileSystem fs;
     SharedPtr<String> base_dir;
-    base_dir = MakeShared<String>(Format("{}/blk_{}", parent_dir, block_id));
+    base_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
     fs.CreateDirectoryNoExp(*base_dir);
     return base_dir;
 }

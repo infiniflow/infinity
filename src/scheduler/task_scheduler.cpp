@@ -111,7 +111,7 @@ void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentT
 }
 
 void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
     u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task, worker_id);
@@ -141,7 +141,7 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
     }
 
     worker_workloads_[scheduled_worker] += tasks.size();
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
                      tasks.size(),
                      query_context->query_id(),
                      scheduled_worker));
@@ -151,7 +151,7 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
 }
 
 void TaskScheduler::ScheduleRoundRobin(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
     u64 worker_id = 0;
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task, worker_id);

@@ -104,14 +104,14 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                     return {table_index_entry_ptr, Status::OK()};
                 } else {
                     // Duplicated index name
-                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *this->index_name_));
+                    UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated index name: {}.", *this->index_name_));
                     LOG_ERROR(*err_msg);
                     return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                 }
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg =
-                    MakeUnique<String>(Format("Write-write conflict: There is a committed database which is later than current transaction."));
+                    MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
                 LOG_ERROR(*err_msg);
                 return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
             }
@@ -132,12 +132,12 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                             LOG_TRACE("New table index entry is added.");
                             return {table_index_entry_ptr, Status::OK()};
                         } else {
-                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated index name: {}.", *this->index_name_));
+                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated index name: {}.", *this->index_name_));
                             LOG_ERROR(*err_msg);
                             return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                         }
                     } else {
-                        UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is a uncommitted transaction."));
+                        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                     }
@@ -146,7 +146,7 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
                     UniquePtr<String> err_msg = MakeUnique<String>(
-                        Format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
+                        fmt::format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
                     LOG_ERROR(*err_msg);
                     return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                 }
@@ -253,8 +253,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
 
 SharedPtr<String> TableIndexMeta::ToString() { throw StorageException("Not implemented"); }
 
-Json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
-    Json json_res;
+nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
+    nlohmann::json json_res;
 
     Vector<TableIndexEntry *> table_index_entry_candidates;
     {
@@ -282,8 +282,8 @@ Json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<TableIndexMeta> TableIndexMeta::Deserialize(const Json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
-    LOG_TRACE(Format("load index"));
+UniquePtr<TableIndexMeta> TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+    LOG_TRACE(fmt::format("load index"));
 
     SharedPtr<String> index_name = MakeShared<String>(table_index_meta_json["index_name"]);
     auto res = MakeUnique<TableIndexMeta>(table_entry, index_name);

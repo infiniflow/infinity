@@ -105,8 +105,8 @@ String IndexDef::ToString() const {
     return ss.str();
 }
 
-Json IndexDef::Serialize() const {
-    Json res;
+nlohmann::json IndexDef::Serialize() const {
+    nlohmann::json res;
     res["index_name"] = *index_name_;
     for (const auto &index : index_array_) {
         res["indexes"].emplace_back(index->Serialize());
@@ -114,7 +114,7 @@ Json IndexDef::Serialize() const {
     return res;
 }
 
-SharedPtr<IndexDef> IndexDef::Deserialize(const Json &index_def_json) {
+SharedPtr<IndexDef> IndexDef::Deserialize(const nlohmann::json &index_def_json) {
     SharedPtr<String> index_name = MakeShared<String>(index_def_json["index_name"]);
     SharedPtr<IndexDef> res = MakeShared<IndexDef>(index_name);
     for (const auto &index : index_def_json["indexes"]) {

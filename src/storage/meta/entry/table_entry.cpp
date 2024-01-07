@@ -49,7 +49,7 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        TableMeta *table_meta,
                        u64 txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
+    : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
       table_name_(Move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type), table_meta_(table_meta) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
@@ -92,7 +92,7 @@ TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def, ConflictType confl
         this->rw_locker_.unlock();
     }
 
-    LOG_TRACE(Format("Creating new index: {}", *index_def->index_name_));
+    LOG_TRACE(fmt::format("Creating new index: {}", *index_def->index_name_));
     return table_index_meta->CreateTableIndexEntry(index_def, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
@@ -112,7 +112,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 
                 return {nullptr, Status::OK()};
             }
             case ConflictType::kError: {
-                String error_message = Format("Attempt to drop not existed index entry {}", index_name);
+                String error_message = fmt::format("Attempt to drop not existed index entry {}", index_name);
                 LOG_TRACE(error_message);
                 return {nullptr, Status(ErrorCode::kNotFound, error_message.c_str())};
             }
@@ -122,7 +122,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 
         }
         Error<StorageException>("Should not reach here.");
     }
-    LOG_TRACE(Format("Drop index entry {}", index_name));
+    LOG_TRACE(fmt::format("Drop index entry {}", index_name));
     return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
@@ -144,7 +144,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManag
     }
     this->rw_locker_.unlock_shared();
 
-    LOG_TRACE(Format("Remove index entry: {}", index_name));
+    LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
     table_index_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
@@ -194,12 +194,12 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
                 SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(this, new_segment_id, buffer_mgr);
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
-                LOG_TRACE(Format("Created a new segment {}", new_segment_id));
+                LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr);
-        LOG_TRACE(Format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
+        LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
     }
 }
 
@@ -256,7 +256,7 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
         if (segment_entry == nullptr) {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Going to delete data in non-exist segment: {}", segment_id));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             Error<ExecutorException>(*err_msg);
             return Status(ErrorCode::kNotFound, Move(err_msg));
         }
@@ -269,7 +269,7 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
 void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
     SizeT row_count = 0;
     for (const auto &range : append_state_ptr->append_ranges_) {
-        LOG_TRACE(Format("Commit, segment: {}, block: {} start offset: {}, count: {}",
+        LOG_TRACE(fmt::format("Commit, segment: {}, block: {} start offset: {}, count: {}",
                          range.segment_id_,
                          range.block_id_,
                          range.start_offset_,
@@ -293,7 +293,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableEntry::GetSegmentByID(this, segment_id);
         if (segment == nullptr) {
-            Error<ExecutorException>(Format("Going to commit delete data in non-exist segment: {}", segment_id));
+            Error<ExecutorException>(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
@@ -309,7 +309,7 @@ Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
 
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     if (this->deleted_) {
-        UniquePtr<String> err_msg = MakeUnique<String>(Format("Table {} is deleted.", *this->GetTableName()));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
         Error<ExecutorException>(*err_msg);
         return Status(ErrorCode::kNotFound, Move(err_msg));
     }
@@ -344,12 +344,12 @@ SegmentEntry *TableEntry::GetSegmentByID(const TableEntry *table_entry, u32 segm
 const BlockEntry *TableEntry::GetBlockEntryByID(u32 seg_id, u16 block_id) const {
     SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, seg_id);
     if (segment_entry == nullptr) {
-        throw ExecutorException(Format("Cannot find segment, segment id: {}", seg_id));
+        throw ExecutorException(fmt::format("Cannot find segment, segment id: {}", seg_id));
     }
 
     BlockEntry *block_entry = segment_entry->GetBlockEntryByID(block_id);
     if (block_entry == nullptr) {
-        throw ExecutorException(Format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
+        throw ExecutorException(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
     }
     return block_entry;
 }
@@ -359,7 +359,7 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     if (iter != this->segment_map_.end()) {
         return {iter->second->row_count(), Status::OK()};
     } else {
-        UniquePtr<String> err_msg = MakeUnique<String>(Format("No segment id: {}.", seg_id));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
         return {0, Status(ErrorCode::kNotFound, Move(err_msg))};
     }
@@ -385,8 +385,8 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
     return result;
 }
 
-Json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
 
     Vector<SegmentEntry *> segment_candidates;
     Vector<TableIndexMeta *> table_index_meta_candidates;
@@ -402,7 +402,7 @@ Json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
         json_res["txn_id"] = this->txn_id_.load();
         json_res["deleted"] = this->deleted_;
         for (const auto &column_def : this->columns_) {
-            Json column_def_json;
+            nlohmann::json column_def_json;
             column_def_json["column_type"] = column_def->type()->Serialize();
             column_def_json["column_id"] = column_def->id();
             column_def_json["column_name"] = column_def->name();
@@ -440,7 +440,7 @@ Json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
     SizeT table_index_count = table_index_meta_candidates.size();
     for (SizeT idx = 0; idx < table_index_count; ++idx) {
         TableIndexMeta *table_index_meta = table_index_meta_candidates[idx];
-        Json index_def_meta_json = table_index_meta->Serialize(max_commit_ts);
+        nlohmann::json index_def_meta_json = table_index_meta->Serialize(max_commit_ts);
         index_def_meta_json["index_name"] = table_index_name_candidates[idx];
         json_res["table_indexes"].emplace_back(index_def_meta_json);
     }
@@ -448,7 +448,7 @@ Json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
     return json_res;
 }
 
-UniquePtr<TableEntry> TableEntry::Deserialize(const Json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
+UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
     SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
     TableEntryType table_entry_type = table_entry_json["table_entry_type"];
@@ -521,7 +521,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const Json &table_entry_json, Tabl
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        Error<NotImplementException>(Format("No column name: {}", column_name));
+        Error<NotImplementException>(fmt::format("No column name: {}", column_name));
     }
     return it->second;
 }
@@ -561,7 +561,7 @@ void TableEntry::MergeFrom(BaseEntry &other) {
     if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
         auto seg_it = this->segment_map_.find(max_segment_id);
         if (seg_it == this->segment_map_.end()) {
-            Error<StorageException>(Format("max_segment_id {} is invalid", max_segment_id));
+            Error<StorageException>(fmt::format("max_segment_id {} is invalid", max_segment_id));
         }
         this->unsealed_segment_ = seg_it->second.get();
     }

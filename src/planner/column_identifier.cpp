@@ -71,7 +71,7 @@ ColumnIdentifier::ColumnIdentifier(SharedPtr<String> db_name,
 
 String ColumnIdentifier::ToString() const {
     if (table_name_ptr_.get() != nullptr)
-        return Format("{}.{}", *table_name_ptr_, *column_name_ptr_);
+        return fmt::format("{}.{}", *table_name_ptr_, *column_name_ptr_);
     else
         return *column_name_ptr_;
 }

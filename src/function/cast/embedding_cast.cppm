@@ -38,12 +38,12 @@ BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
-        Error<TypeException>(Format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+        Error<TypeException>(fmt::format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
-        Error<TypeException>(Format("Can't cast from Embedding type to {}", target.ToString()));
+        Error<TypeException>(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {
@@ -65,7 +65,7 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
             return BindEmbeddingCast<DoubleT>(target_info);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from {} to Embedding type", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from {} to Embedding type", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -93,7 +93,7 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, DoubleT, EmbeddingTryCastToFixlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Embedding type to {}", target->ToString()));
+            Error<TypeException>(fmt::format("Can't cast from Embedding type to {}", target->ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -119,7 +119,7 @@ struct EmbeddingTryCastToFixlen {
             return true;
         }
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
     }
 };
 
@@ -131,7 +131,7 @@ struct EmbeddingTryCastToVarlen {
                            const DataType &,
                            const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -143,13 +143,13 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &,
                                           const SharedPtr<ColumnVector> &vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        Error<TypeException>(Format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+        Error<TypeException>(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
 
     for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
-        LOG_TRACE(Format("{}", ((float *)(source.ptr))[j]));
+        LOG_TRACE(fmt::format("{}", ((float *)(source.ptr))[j]));
     }
 
     String res = EmbeddingT::Embedding2String(source, embedding_info->Type(), embedding_info->Dimension());
@@ -160,7 +160,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         Memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            Error<TypeException>(Format("Varchar column vector should use MemoryVectorBuffer."));
+            Error<TypeException>(fmt::format("Varchar column vector should use MemoryVectorBuffer."));
         }
 
         // Set varchar prefix

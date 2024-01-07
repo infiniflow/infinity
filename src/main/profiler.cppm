@@ -202,7 +202,7 @@ public:
 
     static String QueryPhaseToString(QueryPhase phase);
 
-    static Json Serialize(const QueryProfiler *profiler);
+    static nlohmann::json Serialize(const QueryProfiler *profiler);
 
 private:
     bool enable_ {};

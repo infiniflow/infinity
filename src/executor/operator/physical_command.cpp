@@ -51,7 +51,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SetCmd *set_command = (SetCmd *)(command_info_.get());
             if(set_command->var_name() == enable_profiling_name) {
                 if(set_command->value_type() != SetVarType::kBool) {
-                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
                 return true;
@@ -59,7 +59,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             if(set_command->var_name() == profile_history_capacity_name) {
                 if(set_command->value_type() != SetVarType::kInteger) {
-                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
                 }
                 query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
                 return true;
@@ -67,11 +67,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             if(set_command->var_name() == log_level) {
                 if(set_command->value_type() != SetVarType::kString) {
-                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
                 }
 
                 if(set_command->scope() != SetScope::kGlobal) {
-                    Error<ExecutorException>(Format("log_level is a global config parameter.", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("log_level is a global config parameter.", set_command->var_name()));
                 }
 
                 if(set_command->value_str() == "trace") {
@@ -99,27 +99,27 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     return true;
                 }
 
-                Error<ExecutorException>(Format("Unknown log level: {}.", set_command->value_str()));
+                Error<ExecutorException>(fmt::format("Unknown log level: {}.", set_command->value_str()));
                 //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
                 return true;
             }
 
             if(set_command->var_name() == worker_cpu_limit) {
                 if(set_command->value_type() != SetVarType::kInteger) {
-                    Error<ExecutorException>(Format("Wrong value type: {}", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
                 }
 
                 if(set_command->scope() != SetScope::kGlobal) {
-                    Error<ExecutorException>(Format("cpu_count is a global config parameter.", set_command->var_name()));
+                    Error<ExecutorException>(fmt::format("cpu_count is a global config parameter.", set_command->var_name()));
                 }
 
-                Error<ExecutorException>(Format("You need to change the CPU limit before start the system.", set_command->var_name()));
+                Error<ExecutorException>(fmt::format("You need to change the CPU limit before start the system.", set_command->var_name()));
 //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
                 return true;
             }
 
             {
-                Error<ExecutorException>(Format("Unknown command: {}", set_command->var_name()));
+                Error<ExecutorException>(fmt::format("Unknown command: {}", set_command->var_name()));
             }
             break;
         }
@@ -127,7 +127,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
             if (profiler_record == nullptr) {
-                Error<ExecutorException>(Format("The record does not exist: {}", export_command->file_no()));
+                Error<ExecutorException>(fmt::format("The record does not exist: {}", export_command->file_no()));
             }
             LocalFileSystem fs;
             FileWriter file_writer(fs, export_command->file_name(), 128);

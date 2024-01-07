@@ -33,8 +33,8 @@ IrsIndexEntry::IrsIndexEntry(TableIndexEntry *, SharedPtr<String> index_dir, u64
     begin_ts_ = begin_ts;
 }
 
-Json IrsIndexEntry::Serialize(TxnTimeStamp) {
-    Json json;
+nlohmann::json IrsIndexEntry::Serialize(TxnTimeStamp) {
+    nlohmann::json json;
     json["txn_id"] = this->txn_id_.load();
     json["begin_ts"] = this->begin_ts_;
     json["commit_ts"] = this->commit_ts_.load();
@@ -43,7 +43,7 @@ Json IrsIndexEntry::Serialize(TxnTimeStamp) {
     return json;
 }
 
-SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *) {
+SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *) {
     u64 txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];

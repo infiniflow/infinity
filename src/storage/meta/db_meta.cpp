@@ -76,7 +76,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_t
                         }
                         default: {
                             // Duplicated database
-                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *this->db_name_));
+                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
                             LOG_ERROR(*err_msg);
                             return {db_entry_ptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                         }
@@ -85,7 +85,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_t
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg =
-                    MakeUnique<String>(Format("Write-write conflict: There is a committed database which is later than current transaction."));
+                    MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
                 LOG_ERROR(*err_msg);
                 return {db_entry_ptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
             }
@@ -104,12 +104,12 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_t
                             this->entry_list_.emplace_front(Move(db_entry));
                             return {db_entry_ptr, Status::OK()};
                         } else {
-                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated database name: {}.", *this->db_name_));
+                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
                             LOG_ERROR(*err_msg);
                             return {db_entry_ptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                         }
                     } else {
-                        UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is a uncommitted transaction."));
+                        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
                         return {db_entry_ptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                     }
@@ -118,7 +118,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_t
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
                     UniquePtr<String> err_msg = MakeUnique<String>(
-                        Format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
+                        fmt::format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
                     LOG_ERROR(*err_msg);
                     return {db_entry_ptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                 }
@@ -266,12 +266,12 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 SharedPtr<String> DBMeta::ToString() {
     SharedLock<RWMutex> r_locker(this->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(
-        Format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list_.size()));
+        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list_.size()));
     return res;
 }
 
-Json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
     Vector<DBEntry *> db_candidates;
     {
         SharedLock<RWMutex> lck(this->rw_locker_);
@@ -292,7 +292,7 @@ Json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     return json_res;
 }
 
-UniquePtr<DBMeta> DBMeta::Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr) {
+UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
     SharedPtr<String> data_dir = MakeShared<String>(db_meta_json["data_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
     UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir, db_name);

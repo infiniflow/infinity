@@ -131,7 +131,7 @@ public:
                     COMPARE(DoubleT)
                 }
                 default: {
-                    Error<NotImplementException>(Format("{} not implemented.", type.type()));
+                    Error<NotImplementException>(fmt::format("{} not implemented.", type.type()));
                 }
             }
         }

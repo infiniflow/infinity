@@ -213,13 +213,13 @@ public:
 
 public:
     // Serialization and Deserialization
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void MergeFrom(NewCatalog &other);
 
-    static void Deserialize(const Json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
+    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
     static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 

@@ -46,9 +46,9 @@ public:
 
     virtual String ToString() const override;
 
-    virtual Json Serialize() const override;
+    virtual nlohmann::json Serialize() const override;
 
-    static SharedPtr<IndexFullText> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexFullText> Deserialize(const nlohmann::json &index_def_json);
 
 public:
     String analyzer_{};

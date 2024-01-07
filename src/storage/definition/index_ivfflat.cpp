@@ -80,14 +80,14 @@ String IndexIVFFlat::ToString() const {
     return ss.str();
 }
 
-Json IndexIVFFlat::Serialize() const {
-    Json res = IndexBase::Serialize();
+nlohmann::json IndexIVFFlat::Serialize() const {
+    nlohmann::json res = IndexBase::Serialize();
     res["centroids_count"] = centroids_count_;
     res["metric_type"] = MetricTypeToString(metric_type_);
     return res;
 }
 
-SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &) {
+SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
     Error<StorageException>("Not implemented");
     return nullptr;
 }

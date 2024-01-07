@@ -787,7 +787,7 @@ Value ColumnVector::GetValue(SizeT index) const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index >= tail_index_) {
-        Error<TypeException>(Format("Attempt to access an invalid index of column vector: {}", ToStr(index)));
+        Error<TypeException>(fmt::format("Attempt to access an invalid index of column vector: {}", ToStr(index)));
     }
 
     // Not valid, make a same data type with null indicator
@@ -900,7 +900,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index > tail_index_) {
-        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+        Error<StorageException>(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                                        ToStr(index),
                                        ToStr(tail_index_),
                                        ToStr(capacity_)));
@@ -909,7 +909,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
     if (value.type() != *data_type_) {
-        Error<StorageException>(Format("Attempt to store a different type value into column vector: {}, column vector type: {}",
+        Error<StorageException>(fmt::format("Attempt to store a different type value into column vector: {}, column vector type: {}",
                                        value.type().ToString(),
                                        data_type_->ToString()));
     }
@@ -1040,7 +1040,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             std::tie(src_ptr, src_size) = value.GetEmbedding();
             if (src_size != data_type_->Size()) {
                 Error<TypeException>(
-                    Format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
+                    fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
             Memcpy(dst_ptr, src_ptr, src_size);
@@ -1055,7 +1055,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
 
 void ColumnVector::Finalize(SizeT index) {
     if (index > capacity_) {
-        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+        Error<StorageException>(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     tail_index_ = index;
 }
@@ -1065,10 +1065,10 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index > capacity_) {
-        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+        Error<StorageException>(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     if (index > tail_index_) {
-        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+        Error<StorageException>(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                                        ToStr(index),
                                        ToStr(tail_index_),
                                        ToStr(capacity_)));
@@ -1235,7 +1235,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
         }
     }
     if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+        Error<StorageException>(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
     if (data_type_->type() == LogicalType::kEmbedding) {
         SetByRawPtr(tail_index_++, value_ptr);
@@ -1251,12 +1251,12 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
 
     if (*this->data_type_ != *other.data_type_) {
         Error<StorageException>(
-            Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
+            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
     }
 
     if (this->tail_index_ + count > this->capacity_) {
         Error<StorageException>(
-            Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
     }
 
     switch (data_type_->type()) {
@@ -1488,12 +1488,12 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 //         case kBlob:
          case kMixed:
          case kNull: {
-             LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
+             LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
              Error<NotImplementException>("Not supported now in append data in column");
          }
          case kMissing:
          case kInvalid: {
-             LOG_ERROR(Format("Invalid data type {}", data_type_->ToString()));
+             LOG_ERROR(fmt::format("Invalid data type {}", data_type_->ToString()));
              Error<StorageException>("Invalid data type");
          }
          default: {
@@ -1506,7 +1506,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
     if (data_type_->type() != LogicalType::kRowID) {
-        Error<StorageException>(Format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
+        Error<StorageException>(fmt::format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
     }
     if (row_count == 0) {
         return 0;
@@ -1529,9 +1529,9 @@ SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
 
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
-        LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
+        LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
         Error<StorageException>(
-            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
+            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
         ;
     }
     if (this->buffer_.get() != other.buffer_.get()) {
@@ -1629,7 +1629,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        Error<StorageException>(Format("Not supported vector_type {}", int(vector_type_)));
+        Error<StorageException>(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     size += sizeof(i32);
@@ -1650,7 +1650,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        Error<NotImplementException>(Format("Not supported vector_type {}", int(vector_type_)));
+        Error<NotImplementException>(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);

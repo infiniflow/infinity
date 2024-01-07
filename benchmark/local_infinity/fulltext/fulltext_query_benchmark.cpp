@@ -43,7 +43,7 @@ bool ReadJsonl(const std::string &query_str, size_t &start_pos, size_t query_siz
     std::string_view json_sv(query_str.data() + start_pos, end_pos - start_pos);
     start_pos = end_pos + 1;
 
-    Json json = Json::parse(json_sv);
+    nlohmann::json json = nlohmann::json::parse(json_sv);
     result = {json["_id"], json["text"]};
     return true;
 }

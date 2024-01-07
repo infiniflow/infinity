@@ -14,11 +14,11 @@
 
 module;
 
+export module file_worker;
+
 import stl;
 import file_system;
 import third_party;
-
-export module file_worker;
 
 namespace infinity {
 
@@ -51,7 +51,7 @@ public:
     }
 
     // Get file path. As key of buffer handle.
-    String GetFilePath() const { return Format("{}/{}", *file_dir_, *file_name_); }
+    String GetFilePath() const { return fmt::format("{}/{}", *file_dir_, *file_name_); }
 
     void Sync();
 
@@ -63,7 +63,7 @@ protected:
     virtual void ReadFromFileImpl() = 0;
 
 private:
-    String ChooseFileDir(bool spill) const { return spill ? Format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }
+    String ChooseFileDir(bool spill) const { return spill ? fmt::format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }
 
 public:
     const SharedPtr<String> file_dir_{};

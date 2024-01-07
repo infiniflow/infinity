@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
         if (times >= 2) {
             auto elapsed_ns = profiler.Elapsed();
             auto elapsed_s = elapsed_ns / (1'000'000'000.0);
-            results.push_back(Format("Total cost : {} s", elapsed_s));
+            results.push_back(fmt::format("Total cost : {} s", elapsed_s));
         }
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
@@ -257,9 +257,9 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            results.push_back(Format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
-            results.push_back(Format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
-            results.push_back(Format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
+            results.push_back(fmt::format("R@1:   {:.3f}", float(correct_1) / float(query_count * 1)));
+            results.push_back(fmt::format("R@10:  {:.3f}", float(correct_10) / float(query_count * 10)));
+            results.push_back(fmt::format("R@100: {:.3f}", float(correct_100) / float(query_count * 100)));
         }
     }
 

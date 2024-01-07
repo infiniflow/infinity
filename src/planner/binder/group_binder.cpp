@@ -68,7 +68,7 @@ SharedPtr<BaseExpression> GroupBinder::BuildExpression(const ParsedExpr &expr, B
         String expr_name = expr.GetName();
 
         if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
-            Error<PlannerException>(Format("Duplicated group by expression: {}", expr_name));
+            Error<PlannerException>(fmt::format("Duplicated group by expression: {}", expr_name));
         }
 
         // Add the group by expression into bind context
@@ -115,7 +115,7 @@ SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr
 
     Vector<ParsedExpr *> &expr_array = bind_context_ptr->select_expression_;
     if (select_idx > (i64)expr_array.size() or select_idx < 1) {
-        Error<PlannerException>(Format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
+        Error<PlannerException>(fmt::format("GROUP BY clause out of range - should be from 1 to {}", expr_array.size()));
     }
 
     select_idx -= 1;

@@ -39,7 +39,7 @@ public:
 
     String ToString(i64 &space) const final;
 
-    inline String name() final { return Format("logical_project_{}", ToStr(table_index_)); }
+    inline String name() final { return fmt::format("logical_project_{}", ToStr(table_index_)); }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 

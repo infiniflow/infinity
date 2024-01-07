@@ -109,7 +109,7 @@ public:
         }
 
         if (tail_index_ >= capacity_) {
-            Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+            Error<StorageException>(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
         }
         SetValue(tail_index_++, value);
     }

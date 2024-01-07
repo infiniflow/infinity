@@ -66,7 +66,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         return false;
     }
     if ( fusion_expr_->method_.compare("rrf") != 0) {
-        throw ExecutorException(Format("Fusion method {} is not implemented.", fusion_expr_->method_));
+        throw ExecutorException(fmt::format("Fusion method {} is not implemented.", fusion_expr_->method_));
     }
     SizeT rank_constant = 60;
     if (fusion_expr_->options_.get() != nullptr) {
@@ -88,7 +88,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         SizeT base_rank = 1;
         for (UniquePtr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                Error<ExecutorException>(Format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), GetOutputTypes()->size()));
+                Error<ExecutorException>(fmt::format("input_data_block column count {} is incorrect, expect {}.", input_data_block->column_count(), GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -138,12 +138,12 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         while (fragment_idx < doc.ranks.size() && doc.ranks[fragment_idx] == 0)
             fragment_idx++;
         if (fragment_idx >= doc.ranks.size()) {
-            throw ExecutorException(Format("Cannot find fragment_idx"));
+            throw ExecutorException(fmt::format("Cannot find fragment_idx"));
         }
         u64 fragment_id = fragment_ids[fragment_idx];
         auto &input_blocks = fusion_operator_state->input_data_blocks_[fragment_id];
         if (input_blocks.size() == 0) {
-            throw ExecutorException(Format("input_data_blocks_[{}] is empty.", fragment_id));
+            throw ExecutorException(fmt::format("input_data_blocks_[{}] is empty.", fragment_id));
         }
         SizeT block_idx = 0;
         SizeT row_idx = doc.ranks[fragment_idx] - 1;
@@ -152,7 +152,7 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
             block_idx++;
         }
         if (block_idx >= input_blocks.size()) {
-            throw ExecutorException(Format("Cannot find block_idx"));
+            throw ExecutorException(fmt::format("Cannot find block_idx"));
         }
 
         SizeT column_n = GetOutputTypes()->size() - 2;
@@ -180,7 +180,7 @@ String PhysicalFusion::ToString(i64 &space) const {
     } else {
         arrow_str = "PhysicalFusion ";
     }
-    String res = Format("{} {}", arrow_str, fusion_expr_->ToString());
+    String res = fmt::format("{} {}", arrow_str, fusion_expr_->ToString());
     return res;
 }
 

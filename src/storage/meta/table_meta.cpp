@@ -71,7 +71,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
         table_entry_ptr = table_entry.get();
         this->entry_list_.emplace_front(Move(table_entry));
 
-        LOG_TRACE(Format("New table entry is added: {}.", table_collection_name));
+        LOG_TRACE(fmt::format("New table entry is added: {}.", table_collection_name));
         return {table_entry_ptr, Status::OK()};
     } else {
         // Already have a table entry, check if the table entry is valid here.
@@ -98,14 +98,14 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     return {table_entry_ptr, Status::OK()};
                 } else {
                     // Duplicated table
-                    UniquePtr<String> err_msg = MakeUnique<String>(Format("Duplicated table: {}.", table_collection_name));
+                    UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated table: {}.", table_collection_name));
                     LOG_ERROR(*err_msg);
                     return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                 }
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg = MakeUnique<String>(
-                    Format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
+                    fmt::format("Write-write conflict: There is a committed table: {} which is later than current transaction.", table_collection_name));
                 LOG_ERROR(*err_msg);
                 return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
             }
@@ -130,12 +130,12 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                             this->entry_list_.emplace_front(Move(table_entry));
                             return {table_entry_ptr, Status::OK()};
                         } else {
-                            UniquePtr<String> err_msg = MakeUnique<String>(Format("Create a duplicated table {}.", table_collection_name));
+                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Create a duplicated table {}.", table_collection_name));
                             LOG_ERROR(*err_msg);
                             return {nullptr, Status(ErrorCode::kDuplicate, Move(err_msg))};
                         }
                     } else {
-                        UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is a uncommitted transaction."));
+                        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                     }
@@ -144,7 +144,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                 case TxnState::kCommitted: {
                     // Committing / Committed, report WW conflict and rollback current txn
                     UniquePtr<String> err_msg = MakeUnique<String>(
-                        Format("Write-write conflict: There is a committing/committed table which is later than current transaction."));
+                        fmt::format("Write-write conflict: There is a committing/committed table which is later than current transaction."));
                     LOG_ERROR(*err_msg);
                     return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
                 }
@@ -196,7 +196,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
             // No conflict
             if (header_table_entry->deleted_) {
                 if (conflict_type == ConflictType::kIgnore) {
-                    LOG_TRACE(Format("Ignore drop a not existed table entry {}", table_name));
+                    LOG_TRACE(fmt::format("Ignore drop a not existed table entry {}", table_name));
                     return {nullptr, Status::OK()};
                 }
                 UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped before.");
@@ -215,7 +215,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
         } else {
             // Write-Write conflict
             UniquePtr<String> err_msg =
-                MakeUnique<String>(Format("Write-write conflict: There is a committed database which is later than current transaction."));
+                MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
         }
@@ -229,7 +229,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
             return {table_entry_ptr, Status::OK()};
         } else {
             // Not same txn, issue WW conflict
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Write-write conflict: There is another uncommitted table entry."));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is another uncommitted table entry."));
             LOG_ERROR(*err_msg);
             return {table_entry_ptr, Status(ErrorCode::kWWConflict, Move(err_msg))};
         }
@@ -307,12 +307,12 @@ const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_n
 SharedPtr<String> TableMeta::ToString() {
     SharedLock<RWMutex> r_locker(this->rw_locker_);
     SharedPtr<String> res =
-        MakeShared<String>(Format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, entry_list_.size()));
+        MakeShared<String>(fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, entry_list_.size()));
     return res;
 }
 
-Json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
     Vector<TableEntry *> table_candidates;
     {
         SharedLock<RWMutex> lck(this->rw_locker_);
@@ -345,10 +345,10 @@ Json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
  * @param buffer_mgr
  * @return UniquePtr<TableMeta>
  */
-UniquePtr<TableMeta> TableMeta::Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
+UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr) {
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
-    LOG_TRACE(Format("load table {}", *table_name));
+    LOG_TRACE(fmt::format("load table {}", *table_name));
     UniquePtr<TableMeta> res = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {

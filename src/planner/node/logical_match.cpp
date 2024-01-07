@@ -80,7 +80,7 @@ String LogicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "LogicalMatch ";
     }
-    arrow_str += Format("({})", this->node_id());
+    arrow_str += fmt::format("({})", this->node_id());
     ss << arrow_str << std::endl;
 
     // Table alias and name

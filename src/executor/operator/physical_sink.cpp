@@ -142,7 +142,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
+            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
         }
     }
 }
@@ -166,7 +166,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_
             break;
         }
         default: {
-            Error<ExecutorException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            Error<ExecutorException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }
@@ -321,7 +321,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
         }
     }
 }
@@ -339,7 +339,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             break;
         }
         default: {
-            Error<NotImplementException>(Format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
         }
     }
@@ -349,7 +349,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
                                                       QueueSinkState *queue_sink_state,
                                                       OperatorState *task_operator_state) {
     if (queue_sink_state->error_message_.get() != nullptr) {
-        LOG_TRACE(Format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
+        LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
         auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_error);

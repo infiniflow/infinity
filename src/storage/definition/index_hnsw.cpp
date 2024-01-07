@@ -114,8 +114,8 @@ String IndexHnsw::ToString() const {
     return ss.str();
 }
 
-Json IndexHnsw::Serialize() const {
-    Json res = IndexBase::Serialize();
+nlohmann::json IndexHnsw::Serialize() const {
+    nlohmann::json res = IndexBase::Serialize();
     res["metric_type"] = MetricTypeToString(metric_type_);
     res["encode_type"] = HnswEncodeTypeToString(encode_type_);
     res["M"] = M_;

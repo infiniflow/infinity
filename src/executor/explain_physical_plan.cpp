@@ -700,7 +700,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalTableScan *table_scan_node, Shar
     String output_columns = String(intent_size, ' ') + " - output_columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(Format("No column in table: {}.", table_scan_node->table_alias()));
+        Error<PlannerException>(fmt::format("No column in table: {}.", table_scan_node->table_alias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx) + ", ";
@@ -765,7 +765,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalKnnScan *knn_scan_node, SharedPt
     String output_columns = String(intent_size, ' ') + " - output columns: [";
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(Format("No column in table: {}.", knn_scan_node->TableAlias()));
+        Error<PlannerException>(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx) + ", ";

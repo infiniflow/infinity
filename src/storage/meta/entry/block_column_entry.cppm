@@ -45,9 +45,9 @@ public:
     inline explicit BlockColumnEntry(const BlockEntry *block_entry, u64 column_id, const SharedPtr<String> &base_dir_ref)
         : BaseEntry(EntryType::kBlockColumn), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
-    Json Serialize();
+    nlohmann::json Serialize();
 
-    static UniquePtr<BlockColumnEntry> Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
+    static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 
 public:
     // Getter
@@ -58,7 +58,7 @@ public:
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
     static SharedPtr<String> OutlineFilename(u64 column_id, SizeT file_idx) {
-        return MakeShared<String>(Format("col_{}_out_{}", column_id, file_idx));
+        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id, file_idx));
     }
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }

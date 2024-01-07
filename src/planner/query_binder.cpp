@@ -140,13 +140,13 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
             String select_expr_name = select_expr->ToString();
             if (bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
-                LOG_TRACE(Format("Same expression: {} had already been found in select list index: {}",
+                LOG_TRACE(fmt::format("Same expression: {} had already been found in select list index: {}",
                                  select_expr_name,
                                  bind_context_ptr_->select_expr_name2index_[select_expr_name]));
                 // TODO: create an map from secondary expression to the primary one.
             } else {
                 if (bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
-                    select_expr_name = Format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
+                    select_expr_name = fmt::format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
                 }
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
@@ -925,7 +925,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
-        Error<PlannerException>(Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        Error<PlannerException>(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -944,7 +944,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
-        Error<PlannerException>(Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        Error<PlannerException>(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -954,7 +954,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
     if (statement.update_expr_array_ == nullptr) {
-        Error<PlannerException>(Format("Update expr array is empty"));
+        Error<PlannerException>(fmt::format("Update expr array is empty"));
     }
 
     const Vector<String> &column_names = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
@@ -966,7 +966,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         ParsedExpr *expr = upd_expr->value;
         auto it = std::find(column_names.begin(), column_names.end(), column_name);
         if (it == column_names.end()) {
-            Error<PlannerException>(Format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
+            Error<PlannerException>(fmt::format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
         }
         SizeT column_id = std::distance(column_names.begin(), it);
         SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);

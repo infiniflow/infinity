@@ -102,7 +102,7 @@ private:
 
     static void CSVRowHandler(void *);
 
-    void JSONLRowHandler(const Json &line_json, BlockEntry *block_entry);
+    void JSONLRowHandler(const nlohmann::json &line_json, BlockEntry *block_entry);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

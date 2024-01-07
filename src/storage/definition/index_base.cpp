@@ -145,15 +145,15 @@ String IndexBase::ToString() const {
     return ss.str();
 }
 
-Json IndexBase::Serialize() const {
-    Json res;
+nlohmann::json IndexBase::Serialize() const {
+    nlohmann::json res;
     res["file_name"] = file_name_;
     res["index_type"] = IndexInfo::IndexTypeToString(index_type_);
     res["column_names"] = column_names_;
     return res;
 }
 
-SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
+SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json) {
     SharedPtr<IndexBase> res = nullptr;
     String index_type_name = index_def_json["index_type"];
     IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
