@@ -71,7 +71,7 @@ private:
 
 private:
     NewCatalog *catalog_{};
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     u64 txn_id_{};
     BufferManager *buffer_mgr_{};
     HashMap<u64, UniquePtr<Txn>> txn_map_{};
@@ -79,7 +79,7 @@ private:
     PutWalEntryFn put_wal_entry_{};
 
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
-    Mutex mutex_;
+    std::mutex mutex_;
     TxnTimeStamp txn_ts_{};
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager

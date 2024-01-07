@@ -77,7 +77,7 @@ private:
     static String IndexFileName(const String &index_name, u32 segment_id);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     TableIndexEntry *table_index_entry_{};
     u64 column_id_{};

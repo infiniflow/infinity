@@ -69,6 +69,18 @@ using std::memcmp;
 using std::is_same;
 using std::fill;
 
+using std::shared_mutex;
+using std::mutex;
+using std::shared_lock;
+using std::unique_lock;
+using std::lock_guard;
+using std::condition_variable;
+using std::forward_list;
+using std::isalpha;
+using std::isalnum;
+using std::pow;
+using std::log2;
+
 } // namespace std
 
 namespace infinity {
@@ -191,8 +203,6 @@ export {
     using TxnTimeStamp = u64;
 
     // Concurrency
-
-    using RWMutex = std::shared_mutex;
     using ThreadPool = ctpl::thread_pool;
 
     using Thread = std::thread;
@@ -320,16 +330,7 @@ export {
     template <typename T>
     concept IsTrivial = std::is_trivial_v<T>;
 
-    // Mutex
-    template <typename T>
-    using SharedLock = std::shared_lock<T>;
-
-    template <typename T>
-    using UniqueLock = std::unique_lock<T>;
-
-    template <typename T>
-    using LockGuard = std::lock_guard<T>;
-
+    // std::mutex
     constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
     constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
     constexpr std::memory_order MemoryOrderRelease = std::memory_order::release;
@@ -337,7 +338,7 @@ export {
     constexpr std::memory_order MemoryOrderAcqrel = std::memory_order::acq_rel;
     constexpr std::memory_order MemoryOrderSeqcst = std::memory_order::seq_cst;
 
-    using CondVar = std::condition_variable;
+
 
     // Stringstream
     using StringStream = std::basic_stringstream<char>;
@@ -367,35 +368,10 @@ export {
     template <typename T>
     using EnableSharedFromThis = std::enable_shared_from_this<T>;
 
-    using Mutex = std::mutex;
-
-    float HugeValf() { return HUGE_VALF; }
-
-    template <typename T, typename Allocator = std::allocator<T>>
-    using ForwardList = std::forward_list<T, Allocator>;
-
-    inline bool IsAlpha(const char &c) { return std::isalpha(c); }
-
-    inline bool IsAlNum(const char &c) { return std::isalnum(c); }
-
-    SizeT Pow(SizeT x, SizeT y) { return std::pow(x, y); }
-
-    u64 Log2(u64 num) { return std::log2(num); }
-
     template <typename II, typename OI>
     OI Copy(II first, II last, OI d_first) {
         return std::copy(first, last, d_first);
     }
-
-//    template <typename FI, typename T>
-//    void Fill(FI first, FI last, const T &value) {
-//        std::fill(first, last, value);
-//    }
-//
-//    template <typename T1, typename T2>
-//    constexpr bool IsSame() {
-//        return std::is_same<T1, T2>();
-//    }
 }
 
 export template <typename T1, typename T2>

@@ -186,7 +186,7 @@ nlohmann::json SegmentColumnIndexEntry::Serialize() {
 
     nlohmann::json index_entry_json;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         index_entry_json["segment_id"] = this->segment_id_;
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;

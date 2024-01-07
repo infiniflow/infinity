@@ -31,7 +31,7 @@ export class WriteBuffer : public BufferBase {
     const double growth_rate_;
     const SizeT max_chunk_size_;
 
-    using Container = ForwardList<BufferBase::Buffer>;
+    using Container = std::forward_list<BufferBase::Buffer>;
 
     Container chunk_list_;
     Container::iterator chunk_tail_;

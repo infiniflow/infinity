@@ -42,7 +42,7 @@ String FormatByteSize(u64 byte_size) {
         return "0B";
     }
 
-    int suffixIndex = static_cast<int>(Log2(byte_size) / 10);
+    int suffixIndex = static_cast<int>(std::log2(byte_size) / 10);
     double size = static_cast<double>(byte_size) / (1 << (suffixIndex * 10));
 
     std::ostringstream oss;

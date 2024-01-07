@@ -101,7 +101,7 @@ private:
     Thread checkpoint_thread_{};
 
     // TxnManager and Flush thread access following members
-    Mutex mutex_{};
+    std::mutex mutex_{};
     Deque<SharedPtr<WalEntry>> que_{};
 
     // Only Flush thread access following members
@@ -109,7 +109,7 @@ private:
     StdOfStream ofs_{};
 
     // Flush and Checkpoint threads access following members
-    Mutex mutex2_{};
+    std::mutex mutex2_{};
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
 

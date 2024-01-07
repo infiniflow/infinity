@@ -45,7 +45,7 @@ BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<Fil
 BufferObj::~BufferObj() = default;
 
 BufferHandle BufferObj::Load() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             break;
@@ -74,12 +74,12 @@ BufferHandle BufferObj::Load() {
 }
 
 void BufferObj::GetMutPointer() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     type_ = BufferType::kEphemeral;
 }
 
 void BufferObj::UnloadInner() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
             --rc_;
@@ -96,7 +96,7 @@ void BufferObj::UnloadInner() {
 }
 
 bool BufferObj::Free() {
-    UniqueLock<RWMutex> w_locker(rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     switch (status_) {
         case BufferStatus::kFreed:
         case BufferStatus::kLoaded: {

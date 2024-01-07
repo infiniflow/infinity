@@ -30,7 +30,7 @@ public:
     friend class Txn;
 
     inline void BeginCommit(TxnTimeStamp begin_ts) {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kNotStarted) {
             Error<StorageException>("Transaction isn't in NOT_STARTED status.");
         }
@@ -39,22 +39,22 @@ public:
     }
 
     inline TxnTimeStamp GetBeginTS() {
-        SharedLock<RWMutex> r_locker(rw_locker_);
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return begin_ts_;
     }
 
     inline TxnTimeStamp GetCommitTS() {
-        SharedLock<RWMutex> r_locker(rw_locker_);
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return commit_ts_;
     }
 
     inline TxnState GetTxnState() {
-        SharedLock<RWMutex> r_locker(rw_locker_);
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return state_;
     }
 
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
             Error<StorageException>("Transaction isn't in STARTED status.");
         }
@@ -63,7 +63,7 @@ public:
     }
 
     inline void SetTxnRollbacked() {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
             Error<StorageException>("Transaction isn't in ROLLBACKING status.");
         }
@@ -71,7 +71,7 @@ public:
     }
 
     inline void SetTxnCommitted() {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
             Error<StorageException>("Transaction isn't in COMMITTING status.");
         }
@@ -79,7 +79,7 @@ public:
     }
 
     inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
             Error<StorageException>("Transaction isn't in STARTED status.");
         }
@@ -88,7 +88,7 @@ public:
     }
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnState state_{TxnState::kNotStarted};

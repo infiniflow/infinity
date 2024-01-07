@@ -80,7 +80,7 @@ private:
 
     BufferObj *const buffer_{};
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentColumnIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentColumnIndexEntry

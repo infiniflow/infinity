@@ -54,7 +54,7 @@ namespace infinity {
 
 class ProfileHistory {
 private:
-    Mutex lock_{};
+    std::mutex lock_{};
     Vector<SharedPtr<QueryProfiler>> queue{};
     SizeT front{};
     SizeT rear{};
@@ -69,7 +69,7 @@ public:
     }
 
     void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
-        UniqueLock<Mutex> lk(lock_);
+        std::unique_lock<std::mutex> lk(lock_);
         if ((rear + 1) % max_size == front) {
             return;
         }
@@ -78,7 +78,7 @@ public:
     }
 
     QueryProfiler *GetElement(SizeT index) {
-        UniqueLock<Mutex> lk(lock_);
+        std::unique_lock<std::mutex> lk(lock_);
 
         // FIXME: Bug, unsigned integer: index will always >= 0
         if (index < 0 || index >= (rear - front + max_size) % max_size) {
@@ -92,7 +92,7 @@ public:
         Vector<SharedPtr<QueryProfiler>> elements;
         elements.reserve(max_size);
 
-        UniqueLock<Mutex> lk(lock_);
+        std::unique_lock<std::mutex> lk(lock_);
         for (SizeT i = 0; i < queue.size(); ++i) {
             if (queue[i].get() != nullptr) {
                 elements.push_back(queue[i]);
@@ -239,7 +239,7 @@ public:
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     u64 next_txn_id_{};
     u64 catalog_version_{};
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};

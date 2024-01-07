@@ -54,7 +54,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                       u64 txn_id,
                                                       TxnTimeStamp begin_ts,
                                                       TxnManager *txn_mgr) {
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     const String &table_collection_name = *table_collection_name_ptr;
 
     TableEntry *table_entry_ptr{nullptr};
@@ -175,7 +175,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
 
     TableEntry *table_entry_ptr{nullptr};
 
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
@@ -237,7 +237,7 @@ TableMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *, const S
 }
 
 void TableMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.");
         return;
@@ -263,7 +263,7 @@ void TableMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
  * @return Status
  */
 Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
-    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
@@ -305,7 +305,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_t
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 
 SharedPtr<String> TableMeta::ToString() {
-    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     SharedPtr<String> res =
         MakeShared<String>(fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, entry_list_.size()));
     return res;
@@ -315,7 +315,7 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
     nlohmann::json json_res;
     Vector<TableEntry *> table_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["db_entry_dir"] = *this->db_entry_dir_;
         json_res["table_name"] = *this->table_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.

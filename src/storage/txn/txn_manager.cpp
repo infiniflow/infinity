@@ -55,7 +55,7 @@ Txn *TxnManager::GetTxn(u64 txn_id) {
 }
 
 TxnState TxnManager::GetTxnState(u64 txn_id) {
-    SharedLock<RWMutex> r_locker(rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     Txn *txn_ptr = txn_map_[txn_id].get();
     TxnState res = txn_ptr->GetTxnState();
     return res;
@@ -67,7 +67,7 @@ u64 TxnManager::GetNewTxnID() {
 }
 
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
-    LockGuard<Mutex> guard(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     TxnTimeStamp ts = txn_ts_++;
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
@@ -80,7 +80,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     if (is_running_.load() == false) {
         Error<TransactionException>("TxnManager is not running, cannot invalidate");
     }
-    LockGuard<Mutex> guard(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     SizeT cnt = priority_que_.erase(commit_ts);
     if (cnt > 0 && !priority_que_.empty()) {
         auto it = priority_que_.begin();
@@ -98,7 +98,7 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     }
     if (put_wal_entry_ == nullptr)
         return;
-    UniqueLock<Mutex> lk(mutex_);
+    std::unique_lock<std::mutex> lk(mutex_);
     priority_que_[entry->commit_ts] = entry;
     auto it = priority_que_.begin();
     while (it != priority_que_.end() && it->second.get() != nullptr) {
@@ -119,7 +119,7 @@ void TxnManager::Stop() {
     }
 
     LOG_INFO("TxnManager is stopping...");
-    LockGuard<Mutex> guard(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     auto it = priority_que_.begin();
     while (it != priority_que_.end()) {
         // remove and notify the wal manager condition variable

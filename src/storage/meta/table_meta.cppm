@@ -68,7 +68,7 @@ private:
     Tuple<TableEntry *, Status> GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 

@@ -92,12 +92,12 @@ SegmentEntry::MakeReplaySegmentEntry(const TableEntry *table_entry, u32 segment_
 }
 
 int SegmentEntry::Room() {
-    SharedLock<RWMutex> lck(rw_locker_);
+    std::shared_lock<std::shared_mutex> lck(rw_locker_);
     return this->row_capacity_ - this->row_count_;
 }
 
 u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
         return 0;
     //    SizeT start_row = this->row_count_;
@@ -142,7 +142,7 @@ u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferMa
 }
 
 void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {
         u16 block_id = row_hash_map.first;
@@ -309,7 +309,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
 void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
     SharedPtr<BlockEntry> block_entry;
     {
-        UniqueLock<RWMutex> lck(this->rw_locker_);
+        std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
         if (this->min_row_ts_ == 0) {
             this->min_row_ts_ = commit_ts;
         }
@@ -320,7 +320,7 @@ void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id
 }
 
 void SegmentEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {
         u16 block_id = row_hash_map.first;
@@ -347,7 +347,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
     nlohmann::json json_res;
     Vector<BlockEntry *> block_entries;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["segment_dir"] = *this->segment_dir_;
         json_res["row_capacity"] = this->row_capacity_;
         json_res["segment_id"] = this->segment_id_;

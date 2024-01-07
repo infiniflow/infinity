@@ -59,7 +59,7 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
-    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
     this->index_by_segment_.emplace(segment_id, std::move(index_entry));
 }
 
@@ -71,7 +71,7 @@ nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
     Vector<SegmentColumnIndexEntry *> segment_column_index_entry_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
         json["txn_id"] = this->txn_id_.load();
         json["begin_ts"] = this->begin_ts_;

@@ -35,7 +35,7 @@ public:
             return false;
         }
 
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(task);
         empty_cv_.notify_one();
@@ -47,7 +47,7 @@ public:
             return false;
         }
 
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [this] { return queue_.size() < capacity_; });
         queue_.push_back(std::forward<T>(task));
         empty_cv_.notify_one();
@@ -55,14 +55,14 @@ public:
     }
 
     void EnqueueBulk(List<T> &input_queue) {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         full_cv_.wait(lock, [&] { return queue_.size() + input_queue.size() < capacity_; });
         queue_.splice(queue_.end(), input_queue);
         empty_cv_.notify_one();
     }
 
     void Dequeue(T& task) {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         task = queue_.front();
         queue_.pop_front();
@@ -70,7 +70,7 @@ public:
     }
 
     T DequeueReturn() {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         T res = std::move(queue_.front());
         queue_.pop_front();
@@ -79,14 +79,14 @@ public:
     }
 
     void DequeueBulk(List<T> &output_queue) {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_queue.splice(output_queue.end(), queue_);
         full_cv_.notify_one();
     }
 
     void DequeueBulk(Vector<T> &output_array) {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_array.insert(output_array.end(), queue_.begin(), queue_.end());
         queue_.clear();
@@ -94,7 +94,7 @@ public:
     }
 
     void DequeueBulk(Deque<T> &output_array) {
-        UniqueLock<Mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         empty_cv_.wait(lock, [this] { return !queue_.empty(); });
         output_array = queue_;
 //        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
@@ -103,20 +103,20 @@ public:
     }
 
     [[nodiscard]] SizeT Size() const {
-        LockGuard<Mutex> lock(queue_mutex_);
+        std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.size();
     }
 
     [[nodiscard]] bool Empty() const {
-        LockGuard<Mutex> lock(queue_mutex_);
+        std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.empty();
     }
 
 protected:
     atomic_bool allow_enqueue_{true};
-    mutable Mutex queue_mutex_{};
-    CondVar full_cv_{};
-    CondVar empty_cv_{};
+    mutable std::mutex queue_mutex_{};
+    std::condition_variable full_cv_{};
+    std::condition_variable empty_cv_{};
     Deque<T> queue_{};
     SizeT capacity_{DEFAULT_BLOCKING_QUEUE_SIZE};
 };

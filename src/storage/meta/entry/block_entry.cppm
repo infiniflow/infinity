@@ -146,7 +146,7 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 protected:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const SegmentEntry *segment_entry_{};
 

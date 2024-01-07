@@ -34,8 +34,8 @@ infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
 // infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
-infinity::Mutex server_mutex;
-infinity::CondVar server_cv;
+std::mutex server_mutex;
+std::condition_variable server_cv;
 
 bool server_running = false;
 
@@ -43,7 +43,7 @@ infinity::Thread shut_down_thread;
 
 void ShutdownServer() {
 
-    infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+    std::unique_lock<std::mutex> lock(server_mutex);
     server_running = true;
     server_cv.wait(lock, [&] { return !server_running; });
 
@@ -64,7 +64,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGQUIT:
         case SIGTERM: {
 
-            infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+            std::unique_lock<std::mutex> lock(server_mutex);
             server_running = false;
             server_cv.notify_one();
 

@@ -241,7 +241,7 @@ void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_e
 IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, MemoryOrderAcquire); }
 
 void IRSDataStore::Commit() {
-    UniqueLock<Mutex> lk(commit_mutex_);
+    std::unique_lock<std::mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();

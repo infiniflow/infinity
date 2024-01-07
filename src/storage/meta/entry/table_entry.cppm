@@ -133,7 +133,7 @@ public:
 protected:
     HashMap<String, u64> column_name2column_id_;
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     SharedPtr<String> table_entry_dir_{};
 

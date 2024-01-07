@@ -54,7 +54,7 @@ public:
     inline const SharedPtr<String> &view_name() const { return view_name_; }
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     SharedPtr<CreateViewInfo> create_view_info_;
 

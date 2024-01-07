@@ -49,7 +49,7 @@ private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
 public:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};

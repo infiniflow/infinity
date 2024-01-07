@@ -72,7 +72,7 @@ private:
     void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
     const SharedPtr<IndexDef> index_def_{};
     SharedPtr<String> index_dir_{};

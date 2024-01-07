@@ -208,7 +208,7 @@ void QueryProfiler::Flush(TaskProfiler &&profiler) {
         return;
     }
 
-    UniqueLock<Mutex> lk(flush_lock_);
+    std::unique_lock<std::mutex> lk(flush_lock_);
     records_[profiler.binding_.fragment_id_][profiler.binding_.task_id_].push_back(profiler);
 }
 

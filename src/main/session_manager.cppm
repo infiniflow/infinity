@@ -29,7 +29,7 @@ public:
         u64 session_id = ++ session_id_generator_;
         SharedPtr<RemoteSession> remote_session = MakeShared<RemoteSession>(session_id);
         {
-            UniqueLock<RWMutex> w_locker(rw_locker_);
+            std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, remote_session.get());
         }
         return remote_session;
@@ -39,14 +39,14 @@ public:
         u64 session_id = ++ session_id_generator_;
         SharedPtr<LocalSession> local_session = MakeShared<LocalSession>(session_id);
         {
-            UniqueLock<RWMutex> w_locker(rw_locker_);
+            std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
             sessions_.emplace(session_id, local_session.get());
         }
         return local_session;
     }
 
     BaseSession* GetSessionByID(u64 session_id) {
-        SharedLock<RWMutex> r_locker(rw_locker_);
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         auto iter = sessions_.find(session_id);
         if(iter == sessions_.end()) {
             return nullptr;
@@ -56,17 +56,17 @@ public:
     }
 
     void RemoveSessionByID(u64 session_id) {
-        UniqueLock<RWMutex> w_locker(rw_locker_);
+        std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         sessions_.erase(session_id);
     }
 
     SizeT GetSessionCount() {
-        SharedLock<RWMutex> r_locker(rw_locker_);
+        std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
         return sessions_.size();
     }
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     HashMap<u64, BaseSession*> sessions_;
 
     // First session is ONE;

@@ -65,7 +65,7 @@ private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};
 };

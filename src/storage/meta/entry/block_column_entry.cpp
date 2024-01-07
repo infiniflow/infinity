@@ -143,8 +143,8 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = this->outline_info_.get();
-                    auto base_file_size =
-                        std::min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    auto base_file_size = std::min(SizeT(DEFAULT_BASE_FILE_SIZE * std::pow(DEFAULT_BASE_NUM, outline_info->next_file_idx)),
+                                                   DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
@@ -269,7 +269,8 @@ nlohmann::json BlockColumnEntry::Serialize() {
     return json_res;
 }
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockColumnEntry>
+BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
     UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr, true);
     if (block_column_entry->outline_info_.get() != nullptr) {

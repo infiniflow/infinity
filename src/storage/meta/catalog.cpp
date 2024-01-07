@@ -399,7 +399,7 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     nlohmann::json json_res;
     Vector<DBMeta *> databases;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["current_dir"] = *this->current_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["catalog_version"] = this->catalog_version_;

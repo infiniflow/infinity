@@ -943,7 +943,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
-            UniqueLock<std::mutex> locker(locker_);
+            std::unique_lock<std::mutex> locker(locker_);
             parallel_count = 1;
             tasks_.reserve(parallel_count);
             tasks_.emplace_back(MakeUnique<FragmentTask>(this, 0, operator_count));
@@ -952,7 +952,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case FragmentType::kParallelMaterialize:
         case FragmentType::kParallelStream: {
-            UniqueLock<std::mutex> locker(locker_);
+            std::unique_lock<std::mutex> locker(locker_);
             tasks_.reserve(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_.emplace_back(MakeUnique<FragmentTask>(this, task_id, operator_count));

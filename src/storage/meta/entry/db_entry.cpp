@@ -172,7 +172,7 @@ Status DBEntry::GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableD
 }
 
 SharedPtr<String> DBEntry::ToString() {
-    SharedLock<RWMutex> r_locker(rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     SharedPtr<String> res =
         MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, tables_.size()));
     return res;
@@ -183,7 +183,7 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
 
     Vector<TableMeta *> table_metas;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["db_entry_dir"] = *this->db_entry_dir_;
         json_res["db_name"] = *this->db_name_;
         json_res["txn_id"] = this->txn_id_.load();

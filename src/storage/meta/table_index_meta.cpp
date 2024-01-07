@@ -67,7 +67,7 @@ Tuple<TableIndexEntry *, Status>
 TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     TableIndexEntry *table_index_entry_ptr{nullptr};
 
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
 
     if (this->entry_list_.empty()) {
         // Insert a dummy entry.
@@ -197,7 +197,7 @@ TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnT
 Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *) {
 
     TableIndexEntry *table_index_entry_ptr{nullptr};
-    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
 
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty index entry list.");
@@ -258,7 +258,7 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
 
     Vector<TableIndexEntry *> table_index_entry_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["index_name"] = *this->index_name_;
 
         table_index_entry_candidates.reserve(this->entry_list_.size());
@@ -302,7 +302,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
 
     TableIndexEntry *table_index_entry{nullptr};
 
-    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     for (const auto &entry : this->entry_list_) {
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
@@ -335,7 +335,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
 }
 
 void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
-    UniqueLock<RWMutex> w_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
         return;

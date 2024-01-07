@@ -66,11 +66,11 @@ private:
     Tuple<TableIndexEntry *, Status> DropTableIndexEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
 private:
-    //    RWMutex rw_locker_{};
+    //    std::shared_mutex rw_locker_{};
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     List<UniquePtr<BaseEntry>> entry_list_{};
 };
 } // namespace infinity

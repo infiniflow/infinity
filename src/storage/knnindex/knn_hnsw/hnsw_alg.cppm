@@ -72,8 +72,8 @@ private:
     Distance distance_;
     const UniquePtr<LabelType[]> labels_;
 
-    Mutex global_mutex_;
-    mutable Vector<RWMutex> vertex_mutex_;
+    std::mutex global_mutex_;
+    mutable Vector<std::shared_mutex> vertex_mutex_;
 
 private:
     KnnHnsw(SizeT M,
@@ -159,9 +159,9 @@ private:
                 break;
             }
 
-            SharedLock<RWMutex> lock;
+            std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = SharedLock<RWMutex>(vertex_mutex_[c_idx]);
+                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[c_idx]);
             }
 
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
@@ -200,9 +200,9 @@ private:
         while (check) {
             check = false;
 
-            SharedLock<RWMutex> lock;
+            std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = SharedLock<RWMutex>(vertex_mutex_[cur_p]);
+                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[cur_p]);
             }
 
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
@@ -257,9 +257,9 @@ private:
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
 
-            UniqueLock<RWMutex> lock;
+            std::unique_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = UniqueLock<RWMutex>(vertex_mutex_[n_idx]);
+                lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[n_idx]);
             }
 
             auto [n_neighbors_p, n_neighbor_size_p] = graph_store_.GetNeighborsMut(n_idx, layer_idx);
@@ -322,9 +322,9 @@ public:
 
     template <bool WithLock = true>
     void Build(VertexType vertex_i) {
-        UniqueLock<Mutex> global_lock;
+        std::unique_lock<std::mutex> global_lock;
         if constexpr (WithLock) {
-            global_lock = UniqueLock<Mutex>(global_mutex_);
+            global_lock = std::unique_lock<std::mutex>(global_mutex_);
         }
 
         i32 q_layer = GenerateRandomLayer();
@@ -335,9 +335,9 @@ public:
             }
         }
 
-        UniqueLock<RWMutex> lock;
+        std::unique_lock<std::shared_mutex> lock;
         if constexpr (WithLock) {
-            lock = UniqueLock<RWMutex>(vertex_mutex_[vertex_i]);
+            lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[vertex_i]);
         }
         StoreType query = data_store_.GetVec(vertex_i);
 

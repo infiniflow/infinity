@@ -143,7 +143,7 @@ private:
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
     IRSIndexWriter::Transaction recovery_txn_;
-    Mutex commit_mutex_;
+    std::mutex commit_mutex_;
     DataSnapshotPtr snapshot_;
     UniquePtr<IRSAsync> async_;
     SharedPtr<MaintenanceState> maintenance_state_;

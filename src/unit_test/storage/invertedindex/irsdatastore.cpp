@@ -87,7 +87,7 @@ public:
     Path path_;
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
-    Mutex commit_mutex_;
+    std::mutex commit_mutex_;
     DataSnapshotPtr snapshot_;
 };
 
@@ -137,7 +137,7 @@ void IRSDataStore::Open(bool reopen) {
 void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), MemoryOrderRelease); }
 
 void IRSDataStore::Commit() {
-    UniqueLock<Mutex> lk(commit_mutex_);
+    std::unique_lock<std::mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();

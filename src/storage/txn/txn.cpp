@@ -115,7 +115,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     auto txn_table_iter = txn_tables_store_.find(*table_entry->GetTableName());
     if (txn_table_iter != txn_tables_store_.end()) {
         return txn_table_iter->second.get();
@@ -412,7 +412,7 @@ TxnTimeStamp Txn::Commit() {
     txn_mgr_->PutWalEntry(wal_entry_);
 
     // Wait until CommitTxnBottom is done.
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
     return commit_ts;
 }
@@ -452,14 +452,14 @@ void Txn::CommitBottom() {
     LOG_TRACE(fmt::format("Txn: {} is committed.", txn_id_));
 
     // Notify the top half
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
 }
 
 void Txn::CancelCommitBottom() {
     txn_context_.SetTxnRollbacked();
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
 }

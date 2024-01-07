@@ -187,7 +187,7 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
 
     while (!append_state_ptr->Finished()) {
         {
-            UniqueLock<RWMutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
+            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 u32 new_segment_id = this->next_segment_id_++;
@@ -326,7 +326,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count());
     }
 
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     this->row_count_ = row_count;
     this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
@@ -375,7 +375,7 @@ const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
-    SharedLock<RWMutex> rw_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     result->Reserve(this->segment_map_.size());
 
     for (const auto &segment_pair : this->segment_map_) {
@@ -392,7 +392,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["table_entry_dir"] = *this->table_entry_dir_;
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;

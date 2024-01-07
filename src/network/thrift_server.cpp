@@ -63,7 +63,7 @@ public:
             response.error_msg = "Connect failed";
             LOG_ERROR(fmt::format("THRIFT ERROR: Connect failed"));
         } else {
-            std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
             response.session_id = infinity->GetSessionId();
             response.success = true;
@@ -79,7 +79,7 @@ public:
         } else {
             auto session_id = infinity->GetSessionId();
             infinity->RemoteDisconnect();
-            std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.erase(session_id);
             LOG_TRACE(fmt::format("THRIFT : Disconnect success"));
             response.success = true;
@@ -632,7 +632,7 @@ public:
     }
 
 private:
-    Mutex infinity_session_map_mutex_{};
+    std::mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 
     // SizeT count_ = 0;
@@ -643,7 +643,7 @@ private:
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
         if (infinity_session_map_.count(session_id) > 0) {
             return infinity_session_map_[session_id];
         } else {

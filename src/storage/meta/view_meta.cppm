@@ -54,7 +54,7 @@ private:
     inline void *GetDBEntry() { return this->db_entry_; }
     
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     SharedPtr<String> view_name_{};
 
     DBEntry *db_entry_{};

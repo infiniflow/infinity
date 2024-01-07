@@ -159,7 +159,7 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
 }
 
 u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
@@ -191,7 +191,7 @@ u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_bl
 }
 
 void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
@@ -213,7 +213,7 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
 
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
 void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != txn_id) {
         Error<StorageException>(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
@@ -229,7 +229,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
 }
 
 void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
@@ -270,7 +270,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
     BlockVersion checkpoint_version(this->block_version_->deleted_.size());
     {
-        SharedLock<RWMutex> lock(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
         // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
         if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)
             return;
@@ -313,7 +313,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 // TODO: introduce BlockColumnMeta
 nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
     nlohmann::json json_res;
-    SharedLock<RWMutex> lck(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
     json_res["block_id"] = this->block_id_;
     json_res["checkpoint_ts"] = this->checkpoint_ts_;
@@ -355,7 +355,7 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
 }
 
 i32 BlockEntry::GetAvailableCapacity() {
-    SharedLock<RWMutex> lck(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
     return this->row_capacity_ - this->row_count_;
 }
 

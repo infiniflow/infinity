@@ -109,7 +109,7 @@ private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);
 
 protected:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const TableEntry *table_entry_{};
 

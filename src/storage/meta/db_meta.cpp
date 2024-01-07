@@ -33,7 +33,7 @@ import infinity_exception;
 namespace infinity {
 
 Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflic_type) {
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     DBEntry *db_entry_ptr{nullptr};
     //    rw_locker_.lock();
     if (this->entry_list_.empty()) {
@@ -146,7 +146,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(u64 txn_id, TxnTimeStamp begin_t
 Tuple<DBEntry *, Status> DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *) {
 
     DBEntry *db_entry_ptr{nullptr};
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
@@ -201,12 +201,12 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts,
 }
 
 void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry) {
-    UniqueLock<RWMutex> rw_locker(db_meta->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker_);
     db_meta->entry_list_.emplace_front(std::move(db_entry));
 }
 
 void DBMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
-    UniqueLock<RWMutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.");
         return;
@@ -219,7 +219,7 @@ void DBMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
 }
 
 Tuple<DBEntry *, Status> DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
-    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
@@ -264,7 +264,7 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
 }
 
 SharedPtr<String> DBMeta::ToString() {
-    SharedLock<RWMutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     SharedPtr<String> res = MakeShared<String>(
         fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list_.size()));
     return res;
@@ -274,7 +274,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
     nlohmann::json json_res;
     Vector<DBEntry *> db_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["data_dir"] = *this->data_dir_;
         json_res["db_name"] = *this->db_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
