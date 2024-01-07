@@ -27,7 +27,7 @@ namespace infinity {
 struct OutlineBuffer {
     BufferManager *buffer_mgr_{};
 
-    SizeT current_file_idx_{u64_max};
+    SizeT current_file_idx_{std::numeric_limits<u64>::max()};
 
     SharedPtr<String> base_dir_{};
 

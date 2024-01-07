@@ -120,9 +120,9 @@ void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const
 
 void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
     // Schedule worker 0 if possible
-    u64 scheduled_worker = u64_max;
+    u64 scheduled_worker = std::numeric_limits<u64>::max();;
     u64 min_load_worker{0};
-    u64 min_work_load{u64_max};
+    u64 min_work_load{std::numeric_limits<u64>::max()};
     for(u64 proposed_worker = 0; proposed_worker < worker_count_; ++ proposed_worker) {
         u64 current_work_load = worker_workloads_[proposed_worker];
         if(current_work_load < 1) {
@@ -136,7 +136,7 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
         }
     }
 
-    if(scheduled_worker == u64_max) {
+    if(scheduled_worker == std::numeric_limits<u64>::max()) {
         scheduled_worker = min_load_worker;
     }
 

@@ -156,7 +156,7 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
 // Cast SmallInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -223,7 +223,7 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
 // Cast Integer to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -232,7 +232,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, SmallIntT &target) {
-    if (source < i16_min || source > i16_max) {
+    if (source < std::numeric_limits<i16>::min() || source > std::numeric_limits<i16>::max()) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -293,7 +293,7 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
 // Cast BigInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -302,7 +302,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, TinyIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, SmallIntT &target) {
-    if (source < i16_min || source > i16_max) {
+    if (source < std::numeric_limits<i16>::min() || source > std::numeric_limits<i16>::max()) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -311,7 +311,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, SmallIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, IntegerT &target) {
-    if (source < i32_min || source > i32_max) {
+    if (source < std::numeric_limits<i32>::min() || source > std::numeric_limits<i32>::max()) {
         return false;
     }
     target = static_cast<IntegerT>(source);

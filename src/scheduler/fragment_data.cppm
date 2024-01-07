@@ -30,7 +30,7 @@ export enum class FragmentDataType {
 
 export struct FragmentDataBase {
     FragmentDataType type_{FragmentDataType::kInvalid};
-    u64 fragment_id_{u64_max};
+    u64 fragment_id_{std::numeric_limits<u64>::max()};
 
     FragmentDataBase(FragmentDataType type, u64 fragment_id) : type_(type), fragment_id_(fragment_id) {}
 };
@@ -46,7 +46,7 @@ export struct FragmentData : public FragmentDataBase {
     UniquePtr<DataBlock> data_block_{};
     i64 task_id_{-1};
     Optional<SizeT> data_idx_{};
-    SizeT data_count_{u64_max};
+    SizeT data_count_{std::numeric_limits<u64>::max()};
 
     FragmentData(u64 fragment_id, UniquePtr<DataBlock> data_block, i64 task_id, SizeT data_idx, SizeT data_count)
         : FragmentDataBase(FragmentDataType::kData, fragment_id), data_block_(std::move(data_block)), task_id_(task_id), data_idx_(data_idx),

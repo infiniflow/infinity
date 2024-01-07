@@ -32,7 +32,7 @@ AggregateFunctionSet::~AggregateFunctionSet() { functions_.clear(); }
 void AggregateFunctionSet::AddFunction(const AggregateFunction &func) { functions_.emplace_back(func); }
 
 AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<BaseExpression> &input_argument) {
-    i64 lowest_cost = i64_max;
+    i64 lowest_cost = std::numeric_limits<i64>::max();;
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
