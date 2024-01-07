@@ -167,7 +167,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (!enable_) {
         return;
     }
-    SizeT phase_idx = EnumInteger(phase);
+    SizeT phase_idx = static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase);
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
@@ -192,14 +192,14 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
     }
 
     current_phase_ = QueryPhase::kInvalid;
-    profilers_[EnumInteger(phase)].End();
+    profilers_[static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase)].End();
 }
 
 void QueryProfiler::Stop() {
     if (current_phase_ == QueryPhase::kInvalid) {
         return;
     }
-    profilers_[EnumInteger(current_phase_)].End();
+    profilers_[static_cast<magic_enum::underlying_type_t<QueryPhase>>(current_phase_)].End();
     current_phase_ = QueryPhase::kInvalid;
 }
 

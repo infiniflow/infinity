@@ -209,7 +209,7 @@ private:
 
     Mutex flush_lock_{};
     HashMap<u64, HashMap<i64, Vector<TaskProfiler>>> records_{};
-    Vector<BaseProfiler> profilers_{EnumInteger(QueryPhase::kInvalid)};
+    Vector<BaseProfiler> profilers_{static_cast<magic_enum::underlying_type_t<QueryPhase>>(QueryPhase::kInvalid)};
     OptimizerProfiler optimizer_;
     QueryPhase current_phase_{QueryPhase::kInvalid};
 

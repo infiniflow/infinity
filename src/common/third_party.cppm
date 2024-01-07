@@ -89,6 +89,14 @@ namespace nlohmann {
     export using nlohmann::json;
 }
 
+namespace magic_enum {
+    export using magic_enum::underlying_type_t;
+}
+
+namespace moodycamel {
+    export using moodycamel::ConcurrentQueue;
+}
+
 namespace infinity {
 
 // spdlog
@@ -129,17 +137,6 @@ export void SetLogLevel(LogLevel log_level) {
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::critical);
     }
 }
-
-// Returns integer value from enum value.
-export template <typename E>
-constexpr auto EnumInteger(E value) noexcept -> magic_enum::detail::enable_if_t<E, magic_enum::underlying_type_t<E>> {
-    return static_cast<magic_enum::underlying_type_t<E>>(value);
-}
-
-// ConcurrentQueue
-
-export template<typename T>
-using ConcurrentQueue = moodycamel::ConcurrentQueue<T>;
 
 export using Features = irs::features_t;
 export using IndexFeatures = irs::IndexFeatures;
