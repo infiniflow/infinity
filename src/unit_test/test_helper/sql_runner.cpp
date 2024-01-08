@@ -97,9 +97,11 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     // Create execution pipeline
     // Fragment Builder, only for test now. plan fragment is same as pipeline.
-    auto plan_fragment = query_context_ptr->fragment_builder()->BuildFragment(physical_plan.get());
+    auto [fragment_n, plan_fragment] = query_context_ptr->fragment_builder()->BuildFragment(physical_plan.get());
 
-    FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get());
+    auto notifier = MakeUnique<Notifier>(fragment_n);
+
+    FragmentContext::BuildTask(query_context_ptr.get(), nullptr, plan_fragment.get(), notifier.get());
 
     // Schedule the query tasks
     query_context_ptr->scheduler()->Schedule(plan_fragment.get());

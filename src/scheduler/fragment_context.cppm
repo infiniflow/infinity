@@ -53,7 +53,7 @@ export String FragmentType2String(FragmentType type) {
 }
 
 export class Notifier {
-    Atomic<SizeT> unfinished_fragment_n_;
+    SizeT unfinished_fragment_n_;
 
     std::mutex locker_{};
     std::condition_variable cv_{};
@@ -63,12 +63,12 @@ public:
 
     void Wait() {
         std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return unfinished_fragment_n_.load() == 0; });
+        cv_.wait(lk, [&] { return unfinished_fragment_n_ == 0; });
     }
 
     void Notify() {
         std::unique_lock<std::mutex> lk(locker_);
-        if (unfinished_fragment_n_.fetch_sub(1) == 1) {
+        if (--unfinished_fragment_n_ == 0) {
             cv_.notify_one();
         }
     }

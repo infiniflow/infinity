@@ -446,7 +446,7 @@ void FragmentContext::TryFinishFragment() {
 
     // after notify, the data structure may be destroyed
     if (!TryFinishFragmentInner()) {
-        LOG_INFO(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
+        LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
         if (fragment_type_ != FragmentType::kParallelStream) {
             return;
         }
@@ -456,11 +456,10 @@ void FragmentContext::TryFinishFragment() {
         }
 
         auto *scheduler = query_context_->scheduler();
-        LOG_INFO(
-            fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
+        LOG_TRACE(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
         scheduler->ScheduleFragment(parent_plan_fragment);
     } else {
-        LOG_INFO(fmt::format("All tasks in fragment: {} are completed", fragment_id));
+        LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_id));
 
         auto *parent_plan_fragment = fragment_ptr_->GetParent();
         if (parent_plan_fragment != nullptr) {
@@ -469,10 +468,9 @@ void FragmentContext::TryFinishFragment() {
                 // All child fragment are finished.
 
                 auto *scheduler = query_context_->scheduler();
-                LOG_INFO(
-            fmt::format("Schedule fragment: {} because fragment {} has finished.",
-                                parent_plan_fragment->FragmentID(),
-                                fragment_ptr_->FragmentID()));
+                LOG_TRACE(fmt::format("Schedule fragment: {} because fragment {} has finished.",
+                                      parent_plan_fragment->FragmentID(),
+                                      fragment_ptr_->FragmentID()));
                 scheduler->ScheduleFragment(parent_plan_fragment);
             }
         }
