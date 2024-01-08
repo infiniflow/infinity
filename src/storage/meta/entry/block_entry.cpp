@@ -14,8 +14,7 @@
 
 module;
 
-#include <filesystem>
-#include <memory>
+#include <fstream>
 
 module catalog;
 
@@ -71,8 +70,8 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     ifs.read(buf.data(), buf_len);
     ifs.close();
     char *ptr = buf.data();
-    int32_t created_size = ReadBufAdv<int32_t>(ptr);
-    int32_t deleted_size = ReadBufAdv<int32_t>(ptr);
+    i32 created_size = ReadBufAdv<i32>(ptr);
+    i32 deleted_size = ReadBufAdv<i32>(ptr);
     created_.resize(created_size);
     deleted_.resize(deleted_size);
     std::memcpy(created_.data(), ptr, created_size * sizeof(CreateField));
@@ -80,27 +79,27 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     std::memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != buf_len) {
-        Error<StorageException>("Failed to load block_version file: " + version_path);
+        Error<StorageException>(fmt::format("Failed to load block_version file: {}", version_path));
     }
 }
 
 void BlockVersion::SaveToFile(const String &version_path) {
-    int32_t exp_size = sizeof(int32_t) + created_.size() * sizeof(CreateField);
-    exp_size += sizeof(int32_t) + deleted_.size() * sizeof(TxnTimeStamp);
+    i32 exp_size = sizeof(i32) + created_.size() * sizeof(CreateField);
+    exp_size += sizeof(i32) + deleted_.size() * sizeof(TxnTimeStamp);
     Vector<char> buf(exp_size, 0);
     char *ptr = buf.data();
-    WriteBufAdv<int32_t>(ptr, int32_t(created_.size()));
-    WriteBufAdv<int32_t>(ptr, int32_t(deleted_.size()));
+    WriteBufAdv<i32>(ptr, i32(created_.size()));
+    WriteBufAdv<i32>(ptr, i32(deleted_.size()));
     std::memcpy(ptr, created_.data(), created_.size() * sizeof(CreateField));
     ptr += created_.size() * sizeof(CreateField);
     std::memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != exp_size) {
-        Error<StorageException>("Failed to save block_version file: " + version_path);
+        Error<StorageException>(fmt::format("Failed to save block_version file: {}", version_path));
     }
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
-        Error<StorageException>("Failed to open block_version file: " + version_path);
+        Error<StorageException>(fmt::format("Failed to open block_version file: {}", version_path));
     }
     ofs.write(buf.data(), ptr - buf.data());
     ofs.flush();
@@ -225,7 +224,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
 
     auto &block_version = this->block_version_;
-    block_version->created_.push_back({commit_ts, int32_t(this->row_count_)});
+    block_version->created_.push_back({commit_ts, i32(this->row_count_)});
 }
 
 void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {

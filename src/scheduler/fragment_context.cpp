@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <vector>
+
+module fragment_context;
 
 import stl;
 import parser;
@@ -49,8 +51,6 @@ import create_index_data;
 import logger;
 
 import plan_fragment;
-
-module fragment_context;
 
 namespace infinity {
 
@@ -313,7 +313,7 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
         result.emplace_back(MakeShared<String>(fragment_header));
     }
     for (const auto &task : *tasks) {
-        result.emplace_back(MakeShared<String>("-> Task #" + std::to_string(task->TaskID())));
+        result.emplace_back(MakeShared<String>(fmt::format("-> Task #{}", task->TaskID())));
     }
     // NOTE: Insert blank elements after each Fragment for alignment
     result.emplace_back(MakeShared<String>());
@@ -1012,7 +1012,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         }
         case SinkStateType::kMessage: {
             auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
-            if (message_sink_state->message_ == nullptr) {
+            if (message_sink_state->message_.get() == nullptr) {
                 Error<SchedulerException>("No response message");
             }
 
@@ -1041,7 +1041,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
-        if (task->sink_state_->error_message_ != nullptr) {
+        if (task->sink_state_->error_message_.get() != nullptr) {
             Error<ExecutorException>(*task->sink_state_->error_message_);
         }
     }
@@ -1073,7 +1073,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
-        if (result_table == nullptr) {
+        if (result_table.get() == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
 
@@ -1088,7 +1088,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
-        if (task->sink_state_->error_message_ != nullptr) {
+        if (task->sink_state_->error_message_.get() != nullptr) {
             Error<ExecutorException>(*task->sink_state_->error_message_);
         }
     }
@@ -1121,7 +1121,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
 
-        if (result_table == nullptr) {
+        if (result_table.get() == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
 

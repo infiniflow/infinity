@@ -14,7 +14,7 @@
 
 module;
 
-#include <memory>
+module expression_evaluator;
 
 import stl;
 import base_expression;
@@ -34,8 +34,6 @@ import third_party;
 import infinity_exception;
 import expression_type;
 import bound_cast_func;
-
-module expression_evaluator;
 
 namespace infinity {
 
@@ -61,7 +59,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            Error<ExecutorException>("Unknown expression type: " + expr->Name());
+            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expr->Name()));
         }
     }
 }

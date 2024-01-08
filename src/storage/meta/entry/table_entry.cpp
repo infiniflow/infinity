@@ -14,7 +14,6 @@
 
 module;
 
-#include <memory>
 #include <string>
 
 module catalog;

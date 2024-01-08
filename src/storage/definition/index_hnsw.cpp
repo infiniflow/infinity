@@ -14,9 +14,10 @@
 
 module;
 
-#include <memory>
 #include <string>
 #include <vector>
+
+module index_hnsw;
 
 import stl;
 import parser;
@@ -26,8 +27,6 @@ import infinity_exception;
 import serialize;
 import default_values;
 import index_base;
-
-module index_hnsw;
 
 namespace infinity {
 

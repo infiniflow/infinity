@@ -14,15 +14,13 @@
 
 module;
 
-#include <memory>
-
-import stl;
-import third_party;
+#include <vector>
 
 import infinity_exception;
 
+import stl;
+import third_party;
 import column_vector;
-
 import expression_type;
 
 import aggregate_expression;
@@ -63,7 +61,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             Error<ExecutorException>("Unexpected expression type: KNN");
         }
         default: {
-            Error<ExecutorException>("Unknown expression type: " + expression->Name());
+            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expression->Name()));
         }
     }
     return nullptr;

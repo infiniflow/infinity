@@ -14,8 +14,10 @@
 
 module;
 
-#include <memory>
 #include <string>
+
+module query_binder;
+
 
 import stl;
 
@@ -55,7 +57,6 @@ import search_expression;
 import status;
 import default_values;
 
-module query_binder;
 namespace infinity {
 
 UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {

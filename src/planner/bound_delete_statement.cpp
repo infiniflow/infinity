@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <vector>
+
+module bound_delete_statement;
 
 import bound_statement;
 import table_ref;
@@ -38,8 +40,6 @@ import subquery_unnest;
 import parser;
 import conjunction_expression;
 
-module bound_delete_statement;
-
 namespace infinity {
 
 SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_context) {
@@ -61,7 +61,7 @@ SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_conte
 
 SharedPtr<LogicalNode>
 BoundDeleteStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
-    if (table_ref == nullptr || table_ref->type_ != TableRefType::kTable) {
+    if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
         Error<PlannerException>("unsupported!");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
@@ -102,7 +102,7 @@ void BoundDeleteStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
                                          SharedPtr<BaseExpression> &condition,
                                          QueryContext *query_context,
                                          const SharedPtr<BindContext> &bind_context) {
-    if (condition == nullptr) {
+    if (condition.get() == nullptr) {
         return;
     }
 

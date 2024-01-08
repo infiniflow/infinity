@@ -14,9 +14,10 @@
 
 module;
 
-#include <memory>
 #include <string>
 #include <vector>
+
+module index_base;
 
 import stl;
 import serialize;
@@ -26,8 +27,6 @@ import index_full_text;
 import third_party;
 import parser;
 import infinity_exception;
-
-module index_base;
 
 namespace infinity {
 

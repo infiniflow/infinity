@@ -14,8 +14,9 @@
 
 module;
 
-#include <memory>
 #include <vector>
+
+module logical_node_visitor;
 
 import stl;
 import base_expression;
@@ -49,8 +50,6 @@ import knn_expression;
 import conjunction_expression;
 import logger;
 
-module logical_node_visitor;
-
 namespace infinity {
 
 void LogicalNodeVisitor::VisitNodeChildren(LogicalNode &op) {
@@ -83,10 +82,10 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kLimit: {
             auto &node = (LogicalLimit &)op;
-            if (node.limit_expression_ != nullptr) {
+            if (node.limit_expression_.get() != nullptr) {
                 VisitExpression(node.limit_expression_);
             }
-            if (node.offset_expression_ != nullptr) {
+            if (node.offset_expression_.get() != nullptr) {
                 VisitExpression(node.offset_expression_);
             }
             break;

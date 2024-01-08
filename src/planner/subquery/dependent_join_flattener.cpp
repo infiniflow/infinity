@@ -13,7 +13,8 @@
 // limitations under the License.
 module;
 
-#include <memory>
+module dependent_join_flattener;
+
 
 import stl;
 import parser;
@@ -42,8 +43,6 @@ import scalar_function_set;
 import table_scan;
 import corrlated_expr_detector;
 import rewrite_correlated_expression;
-
-module dependent_join_flattener;
 
 namespace infinity {
 

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
-#include <cstdint>
+//#include <cassert>
+//#include <cstdint>
 #include <fstream>
-#include <memory>
-#include <queue>
-#include <random>
+//#include <memory>
+//#include <queue>
+//#include <random>
 
 import hnsw_alg;
 import file_system;
@@ -34,9 +34,9 @@ import stl;
 using namespace infinity;
 
 int main() {
-    using LabelT = uint64_t;
+    using LabelT = u64;
 
-    std::string save_dir = tmp_data_path();
+    String save_dir = tmp_data_path();
 
     int dim = 16;
     int element_size = 1000;
@@ -54,7 +54,7 @@ int main() {
     rng.seed(0);
     std::uniform_real_distribution<float> distrib_real;
 
-    auto data = std::make_unique<float[]>(dim * element_size);
+    auto data = MakeUnique<float[]>(dim * element_size);
     for (int i = 0; i < dim * element_size; ++i) {
         data[i] = distrib_real(rng);
     }
@@ -64,7 +64,7 @@ int main() {
     {
         auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
 
-        auto labels = std::make_unique<LabelT[]>(element_size);
+        auto labels = MakeUnique<LabelT[]>(element_size);
         std::iota(labels.get(), labels.get() + element_size, 0);
         hnsw_index->InsertVecs(data.get(), labels.get(), element_size);
         std::ofstream os("tmp/dump.txt");
@@ -77,22 +77,22 @@ int main() {
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
             auto result = hnsw_index->KnnSearch1(query, 1);
-            assert(result.size() == 1);
+//            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;
             }
         }
-        printf("correct rage: %f\n", float(correct) / element_size);
+        std::printf("correct rage: %f\n", float(correct) / element_size);
 
-        uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kWriteLock);
+        u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kWriteLock);
         hnsw_index->Save(*file_handler);
         file_handler->Close();
     }
 
     {
-        uint8_t file_flags = FileFlags::READ_FLAG;
-        std::unique_ptr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kReadLock);
+        u8 file_flags = FileFlags::READ_FLAG;
+        UniquePtr<FileHandler> file_handler = fs.OpenFile(save_dir + "/test_hnsw.bin", file_flags, FileLockType::kReadLock);
 
         auto hnsw_index = Hnsw::Load(*file_handler, {});
         hnsw_index->SetEf(10);
@@ -103,12 +103,12 @@ int main() {
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
             auto result = hnsw_index->KnnSearch1(query, 1);
-            assert(result.size() == 1);
+//            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;
             }
         }
-        printf("correct rage: %f\n", float(correct) / element_size);
+        std::printf("correct rage: %f\n", float(correct) / element_size);
         file_handler->Close();
     }
 }

@@ -42,6 +42,7 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <random>
 
 export module stl;
 
@@ -69,6 +70,10 @@ using std::strtod;
 using std::memcpy;
 using std::memset;
 using std::memcmp;
+using std::strlen;
+
+using std::time;
+using std::printf;
 
 using std::is_same;
 using std::fill;
@@ -117,6 +122,22 @@ using std::cerr;
 using std::endl;
 
 using std::ostream;
+using std::ofstream;
+using std::ifstream;
+using std::ios;
+
+using std::align;
+
+using std::static_pointer_cast;
+using std::dynamic_pointer_cast;
+
+namespace filesystem {
+    using std::filesystem::file_size;
+}
+
+using std::mt19937;
+using std::uniform_real_distribution;
+using std::iota;
 } // namespace std
 
 namespace infinity {

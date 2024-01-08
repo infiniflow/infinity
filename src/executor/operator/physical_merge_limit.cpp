@@ -14,7 +14,7 @@
 
 module;
 
-#include <memory>
+module physical_merge_limit;
 
 import stl;
 import query_context;
@@ -24,8 +24,6 @@ import physical_operator_type;
 import value_expression;
 import physical_limit;
 import operator_state;
-
-module physical_merge_limit;
 
 namespace infinity {
 
@@ -39,7 +37,7 @@ PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
     i64 offset = 0;
     i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
 
-    if (offset_expr_ != nullptr) {
+    if (offset_expr_.get() != nullptr) {
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
     counter_ = MakeUnique<UnSyncCounter>(offset, limit);
