@@ -273,18 +273,7 @@ export {
     template <typename T>
     concept IsStandLayout = std::is_standard_layout_v<T>;
 
-    // std::mutex
-//    constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
-//    constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
-//    constexpr std::memory_order std::memory_order::release = std::memory_order::release;
-//    constexpr std::memory_order std::memory_order::acquire = std::memory_order::acquire;
-//    constexpr std::memory_order std::memory_order::acq_rel = std::memory_order::acq_rel;
-//    constexpr std::memory_order MemoryOrderSeqcst = std::memory_order::seq_cst;
-
-
-
     // Stringstream
-    using StringStream = std::basic_stringstream<char>;
     using IStringStream = std::istringstream;
     using OStringStream = std::ostringstream;
 
