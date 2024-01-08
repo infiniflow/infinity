@@ -13,10 +13,10 @@
 // limitations under the License.
 
 module;
-#include <algorithm>
+
 #include <functional>
 #include <immintrin.h>
-#include <limits>
+
 import stl;
 import knn_result_handler;
 import mlas_matrix_multiply;

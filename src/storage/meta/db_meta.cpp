@@ -14,7 +14,7 @@
 
 module;
 
-#include <algorithm>
+#include <vector>
 
 module catalog;
 

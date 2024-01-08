@@ -14,8 +14,6 @@
 
 module;
 
-#include <algorithm>
-
 import stl;
 import logical_node;
 import logical_node_type;

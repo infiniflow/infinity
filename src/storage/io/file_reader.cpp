@@ -14,8 +14,6 @@
 
 module;
 
-#include <algorithm>
-
 module file_reader;
 
 import stl;

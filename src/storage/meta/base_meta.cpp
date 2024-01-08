@@ -14,8 +14,6 @@
 
 module;
 
-#include <algorithm>
-
 module catalog;
 
 import stl;

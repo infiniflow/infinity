@@ -15,7 +15,6 @@
 module;
 
 #include <concepts>
-#include <algorithm>
 
 import stl;
 import specific_concurrent_queue;

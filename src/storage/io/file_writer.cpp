@@ -14,8 +14,6 @@
 
 module;
 
-#include <algorithm>
-
 import stl;
 
 module file_writer;

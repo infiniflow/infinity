@@ -72,6 +72,7 @@ using std::memcmp;
 
 using std::is_same;
 using std::fill;
+using std::lower_bound;
 
 using std::shared_mutex;
 using std::mutex;
@@ -93,6 +94,21 @@ using std::isnan;
 using std::isinf;
 using std::fmod;
 using std::fabs;
+using std::fill_n;
+using std::transform;
+using std::sort;
+using std::make_heap;
+using std::pop_heap;
+using std::reverse;
+using std::remove_if;
+using std::find;
+
+namespace ranges {
+
+using std::ranges::for_each;
+using std::ranges::equal;
+
+}
 
 using std::numeric_limits;
 

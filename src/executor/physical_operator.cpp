@@ -14,6 +14,8 @@
 
 module;
 
+module physical_operator;
+
 import stl;
 import physical_operator_type;
 import default_values;
@@ -26,10 +28,6 @@ import base_table_ref;
 import third_party;
 import infinity_exception;
 import catalog;
-
-#include <algorithm>
-
-module physical_operator;
 
 namespace infinity {
 
