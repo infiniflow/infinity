@@ -14,7 +14,6 @@
 
 module;
 
-#include <iostream>
 #include <string>
 
 #include "statement/extra/create_index_info.h"

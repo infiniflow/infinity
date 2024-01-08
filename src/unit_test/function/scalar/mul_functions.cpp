@@ -14,8 +14,6 @@
 
 #include "unit_test/base_test.h"
 
-#include <cmath>
-
 import infinity_exception;
 
 import global_resource_usage;

@@ -15,7 +15,6 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <queue>
 #include <random>
@@ -30,6 +29,7 @@ import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
 import compilation_config;
+import stl;
 
 using namespace infinity;
 

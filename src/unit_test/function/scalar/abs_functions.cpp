@@ -14,8 +14,6 @@
 
 #include "unit_test/base_test.h"
 
-#include <cmath>
-
 import infinity_exception;
 
 import global_resource_usage;
@@ -267,7 +265,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
             f32 input = i - 16384;
             input -= 0.5;
             EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
-            EXPECT_FLOAT_EQ(v.value_.float32, fabs(input));
+            EXPECT_FLOAT_EQ(v.value_.float32, std::fabs(input));
         }
     }
 
@@ -315,7 +313,7 @@ TEST_F(AbsFunctionsTest, abs_func) {
             f64 input = i - 16384;
             input -= 0.5;
             EXPECT_EQ(result->nulls_ptr_->IsTrue(i), true);
-            EXPECT_FLOAT_EQ(v.value_.float64, fabs(input));
+            EXPECT_FLOAT_EQ(v.value_.float64, std::fabs(input));
         }
     }
 

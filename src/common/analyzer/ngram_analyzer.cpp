@@ -15,7 +15,7 @@
 module;
 
 #include "string_utils.h"
-#include <iostream>
+
 import stl;
 import term;
 import stemmer;

@@ -89,9 +89,18 @@ using std::log2;
 using std::sqrt;
 using std::floor;
 using std::nearbyint;
+using std::isnan;
+using std::isinf;
+using std::fmod;
+using std::fabs;
 
 using std::numeric_limits;
 
+using std::cout;
+using std::cerr;
+using std::endl;
+
+using std::ostream;
 } // namespace std
 
 namespace infinity {

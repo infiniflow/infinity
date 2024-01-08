@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
-#include <iostream>
+
 #include <random>
 
 import lvq_store;
@@ -22,6 +22,7 @@ import file_system;
 import file_system_type;
 import dist_func_l2;
 import compilation_config;
+import stl;
 
 using namespace infinity;
 
