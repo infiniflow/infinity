@@ -25,6 +25,7 @@ export namespace infinity {
 template <typename ValueType>
 inline ValueType NullValue() {
     TypeException(DataType::TypeToString<ValueType>() + " doesn't have null value.");
+    return ValueType();
 }
 
 template <>

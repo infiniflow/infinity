@@ -56,6 +56,8 @@ using std::max;
 using std::min;
 
 using std::to_string;
+using std::from_chars;
+using std::errc;
 
 using std::stoi;
 using std::strtol;
@@ -75,6 +77,8 @@ using std::shared_lock;
 using std::unique_lock;
 using std::lock_guard;
 using std::condition_variable;
+using std::memory_order;
+
 using std::forward_list;
 using std::isalpha;
 using std::isalnum;
@@ -168,14 +172,6 @@ export {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
     }
 
-    const char *FromChars(const char *first, const char *last, unsigned long &value) {
-        auto res = std::from_chars(first, last, value);
-        if (res.ec == std::errc()) {
-            return res.ptr;
-        } else {
-            return nullptr;
-        }
-    }
     // Primitives
 
     using i8 = int8_t;
@@ -277,16 +273,13 @@ export {
     template <typename T>
     concept IsStandLayout = std::is_standard_layout_v<T>;
 
-    template <typename T>
-    concept IsTrivial = std::is_trivial_v<T>;
-
     // std::mutex
-    constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
-    constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
-    constexpr std::memory_order MemoryOrderRelease = std::memory_order::release;
-    constexpr std::memory_order MemoryOrderAcquire = std::memory_order::acquire;
-    constexpr std::memory_order MemoryOrderAcqrel = std::memory_order::acq_rel;
-    constexpr std::memory_order MemoryOrderSeqcst = std::memory_order::seq_cst;
+//    constexpr std::memory_order MemoryOrderRelax = std::memory_order::relaxed;
+//    constexpr std::memory_order MemoryOrderConsume = std::memory_order::consume;
+//    constexpr std::memory_order std::memory_order::release = std::memory_order::release;
+//    constexpr std::memory_order std::memory_order::acquire = std::memory_order::acquire;
+//    constexpr std::memory_order std::memory_order::acq_rel = std::memory_order::acq_rel;
+//    constexpr std::memory_order MemoryOrderSeqcst = std::memory_order::seq_cst;
 
 
 

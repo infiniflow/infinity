@@ -134,7 +134,7 @@ void IRSDataStore::Open(bool reopen) {
     StoreSnapshot(data);
 }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), MemoryOrderRelease); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), std::memory_order::release); }
 
 void IRSDataStore::Commit() {
     std::unique_lock<std::mutex> lk(commit_mutex_);

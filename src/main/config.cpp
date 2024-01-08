@@ -46,15 +46,12 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
     HashMap<String, u64> byte_unit = {{"kb", 1024ul}, {"mb", 1024ul * 1024ul}, {"gb", 1024ul * 1024ul * 1024ul}};
     if (byte_size_str.empty()) {
         return MakeShared<String>("No byte size is given");
-        ;
     }
 
     u64 factor;
-    const char *ptr = FromChars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
-    if (ptr == nullptr) {
-        return MakeShared<String>("Unrecognized byte size");
-    } else {
-        String unit = ptr;
+    auto res = std::from_chars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
+    if(res.ec == std::errc()) {
+        String unit = res.ptr;
         ToLower(unit);
         auto it = byte_unit.find(unit);
         if (it != byte_unit.end()) {
@@ -63,6 +60,8 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
         } else {
             return MakeShared<String>("Unrecognized byte size");
         }
+    } else {
+        return MakeShared<String>("Unrecognized byte size");
     }
 }
 

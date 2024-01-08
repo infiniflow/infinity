@@ -108,7 +108,7 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     return;
 }
 
-void TxnManager::Start() { is_running_.store(true, MemoryOrderRelax); }
+void TxnManager::Start() { is_running_.store(true, std::memory_order::relaxed); }
 
 void TxnManager::Stop() {
     bool expected = true;
