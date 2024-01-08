@@ -32,11 +32,6 @@ namespace infinity {
 
 class PlanFragment;
 
-enum class FragmentStatus {
-    kFinish,
-    kInvalid,
-};
-
 export enum class FragmentType {
     kInvalid,
     kSerialMaterialize,
@@ -57,12 +52,34 @@ export String FragmentType2String(FragmentType type) {
     }
 }
 
-export class FragmentContext {
-public:
-    static void BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr);
+export class Notifier {
+    Atomic<SizeT> unfinished_fragment_n_;
+
+    std::mutex locker_{};
+    std::condition_variable cv_{};
 
 public:
-    explicit FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context);
+    Notifier(SizeT fragment_n) : unfinished_fragment_n_(fragment_n) {}
+
+    void Wait() {
+        std::unique_lock<std::mutex> lk(locker_);
+        cv_.wait(lk, [&] { return unfinished_fragment_n_.load() == 0; });
+    }
+
+    void Notify() {
+        std::unique_lock<std::mutex> lk(locker_);
+        if (unfinished_fragment_n_.fetch_sub(1) == 1) {
+            cv_.notify_one();
+        }
+    }
+};
+
+export class FragmentContext {
+public:
+    static void BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Notifier *notifier);
+
+public:
+    explicit FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier);
 
     virtual ~FragmentContext() = default;
 
@@ -92,16 +109,9 @@ public:
     }
 
     inline SharedPtr<DataTable> GetResult() {
-        std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return fragment_status_ == FragmentStatus::kFinish; });
+        notifier_->Wait();
 
         return GetResultInternal();
-    }
-
-    inline void Complete() {
-        std::unique_lock<std::mutex> lk(locker_);
-        fragment_status_ = FragmentStatus::kFinish;
-        cv_.notify_one();
     }
 
     inline QueryContext *query_context() { return query_context_; }
@@ -129,10 +139,7 @@ protected:
     virtual SharedPtr<DataTable> GetResultInternal() = 0;
 
 protected:
-    atomic_u64 task_n_{0};
-
-    std::mutex locker_{};
-    std::condition_variable cv_{};
+    Notifier *notifier_{};
 
     PlanFragment *fragment_ptr_{};
 
@@ -143,7 +150,6 @@ protected:
     Vector<SharedPtr<DataBlock>> data_array_{};
 
     FragmentType fragment_type_{FragmentType::kInvalid};
-    FragmentStatus fragment_status_{FragmentStatus::kInvalid};
 
     atomic_u64 unfinished_task_n_{0};
     atomic_u64 unfinished_child_n_{0};
@@ -151,8 +157,8 @@ protected:
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {
 public:
-    explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
-        : FragmentContext(fragment_ptr, query_context) {}
+    explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(fragment_ptr, query_context, notifier) {}
 
     ~SerialMaterializedFragmentCtx() final = default;
 
@@ -164,8 +170,8 @@ public:
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
 public:
-    explicit inline ParallelMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
-        : FragmentContext(fragment_ptr, query_context) {}
+    explicit inline ParallelMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(fragment_ptr, query_context, notifier) {}
 
     ~ParallelMaterializedFragmentCtx() final = default;
 
@@ -182,8 +188,8 @@ protected:
 
 export class ParallelStreamFragmentCtx final : public FragmentContext {
 public:
-    explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context)
-        : FragmentContext(fragment_ptr, query_context) {}
+    explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(fragment_ptr, query_context, notifier) {}
 
     ~ParallelStreamFragmentCtx() final = default;
 

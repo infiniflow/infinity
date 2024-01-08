@@ -114,12 +114,14 @@ u64 FragmentTask::FragmentId() const {
 // Finished **OR** Error
 bool FragmentTask::IsComplete() { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
 
+bool FragmentTask::TryIntoWorkerLoop() {
+    auto expect_status = FragmentTaskStatus::kPending;
+    return status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kRunning);
+}
+
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {
-    auto fragment_context = static_cast<FragmentContext *>(fragment_context_);
-    if (fragment_context->ContextType() != FragmentType::kParallelStream) {
-        return false;
-    }
+    // If reach here, child fragment must be stream
     if (source_state_->state_type_ != SourceStateType::kQueue) {
         // fragment's source is not from queue
         return false;
@@ -131,6 +133,7 @@ bool FragmentTask::QuitFromWorkerLoop() {
         LOG_INFO(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
+    LOG_INFO(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
     return false;
 }
 
@@ -143,8 +146,11 @@ TaskBinding FragmentTask::TaskBinding() const {
 }
 
 void FragmentTask::CompleteTask() {
+    // One thread reach here
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
+    } else if (status_ != FragmentTaskStatus::kError) {
+        Error<SchedulerException>("Bug");
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_INFO(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));

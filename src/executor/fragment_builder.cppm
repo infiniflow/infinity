@@ -27,7 +27,7 @@ export class FragmentBuilder {
 public:
     explicit FragmentBuilder(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {}
 
-    UniquePtr<PlanFragment> BuildFragment(PhysicalOperator *phys_op);
+    Pair<SizeT, UniquePtr<PlanFragment>> BuildFragment(PhysicalOperator *phys_op);
 
 private:
     void BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);

@@ -135,6 +135,14 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
 
+    {
+        String out;
+        for (auto &global_block_id : *block_ids) {
+            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
+        }
+        LOG_INFO(fmt::format("TableScan: block_ids: {}", out));
+    }
+
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();
     while (block_ids_idx < block_ids->size()) {
@@ -173,7 +181,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         read_offset += write_size;
     }
 
-    LOG_TRACE(Format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids->size()));
+    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids->size()));
 
     if (block_ids_idx >= block_ids->size()) {
         table_scan_operator_state->SetComplete();

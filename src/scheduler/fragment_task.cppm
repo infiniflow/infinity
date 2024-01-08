@@ -70,10 +70,7 @@ public:
     [[nodiscard]] bool IsComplete();
 
     // TryInto and QuitFrom race on `status_`
-    bool TryIntoWorkerLoop() {
-        auto expect_status = FragmentTaskStatus::kPending;
-        return status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kRunning);
-    }
+    bool TryIntoWorkerLoop();
 
     bool QuitFromWorkerLoop();
 

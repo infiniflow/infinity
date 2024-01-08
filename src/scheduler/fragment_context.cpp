@@ -326,7 +326,7 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     }
 }
 
-void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr) {
+void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Notifier *notifier) {
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
@@ -339,15 +339,15 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
             Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
-            fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
         case FragmentType::kParallelMaterialize: {
-            fragment_context = MakeUnique<ParallelMaterializedFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<ParallelMaterializedFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
         case FragmentType::kParallelStream: {
-            fragment_context = MakeUnique<ParallelStreamFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<ParallelStreamFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
     }
@@ -416,7 +416,7 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
     if (fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : fragment_ptr->Children()) {
-            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get());
+            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), notifier);
         }
     }
     switch (fragment_operators[0]->operator_type()) {
@@ -437,14 +437,16 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
     fragment_ptr->SetContext(std::move(fragment_context));
 }
 
-FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
+FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
     : fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
-      fragment_status_(FragmentStatus::kInvalid), unfinished_child_n_(fragment_ptr->Children().size()) {}
+      unfinished_child_n_(fragment_ptr->Children().size()), notifier_(notifier) {}
 
 void FragmentContext::TryFinishFragment() {
+    auto fragment_id = fragment_ptr_->FragmentID();
+
+    // after notify, the data structure may be destroyed
     if (!TryFinishFragmentInner()) {
-        LOG_INFO(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
-        // return;
+        LOG_INFO(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
         if (fragment_type_ != FragmentType::kParallelStream) {
             return;
         }
@@ -454,32 +456,27 @@ void FragmentContext::TryFinishFragment() {
         }
 
         auto *scheduler = query_context_->scheduler();
-        LOG_TRACE(
-            fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
+        LOG_INFO(
+            fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
         scheduler->ScheduleFragment(parent_plan_fragment);
     } else {
-        LOG_INFO(fmt::format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
-        fragment_status_ = FragmentStatus::kFinish;
-        auto *sink_op = GetSinkOperator();
-        if (sink_op->sink_type() == SinkType::kResult) {
-            Complete();
-            return;
-        }
+        LOG_INFO(fmt::format("All tasks in fragment: {} are completed", fragment_id));
+
         auto *parent_plan_fragment = fragment_ptr_->GetParent();
-        if (parent_plan_fragment == nullptr) {
-            return;
-        }
+        if (parent_plan_fragment != nullptr) {
+            auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+            if (parent_fragment_ctx->TryStartFragment()) {
+                // All child fragment are finished.
 
-        auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
-        if (!parent_fragment_ctx->TryStartFragment()) {
-            return;
+                auto *scheduler = query_context_->scheduler();
+                LOG_INFO(
+            fmt::format("Schedule fragment: {} because fragment {} has finished.",
+                                parent_plan_fragment->FragmentID(),
+                                fragment_ptr_->FragmentID()));
+                scheduler->ScheduleFragment(parent_plan_fragment);
+            }
         }
-        // All child fragment are finished.
-
-        auto *scheduler = query_context_->scheduler();
-        LOG_INFO(
-            fmt::format("Schedule fragment: {} because fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
-        scheduler->ScheduleFragment(parent_plan_fragment);
+        notifier_->Notify();
     }
 }
 
@@ -980,7 +977,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
-            std::unique_lock<std::mutex> locker(locker_);
             parallel_count = 1;
             tasks_.reserve(parallel_count);
             tasks_.emplace_back(MakeUnique<FragmentTask>(this, 0, operator_count));
@@ -989,7 +985,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case FragmentType::kParallelMaterialize:
         case FragmentType::kParallelStream: {
-            std::unique_lock<std::mutex> locker(locker_);
             tasks_.reserve(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_.emplace_back(MakeUnique<FragmentTask>(this, task_id, operator_count));
