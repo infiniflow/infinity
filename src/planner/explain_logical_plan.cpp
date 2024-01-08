@@ -229,7 +229,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, SharedP
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -284,7 +284,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -325,7 +325,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPt
     }
 
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -362,7 +362,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, Sha
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -417,7 +417,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
     // Conflict type
     {
         String conflict_type_str =
-            fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->create_view_info()->conflict_type_));
+            fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(create_node->create_view_info()->conflict_type_));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -455,7 +455,7 @@ void ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr<V
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -493,7 +493,7 @@ void ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<Ve
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -531,7 +531,7 @@ void ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, SharedP
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -569,7 +569,7 @@ void ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<Vec
 
     // Conflict type
     {
-        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictTypeToStr(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -937,12 +937,12 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
             Explain(sort_node->expressions_[idx].get(), sort_expression_str);
             sort_expression_str += " ";
-            sort_expression_str += OrderBy2Str(sort_node->order_by_types_[idx]);
+            sort_expression_str += SelectStatement::ToString(sort_node->order_by_types_[idx]);
             sort_expression_str += ", ";
         }
         Explain(sort_node->expressions_.back().get(), sort_expression_str);
         sort_expression_str += " ";
-        sort_expression_str += OrderBy2Str(sort_node->order_by_types_.back());
+        sort_expression_str += SelectStatement::ToString(sort_node->order_by_types_.back());
         sort_expression_str += "]";
         result->emplace_back(MakeShared<String>(sort_expression_str));
     }
@@ -1047,7 +1047,7 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
             join_header = String(intent_size - 2, ' ');
             join_header += "-> ";
         }
-        join_header += JoinType2Str(join_node->join_type_);
+        join_header += JoinReference::ToString(join_node->join_type_);
         join_header += "(";
         join_header += std::to_string(join_node->node_id());
         join_header += ")";

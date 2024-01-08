@@ -43,7 +43,7 @@ JoinReference::~JoinReference() {
 
 std::string JoinReference::ToString() { return "Join"; }
 
-std::string ToString(JoinType type) {
+std::string JoinReference::ToString(JoinType type) {
     switch (type) {
         case JoinType::kInner:
             return "INNER JOIN";

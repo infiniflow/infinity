@@ -18,6 +18,7 @@ module;
 #include "sql_parser.h"
 #include "type/info/array_info.h"
 #include "type/number/float16.h"
+#include "type/complex/embedding_type.h"
 
 export module parser;
 
@@ -219,49 +220,10 @@ export using OrderByExpr = OrderByExpr;
 export using ColumnDef = ColumnDef;
 export using TableConstraint = TableConstraint;
 
-export inline std::string ConflictType2Str(ConflictType type) {
-    return ConflictTypeToStr(type);
-}
-
-export inline std::string OrderBy2Str(OrderType type) {
-    return ToString(type);
-}
-
-export inline std::string JoinType2Str(JoinType type) {
-    return ToString(type);
-}
-
-export inline std::string ConstrainType2String(ConstraintType type) {
-    return ConstrainTypeToString(type);
-}
-
-export inline std::string EmbeddingDataType2String(EmbeddingDataType type) {
-    return EmbeddingType::EmbeddingDataType2String(type);
-}
-
-//export template <typename T>
-//T ReadBuf(char *const buf);
-//
-//export template <typename T>
-//T ReadBufAdv(char *&buf);
-//
-//export template <>
-//std::string ReadBuf<std::string>(char *const buf);
-//
-//export template <>
-//std::string ReadBufAdv<std::string>(char *&buf);
-//
-//export template <typename T>
-//void WriteBuf(char *const buf, const T &value);
-//
-//export template <typename T>
-//void WriteBufAdv(char *&buf, const T &value);
-//
-//export template <>
-//void WriteBuf<std::string>(char *const buf, const std::string &value);
-//
-//template <>
-//void WriteBufAdv<std::string>(char *&buf, const std::string &value);
+export using infinity::ConflictTypeToStr;
+export using infinity::EmbeddingType;
+export using infinity::ConstrainTypeToString;
+export using infinity::ToEmbeddingDataType;
 
 }
 

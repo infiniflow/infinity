@@ -88,7 +88,7 @@ SelectStatement::~SelectStatement() {
 
 std::string SelectStatement::ToString() const { return "Select Statement"; }
 
-std::string ToString(OrderType type) {
+std::string SelectStatement::ToString(OrderType type) {
     switch (type) {
         case OrderType::kAsc:
             return "ASC";
