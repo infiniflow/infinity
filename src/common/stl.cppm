@@ -52,6 +52,8 @@ using std::experimental::source_location;
 using std::forward;
 using std::move;
 
+using std::swap;
+
 using std::max;
 using std::min;
 
@@ -84,6 +86,9 @@ using std::isalpha;
 using std::isalnum;
 using std::pow;
 using std::log2;
+using std::sqrt;
+using std::floor;
+using std::nearbyint;
 
 using std::numeric_limits;
 

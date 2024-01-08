@@ -14,8 +14,6 @@
 
 module;
 
-#include <cmath>
-
 import parser;
 import stl;
 import bound_cast_func;
