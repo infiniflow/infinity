@@ -25,31 +25,31 @@ export module parser;
 namespace infinity {
 
 export using IrsFilter = irs::filter;
-export using SearchOptions = SearchOptions;
-export using QueryDriver = QueryDriver;
+export using infinity::SearchOptions;
+export using infinity::QueryDriver;
 
-export using SQLParser = SQLParser;
-export using ParserResult = ParserResult;
+export using infinity::SQLParser;
+export using infinity::ParserResult;
 
-export using LogicalType = LogicalType;
-export using ColumnDef = ColumnDef;
-export using DataType = DataType;
-export using RowID = RowID;
+export using infinity::LogicalType;
+export using infinity::ColumnDef;
+export using infinity::DataType;
+export using infinity::RowID;
 
 // Bool
-export using BooleanT = BooleanT;
+export using infinity::BooleanT;
 
 // Numeric
-export using TinyIntT = TinyIntT;
-export using SmallIntT = SmallIntT;
-export using IntegerT = IntegerT;
-export using BigIntT = BigIntT;
-export using HugeIntT = HugeIntT;
+export using infinity::TinyIntT;
+export using infinity::SmallIntT;
+export using infinity::IntegerT;
+export using infinity::BigIntT;
+export using infinity::HugeIntT;
 
-export using FloatT = FloatT;
-export using DoubleT = DoubleT;
+export using infinity::FloatT;
+export using infinity::DoubleT;
 
-export using DecimalT = DecimalT;
+export using infinity::DecimalT;
 
 // std::string
 export using VarcharT = Varchar;
@@ -87,27 +87,27 @@ export using RowID = RowID;
 export using MixedT = MixedType;
 
 // TimeUnit
-export using TimeUnit = TimeUnit;
+export using infinity::TimeUnit;
 
 export using float16_t = float16_t;
 
-export using IntegerMixedType = IntegerMixedType;
-export using FloatMixedType = FloatMixedType;
-export using ArrayMixedType = ArrayMixedType;
-export using BaseMixedType = BaseMixedType;
-export using LongStrMixedType = LongStrMixedType;
-export using MissingMixedType = MissingMixedType;
-export using ShortStrMixedType = ShortStrMixedType;
-export using MixedType = MixedType;
-export using MixedValueType = MixedValueType;
-export using TupleMixedType = TupleMixedType;
+export using infinity::IntegerMixedType;
+export using infinity::FloatMixedType;
+export using infinity::ArrayMixedType;
+export using infinity::BaseMixedType;
+export using infinity::LongStrMixedType;
+export using infinity::MissingMixedType;
+export using infinity::ShortStrMixedType;
+export using infinity::MixedType;
+export using infinity::MixedValueType;
+export using infinity::TupleMixedType;
 
-export using TypeInfo = TypeInfo;
-export using EmbeddingDataType = EmbeddingDataType;
-export using EmbeddingInfo = EmbeddingInfo;
-export using DecimalInfo = DecimalInfo;
-export using BitmapInfo = BitmapInfo;
-export using ArrayInfo = ArrayInfo;
+export using infinity::TypeInfo;
+export using infinity::EmbeddingDataType;
+export using infinity::EmbeddingInfo;
+export using infinity::DecimalInfo;
+export using infinity::BitmapInfo;
+export using infinity::ArrayInfo;
 
 export using TypeInfoType = TypeInfoType;
 
@@ -124,101 +124,100 @@ export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;
 export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
 
 // Parser Exception
-export using ParserException = ParserException;
+export using infinity::ParserException;
 
-export using StatementType = StatementType;
-export using DDLType = DDLType;
-export using ConflictType = ConflictType;
-export using ConstraintType = ConstraintType;
-export using KnnDistanceType = KnnDistanceType;
-export using TableRefType = TableRefType;
-export using ExplainType = ExplainType;
-export using FlushType = FlushType;
-export using OptimizeType = OptimizeType;
-export using EmbeddingDataType = EmbeddingDataType;
-export using IndexType = IndexType;
+export using infinity::StatementType;
+export using infinity::DDLType;
+export using infinity::ConflictType;
+export using infinity::ConstraintType;
+export using infinity::KnnDistanceType;
+export using infinity::TableRefType;
+export using infinity::ExplainType;
+export using infinity::FlushType;
+export using infinity::OptimizeType;
+export using infinity::IndexType;
 
-export using ExtraDDLInfo = ExtraDDLInfo;
-export using CreateTableInfo = CreateTableInfo;
-export using CreateIndexInfo = CreateIndexInfo;
-export using CreateViewInfo = CreateViewInfo;
-export using CreateCollectionInfo = CreateCollectionInfo;
-export using CreateSchemaInfo = CreateSchemaInfo;
+export using infinity::ExtraDDLInfo;
+export using infinity::CreateTableInfo;
+export using infinity::CreateIndexInfo;
+export using infinity::CreateViewInfo;
+export using infinity::CreateCollectionInfo;
+export using infinity::CreateSchemaInfo;
 
-export using DropIndexInfo = DropIndexInfo;
-export using DropTableInfo = DropTableInfo;
-export using DropCollectionInfo = DropCollectionInfo;
-export using DropSchemaInfo = DropSchemaInfo;
-export using DropViewInfo = DropViewInfo;
-export using CommandInfo = CommandInfo;
-export using IndexInfo = IndexInfo;
+export using infinity::DropIndexInfo;
+export using infinity::DropTableInfo;
+export using infinity::DropCollectionInfo;
+export using infinity::DropSchemaInfo;
+export using infinity::DropViewInfo;
+export using infinity::CommandInfo;
+export using infinity::IndexInfo;
 
-export using UseCmd = UseCmd;
-export using CheckTable = CheckTable;
-export using SetCmd = SetCmd;
-export using ExportCmd = ExportCmd;
+export using infinity::UseCmd;
+export using infinity::CheckTable;
+export using infinity::SetCmd;
+export using infinity::ExportCmd;
 
-export using InitParameter = InitParameter;
+export using infinity::InitParameter;
 
-export using BaseTableReference = BaseTableReference;
-export using TableReference = TableReference;
-export using JoinReference = JoinReference;
-export using CrossProductReference = CrossProductReference;
-export using SubqueryReference = SubqueryReference;
+export using infinity::BaseTableReference;
+export using infinity::TableReference;
+export using infinity::JoinReference;
+export using infinity::CrossProductReference;
+export using infinity::SubqueryReference;
 
-export using ShowStmtType = ShowStmtType;
-export using CopyFileType = CopyFileType;
-export using SetOperatorType = SetOperatorType;
+export using infinity::ShowStmtType;
+export using infinity::CopyFileType;
+export using infinity::SetOperatorType;
 
-export using BaseStatement = BaseStatement;
-export using CreateStatement = CreateStatement;
-export using SelectStatement = SelectStatement;
-export using UpdateStatement = UpdateStatement;
-export using DeleteStatement = DeleteStatement;
-export using InsertStatement = InsertStatement;
-export using DropStatement = DropStatement;
-export using ShowStatement = ShowStatement;
-export using CopyStatement = CopyStatement;
-export using PrepareStatement = PrepareStatement;
-export using ExecuteStatement = ExecuteStatement;
-export using FlushStatement = FlushStatement;
-export using OptimizeStatement = OptimizeStatement;
-export using AlterStatement = AlterStatement;
-export using ExplainStatement = ExplainStatement;
-export using CommandStatement = CommandStatement;
+export using infinity::BaseStatement;
+export using infinity::CreateStatement;
+export using infinity::SelectStatement;
+export using infinity::UpdateStatement;
+export using infinity::DeleteStatement;
+export using infinity::InsertStatement;
+export using infinity::DropStatement;
+export using infinity::ShowStatement;
+export using infinity::CopyStatement;
+export using infinity::PrepareStatement;
+export using infinity::ExecuteStatement;
+export using infinity::FlushStatement;
+export using infinity::OptimizeStatement;
+export using infinity::AlterStatement;
+export using infinity::ExplainStatement;
+export using infinity::CommandStatement;
 
-export using ParsedExprType = ParsedExprType;
-export using OrderType = OrderType;
-export using LiteralType = LiteralType;
-export using SubqueryType = SubqueryType;
-export using JoinType = JoinType;
-export using KnnDistanceType = KnnDistanceType;
-export using CommandType = CommandType;
-export using SetVarType = SetVarType;
-export using ExportType = ExportType;
-export using SetScope = SetScope;
+export using infinity::ParsedExprType;
+export using infinity::OrderType;
+export using infinity::LiteralType;
+export using infinity::SubqueryType;
+export using infinity::JoinType;
+export using infinity::KnnDistanceType;
+export using infinity::CommandType;
+export using infinity::SetVarType;
+export using infinity::ExportType;
+export using infinity::SetScope;
 
-export using ParsedExpr = ParsedExpr;
-export using ColumnExpr = ColumnExpr;
-export using ConstantExpr = ConstantExpr;
-export using FunctionExpr = FunctionExpr;
-export using KnnExpr = KnnExpr;
-export using MatchExpr = MatchExpr;
-export using QueryExpr = QueryExpr;
-export using FusionExpr = FusionExpr;
-export using SearchExpr = SearchExpr;
-export using BetweenExpr = BetweenExpr;
-export using SubqueryExpr = SubqueryExpr;
-export using CaseExpr = CaseExpr;
-export using WhenThen = WhenThen;
-export using CastExpr = CastExpr;
-export using WithExpr = WithExpr;
-export using UpdateExpr = UpdateExpr;
-export using InExpr = InExpr;
-export using OrderByExpr = OrderByExpr;
+export using infinity::ParsedExpr;
+export using infinity::ColumnExpr;
+export using infinity::ConstantExpr;
+export using infinity::FunctionExpr;
+export using infinity::KnnExpr;
+export using infinity::MatchExpr;
+export using infinity::QueryExpr;
+export using infinity::FusionExpr;
+export using infinity::SearchExpr;
+export using infinity::BetweenExpr;
+export using infinity::SubqueryExpr;
+export using infinity::CaseExpr;
+export using infinity::WhenThen;
+export using infinity::CastExpr;
+export using infinity::WithExpr;
+export using infinity::UpdateExpr;
+export using infinity::InExpr;
+export using infinity::OrderByExpr;
 
-export using ColumnDef = ColumnDef;
-export using TableConstraint = TableConstraint;
+export using infinity::ColumnDef;
+export using infinity::TableConstraint;
 
 export using infinity::ConflictTypeToStr;
 export using infinity::EmbeddingType;
