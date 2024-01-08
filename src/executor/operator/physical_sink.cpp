@@ -137,7 +137,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                     Error<ExecutorException>("Empty agg output");
                 }
             } else {
-                materialize_sink_state->data_block_array_ = std::move(agg_output_state->data_block_array_);
+                for (auto &data_block : agg_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                agg_output_state->data_block_array_.clear();
             }
             break;
         }

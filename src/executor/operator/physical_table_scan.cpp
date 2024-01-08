@@ -33,7 +33,8 @@ import catalog;
 import default_values;
 import infinity_exception;
 import infinity_exception;
-
+import third_party;
+import logger;
 module physical_table_scan;
 
 namespace infinity {
@@ -136,37 +137,44 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();
-    while (write_capacity > 0 && block_ids_idx < block_ids->size()) {
+    while (block_ids_idx < block_ids->size()) {
         u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
-        auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
-
-        if (write_size > 0) {
-            read_offset = row_begin;
-            SizeT output_column_id{0};
-            for (auto column_id : column_ids) {
-                if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
-                    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
-                } else {
-                    ColumnBuffer column_buffer =
-                        current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
-                    output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
-                }
-            }
-
-            // write_size = already read size = already write size
-            write_capacity -= write_size;
-            read_offset += write_size;
-        } else {
+        if (row_begin == row_end) {
             // we have read all data from current block, move to next block
             ++block_ids_idx;
             read_offset = 0;
+            continue;
         }
+        if (write_capacity == 0) {
+            // output is full
+            break;
+        }
+        auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
+
+        read_offset = row_begin;
+        SizeT output_column_id{0};
+        for (auto column_id : column_ids) {
+            if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
+                u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
+                output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
+            } else {
+                ColumnBuffer column_buffer =
+                    current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
+                output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
+            }
+        }
+
+        // write_size = already read size = already write size
+        write_capacity -= write_size;
+        read_offset += write_size;
     }
+
+    LOG_TRACE(Format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids->size()));
+
     if (block_ids_idx >= block_ids->size()) {
         table_scan_operator_state->SetComplete();
     }

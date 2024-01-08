@@ -106,6 +106,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     if (!initialized_) {
         Error<SchedulerException>("Scheduler isn't initialized");
     }
+    DumpPlanFragment(plan_fragment);
 
     Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
     for (auto *plan_fragment : fragments) {
@@ -183,20 +184,21 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
 
 void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
     StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
-        LOG_TRACE(fmt::format("Fragment id: {}, type: {}", fragment->FragmentID(), FragmentType2String(fragment->GetFragmentType())));
+        LOG_INFO(fmt::format("Fragment id: {}, type: {}", fragment->FragmentID(), FragmentType2String(fragment->GetFragmentType())));
         auto *fragment_ctx = fragment->GetContext();
         for (auto &task : fragment_ctx->Tasks()) {
-            LOG_TRACE(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+            LOG_INFO(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
         }
         for (auto iter = fragment_ctx->GetOperators().begin(); iter != fragment_ctx->GetOperators().end(); ++iter) {
-            LOG_TRACE(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+            LOG_INFO(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
         }
         for (auto &child : fragment->Children()) {
             TraverseFragmentTree(child.get());
         }
     };
+    LOG_INFO(">>> DUMP START");
     TraverseFragmentTree(root);
-    LOG_TRACE("");
+    LOG_INFO(">>> DUMP END");
 }
 
 } // namespace infinity

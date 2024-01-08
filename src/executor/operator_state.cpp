@@ -19,7 +19,8 @@ import stl;
 import physical_operator_type;
 import fragment_data;
 import infinity_exception;
-
+import logger;
+import third_party;
 module operator_state;
 
 namespace infinity {
@@ -32,6 +33,8 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
         if (pending_tasks == 0) {
             num_tasks_.erase(it);
         }
+    } else {
+        Error<ExecutorException>("Bug");
     }
 }
 

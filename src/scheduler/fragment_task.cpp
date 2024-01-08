@@ -44,7 +44,7 @@ void FragmentTask::Init() {
 }
 
 void FragmentTask::OnExecute(i64) {
-    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
+    LOG_INFO(fmt::format("Task: {} of Fragment: {} is running", task_id_, FragmentId()));
     //    infinity::BaseProfiler prof;
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
@@ -128,7 +128,7 @@ bool FragmentTask::QuitFromWorkerLoop() {
 
     auto expect_status = FragmentTaskStatus::kRunning;
     if (queue_state->source_queue_.Empty() && status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kPending)) {
-        LOG_TRACE(fmt::format("Task: {} of Fragment: {} is quit from worker loop", task_id_, FragmentId()));
+        LOG_INFO(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
     return false;
@@ -147,7 +147,7 @@ void FragmentTask::CompleteTask() {
         status_ = FragmentTaskStatus::kFinished;
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
-    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
+    LOG_INFO(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
     fragment_context->TryFinishFragment();
 }
 

@@ -439,11 +439,12 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
     : fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
-      fragment_status_(FragmentStatus::kNotStart), unfinished_child_n_(fragment_ptr->Children().size()) {}
+      fragment_status_(FragmentStatus::kInvalid), unfinished_child_n_(fragment_ptr->Children().size()) {}
 
 void FragmentContext::TryFinishFragment() {
     if (!TryFinishFragmentInner()) {
-        LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        LOG_INFO(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_ptr_->FragmentID()));
+        // return;
         if (fragment_type_ != FragmentType::kParallelStream) {
             return;
         }
@@ -457,7 +458,7 @@ void FragmentContext::TryFinishFragment() {
             fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
         scheduler->ScheduleFragment(parent_plan_fragment);
     } else {
-        LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+        LOG_INFO(fmt::format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
         fragment_status_ = FragmentStatus::kFinish;
         auto *sink_op = GetSinkOperator();
         if (sink_op->sink_type() == SinkType::kResult) {
@@ -476,7 +477,7 @@ void FragmentContext::TryFinishFragment() {
         // All child fragment are finished.
 
         auto *scheduler = query_context_->scheduler();
-        LOG_TRACE(
+        LOG_INFO(
             fmt::format("Schedule fragment: {} because fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_ptr_->FragmentID()));
         scheduler->ScheduleFragment(parent_plan_fragment);
     }

@@ -33,8 +33,6 @@ namespace infinity {
 class PlanFragment;
 
 enum class FragmentStatus {
-    kNotStart,
-    kStart,
     kFinish,
     kInvalid,
 };
@@ -114,9 +112,6 @@ public:
 
 private:
     bool TryStartFragment() {
-        if (fragment_status_ != FragmentStatus::kNotStart) {
-            return false;
-        }
         u64 unfinished_child = unfinished_child_n_.fetch_sub(1);
         return unfinished_child == 1;
     }
