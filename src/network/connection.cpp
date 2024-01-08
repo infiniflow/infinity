@@ -37,8 +37,8 @@ module connection;
 
 namespace infinity {
 
-Connection::Connection(AsioIOService &io_service)
-    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
+Connection::Connection(boost::asio::io_service &io_service)
+    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
     if(session_ == nullptr) {

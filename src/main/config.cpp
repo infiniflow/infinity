@@ -286,8 +286,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.listen_address = network_config["listen_address"].value_or(default_listen_address);
 
             // Validate the address format
-            BoostErrorCode error;
-            asio_make_address(system_option_.listen_address, error);
+            boost::system::error_code error;
+            boost::asio::ip::make_address(system_option_.listen_address, error);
             if (error) {
                 String err_msg = fmt::format("Not a valid IPv4 address: {}", system_option_.listen_address);
                 result = MakeShared<String>(err_msg);
