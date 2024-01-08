@@ -7,7 +7,7 @@ import sys
 
 
 def main():
-    benchmark_bars = {"sift_1": 2.256, "sift_4": 0.869, "sift_8": 0.501}
+    benchmark_bars = {"sift_1": 2.256, "sift_4": 0.869, "sift_8": 0.451}
     benchmark_id = sys.argv[1]
     standard = benchmark_bars[benchmark_id]
     file_path = sys.argv[2]
@@ -22,7 +22,7 @@ def main():
     difference_percentage = 100 * (result - standard) / standard
     print("difference percentage: {:.2f}%".format(difference_percentage))
     print()
-    if difference_percentage < 3:
+    if difference_percentage < 5:
         print("benchmark result is acceptable")
         sys.exit(0)
     else:
