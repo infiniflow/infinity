@@ -37,8 +37,8 @@ public:
                                     UniquePtr<PhysicalOperator> left,
                                     UniquePtr<PhysicalOperator> right,
                                     SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, Move(left), Move(right), id, load_metas), join_type_(join_type),
-          conditions_(Move(conditions)) {}
+        : PhysicalOperator(PhysicalOperatorType::kJoinNestedLoop, std::move(left), std::move(right), id, load_metas), join_type_(join_type),
+          conditions_(std::move(conditions)) {}
 
     ~PhysicalNestedLoopJoin() override = default;
 

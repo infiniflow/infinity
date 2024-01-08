@@ -81,7 +81,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
     //                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
     //                                 LOG_TRACE(
-    //                                     Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
+    //                                     fmt::format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
     //                                     top_distance[id]));
     //                             }
     //                         }
@@ -235,7 +235,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                             for (i64 top_idx = 0; top_idx < knn_scan_function_data_ptr->topk_; ++top_idx) {
     //                                 SizeT id = query_idx * knn_scan_function_data_ptr->query_embedding_count_ + top_idx;
     //                                 LOG_TRACE(
-    //                                     Format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
+    //                                     fmt::format("Row offset: {}: {}, distance {}", row_id[id].segment_id_, row_id[id].segment_offset_,
     //                                     top_distance[id]));
     //                             }
     //                         }
@@ -387,7 +387,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //     while(write_capacity > 0 && segments_idx < segment_indexes->size()) {
     //         SegmentEntry* current_segment_entry = segment_entries[segments_idx];
     //         auto remaining_rows = current_segment_entry->current_row_ - read_offset;
-    //         auto write_size = Min(write_capacity, remaining_rows);
+    //         auto write_size = std::min(write_capacity, remaining_rows);
 
     //         SizeT output_column_id{0};
     //         for (auto column_id : column_ids) {

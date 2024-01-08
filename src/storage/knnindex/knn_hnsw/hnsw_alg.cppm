@@ -72,8 +72,8 @@ private:
     Distance distance_;
     const UniquePtr<LabelType[]> labels_;
 
-    Mutex global_mutex_;
-    mutable Vector<RWMutex> vertex_mutex_;
+    std::mutex global_mutex_;
+    mutable Vector<std::shared_mutex> vertex_mutex_;
 
 private:
     KnnHnsw(SizeT M,
@@ -86,12 +86,12 @@ private:
             UniquePtr<LabelType[]> labels,
             SizeT ef,
             SizeT random_seed)
-        : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(Max(M_, ef_construction)), //
+        : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(std::max(M_, ef_construction)), //
           mult_(1 / std::log(1.0 * M_)),                                                 //
-          data_store_(Move(data_store)),                                                 //
-          graph_store_(Move(graph_store)),                                               //
-          distance_(Move(distance)),                                                     //
-          labels_(Move(labels)),                                                         //
+          data_store_(std::move(data_store)),                                                 //
+          graph_store_(std::move(graph_store)),                                               //
+          distance_(std::move(distance)),                                                     //
+          labels_(std::move(labels)),                                                         //
           vertex_mutex_(data_store_.max_vec_num()) {
         if (ef == 0) {
             ef = ef_construction_;
@@ -105,16 +105,16 @@ private:
 public:
     static UniquePtr<This> Make(SizeT max_vertex, SizeT dim, SizeT M, SizeT ef_construction, DataStore::InitArgs args) {
         auto [Mmax, Mmax0] = This::GetMmax(M);
-        auto data_store = DataStore::Make(max_vertex, dim, Move(args));
+        auto data_store = DataStore::Make(max_vertex, dim, std::move(args));
         auto graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
         Distance distance(data_store.dim());
         return UniquePtr<This>(new This(M,
                                         Mmax,
                                         Mmax0,
                                         ef_construction,
-                                        Move(data_store),
-                                        Move(graph_store),
-                                        Move(distance),
+                                        std::move(data_store),
+                                        std::move(graph_store),
+                                        std::move(distance),
                                         MakeUnique<LabelType[]>(max_vertex),
                                         0,
                                         0));
@@ -159,9 +159,9 @@ private:
                 break;
             }
 
-            SharedLock<RWMutex> lock;
+            std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = SharedLock<RWMutex>(vertex_mutex_[c_idx]);
+                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[c_idx]);
             }
 
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(c_idx, layer_idx);
@@ -173,7 +173,7 @@ private:
                 }
                 visited[n_idx] = true;
                 if (prefetch_start >= 0) {
-                    int lower = Max(0, prefetch_start - prefetch_step_);
+                    int lower = std::max(0, prefetch_start - prefetch_step_);
                     for (int i = prefetch_start; i >= lower; --i) {
                         data_store_.Prefetch(neighbors_p[i]);
                     }
@@ -189,7 +189,7 @@ private:
             }
         }
         result_handler.EndWithoutSort();
-        return {result_handler.GetSize(0), Move(d_ptr), Move(i_ptr)};
+        return {result_handler.GetSize(0), std::move(d_ptr), std::move(i_ptr)};
     }
 
     template <bool WithLock = false>
@@ -200,9 +200,9 @@ private:
         while (check) {
             check = false;
 
-            SharedLock<RWMutex> lock;
+            std::shared_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = SharedLock<RWMutex>(vertex_mutex_[cur_p]);
+                lock = std::shared_lock<std::shared_mutex>(vertex_mutex_[cur_p]);
             }
 
             const auto [neighbors_p, neighbor_size] = graph_store_.GetNeighbors(cur_p, layer_idx);
@@ -257,9 +257,9 @@ private:
         for (int i = 0; i < q_neighbor_size; ++i) {
             VertexType n_idx = q_neighbors_p[i];
 
-            UniqueLock<RWMutex> lock;
+            std::unique_lock<std::shared_mutex> lock;
             if constexpr (WithLock) {
-                lock = UniqueLock<RWMutex>(vertex_mutex_[n_idx]);
+                lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[n_idx]);
             }
 
             auto [n_neighbors_p, n_neighbor_size_p] = graph_store_.GetNeighborsMut(n_idx, layer_idx);
@@ -280,7 +280,7 @@ private:
                 candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[i]), data_store_), n_neighbors_p[i]);
             }
 
-            SelectNeighborsHeuristic(Move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
+            SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
         }
     }
 
@@ -310,7 +310,7 @@ public:
         if (ret == DataStore::ERR_IDX) {
             Error<StorageException>("Data index is not enough.");
         }
-        std::copy(labels, labels + insert_n, labels_.get() + ret);
+        Copy(labels, labels + insert_n, labels_.get() + ret);
         return ret;
     }
 
@@ -322,9 +322,9 @@ public:
 
     template <bool WithLock = true>
     void Build(VertexType vertex_i) {
-        UniqueLock<Mutex> global_lock;
+        std::unique_lock<std::mutex> global_lock;
         if constexpr (WithLock) {
-            global_lock = UniqueLock<Mutex>(global_mutex_);
+            global_lock = std::unique_lock<std::mutex>(global_mutex_);
         }
 
         i32 q_layer = GenerateRandomLayer();
@@ -335,9 +335,9 @@ public:
             }
         }
 
-        UniqueLock<RWMutex> lock;
+        std::unique_lock<std::shared_mutex> lock;
         if constexpr (WithLock) {
-            lock = UniqueLock<RWMutex>(vertex_mutex_[vertex_i]);
+            lock = std::unique_lock<std::shared_mutex>(vertex_mutex_[vertex_i]);
         }
         StoreType query = data_store_.GetVec(vertex_i);
 
@@ -347,7 +347,7 @@ public:
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        for (i32 cur_layer = Min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
+        for (i32 cur_layer = std::min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
             auto [result_n, d_ptr, v_ptr] = SearchLayer<WithLock>(ep, query, cur_layer, ef_construction_, None);
             auto search_result = Vector<PDV>(result_n);
             for (SizeT i = 0; i < result_n; ++i) {
@@ -355,7 +355,7 @@ public:
             }
 
             const auto [q_neighbors_p, q_neighbor_size_p] = graph_store_.GetNeighborsMut(vertex_i, cur_layer);
-            SelectNeighborsHeuristic(Move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
+            SelectNeighborsHeuristic(std::move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
             ep = q_neighbors_p[0];
             ConnectNeighbors<WithLock>(vertex_i, q_neighbors_p, *q_neighbor_size_p, cur_layer);
         }
@@ -368,7 +368,7 @@ public:
         for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
             ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
         }
-        return SearchLayer<WithLock>(ep, query, 0, Max(k, ef_), bitmask);
+        return SearchLayer<WithLock>(ep, query, 0, std::max(k, ef_), bitmask);
     }
 
     // function for test
@@ -410,7 +410,7 @@ public:
 
         auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
         file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
-        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, Move(data_store), Move(graph_store), Move(distance), Move(labels), 0, 0));
+        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), std::move(labels), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

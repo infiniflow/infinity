@@ -145,7 +145,7 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const StdFunct
         case ExpressionType::kValue:
             break;
         default: {
-            Error<PlannerException>(Format("Unsupported expression type: {}", expression->Name()));
+            Error<PlannerException>(fmt::format("Unsupported expression type: {}", expression->Name()));
         }
     }
 }

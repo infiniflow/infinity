@@ -85,14 +85,14 @@ void KnnScanFunctionData::Init() {
         case KnnDistanceType::kHamming: {
             auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_max->Begin();
-            merge_knn_base_ = Move(merge_knn_max);
+            merge_knn_base_ = std::move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
             auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_min->Begin();
-            merge_knn_base_ = Move(merge_knn_min);
+            merge_knn_base_ = std::move(merge_knn_min);
             break;
         }
     }

@@ -21,7 +21,7 @@ module pg_protocol_handler;
 
 namespace infinity {
 
-PGProtocolHandler::PGProtocolHandler(const SharedPtr<AsioSocket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
+PGProtocolHandler::PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : buffer_reader_(socket), buffer_writer_(socket) {}
 
 u32 PGProtocolHandler::read_startup_header() {
     constexpr u32 SSL_MESSAGE_VERSION = 80877103u;

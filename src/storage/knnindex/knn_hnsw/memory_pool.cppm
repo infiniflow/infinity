@@ -49,7 +49,7 @@ class PooledType {
 public:
     PooledType(MemPoolT *pool, Args... args) : pool_(pool), functor_(F(args...)) {}
 
-    PooledType(PooledType &&other) : pool_(other.pool_), data_(Move(other.data_)), functor_(Move(other.functor_)) { other.pool_ = nullptr; }
+    PooledType(PooledType &&other) : pool_(other.pool_), data_(std::move(other.data_)), functor_(std::move(other.functor_)) { other.pool_ = nullptr; }
 
     PooledType(const PooledType &) = delete;
     PooledType &operator=(const PooledType &) = delete;
@@ -58,7 +58,7 @@ public:
     ~PooledType() {
         if (pool_) {
             functor_.Release(data_);
-            pool_->Release(Move(data_));
+            pool_->Release(std::move(data_));
         }
     }
 
@@ -87,7 +87,7 @@ public:
 
 private:
     friend class PooledType<F, Args...>;
-    void Release(typename F::DataT data) { pool_.Enqueue(Move(data)); }
+    void Release(typename F::DataT data) { pool_.Enqueue(std::move(data)); }
 };
 
 // -------------- implement concept below ----------------

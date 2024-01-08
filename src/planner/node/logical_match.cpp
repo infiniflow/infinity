@@ -31,7 +31,7 @@ module logical_match;
 namespace infinity {
 
 LogicalMatch::LogicalMatch(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchExpression> match_expr)
-    : LogicalNode(node_id, LogicalNodeType::kMatch), base_table_ref_(base_table_ref), match_expr_(Move(match_expr)) {}
+    : LogicalNode(node_id, LogicalNodeType::kMatch), base_table_ref_(base_table_ref), match_expr_(std::move(match_expr)) {}
 
 Vector<ColumnBinding> LogicalMatch::GetColumnBindings() const {
     Vector<ColumnBinding> result;
@@ -80,7 +80,7 @@ String LogicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "LogicalMatch ";
     }
-    arrow_str += Format("({})", this->node_id());
+    arrow_str += fmt::format("({})", this->node_id());
     ss << arrow_str << std::endl;
 
     // Table alias and name
@@ -97,7 +97,7 @@ String LogicalMatch::ToString(i64 &space) const {
     // Table index
     String table_index = String(space, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(this->TableIndex());
+    table_index += std::to_string(this->TableIndex());
     ss << table_index << std::endl;
 
     String match_info = String(space, ' ');

@@ -56,10 +56,10 @@ class IRSDataStore {
 public:
     IRSDataStore(const String &table_name, const String &directory);
     struct DataSnapshot {
-        DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
+        DataSnapshot(IRSDirectoryReader &&reader) : reader_(std::move(reader)) {}
         DataSnapshot &operator=(DataSnapshot &&rhs) noexcept {
             if (this != &rhs) {
-                reader_ = Move(rhs.reader_);
+                reader_ = std::move(rhs.reader_);
             }
             return *this;
         }
@@ -87,7 +87,7 @@ public:
     Path path_;
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
-    Mutex commit_mutex_;
+    std::mutex commit_mutex_;
     DataSnapshotPtr snapshot_;
 };
 
@@ -128,16 +128,16 @@ void IRSDataStore::Open(bool reopen) {
         return std::make_pair(info, irs::FeatureWriterFactory{});
     };
 
-    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
+    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), std::move(format), OpenMode(open_mode), options);
     auto reader = index_writer_->GetSnapshot();
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
     StoreSnapshot(data);
 }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), std::memory_order::release); }
 
 void IRSDataStore::Commit() {
-    UniqueLock<Mutex> lk(commit_mutex_);
+    std::unique_lock<std::mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();
@@ -148,7 +148,7 @@ void IRSDataStore::Commit() {
     for (auto &segment : reader) {
         std::cout << segment.Meta().name << std::endl;
     }
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
     StoreSnapshot(data);
 }
 
@@ -181,7 +181,7 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
 
     SizeT topn(DEFAULT_TOPN);
     if (auto it = options.find("topn"); it != options.end()) {
-        topn = StrToInt(it->second);
+        topn = std::stoi(it->second);
     }
 
     sorted.reserve(topn);
@@ -313,7 +313,7 @@ TEST_F(IRSDatastoreTest, test1) {
     auto query = std::make_unique<irs::by_term>();
     query->mutable_options()->term = toBstring("hello");
     *query->mutable_field() = "body";
-    flt = Move(query);
+    flt = std::move(query);
 
     SearchOptions search_ops("");
     ScoredIds result;

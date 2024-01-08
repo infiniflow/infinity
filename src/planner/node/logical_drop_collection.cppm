@@ -27,7 +27,7 @@ namespace infinity {
 export class LogicalDropCollection final : public LogicalNode {
 public:
     LogicalDropCollection(u64 node_id, SharedPtr<String> schema_name, SharedPtr<String> collection_name, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kDropCollection), schema_name_(Move(schema_name)), collection_name_(Move(collection_name)),
+        : LogicalNode(node_id, LogicalNodeType::kDropCollection), schema_name_(std::move(schema_name)), collection_name_(std::move(collection_name)),
           conflict_type_(conflict_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;

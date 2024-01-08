@@ -25,7 +25,7 @@ module function_expression;
 namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments)
-    : BaseExpression(ExpressionType::kFunction, Move(arguments)), func_(Move(function)) {}
+    : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {}
 
 String FunctionExpression::ToString() const {
     if (!alias_.empty()) {

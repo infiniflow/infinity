@@ -30,7 +30,7 @@ using FragmentTaskBlockQueue = BlockingQueue<FragmentTask*>;
 
 struct Worker {
     Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
-        : cpu_id_(cpu_id), queue_(Move(queue)), thread_(Move(thread)) {}
+        : cpu_id_(cpu_id), queue_(std::move(queue)), thread_(std::move(thread)) {}
     u64 cpu_id_{0};
     UniquePtr<FragmentTaskBlockQueue> queue_{};
     UniquePtr<Thread> thread_{};

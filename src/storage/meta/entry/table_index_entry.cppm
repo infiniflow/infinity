@@ -51,10 +51,10 @@ public:
 
     static UniquePtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-    Json Serialize(TxnTimeStamp max_commit_ts);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<TableIndexEntry>
-    Deserialize(const Json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableEntry *table_entry);
+    Deserialize(const nlohmann::json &index_def_entry_json, TableIndexMeta *table_index_meta, BufferManager *buffer_mgr, TableEntry *table_entry);
 
 public:
     // Getter
@@ -72,7 +72,7 @@ private:
     void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
     const SharedPtr<IndexDef> index_def_{};
     SharedPtr<String> index_dir_{};

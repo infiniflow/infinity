@@ -60,7 +60,7 @@ private:
     void PushGCQueue(BufferObj *buffer_handle);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     SharedPtr<String> base_dir_;
     SharedPtr<String> temp_dir_;

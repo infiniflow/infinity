@@ -86,7 +86,7 @@ public:
     u64 rc() const { return rc_; }
 
 protected:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     BufferManager *buffer_mgr_;
 

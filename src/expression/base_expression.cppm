@@ -35,17 +35,17 @@ export struct SourcePosition {
 
     explicit SourcePosition(u64 bind_context_id, ExprSourceType source_type) : bind_context_id_(bind_context_id), source_type_(source_type) {}
 
-    u64 bind_context_id_{u64_max};
+    u64 bind_context_id_{std::numeric_limits<u64>::max()};
     ExprSourceType source_type_{ExprSourceType::kInvalid};
     String binding_name_{};
 };
 
 export class BaseExpression : public EnableSharedFromThis<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(Move(arguments)){};
+    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)){};
 
     explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments, String alias)
-        : alias_(Move(alias)), type_(type), arguments_(Move(arguments)){};
+        : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)){};
 
     virtual ~BaseExpression() = default;
 

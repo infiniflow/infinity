@@ -40,7 +40,7 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
     String expr_name = expr->GetName();
 
     if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
-        expr_name = Format("{}.{}", bind_context_ptr->binding_names_by_column_[expr_name][0], expr_name);
+        expr_name = fmt::format("{}.{}", bind_context_ptr->binding_names_by_column_[expr_name][0], expr_name);
     }
 
     if (bind_context_ptr->select_alias2index_.contains(expr_name)) {
@@ -84,7 +84,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
             auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];
-            expr_name = Format("{}.{}", table_name, expr_name);
+            expr_name = fmt::format("{}.{}", table_name, expr_name);
             binding_table_name = table_name;
             binding_table_index = bind_context_ptr->table_name2table_index_[table_name];
         }
@@ -98,7 +98,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         }
 
         if (column_id == -1) {
-            Error<PlannerException>(Format("{} isn't found in project list.", expr_name));
+            Error<PlannerException>(fmt::format("{} isn't found in project list.", expr_name));
         }
     }
 
@@ -107,7 +107,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     SharedPtr<ColumnExpression> result = ColumnExpression::Make(project_expr->Type(),
                                                                 binding_table_name,
                                                                 binding_table_index,
-                                                                ToStr(column_id),
+                                                                std::to_string(column_id),
                                                                 column_id,
                                                                 depth);
     result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kProjection);

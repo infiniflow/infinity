@@ -26,7 +26,7 @@ namespace infinity {
 
 export class BufferReader {
 public:
-    explicit BufferReader(const SharedPtr<AsioSocket> &socket) : socket_(socket){};
+    explicit BufferReader(const SharedPtr<boost::asio::ip::tcp::socket> &socket) : socket_(socket){};
 
     [[nodiscard]] SizeT size() const;
 
@@ -57,7 +57,7 @@ private:
     RingBufferIterator start_pos_{data_};
     RingBufferIterator current_pos_{data_};
 
-    SharedPtr<AsioSocket> socket_;
+    SharedPtr<boost::asio::ip::tcp::socket> socket_;
 };
 
 } // namespace infinity

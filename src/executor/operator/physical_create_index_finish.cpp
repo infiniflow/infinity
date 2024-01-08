@@ -35,7 +35,7 @@ PhysicalCreateIndexFinish::PhysicalCreateIndexFinish(u64 id,
                                                      SharedPtr<Vector<String>> output_names,
                                                      SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                      SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, Move(left), nullptr, id, load_metas), db_name_(db_name), table_name_(table_name),
+    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, std::move(left), nullptr, id, load_metas), db_name_(db_name), table_name_(table_name),
       index_def_(index_def), output_names_(output_names), output_types_(output_types) {}
 
 void PhysicalCreateIndexFinish::Init() {}

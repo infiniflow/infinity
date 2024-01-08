@@ -75,7 +75,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  output_types_->size() - 2);
             }
             default: {
-                LOG_ERROR(Format("Unknown special function: {}", expression->Name()));
+                LOG_ERROR(fmt::format("Unknown special function: {}", expression->Name()));
             }
         }
     }
@@ -86,7 +86,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
             return ReferenceExpression::Make(expression->Type(), expression->table_name(), expression->column_name(), expression->alias_, idx);
         }
     }
-    LOG_ERROR(Format("Can't bind column expression: {} [{}.{}]",
+    LOG_ERROR(fmt::format("Can't bind column expression: {} [{}.{}]",
                      expression->table_name(),
                      expression->binding().table_idx,
                      expression->binding().column_idx));

@@ -43,8 +43,8 @@ public:
                           Vector<SharedPtr<BaseExpression>> expressions,
                           Vector<OrderType> order_by_types,
                           SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kSort, Move(left), nullptr, id, load_metas), expressions_(Move(expressions)),
-          order_by_types_(Move(order_by_types)) {}
+        : PhysicalOperator(PhysicalOperatorType::kSort, std::move(left), nullptr, id, load_metas), expressions_(std::move(expressions)),
+          order_by_types_(std::move(order_by_types)) {}
 
     ~PhysicalSort() override = default;
 

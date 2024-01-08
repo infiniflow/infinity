@@ -53,9 +53,9 @@ Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const Stri
         db_name_ = db_name;
     } else {
         if (!IsEqual(db_name_, db_name)) {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Attempt to get table {} from another database {}", db_name, table_name));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, Move(err_msg))};
+            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
         }
     }
 
@@ -89,7 +89,7 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
     wal_entry_->cmds.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     UniquePtr<String> err_msg = table_store->Append(input_block);
     if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, Move(err_msg));
+        return Status(ErrorCode::kError, std::move(err_msg));
     }
     return Status::OK();
 }
@@ -109,13 +109,13 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     wal_entry_->cmds.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     UniquePtr<String> err_msg = table_store->Delete(row_ids);
     if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, Move(err_msg));
+        return Status(ErrorCode::kError, std::move(err_msg));
     }
     return Status::OK();
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     auto txn_table_iter = txn_tables_store_.find(*table_entry->GetTableName());
     if (txn_table_iter != txn_tables_store_.end()) {
         return txn_table_iter->second.get();
@@ -231,7 +231,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         if (table_status.ok()) {
             UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kError, Move(err_msg));
+            return Status(ErrorCode::kError, std::move(err_msg));
         } else {
             return table_status;
         }
@@ -412,7 +412,7 @@ TxnTimeStamp Txn::Commit() {
     txn_mgr_->PutWalEntry(wal_entry_);
 
     // Wait until CommitTxnBottom is done.
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
     return commit_ts;
 }
@@ -449,17 +449,17 @@ void Txn::CommitBottom() {
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
     }
-    LOG_TRACE(Format("Txn: {} is committed.", txn_id_));
+    LOG_TRACE(fmt::format("Txn: {} is committed.", txn_id_));
 
     // Notify the top half
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
 }
 
 void Txn::CancelCommitBottom() {
     txn_context_.SetTxnRollbacked();
-    UniqueLock<Mutex> lk(lock_);
+    std::unique_lock<std::mutex> lk(lock_);
     done_bottom_ = true;
     cond_var_.notify_one();
 }
@@ -496,7 +496,7 @@ void Txn::Rollback() {
 
     txn_context_.SetTxnRollbacked();
 
-    LOG_TRACE(Format("Txn: {} is dropped.", txn_id_));
+    LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds.push_back(cmd); }

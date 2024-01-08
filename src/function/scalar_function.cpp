@@ -29,14 +29,14 @@ module scalar_function;
 namespace infinity {
 
 ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionType function)
-    : Function(Move(name), FunctionType::kScalar), parameter_types_(Move(argument_types)), return_type_(Move(return_type)),
-      function_(Move(function)) {}
+    : Function(std::move(name), FunctionType::kScalar), parameter_types_(std::move(argument_types)), return_type_(std::move(return_type)),
+      function_(std::move(function)) {}
 
 void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
-        Error<PlannerException>(Format("Function: {} arguments number isn't matched.", name_));
+        Error<PlannerException>(fmt::format("Function: {} arguments number isn't matched.", name_));
     }
     for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {

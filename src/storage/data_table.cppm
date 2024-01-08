@@ -69,7 +69,7 @@ public:
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
         if (idx >= data_blocks_.size()) {
-            Error<StorageException>(Format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
+            Error<StorageException>(fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
         }
         return data_blocks_[idx];
     }
@@ -82,7 +82,7 @@ public:
 
     inline void UpdateRowCount(SizeT row_count) { row_count_ += row_count; }
 
-    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = Move(result_msg); }
+    inline void SetResultMsg(UniquePtr<String> result_msg) { result_msg_ = std::move(result_msg); }
 
     [[nodiscard]] inline String *result_msg() const { return result_msg_.get(); }
 

@@ -49,9 +49,9 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const IndexBase *index_base, const ColumnDef *column_def);
 
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static SharedPtr<SegmentEntry> Deserialize(const Json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(infinity::BaseEntry &other) override;
 
@@ -76,7 +76,7 @@ public:
 
 public:
     // Used in WAL replay & Physical Import
-    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(Move(block_entry)); }
+    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
 
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
@@ -109,7 +109,7 @@ private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);
 
 protected:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const TableEntry *table_entry_{};
 

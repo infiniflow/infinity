@@ -67,7 +67,7 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
-            Error<PlannerException>(Format("Fail to bind the expression: {}", expr.GetName()));
+            Error<PlannerException>(fmt::format("Fail to bind the expression: {}", expr.GetName()));
         }
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
@@ -250,7 +250,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr,
     SharedPtr<ColumnExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
     if (column_expr != nullptr && column_expr->IsCorrelated()) {
         // Correlated column expression
-        LOG_TRACE(Format("Has correlated expr {}", column_expr->column_name()));
+        LOG_TRACE(fmt::format("Has correlated expr {}", column_expr->column_name()));
         bind_context_ptr->AddCorrelatedColumnExpr(column_expr);
     }
     return column_expr;
@@ -328,7 +328,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         case FunctionType::kTable:
             Error<PlannerException>("Table function shouldn't be bound here.");
         default: {
-            Error<PlannerException>(Format("Unknown function type: {}", function_set_ptr->name()));
+            Error<PlannerException>(fmt::format("Unknown function type: {}", function_set_ptr->name()));
         }
     }
     return nullptr;
@@ -444,7 +444,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
-            Error<PlannerException>(Format("Query embedding with dimension: {} which doesn't not matched with {}",
+            Error<PlannerException>(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
                                            parsed_knn_expr.dimension_,
                                            embedding_info->Dimension()));
         }
@@ -458,7 +458,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
                                                                         parsed_knn_expr.dimension_,
                                                                         parsed_knn_expr.distance_type_,
-                                                                        Move(query_embedding),
+                                                                        std::move(query_embedding),
                                                                         arguments,
                                                                         parsed_knn_expr.topn_,
                                                                         parsed_knn_expr.opt_params_);
@@ -496,7 +496,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
             UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
+            SharedPtr<SubqueryExpression> in_subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
             in_subquery_expr->left_ = bound_left_expr;
             in_subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return in_subquery_expr;
@@ -508,7 +508,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             QueryBinder query_binder(this->query_context_, subquery_binding_context_ptr);
             UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder.BindSelect(*expr.select_);
 
-            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(Move(bound_statement_ptr), subquery_type);
+            SharedPtr<SubqueryExpression> subquery_expr = MakeShared<SubqueryExpression>(std::move(bound_statement_ptr), subquery_type);
 
             subquery_expr->correlated_columns = bind_context_ptr->correlated_column_exprs_;
             return subquery_expr;

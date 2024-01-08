@@ -27,7 +27,7 @@ namespace infinity {
 export class LogicalCommand : public LogicalNode {
 public:
     LogicalCommand(u64 node_id, SharedPtr<CommandInfo> command_info)
-        : LogicalNode(node_id, LogicalNodeType::kCommand), command_info_(Move(command_info)) {}
+        : LogicalNode(node_id, LogicalNodeType::kCommand), command_info_(std::move(command_info)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

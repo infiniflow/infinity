@@ -28,7 +28,7 @@ namespace infinity {
 
 Pair<u64, u64> VarHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        Error<ExecutorException>(Format("Attempt to allocate memory with size: {} as the string heap", nbytes));
+        Error<ExecutorException>(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
     }
 
     u64 start_chunk_id = INITIAL_VECTOR_CHUNK_ID;
@@ -72,8 +72,8 @@ Pair<u64, u64> VarHeapManager::Allocate(SizeT nbytes) {
 
                 if (current_chunk_size_ > chunks_[current_chunk_idx_]->capacity_) {
                     UniquePtr<VectorHeapChunk> new_chunk = MakeUnique<VectorHeapChunk>(current_chunk_size_);
-                    Memcpy(new_chunk->ptr_, chunks_[current_chunk_idx_]->ptr_, current_chunk_offset_);
-                    chunks_[current_chunk_idx_] = Move(new_chunk);
+                    std::memcpy(new_chunk->ptr_, chunks_[current_chunk_idx_]->ptr_, current_chunk_offset_);
+                    chunks_[current_chunk_idx_] = std::move(new_chunk);
                 }
 
                 if(current_chunk_offset_ + nbytes < current_chunk_size_) {
@@ -135,10 +135,10 @@ Pair<u64, u64> VarHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         if (nbytes <= current_chunk_remain_size) {
             // Current chunk can hold the data
-            Memcpy(start_ptr, data_ptr, nbytes);
+            std::memcpy(start_ptr, data_ptr, nbytes);
             nbytes = 0;
         } else {
-            Memcpy(start_ptr, data_ptr, current_chunk_remain_size);
+            std::memcpy(start_ptr, data_ptr, current_chunk_remain_size);
             data_ptr += current_chunk_remain_size;
             nbytes -= current_chunk_remain_size;
             ++chunk_id;
@@ -157,10 +157,10 @@ void VarHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, 
         char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         if (nbytes <= current_chunk_remain_size) {
-            Memcpy(buffer, start_ptr, nbytes);
+            std::memcpy(buffer, start_ptr, nbytes);
             nbytes = 0;
         } else {
-            Memcpy(buffer, start_ptr, current_chunk_remain_size);
+            std::memcpy(buffer, start_ptr, current_chunk_remain_size);
             buffer += current_chunk_remain_size;
             nbytes -= current_chunk_remain_size;
             ++chunk_id;

@@ -51,7 +51,7 @@ void TaskScheduler::Init(const Config *config_ptr) {
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id % cpu_count);
 
-        worker_array_.emplace_back(cpu_id, Move(worker_queue), Move(worker_thread));
+        worker_array_.emplace_back(cpu_id, std::move(worker_queue), std::move(worker_thread));
         worker_workloads_[cpu_id] = 0;
     }
 
@@ -111,7 +111,7 @@ void TaskScheduler::Schedule(QueryContext *query_context, const Vector<FragmentT
 }
 
 void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into scheduler with OneWorkerPerQuery policy", tasks.size(), query_context->query_id()));
     u64 worker_id = ProposedWorkerID(query_context->GetTxn()->TxnID());
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task, worker_id);
@@ -120,9 +120,9 @@ void TaskScheduler::ScheduleOneWorkerPerQuery(QueryContext *query_context, const
 
 void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
     // Schedule worker 0 if possible
-    u64 scheduled_worker = u64_max;
+    u64 scheduled_worker = std::numeric_limits<u64>::max();;
     u64 min_load_worker{0};
-    u64 min_work_load{u64_max};
+    u64 min_work_load{std::numeric_limits<u64>::max()};
     for(u64 proposed_worker = 0; proposed_worker < worker_count_; ++ proposed_worker) {
         u64 current_work_load = worker_workloads_[proposed_worker];
         if(current_work_load < 1) {
@@ -136,12 +136,12 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
         }
     }
 
-    if(scheduled_worker == u64_max) {
+    if(scheduled_worker == std::numeric_limits<u64>::max()) {
         scheduled_worker = min_load_worker;
     }
 
     worker_workloads_[scheduled_worker] += tasks.size();
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into worker: {} with ScheduleOneWorkerIfPossible policy",
                      tasks.size(),
                      query_context->query_id(),
                      scheduled_worker));
@@ -151,7 +151,7 @@ void TaskScheduler::ScheduleOneWorkerIfPossible(QueryContext *query_context, con
 }
 
 void TaskScheduler::ScheduleRoundRobin(QueryContext *query_context, const Vector<FragmentTask *> &tasks, PlanFragment *plan_fragment) {
-    LOG_TRACE(Format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
+    LOG_TRACE(fmt::format("Schedule {} tasks of query id: {} into scheduler with RR policy", tasks.size(), query_context->query_id()));
     u64 worker_id = 0;
     for (const auto &fragment_task : tasks) {
         ScheduleTask(fragment_task, worker_id);

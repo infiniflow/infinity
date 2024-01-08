@@ -33,7 +33,7 @@ namespace infinity {
 export class QueryBinder {
 public:
     explicit QueryBinder(QueryContext *query_context, SharedPtr<BindContext> bind_context_ptr)
-        : query_context_ptr_(Move(query_context)), bind_context_ptr_(Move(bind_context_ptr)) {}
+        : query_context_ptr_(std::move(query_context)), bind_context_ptr_(std::move(bind_context_ptr)) {}
 
     UniquePtr<BoundSelectStatement> BindSelect(const SelectStatement &statement);
 

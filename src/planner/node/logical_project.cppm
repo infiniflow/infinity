@@ -29,7 +29,7 @@ namespace infinity {
 export class LogicalProject : public LogicalNode {
 public:
     inline LogicalProject(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 projection_index)
-        : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(Move(expressions)), table_index_(projection_index) {}
+        : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(std::move(expressions)), table_index_(projection_index) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -39,7 +39,7 @@ public:
 
     String ToString(i64 &space) const final;
 
-    inline String name() final { return Format("logical_project_{}", ToStr(table_index_)); }
+    inline String name() final { return fmt::format("logical_project_{}", std::to_string(table_index_)); }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 

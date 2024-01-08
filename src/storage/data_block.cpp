@@ -170,14 +170,14 @@ Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return co
 
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
     if (column_index >= column_count_) {
-        Error<StorageException>(Format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->SetValue(row_index, val);
 }
 
 void DataBlock::AppendValue(SizeT column_index, const Value &value) {
     if (column_index >= column_count_) {
-        Error<StorageException>(Format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->AppendValue(value);
     finalized = false;
@@ -185,7 +185,7 @@ void DataBlock::AppendValue(SizeT column_index, const Value &value) {
 
 void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
     if (column_index >= column_count_) {
-        Error<StorageException>(Format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->AppendByPtr(value_ptr);
     finalized = false;
@@ -257,11 +257,11 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) { AppendWith(other
 void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
         Error<StorageException>(
-            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+            fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
         ;
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
-        Error<StorageException>(Format("Attempt append block with row count {} into block with row count {}, "
+        Error<StorageException>(fmt::format("Attempt append block with row count {} into block with row count {}, "
                                        "which exceeds the capacity {}",
                                        other->row_count(),
                                        this->row_count(),
@@ -277,11 +277,11 @@ void DataBlock::AppendWith(const DataBlock *other) {
 void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
     if (other->column_count() != this->column_count()) {
         Error<StorageException>(
-            Format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
+            fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
         ;
     }
     if (this->row_count_ + count > this->capacity_) {
-        Error<StorageException>(Format("Attempt append block with row count {} into block with row count{}, "
+        Error<StorageException>(fmt::format("Attempt append block with row count {} into block with row count{}, "
                                        "which exceeds the capacity {}",
                                        count,
                                        this->row_count(),

@@ -51,18 +51,18 @@ void FileWorker::WriteToFile(bool to_spill) {
     if (!fs.Exists(write_dir)) {
         fs.CreateDirectory(write_dir);
     }
-    String write_path = Format("{}/{}", write_dir, *file_name_);
+    String write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
     if (to_spill) {
         auto local_file_handle_ = static_cast<LocalFileHandler *>(file_handler_.get());
-        LOG_WARN(Format("Open spill file: {}, fd: {}", write_path, local_file_handle_->fd_));
+        LOG_WARN(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle_->fd_));
     }
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
         if (to_spill) {
-            LOG_WARN(Format("Write to spill file {} finished. success {}", write_path, prepare_success));
+            LOG_WARN(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
         }
         if (!prepare_success) {
             file_handler_->Close();
@@ -75,7 +75,7 @@ void FileWorker::WriteToFile(bool to_spill) {
 void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
 
-    String read_path = Format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     u8 flags = FileFlags::READ_FLAG;
     file_handler_ = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
     DeferFn defer_fn([&]() {
@@ -88,17 +88,17 @@ void FileWorker::ReadFromFile(bool from_spill) {
 void FileWorker::MoveFile() {
     LocalFileSystem fs;
 
-    String src_path = Format("{}/{}", ChooseFileDir(true), *file_name_);
+    String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     String dest_dir = ChooseFileDir(false);
-    String dest_path = Format("{}/{}", dest_dir, *file_name_);
+    String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (!fs.Exists(src_path)) {
-        Error<StorageException>(Format("File {} doesn't exist.", src_path));
+        Error<StorageException>(fmt::format("File {} doesn't exist.", src_path));
     }
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);
     }
     // if (fs.Exists(dest_path)) {
-    //     Error<StorageException>(Format("File {} was already been created before.", dest_path));
+    //     Error<StorageException>(fmt::format("File {} was already been created before.", dest_path));
     // }
     fs.Rename(src_path, dest_path);
 }

@@ -28,7 +28,7 @@ public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
     IndexIVFFlat(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexBase(file_name, IndexType::kIVFFlat, Move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+        : IndexBase(file_name, IndexType::kIVFFlat, std::move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
 
     ~IndexIVFFlat() final = default;
 
@@ -45,9 +45,9 @@ public:
 
     virtual String ToString() const override;
 
-    virtual Json Serialize() const override;
+    virtual nlohmann::json Serialize() const override;
 
-    static SharedPtr<IndexIVFFlat> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexIVFFlat> Deserialize(const nlohmann::json &index_def_json);
 
 public:
     const SizeT centroids_count_{};

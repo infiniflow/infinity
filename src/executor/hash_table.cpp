@@ -83,7 +83,7 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
     UniquePtr<char[]> hash_key = MakeUnique<char[]>(key_size_);
     SizeT column_count = columns.size();
     for (SizeT row_id = 0; row_id < row_count; ++row_id) {
-        Memset(hash_key.get(), 0, key_size_);
+        std::memset(hash_key.get(), 0, key_size_);
         SizeT offset = 0;
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -103,14 +103,14 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
             if (data_type.type() == kVarchar) {
                 VarcharT *vchar_ptr = &((VarcharT *)(columns[column_id]->data_ptr_))[row_id];
                 if (vchar_ptr->IsInlined()) {
-                    Memcpy(target_ptr, vchar_ptr->prefix, vchar_ptr->length);
+                    std::memcpy(target_ptr, vchar_ptr->prefix, vchar_ptr->length);
                 } else {
-                    Memcpy(target_ptr, vchar_ptr->ptr, vchar_ptr->length);
+                    std::memcpy(target_ptr, vchar_ptr->ptr, vchar_ptr->length);
                 }
                 offset += (vchar_ptr->length + 1);
             } else {
                 SizeT type_size = types_[column_id].Size();
-                Memcpy(target_ptr, columns[column_id]->data_ptr_ + type_size * row_id, type_size);
+                std::memcpy(target_ptr, columns[column_id]->data_ptr_ + type_size * row_id, type_size);
                 offset += (type_size + 1);
             }
         }

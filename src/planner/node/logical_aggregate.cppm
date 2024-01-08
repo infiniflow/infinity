@@ -34,8 +34,8 @@ public:
                               u64 groupby_index,
                               Vector<SharedPtr<BaseExpression>> aggregates,
                               u64 aggregate_index)
-        : LogicalNode(node_id, LogicalNodeType::kAggregate), groups_(Move(groups)), groupby_index_(groupby_index), aggregates_(Move(aggregates)),
-          aggregate_index_(aggregate_index), base_table_ref_(Move(base_table_ref)) {}
+        : LogicalNode(node_id, LogicalNodeType::kAggregate), groups_(std::move(groups)), groupby_index_(groupby_index), aggregates_(std::move(aggregates)),
+          aggregate_index_(aggregate_index), base_table_ref_(std::move(base_table_ref)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

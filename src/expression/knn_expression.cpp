@@ -54,8 +54,8 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              Vector<SharedPtr<BaseExpression>> arguments,
                              i64 topn,
                              Vector<InitParameter *> *opt_params)
-    : BaseExpression(ExpressionType::kKnn, Move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
-      distance_type_(knn_distance_type), query_embedding_(Move(query_embedding)),
+    : BaseExpression(ExpressionType::kKnn, std::move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
+      distance_type_(knn_distance_type), query_embedding_(std::move(query_embedding)),
       topn_(topn) // Should call move constructor, otherwise there will be memory leak.
 {
     if (opt_params) {
@@ -70,7 +70,7 @@ String KnnExpression::ToString() const {
         return alias_;
     }
 
-    String expr_str = Format("KNN({}, Float32, {}, {})",
+    String expr_str = fmt::format("KNN({}, Float32, {}, {})",
                              arguments_.at(0)->Name(),
                              //  EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
                              KnnDistanceType2Str(distance_type_),

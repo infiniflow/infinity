@@ -86,7 +86,7 @@ BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_
 }
 
 void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
-    UniqueLock<RWMutex> w_locker(meta->rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(meta->rw_locker_);
     if (meta->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
         return;
@@ -101,12 +101,12 @@ void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
 }
 
 Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
-    SharedLock<RWMutex> r_locker(meta->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(meta->rw_locker_);
     for (const auto &entry : meta->entry_list_) {
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kNotFound, Move(err_msg));
+            return Status(ErrorCode::kNotFound, std::move(err_msg));
         }
 
         if (entry->commit_ts_ < UNCOMMIT_TS) {
@@ -115,7 +115,7 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
                 if (entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                     LOG_ERROR(*err_msg);
-                    return Status(ErrorCode::kNotFound, Move(err_msg));
+                    return Status(ErrorCode::kNotFound, std::move(err_msg));
                 } else {
                     base_entry = entry.get();
                     return Status::OK();
@@ -129,7 +129,7 @@ Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, Bas
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return Status(ErrorCode::kNotFound, Move(err_msg));
+    return Status(ErrorCode::kNotFound, std::move(err_msg));
 }
 } // namespace infinity
 

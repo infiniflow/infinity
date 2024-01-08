@@ -25,7 +25,7 @@ namespace infinity {
 
 export struct FixHeapManager {
     // Use to store string.
-    static constexpr u64 INVALID_CHUNK_OFFSET = u64_max;
+    static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();;
 
 public:
     inline explicit FixHeapManager(u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE) : current_chunk_size_(chunk_size) {

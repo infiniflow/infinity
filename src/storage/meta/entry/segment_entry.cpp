@@ -87,17 +87,17 @@ SegmentEntry::MakeReplaySegmentEntry(const TableEntry *table_entry, u32 segment_
 
     const auto *table_ptr = (const TableEntry *)table_entry;
     new_entry->column_count_ = table_ptr->ColumnCount();
-    new_entry->segment_dir_ = Move(segment_dir);
+    new_entry->segment_dir_ = std::move(segment_dir);
     return new_entry;
 }
 
 int SegmentEntry::Room() {
-    SharedLock<RWMutex> lck(rw_locker_);
+    std::shared_lock<std::shared_mutex> lck(rw_locker_);
     return this->row_capacity_ - this->row_count_;
 }
 
 u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
         return 0;
     //    SizeT start_row = this->row_count_;
@@ -123,7 +123,7 @@ u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferMa
             u16 actual_appended =
                 last_block_entry->AppendData(txn_id, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
             if (to_append_rows < actual_appended) {
-                Error<StorageException>(Format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
+                Error<StorageException>(fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
             }
 
             append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_block_id, range_block_start_row, actual_appended);
@@ -142,13 +142,13 @@ u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferMa
 }
 
 void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {
         u16 block_id = row_hash_map.first;
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id));
+            Error<StorageException>(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         const Vector<RowID> &rows = row_hash_map.second;
@@ -292,12 +292,12 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
             break;
         }
         case IndexType::kIRSFullText: {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }
         default: {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }
@@ -309,29 +309,29 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
 void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
     SharedPtr<BlockEntry> block_entry;
     {
-        UniqueLock<RWMutex> lck(this->rw_locker_);
+        std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
         if (this->min_row_ts_ == 0) {
             this->min_row_ts_ = commit_ts;
         }
-        this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
         block_entry = this->block_entries_[block_id];
     }
     block_entry->CommitAppend(txn_id, commit_ts);
 }
 
 void SegmentEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
-    UniqueLock<RWMutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {
         u16 block_id = row_hash_map.first;
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(Format("The segment doesn't contain the given block: {}.", block_id));
+            Error<StorageException>(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->max_row_ts_ = Max(this->max_row_ts_, commit_ts);
+        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
     }
 }
 
@@ -343,11 +343,11 @@ BlockEntry *SegmentEntry::GetBlockEntryByID(u16 block_id) const {
     }
 }
 
-Json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Json json_res;
+nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    nlohmann::json json_res;
     Vector<BlockEntry *> block_entries;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["segment_dir"] = *this->segment_dir_;
         json_res["row_capacity"] = this->row_capacity_;
         json_res["segment_id"] = this->segment_id_;
@@ -363,13 +363,13 @@ Json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint
         }
     }
     for (BlockEntry *block_entry : block_entries) {
-        LOG_TRACE(Format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
                          block_entry->checkpoint_ts(),
                          block_entry->min_row_ts(),
                          block_entry->max_row_ts(),
                          max_commit_ts));
         block_entry->Flush(max_commit_ts);
-        LOG_TRACE(Format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
                          block_entry->checkpoint_ts(),
                          block_entry->min_row_ts(),
                          block_entry->max_row_ts(),
@@ -383,7 +383,7 @@ Json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint
     return json_res;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
 
     segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
@@ -401,11 +401,11 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const Json &segment_entry_json
         for (const auto &block_json : segment_entry_json["block_entries"]) {
             UniquePtr<BlockEntry> block_entry = BlockEntry::Deserialize(block_json, segment_entry.get(), buffer_mgr);
             auto block_entries_size = segment_entry->block_entries_.size();
-            segment_entry->block_entries_.resize(Max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
-            segment_entry->block_entries_[block_entry->block_id()] = Move(block_entry);
+            segment_entry->block_entries_.resize(std::max(block_entries_size, static_cast<SizeT>(block_entry->block_id() + 1)));
+            segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
         }
     }
-    LOG_TRACE(Format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
+    LOG_TRACE(fmt::format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
 
     return segment_entry;
 }
@@ -415,7 +415,7 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
     SharedPtr<String> segment_dir;
     do {
         u32 seed = time(nullptr);
-        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + ToStr(seg_id));
+        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
     } while (!fs.CreateDirectoryNoExp(*segment_dir));
     return segment_dir;
 }
@@ -444,9 +444,9 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
         Error<StorageException>("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
     }
 
-    this->row_count_ = Max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = Max(this->max_row_ts_, segment_entry2->max_row_ts_);
-    this->row_capacity_ = Max(this->row_capacity_, segment_entry2->row_capacity_);
+    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
+    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
+    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
 
     SizeT block_count = this->block_entries_.size();
     SizeT idx = 0;
@@ -487,7 +487,7 @@ UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_coun
             return MakeUnique<CreateFullTextParam>(index_base, column_def);
         }
         default: {
-            UniquePtr<String> err_msg = MakeUnique<String>(Format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }

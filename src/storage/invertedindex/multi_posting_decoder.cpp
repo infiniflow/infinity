@@ -84,7 +84,7 @@ bool MultiPostingDecoder::DecodeDocBufferInOneSegment(docid_t start_doc_id,
         return false;
     }
 
-    docid_t cur_seg_doc_id = Max(docid_t(0), start_doc_id - base_doc_id_);
+    docid_t cur_seg_doc_id = std::max(docid_t(0), start_doc_id - base_doc_id_);
     if (!index_decoder_->DecodeDocBuffer(cur_seg_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
         return false;
     }

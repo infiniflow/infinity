@@ -46,7 +46,7 @@ bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings
 docid_t PostingIterator::SeekDoc(docid_t doc_id) {
     docid_t ret = INVALID_DOCID;
     docid_t cur_doc_id = current_doc_id_;
-    doc_id = Max(cur_doc_id + 1, doc_id);
+    doc_id = std::max(cur_doc_id + 1, doc_id);
     if (unlikely(doc_id > last_doc_id_in_buffer_)) {
         if (!posting_decoder_->DecodeDocBuffer(doc_id, doc_buffer_, cur_doc_id, last_doc_id_in_buffer_, current_ttf_))
             return ret;

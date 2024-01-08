@@ -139,12 +139,12 @@ private:
         if (identifier.empty()) {
             return false;
         }
-        if (!IsAlpha(identifier[0]) && identifier[0] != '_') {
+        if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
             return false;
         }
         for (SizeT i = 1; i < identifier.length(); i++) {
             char ch = identifier[i];
-            if (!IsAlNum(ch) && ch != '_') {
+            if (!std::isalnum(ch) && ch != '_') {
                 return false;
             }
         }

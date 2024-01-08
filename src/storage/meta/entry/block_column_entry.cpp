@@ -41,7 +41,7 @@ UniquePtr<BlockColumnEntry>
 BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager, bool is_replay) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
 
-    block_column_entry->file_name_ = MakeShared<String>(ToStr(column_id) + ".col");
+    block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
 
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
     DataType *column_type = block_column_entry->column_type_.get();
@@ -51,9 +51,9 @@ BlockColumnEntry::MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 col
 
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
     if (!is_replay) {
-        block_column_entry->buffer_ = buffer_manager->Allocate(Move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
     } else {
-        block_column_entry->buffer_ = buffer_manager->Get(Move(file_worker));
+        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     if (block_column_entry->column_type_->type() == kVarchar) {
@@ -67,7 +67,7 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BufferManager *buffer_manager) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
-        this->buffer_ = buffer_manager->Get(Move(file_worker));
+        this->buffer_ = buffer_manager->Get(std::move(file_worker));
     }
 
     bool outline = this->column_type_->type() == kVarchar;
@@ -126,7 +126,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
         case kFloat:
         case kDouble:
         case kEmbedding: {
-            Memcpy(dst_p, src_p, data_size);
+            std::memcpy(dst_p, src_p, data_size);
             break;
         }
         case kVarchar: {
@@ -139,12 +139,12 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                 if (varchar_type->IsInlined()) {
                     auto &short_info = varchar_layout->u.short_info_;
                     varchar_layout->length_ = varchar_type->length_;
-                    Memcpy(short_info.data.data(), varchar_type->short_.data_, varchar_type->length_);
+                    std::memcpy(short_info.data.data(), varchar_type->short_.data_, varchar_type->length_);
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = this->outline_info_.get();
-                    auto base_file_size =
-                        Min(DEFAULT_BASE_FILE_SIZE * Pow(DEFAULT_BASE_NUM, outline_info->next_file_idx), DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    auto base_file_size = std::min(SizeT(DEFAULT_BASE_FILE_SIZE * std::pow(DEFAULT_BASE_NUM, outline_info->next_file_idx)),
+                                                   DEFAULT_OUTLINE_FILE_MAX_SIZE);
 
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
@@ -153,9 +153,9 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                         auto file_worker =
                             MakeUnique<DataFileWorker>(this->base_dir_,
                                                        file_name,
-                                                       DEFAULT_BASE_NUM * Max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
+                                                       DEFAULT_BASE_NUM * std::max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
 
-                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(Move(file_worker));
+                        BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);
                     }
                     auto &[current_buffer_obj, current_buffer_offset] = outline_info->written_buffers_.back();
@@ -164,7 +164,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                     if (varchar_type->IsValue()) {
                         u32 outline_data_size = varchar_type->length_;
                         ptr_t outline_src_ptr = varchar_type->value_.ptr_;
-                        Memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
+                        std::memcpy(outline_dst_ptr, outline_src_ptr, outline_data_size);
                     } else {
                         vector_buffer->fix_heap_mgr_->ReadFromHeap(outline_dst_ptr,
                                                                    varchar_type->vector_.chunk_id_,
@@ -173,7 +173,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                     }
 
                     varchar_layout->length_ = varchar_type->length_;
-                    Memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);
+                    std::memcpy(long_info.prefix_.data(), varchar_type->value_.prefix_, VARCHAR_PREFIX_LEN);
                     long_info.file_idx_ = outline_info->next_file_idx - 1;
                     long_info.file_offset_ = current_buffer_offset;
                     current_buffer_offset += varchar_type->length_;
@@ -248,19 +248,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
             //        case kBlob:
         case kMixed:
         case kNull: {
-            LOG_ERROR(Format("{} isn't supported", column_type->ToString()));
+            LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
             Error<NotImplementException>("Invalid data type.");
         }
         case kMissing:
         case kInvalid: {
-            LOG_ERROR(Format("Invalid data type {}", column_type->ToString()));
+            LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
             Error<StorageException>("Invalid data type.");
         }
     }
 }
 
-Json BlockColumnEntry::Serialize() {
-    Json json_res;
+nlohmann::json BlockColumnEntry::Serialize() {
+    nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;
     if (this->outline_info_) {
         auto &outline_info = this->outline_info_;
@@ -269,7 +269,8 @@ Json BlockColumnEntry::Serialize() {
     return json_res;
 }
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::Deserialize(const Json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
+UniquePtr<BlockColumnEntry>
+BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     u64 column_id = column_data_json["column_id"];
     UniquePtr<BlockColumnEntry> block_column_entry = MakeNewBlockColumnEntry(block_entry, column_id, buffer_mgr, true);
     if (block_column_entry->outline_info_.get() != nullptr) {
@@ -286,7 +287,7 @@ Vector<String> BlockColumnEntry::OutlinePaths() const {
         for (SizeT i = 0; i < outline_info_->next_file_idx; ++i) {
             auto outline_file = BlockColumnEntry::OutlineFilename(column_id_, i);
 
-            outline_paths.push_back(Move(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file)));
+            outline_paths.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file));
         }
     }
     return outline_paths;

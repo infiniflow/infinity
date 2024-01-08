@@ -140,13 +140,13 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
             String select_expr_name = select_expr->ToString();
             if (bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
-                LOG_TRACE(Format("Same expression: {} had already been found in select list index: {}",
+                LOG_TRACE(fmt::format("Same expression: {} had already been found in select list index: {}",
                                  select_expr_name,
                                  bind_context_ptr_->select_expr_name2index_[select_expr_name]));
                 // TODO: create an map from secondary expression to the primary one.
             } else {
                 if (bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
-                    select_expr_name = Format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
+                    select_expr_name = fmt::format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
                 }
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
@@ -314,7 +314,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
 
     String binding_name;
     if (subquery_ref->alias_ == nullptr) {
-        binding_name = "subquery" + ToStr(subquery_table_index);
+        binding_name = "subquery" + std::to_string(subquery_table_index);
     } else {
         binding_name = subquery_ref->alias_->alias_;
         if (subquery_ref->alias_->column_alias_array_ != nullptr) {
@@ -330,7 +330,7 @@ SharedPtr<TableRef> QueryBinder::BuildSubquery(QueryContext *, const SubqueryRef
     this->bind_context_ptr_->AddSubqueryBinding(binding_name, subquery_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use binding name as the subquery table reference name
-    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), subquery_table_index, binding_name);
+    auto subquery_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), subquery_table_index, binding_name);
 
     // TODO: Not care about the correlated expression
 
@@ -365,7 +365,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     this->bind_context_ptr_->AddCTEBinding(name, cte_table_index, bound_statement_ptr->types_ptr_, bound_statement_ptr->names_ptr_);
 
     // Use CTE name as the subquery table reference name
-    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), cte_table_index, name);
+    auto cte_table_ref_ptr = MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), cte_table_index, name);
 
     // TODO: Not care about the correlated expression
 
@@ -411,7 +411,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_id, begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, Move(block_index), alias, table_index, names_ptr, types_ptr);
+    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, std::move(block_index), alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
     this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr, block_index);
@@ -451,7 +451,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
 
     // Use view name as the subquery table reference name
     auto subquery_table_ref_ptr =
-        MakeShared<SubqueryTableRef>(Move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
+        MakeShared<SubqueryTableRef>(std::move(bound_statement_ptr), bind_context_ptr_->GenerateTableIndex(), from_table->table_name_);
 
     // TODO: Not care about the correlated expression
 
@@ -506,7 +506,7 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
         cross_product_table_ref->right_table_ref_ = right_table_ref;
 
         left_bind_context = cross_product_bind_context;
-        left_query_binder = Move(cross_product_query_binder);
+        left_query_binder = std::move(cross_product_query_binder);
         left_table_ref = cross_product_table_ref;
     }
 
@@ -755,7 +755,7 @@ void QueryBinder::BuildGroupBy(QueryContext *query_context,
                                UniquePtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->group_by_table_index_ = table_index;
-    bind_context_ptr_->group_by_table_name_ = "groupby" + ToStr(table_index);
+    bind_context_ptr_->group_by_table_name_ = "groupby" + std::to_string(table_index);
 
     if (select.group_by_list_ != nullptr) {
         // Start to bind GROUP BY clause
@@ -784,7 +784,7 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
                               UniquePtr<BoundSelectStatement> &select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->aggregate_table_index_ = table_index;
-    bind_context_ptr_->aggregate_table_name_ = "aggregate" + ToStr(table_index);
+    bind_context_ptr_->aggregate_table_name_ = "aggregate" + std::to_string(table_index);
 
     // All having expr must appear in group by list or aggregate function list.
     if (select.group_by_list_ != nullptr && select.having_expr_ != nullptr) {
@@ -809,7 +809,7 @@ void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &st
 void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement> &bound_select_statement) {
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     bind_context_ptr_->project_table_index_ = table_index;
-    bind_context_ptr_->project_table_name_ = "project" + ToStr(table_index);
+    bind_context_ptr_->project_table_name_ = "project" + std::to_string(table_index);
 
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
 
@@ -925,7 +925,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
-        Error<PlannerException>(Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        Error<PlannerException>(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -944,7 +944,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
-        Error<PlannerException>(Format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
+        Error<PlannerException>(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -954,7 +954,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
     if (statement.update_expr_array_ == nullptr) {
-        Error<PlannerException>(Format("Update expr array is empty"));
+        Error<PlannerException>(fmt::format("Update expr array is empty"));
     }
 
     const Vector<String> &column_names = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
@@ -966,7 +966,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         ParsedExpr *expr = upd_expr->value;
         auto it = std::find(column_names.begin(), column_names.end(), column_name);
         if (it == column_names.end()) {
-            Error<PlannerException>(Format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
+            Error<PlannerException>(fmt::format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
         }
         SizeT column_id = std::distance(column_names.begin(), it);
         SharedPtr<BaseExpression> update_expr = project_binder->Bind(*expr, this->bind_context_ptr_.get(), 0, true);

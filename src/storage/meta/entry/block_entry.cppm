@@ -89,9 +89,9 @@ public:
     // Used in block iterator
     inline BlockColumnEntry *GetColumnDataByID(u64 column_id) const { return this->columns_[column_id].get(); }
 
-    Json Serialize(TxnTimeStamp max_commit_ts);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<BlockEntry> Deserialize(const Json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
+    static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(BaseEntry &other) override;
 
@@ -146,7 +146,7 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 protected:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const SegmentEntry *segment_entry_{};
 

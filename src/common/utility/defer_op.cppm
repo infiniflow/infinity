@@ -23,7 +23,7 @@ namespace infinity {
 export template <typename FN>
 class DeferFn {
 public:
-    explicit DeferFn(FN func) : func_(Move(func)) {}
+    explicit DeferFn(FN func) : func_(std::move(func)) {}
 
     ~DeferFn() noexcept { func_(); }
 

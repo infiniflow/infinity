@@ -49,13 +49,13 @@ NanoSeconds BaseProfiler::ElapsedInternal() const {
 String BaseProfiler::ElapsedToString(NanoSeconds duration, i64 scale) {
     String result;
     if (duration.count() <= 1000 * scale) {
-        result.append(Format("{}ns", duration.count()));
+        result.append(fmt::format("{}ns", duration.count()));
     } else if (duration.count() <= 1000 * 1000 * scale) {
-        result.append(Format("{}us", ChronoCast<MicroSeconds>(duration).count()));
+        result.append(fmt::format("{}us", ChronoCast<MicroSeconds>(duration).count()));
     } else if (duration.count() <= 1000 * 1000 * 1000 * scale) {
-        result.append(Format("{}ms", ChronoCast<MilliSeconds>(duration).count()));
+        result.append(fmt::format("{}ms", ChronoCast<MilliSeconds>(duration).count()));
     } else {
-        result.append(Format("{}s", ChronoCast<Seconds>(duration).count()));
+        result.append(fmt::format("{}s", ChronoCast<Seconds>(duration).count()));
     }
     return result;
 }
@@ -78,7 +78,7 @@ String OptimizerProfiler::ToString(SizeT intent) const {
     SizeT profiler_count = profilers_.size();
     for (SizeT idx = 0; idx < profiler_count; ++idx) {
         const auto &profiler = profilers_[idx];
-        result.append(Format("{}{}: {}", space, profiler.name(), profiler.ElapsedToString()));
+        result.append(fmt::format("{}{}: {}", space, profiler.name(), profiler.ElapsedToString()));
     }
 
     return result;
@@ -123,7 +123,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
 
     OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
 
-    timings_.push_back(Move(info));
+    timings_.push_back(std::move(info));
     active_operator_ = nullptr;
 }
 
@@ -167,13 +167,13 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (!enable_) {
         return;
     }
-    SizeT phase_idx = EnumInteger(phase);
+    SizeT phase_idx = static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase);
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        Error<ExecutorException>(Format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
+        Error<ExecutorException>(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
     BaseProfiler& phase_profiler = profilers_[phase_idx];
@@ -192,14 +192,14 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
     }
 
     current_phase_ = QueryPhase::kInvalid;
-    profilers_[EnumInteger(phase)].End();
+    profilers_[static_cast<magic_enum::underlying_type_t<QueryPhase>>(phase)].End();
 }
 
 void QueryProfiler::Stop() {
     if (current_phase_ == QueryPhase::kInvalid) {
         return;
     }
-    profilers_[EnumInteger(current_phase_)].End();
+    profilers_[static_cast<magic_enum::underlying_type_t<QueryPhase>>(current_phase_)].End();
     current_phase_ = QueryPhase::kInvalid;
 }
 
@@ -208,7 +208,7 @@ void QueryProfiler::Flush(TaskProfiler &&profiler) {
         return;
     }
 
-    UniqueLock<Mutex> lk(flush_lock_);
+    std::unique_lock<std::mutex> lk(flush_lock_);
     records_[profiler.binding_.fragment_id_][profiler.binding_.task_id_].push_back(profiler);
 }
 
@@ -263,32 +263,32 @@ String QueryProfiler::ToString() const {
     return ss.str();
 }
 
-Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
-    Json json;
+nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
+    nlohmann::json json;
 
     i64 start = std::numeric_limits<i64>::max();
     i64 end = 0;
     for (const auto &fragment : profiler->records_) {
-        Json json_fragments;
+        nlohmann::json json_fragments;
         json_fragments["fragment_id"] = fragment.first;
 
         i64 fragment_start = std::numeric_limits<i64>::max();
         i64 fragment_end = 0;
         for (const auto &task : fragment.second) {
-            Json json_tasks;
+            nlohmann::json json_tasks;
             SizeT times = 0;
             json_tasks["task_id"] = task.first;
 
             i64 task_start = std::numeric_limits<i64>::max();
             i64 task_end = 0;
             for (const auto &operators : task.second) {
-                task_start = Min(task_start, operators.task_profiler_.GetBegin());
-                task_end = Max(task_end, operators.task_profiler_.GetEnd());
+                task_start = std::min(task_start, operators.task_profiler_.GetBegin());
+                task_end = std::max(task_end, operators.task_profiler_.GetEnd());
 
-                Json json_operators;
+                nlohmann::json json_operators;
                 json_operators["times"] = times;
                 for (const auto &op : operators.timings_) {
-                    Json json_info;
+                    nlohmann::json json_info;
                     json_info["name"] = op.name_;
                     json_info["start"] = op.start_;
                     json_info["end"] = op.end_;
@@ -305,8 +305,8 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
             json_tasks["task_end"] = task_end;
             json_tasks["task_total"] = task_end - task_start;
 
-            fragment_start = Min(fragment_start, task_start);
-            fragment_end = Max(fragment_end, task_end);
+            fragment_start = std::min(fragment_start, task_start);
+            fragment_end = std::max(fragment_end, task_end);
 
             json_fragments["tasks"].push_back(json_tasks);
         }
@@ -316,8 +316,8 @@ Json QueryProfiler::Serialize(const QueryProfiler *profiler) {
         json_fragments["fragment_end"] = fragment_end;
         json_fragments["fragment_total"] = fragment_total;
 
-        start = Min(start, fragment_start);
-        end = Max(end, fragment_end);
+        start = std::min(start, fragment_start);
+        end = std::max(end, fragment_end);
 
         json["fragments"].push_back(json_fragments);
     }

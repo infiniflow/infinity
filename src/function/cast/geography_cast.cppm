@@ -40,7 +40,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, GeographyTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from geography type to {}", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from geography type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -50,7 +50,7 @@ struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
-                Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };

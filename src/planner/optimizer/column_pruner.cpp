@@ -50,7 +50,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                 auto &aggr = op.Cast<LogicalAggregate>();
                 auto filtered_aggregates = ClearUnusedExpressions(aggr.aggregates_, aggr.aggregate_index_);
 
-                aggr.aggregates_ = Move(filtered_aggregates);
+                aggr.aggregates_ = std::move(filtered_aggregates);
                 if (aggr.aggregates_.empty() && aggr.groups_.empty()) {
                     // TODO: CountStar -> Count(*) is not supported yet
                 }
@@ -85,7 +85,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                 auto &proj = op.Cast<LogicalProject>();
                 auto filtered_expressions = ClearUnusedExpressions(proj.expressions_, proj.table_index_);
 
-                proj.expressions_ = Move(filtered_expressions);
+                proj.expressions_ = std::move(filtered_expressions);
                 if (proj.expressions_.empty()) {
                     // nothing references the projected expressions
                     // this happens in the case of e.g. EXISTS(SELECT * FROM ...)
@@ -148,7 +148,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
 
             // TODO: Scan does not currently support Filter Pushdown
             // remove the original columns of scan with the filtered columns
-            scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            scan.base_table_ref_->RetainColumnByIndices(std::move(project_indices));
 
             // TODO: Scan does not currently support Filter Prune
 
@@ -162,7 +162,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
                 return;
             }
             Vector<SizeT> project_indices = ClearUnusedExpressions(scan.base_table_ref_->column_ids_, scan.TableIndex());
-            scan.base_table_ref_->RetainColumnByIndices(Move(project_indices));
+            scan.base_table_ref_->RetainColumnByIndices(std::move(project_indices));
             return;
         }
         case LogicalNodeType::kViewScan:

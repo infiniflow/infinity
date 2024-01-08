@@ -29,7 +29,7 @@ namespace infinity {
 
 struct ColumnVectorCastData {
     explicit ColumnVectorCastData(bool strict, SharedPtr<ColumnVector> &column_vector_ptr, DataType source_type, DataType target_type)
-        : source_type_(Move(source_type)), target_type_(Move(target_type)), strict_(strict), column_vector_ptr_(column_vector_ptr) {}
+        : source_type_(std::move(source_type)), target_type_(std::move(target_type)), strict_(strict), column_vector_ptr_(column_vector_ptr) {}
 
     DataType source_type_{LogicalType::kInvalid};
     DataType target_type_{LogicalType::kInvalid};
@@ -42,7 +42,7 @@ template <typename Operator>
 struct TryCastValue {
     template <typename SourceValueType, typename TargetValueType>
     inline static void Execute(SourceValueType input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
-        if (Operator::template Run<SourceValueType, TargetValueType>(Move(input), result)) {
+        if (Operator::template Run<SourceValueType, TargetValueType>(std::move(input), result)) {
             return;
         }
 

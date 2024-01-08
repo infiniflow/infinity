@@ -44,22 +44,22 @@ export {
     constexpr i64 MAX_BLOCK_CAPACITY = 65536L;
     constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
     constexpr i64 MIN_BLOCK_CAPACITY = 8192;
-    constexpr i16 INVALID_BLOCK_ID = i16_max;
+    constexpr i16 INVALID_BLOCK_ID = std::numeric_limits<i16>::max();
     constexpr i64 MAX_BLOCK_COUNT_IN_SEGMENT = 65536L;
 
     // column vector related constants
     constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
-    constexpr u64 INITIAL_VECTOR_CHUNK_ID = u64_max;
+    constexpr u64 INITIAL_VECTOR_CHUNK_ID = std::numeric_limits<u64>::max();;
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
-    constexpr u64 MAX_VECTOR_CHUNK_COUNT = u64_max; // Each row has one chunk.
+    constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();; // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
     constexpr SizeT SEGMENT_OFFSET_IN_DOCID = 23;           // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
     constexpr u64 SEGMENT_MASK_IN_DOCID = 0x7FFFFF;         // it should be adjusted together with DEFAULT_SEGMENT_CAPACITY
-    constexpr u32 INVALID_SEGMENT_ID = u32_max;
+    constexpr u32 INVALID_SEGMENT_ID = std::numeric_limits<u32>::max();
 
     // queue related constants, TODO: double check the necessary
     constexpr SizeT DEFAULT_READER_PREPARE_QUEUE_SIZE = 1024;
@@ -69,9 +69,9 @@ export {
     constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 
     // transaction related constants
-    constexpr u64 MAX_TXN_ID = u64_max;
-    constexpr u64 MAX_TIMESTAMP = u64_max;
-    constexpr TxnTimeStamp UNCOMMIT_TS = u64_max;
+    constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();;
+    constexpr u64 MAX_TIMESTAMP = std::numeric_limits<u64>::max();;
+    constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<u64>::max();;
 
     constexpr SizeT KB = 1024;
     constexpr SizeT MB = 1024 * KB;

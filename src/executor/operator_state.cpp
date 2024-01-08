@@ -58,7 +58,7 @@ bool QueueSourceState::GetData() {
             auto *fragment_error = static_cast<FragmentError *>(fragment_data_base.get());
             if (this->error_message_.get() == nullptr) {
                 // Only record the first error of input data.
-                this->error_message_ = Move(fragment_error->error_message_);
+                this->error_message_ = std::move(fragment_error->error_message_);
             }
             // Get an error message from predecessor fragment
             MarkCompletedTask(fragment_error->fragment_id_);
@@ -81,21 +81,21 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeKnn: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
-            merge_knn_op_state->input_data_block_ = Move(fragment_data->data_block_);
+            merge_knn_op_state->input_data_block_ = std::move(fragment_data->data_block_);
             merge_knn_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kFusion: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             FusionOperatorState *fusion_op_state = (FusionOperatorState *)next_op_state;
-            fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(Move(fragment_data->data_block_));
+            fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(std::move(fragment_data->data_block_));
             fusion_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kMergeLimit: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
-            limit_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
+            limit_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
             if (!limit_op_state->input_complete_) {
                 limit_op_state->input_complete_ = completed;
             }
@@ -107,8 +107,8 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeAggregate: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
-            // merge_aggregate_op_state->input_data_blocks_.push_back(Move(fragment_data->data_block_));
-            merge_aggregate_op_state->input_data_block_ = Move(fragment_data->data_block_);
+            // merge_aggregate_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            merge_aggregate_op_state->input_data_block_ = std::move(fragment_data->data_block_);
             merge_aggregate_op_state->input_complete_ = completed;
             break;
         }

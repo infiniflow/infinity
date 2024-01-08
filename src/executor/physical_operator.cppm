@@ -31,7 +31,7 @@ export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 
 public:
     inline explicit PhysicalOperator(PhysicalOperatorType type, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, u64 id, SharedPtr<Vector<LoadMeta>> &load_metas)
-        : operator_id_(id), operator_type_(type), left_(Move(left)), right_(Move(right)) {
+        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)) {
         load_metas_ = load_metas;
     }
 

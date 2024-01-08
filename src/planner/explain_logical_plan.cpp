@@ -212,30 +212,30 @@ void ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, SharedP
     {
         String create_header_str;
         if (intent_size != 0) {
-            create_header_str = Format("{}-> CREATE SCHEMA ", String(intent_size - 2, ' '));
+            create_header_str = fmt::format("{}-> CREATE SCHEMA ", String(intent_size - 2, ' '));
         } else {
             create_header_str = "CREATE SCHEMA ";
         }
 
-        create_header_str += Format("({})", create_node->node_id());
+        create_header_str += fmt::format("({})", create_node->node_id());
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -244,24 +244,24 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
     {
         String create_header_str;
         if (intent_size != 0) {
-            create_header_str = Format("{}-> CREATE TABLE ", String(intent_size - 2, ' '));
+            create_header_str = fmt::format("{}-> CREATE TABLE ", String(intent_size - 2, ' '));
         } else {
             create_header_str = "CREATE TABLE ";
         }
 
-        create_header_str += Format("({})", create_node->node_id());
+        create_header_str += fmt::format("({})", create_node->node_id());
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = Format("{} - table name: {}", String(intent_size, ' '), *create_node->table_definitions()->table_name());
+        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *create_node->table_definitions()->table_name());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -284,13 +284,13 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -304,7 +304,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, SharedPt
             create_header_str = "CREATE INDEX ";
         }
 
-        create_header_str += "(" + ToStr(create_node->node_id()) + ")";
+        create_header_str += "(" + std::to_string(create_node->node_id()) + ")";
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
@@ -339,36 +339,36 @@ void ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, Sha
     {
         String create_header_str;
         if (intent_size != 0) {
-            create_header_str = Format("{}-> CREATE COLLECTION ", String(intent_size - 2, ' '));
+            create_header_str = fmt::format("{}-> CREATE COLLECTION ", String(intent_size - 2, ' '));
         } else {
             create_header_str = "CREATE COLLECTION ";
         }
 
-        create_header_str += Format("({})", create_node->node_id());
+        create_header_str += fmt::format("({})", create_node->node_id());
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Collection name
     {
-        String collection_name_str = Format("{} - collection name: {}", String(intent_size, ' '), *create_node->collection_name());
+        String collection_name_str = fmt::format("{} - collection name: {}", String(intent_size, ' '), *create_node->collection_name());
         result->emplace_back(MakeShared<String>(collection_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -377,23 +377,23 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
     {
         String create_header_str;
         if (intent_size != 0) {
-            create_header_str = Format("{}-> CREATE VIEW ", String(intent_size - 2, ' '));
+            create_header_str = fmt::format("{}-> CREATE VIEW ", String(intent_size - 2, ' '));
         } else {
             create_header_str = "CREATE VIEW ";
         }
-        create_header_str += Format("({})", create_node->node_id());
+        create_header_str += fmt::format("({})", create_node->node_id());
         result->emplace_back(MakeShared<String>(create_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), create_node->create_view_info()->schema_name_);
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), create_node->create_view_info()->schema_name_);
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // View name
     {
-        String view_name_str = Format("{} - view name: {}", String(intent_size, ' '), create_node->create_view_info()->view_name_);
+        String view_name_str = fmt::format("{} - view name: {}", String(intent_size, ' '), create_node->create_view_info()->view_name_);
         result->emplace_back(MakeShared<String>(view_name_str));
     }
 
@@ -417,19 +417,19 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
     // Conflict type
     {
         String conflict_type_str =
-            Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->create_view_info()->conflict_type_));
+            fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(create_node->create_view_info()->conflict_type_));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Text
     {
-        String sql_text = Format("{} - text: Not implemented", String(intent_size, ' '));
+        String sql_text = fmt::format("{} - text: Not implemented", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(sql_text));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -438,30 +438,30 @@ void ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr<V
     {
         String drop_header_str;
         if (intent_size != 0) {
-            drop_header_str = Format("{}-> CREATE SCHEMA ", String(intent_size - 2, ' '));
+            drop_header_str = fmt::format("{}-> CREATE SCHEMA ", String(intent_size - 2, ' '));
         } else {
             drop_header_str = "DROP SCHEMA ";
         }
 
-        drop_header_str += Format("({})", drop_node->node_id());
+        drop_header_str += fmt::format("({})", drop_node->node_id());
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -470,36 +470,36 @@ void ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<Ve
     {
         String drop_header_str;
         if (intent_size != 0) {
-            drop_header_str = Format("{}-> DROP TABLE ", String(intent_size - 2, ' '));
+            drop_header_str = fmt::format("{}-> DROP TABLE ", String(intent_size - 2, ' '));
         } else {
             drop_header_str = "DROP TABLE ";
         }
 
-        drop_header_str += Format("({})", drop_node->node_id());
+        drop_header_str += fmt::format("({})", drop_node->node_id());
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = Format("{} - table: {}", String(intent_size, ' '), *drop_node->table_name());
+        String table_name_str = fmt::format("{} - table: {}", String(intent_size, ' '), *drop_node->table_name());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -508,36 +508,36 @@ void ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, SharedP
     {
         String drop_header_str;
         if (intent_size != 0) {
-            drop_header_str = Format("{}-> DROP COLLECTION ", String(intent_size - 2, ' '));
+            drop_header_str = fmt::format("{}-> DROP COLLECTION ", String(intent_size - 2, ' '));
         } else {
             drop_header_str = "DROP COLLECTION ";
         }
 
-        drop_header_str += Format("({})", drop_node->node_id());
+        drop_header_str += fmt::format("({})", drop_node->node_id());
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Collection name
     {
-        String table_name_str = Format("{} - collection: {}", String(intent_size, ' '), *drop_node->collection_name());
+        String table_name_str = fmt::format("{} - collection: {}", String(intent_size, ' '), *drop_node->collection_name());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -546,36 +546,36 @@ void ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<Vec
     {
         String drop_header_str;
         if (intent_size != 0) {
-            drop_header_str = Format("{}-> DROP VIEW ", String(intent_size - 2, ' '));
+            drop_header_str = fmt::format("{}-> DROP VIEW ", String(intent_size - 2, ' '));
         } else {
             drop_header_str = "DROP VIEW ";
         }
 
-        drop_header_str += Format("({})", drop_node->node_id());
+        drop_header_str += fmt::format("({})", drop_node->node_id());
         result->emplace_back(MakeShared<String>(drop_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // View name
     {
-        String table_name_str = Format("{} - view name: {}", String(intent_size, ' '), *drop_node->view_name());
+        String table_name_str = fmt::format("{} - view name: {}", String(intent_size, ' '), *drop_node->view_name());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
     // Conflict type
     {
-        String conflict_type_str = Format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
+        String conflict_type_str = fmt::format("{} - conflict type: {}", String(intent_size, ' '), ConflictType2Str(drop_node->conflict_type()));
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
     // Output column
     {
-        String output_columns_str = Format("{} - output columns: [OK]", String(intent_size, ' '));
+        String output_columns_str = fmt::format("{} - output columns: [OK]", String(intent_size, ' '));
         result->emplace_back(MakeShared<String>(output_columns_str));
     }
 }
@@ -584,25 +584,25 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
     {
         String insert_header_str;
         if (intent_size != 0) {
-            insert_header_str = Format("{}-> INSERT ", String(intent_size - 2, ' '));
+            insert_header_str = fmt::format("{}-> INSERT ", String(intent_size - 2, ' '));
         } else {
             insert_header_str = "INSERT ";
         }
 
-        insert_header_str += Format("({})", insert_node->node_id());
+        insert_header_str += fmt::format("({})", insert_node->node_id());
         result->emplace_back(MakeShared<String>(insert_header_str));
     }
 
     // Schema name
     {
-        String schema_name_str = Format("{} - schema name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetDBName());
+        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetDBName());
 
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = Format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetTableName());
+        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetTableName());
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -649,18 +649,18 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
     {
         String project_header;
         if (intent_size != 0) {
-            project_header = Format("{}-> PROJECT ", String(intent_size - 2, ' '));
+            project_header = fmt::format("{}-> PROJECT ", String(intent_size - 2, ' '));
         } else {
             project_header = "PROJECT ";
         }
 
-        project_header += Format("({})", project_node->node_id());
+        project_header += fmt::format("({})", project_node->node_id());
         result->emplace_back(MakeShared<String>(project_header));
     }
 
     // Table index
     {
-        String table_index = Format("{} - table index: #{}", String(intent_size, ' '), project_node->table_index_);
+        String table_index = fmt::format("{} - table index: #{}", String(intent_size, ' '), project_node->table_index_);
         result->emplace_back(MakeShared<String>(table_index));
     }
 
@@ -685,12 +685,12 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
 void ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String filter_node_header;
     if (intent_size != 0) {
-        filter_node_header = Format("{}-> FILTER ", String(intent_size - 2, ' '));
+        filter_node_header = fmt::format("{}-> FILTER ", String(intent_size - 2, ' '));
     } else {
         filter_node_header = "FILTER ";
     }
 
-    filter_node_header += Format("({})", filter_node->node_id());
+    filter_node_header += fmt::format("({})", filter_node->node_id());
     result->emplace_back(MakeShared<String>(filter_node_header));
 
     // filter expression
@@ -725,7 +725,7 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
         table_scan_header = "TABLE SCAN ";
     }
 
-    table_scan_header += Format("({})", table_scan_node->node_id());
+    table_scan_header += fmt::format("({})", table_scan_node->node_id());
     result->emplace_back(MakeShared<String>(table_scan_header));
 
     // Table alias and name
@@ -743,7 +743,7 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     // Table index
     String table_index = String(intent_size, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(table_scan_node->TableIndex());
+    table_index += std::to_string(table_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     // Output columns
@@ -751,7 +751,7 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     output_columns += " - output columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(Format("No column in table: {}.", table_scan_node->TableAlias()));
+        Error<PlannerException>(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx);
@@ -771,7 +771,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
         knn_scan_header = "KNN SCAN ";
     }
 
-    knn_scan_header += Format("({})", knn_scan_node->node_id());
+    knn_scan_header += fmt::format("({})", knn_scan_node->node_id());
     result->emplace_back(MakeShared<String>(knn_scan_header));
 
     // Table alias and name
@@ -789,7 +789,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     // Table index
     String table_index = String(intent_size, ' ');
     table_index += " - table index: #";
-    table_index += ToStr(knn_scan_node->TableIndex());
+    table_index += std::to_string(knn_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
     const auto &knn_expression = knn_scan_node->knn_expression_;
@@ -807,7 +807,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
 
     String embedding_dimension_str = String(intent_size + 2, ' ');
     embedding_dimension_str += " - dimension: ";
-    embedding_type_str += ToStr(knn_expr_raw->dimension_);
+    embedding_type_str += std::to_string(knn_expr_raw->dimension_);
     result->emplace_back(MakeShared<String>(embedding_dimension_str));
 
     String distance_type_str = String(intent_size + 2, ' ');
@@ -834,7 +834,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     output_columns += " - output columns: [";
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(Format("No column in table: {}.", knn_scan_node->TableAlias()));
+        Error<PlannerException>(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx);
@@ -862,7 +862,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
         }
 
         agg_header += "(";
-        agg_header += ToStr(aggregate_node->node_id());
+        agg_header += std::to_string(aggregate_node->node_id());
         agg_header += ")";
         result->emplace_back(MakeShared<String>(agg_header));
     }
@@ -871,7 +871,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
     {
         String aggregate_table_index = String(intent_size, ' ');
         aggregate_table_index += " - aggregate table index: #";
-        aggregate_table_index += ToStr(aggregate_node->aggregate_index_);
+        aggregate_table_index += std::to_string(aggregate_node->aggregate_index_);
         result->emplace_back(MakeShared<String>(aggregate_table_index));
     }
 
@@ -895,7 +895,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
         // Group by table index
         String group_table_index = String(intent_size, ' ');
         group_table_index += " - group by table index: #";
-        group_table_index += ToStr(aggregate_node->groupby_index_);
+        group_table_index += std::to_string(aggregate_node->groupby_index_);
         result->emplace_back(MakeShared<String>(group_table_index));
 
         String group_by_expression_str = String(intent_size, ' ');
@@ -921,7 +921,7 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         }
 
         sort_header += "(";
-        sort_header += ToStr(sort_node->node_id());
+        sort_header += std::to_string(sort_node->node_id());
         sort_header += ")";
         result->emplace_back(MakeShared<String>(sort_header));
     }
@@ -974,7 +974,7 @@ void ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vecto
         }
 
         limit_header += "(";
-        limit_header += ToStr(limit_node->node_id());
+        limit_header += std::to_string(limit_node->node_id());
         limit_header += ")";
         result->emplace_back(MakeShared<String>(limit_header));
     }
@@ -1019,7 +1019,7 @@ void ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, 
             cross_product_header = "CROSS PRODUCT ";
         }
         cross_product_header += "(";
-        cross_product_header += ToStr(cross_product_node->node_id());
+        cross_product_header += std::to_string(cross_product_node->node_id());
         cross_product_header += ")";
         result->emplace_back(MakeShared<String>(cross_product_header));
     }
@@ -1049,7 +1049,7 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
         }
         join_header += JoinType2Str(join_node->join_type_);
         join_header += "(";
-        join_header += ToStr(join_node->node_id());
+        join_header += std::to_string(join_node->node_id());
         join_header += ")";
         result->emplace_back(MakeShared<String>(join_header));
     }
@@ -1099,7 +1099,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW TABLES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1117,7 +1117,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW VIEWS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1135,7 +1135,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "DESCRIBE TABLE/COLLECTION ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1163,7 +1163,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW DATABASES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1181,7 +1181,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW CONFIGS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1199,7 +1199,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW PROFILES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1218,7 +1218,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW INDEXES ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1236,19 +1236,19 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW SEGMENTS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
             if (show_node->segment_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
-                output_columns_str += " - segment: " + ToStr(*show_node->segment_id());
+                output_columns_str += " - segment: " + std::to_string(*show_node->segment_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
             }
 
             if (show_node->block_id().has_value()) {
                 String output_columns_str = String(intent_size, ' ');
-                output_columns_str += " - block: " + ToStr(*show_node->block_id());
+                output_columns_str += " - block: " + std::to_string(*show_node->block_id());
                 result->emplace_back(MakeShared<String>(output_columns_str));
             }
 
@@ -1266,7 +1266,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW SESSION STATUS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1284,7 +1284,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
                 show_str = "SHOW GLOBAL STATUS ";
             }
             show_str += "(";
-            show_str += ToStr(show_node->node_id());
+            show_str += std::to_string(show_node->node_id());
             show_str += ")";
             result->emplace_back(MakeShared<String>(show_str));
 
@@ -1349,9 +1349,9 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             ColumnExpression *column_expression = (ColumnExpression *)base_expression;
             expr_str += column_expression->Name();
             expr_str += " (#";
-            expr_str += ToStr(column_expression->binding().table_idx);
+            expr_str += std::to_string(column_expression->binding().table_idx);
             expr_str += ".";
-            expr_str += ToStr(column_expression->binding().column_idx);
+            expr_str += std::to_string(column_expression->binding().column_idx);
             expr_str += ")";
             break;
         }
@@ -1427,7 +1427,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             ReferenceExpression *reference_expression = (ReferenceExpression *)base_expression;
             expr_str += reference_expression->Name();
             expr_str += " (#";
-            expr_str += ToStr(reference_expression->column_index());
+            expr_str += std::to_string(reference_expression->column_index());
             expr_str += ")";
             break;
         }
@@ -1451,54 +1451,54 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
         }
 
         import_header_str += "(";
-        import_header_str += ToStr(import_node->node_id());
+        import_header_str += std::to_string(import_node->node_id());
         import_header_str += ")";
         result->emplace_back(MakeShared<String>(import_header_str));
     }
 
     {
         SharedPtr<String> schema_name =
-            MakeShared<String>(Format("{} - schema name: {}", String(intent_size, ' '), *import_node->table_entry()->GetDBName()));
+            MakeShared<String>(fmt::format("{} - schema name: {}", String(intent_size, ' '), *import_node->table_entry()->GetDBName()));
         result->emplace_back(schema_name);
     }
 
     {
         SharedPtr<String> table_name =
-            MakeShared<String>(Format("{} - table name: {}", String(intent_size, ' '), *import_node->table_entry()->GetTableName()));
+            MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), *import_node->table_entry()->GetTableName()));
         result->emplace_back(table_name);
     }
 
     {
-        SharedPtr<String> path = MakeShared<String>(Format("{} - file: {}", String(intent_size, ' '), import_node->file_path()));
+        SharedPtr<String> path = MakeShared<String>(fmt::format("{} - file: {}", String(intent_size, ' '), import_node->file_path()));
         result->emplace_back(path);
     }
 
     switch (import_node->FileType()) {
         case CopyFileType::kCSV: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: CSV", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: CSV", String(intent_size, ' ')));
             result->emplace_back(file_type);
 
             SharedPtr<String> header =
-                MakeShared<String>(Format("{} - header: {}", String(intent_size, ' '), (import_node->header() ? "Yes" : "No")));
+                MakeShared<String>(fmt::format("{} - header: {}", String(intent_size, ' '), (import_node->header() ? "Yes" : "No")));
             result->emplace_back(header);
 
             SharedPtr<String> delimiter =
-                MakeShared<String>(Format("{} - header: {} - delimiter: ", String(intent_size, ' '), import_node->delimiter()));
+                MakeShared<String>(fmt::format("{} - header: {} - delimiter: ", String(intent_size, ' '), import_node->delimiter()));
             result->emplace_back(delimiter);
             break;
         }
         case CopyFileType::kJSON: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSON", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: JSON", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
         case CopyFileType::kJSONL: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSONL", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: JSONL", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
         case CopyFileType::kFVECS: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: FVECS", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: FVECS", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
@@ -1520,52 +1520,52 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
 
         export_header_str += "(";
-        export_header_str += ToStr(export_node->node_id());
+        export_header_str += std::to_string(export_node->node_id());
         export_header_str += ")";
         result->emplace_back(MakeShared<String>(export_header_str));
     }
 
     {
-        SharedPtr<String> schema_name = MakeShared<String>(Format("{} - schema name: {}", String(intent_size, ' '), export_node->schema_name()));
+        SharedPtr<String> schema_name = MakeShared<String>(fmt::format("{} - schema name: {}", String(intent_size, ' '), export_node->schema_name()));
         result->emplace_back(schema_name);
     }
 
     {
-        SharedPtr<String> table_name = MakeShared<String>(Format("{} - table name: {}", String(intent_size, ' '), export_node->table_name()));
+        SharedPtr<String> table_name = MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), export_node->table_name()));
         result->emplace_back(table_name);
     }
 
     {
-        SharedPtr<String> path = MakeShared<String>(Format("{} - file: {}", String(intent_size, ' '), export_node->file_path()));
+        SharedPtr<String> path = MakeShared<String>(fmt::format("{} - file: {}", String(intent_size, ' '), export_node->file_path()));
         result->emplace_back(path);
     }
 
     switch (export_node->FileType()) {
         case CopyFileType::kCSV: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: CSV", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: CSV", String(intent_size, ' ')));
             result->emplace_back(file_type);
 
             SharedPtr<String> header =
-                MakeShared<String>(Format("{} - header: {}", String(intent_size, ' '), (export_node->header() ? "Yes" : "No")));
+                MakeShared<String>(fmt::format("{} - header: {}", String(intent_size, ' '), (export_node->header() ? "Yes" : "No")));
             result->emplace_back(header);
 
             SharedPtr<String> delimiter =
-                MakeShared<String>(Format("{} - header: {} - delimiter: ", String(intent_size, ' '), export_node->delimiter()));
+                MakeShared<String>(fmt::format("{} - header: {} - delimiter: ", String(intent_size, ' '), export_node->delimiter()));
             result->emplace_back(delimiter);
             break;
         }
         case CopyFileType::kJSON: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSON", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: JSON", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
         case CopyFileType::kJSONL: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: JSONL", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: JSONL", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
         case CopyFileType::kFVECS: {
-            SharedPtr<String> file_type = MakeShared<String>(Format("{} - type: FVECS", String(intent_size, ' ')));
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: FVECS", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }
@@ -1588,17 +1588,17 @@ void ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vecto
     switch (flush_node->flush_type()) {
         case FlushType::kData:
             flush_header_str += "DATA (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
         case FlushType::kLog:
             flush_header_str += "LOG (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
         case FlushType::kBuffer:
             flush_header_str += "BUFFER (";
-            flush_header_str += ToStr(flush_node->node_id());
+            flush_header_str += std::to_string(flush_node->node_id());
             flush_header_str += ")";
             break;
     }
@@ -1617,7 +1617,7 @@ void ExplainLogicalPlan::Explain(const LogicalOptimize *optimize_node, SharedPtr
     switch (optimize_node->optimize_type()) {
         case OptimizeType::kIRS:
             optimize_header_str += "DATA (";
-            optimize_header_str += ToStr(optimize_node->node_id());
+            optimize_header_str += std::to_string(optimize_node->node_id());
             optimize_header_str += ")";
             break;
     }

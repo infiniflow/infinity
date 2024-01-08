@@ -33,7 +33,7 @@ public:
 
 public:
     LogicalCreateSchema(u64 node_id, SharedPtr<String> schema_name, ConflictType conflict_type)
-        : LogicalNode(node_id, LogicalNodeType::kCreateSchema), schema_name_(Move(schema_name)), conflict_type_(conflict_type) {}
+        : LogicalNode(node_id, LogicalNodeType::kCreateSchema), schema_name_(std::move(schema_name)), conflict_type_(conflict_type) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

@@ -69,7 +69,7 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
         UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
         data_block->Init(*GetOutputTypes());
         DataBlock* output_data_block = data_block.get();
-        operator_state->data_block_array_.emplace_back(Move(data_block));
+        operator_state->data_block_array_.emplace_back(std::move(data_block));
 
         SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
         DataBlock* input_data_block = prev_op_state->data_block_array_[block_idx].get();
@@ -80,7 +80,7 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
                                                 output_data_block,
                                                 input_data_block->row_count());
 
-        LOG_TRACE(Format("{} rows after filter", selected_count));
+        LOG_TRACE(fmt::format("{} rows after filter", selected_count));
     }
 
     // Clean input data block array;

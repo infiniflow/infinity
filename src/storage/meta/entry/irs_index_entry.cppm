@@ -41,15 +41,15 @@ public:
 
     void AddColumn(SharedPtr<IndexBase> index_base, u64 column_id);
 
-    Json Serialize(TxnTimeStamp max_commit_ts);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static SharedPtr<IrsIndexEntry> Deserialize(const Json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
+    static SharedPtr<IrsIndexEntry> Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
 public:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     const TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};

@@ -39,7 +39,7 @@ export enum class SinkType {
 export class PhysicalSink final : public PhysicalOperator {
 public:
     explicit PhysicalSink(u64 id, SinkType sink_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr, id, load_metas), output_names_(Move(names)), output_types_(Move(types)),
+        : PhysicalOperator(PhysicalOperatorType::kSink, nullptr, nullptr, id, load_metas), output_names_(std::move(names)), output_types_(std::move(types)),
           type_(sink_type) {}
 
     ~PhysicalSink() override = default;

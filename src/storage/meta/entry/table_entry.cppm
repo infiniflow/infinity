@@ -117,9 +117,9 @@ public:
     void GetFullTextAnalyzers(u64 txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
 
 public:
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<TableEntry> Deserialize(const Json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
+    static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
     virtual void MergeFrom(BaseEntry &other);
 
@@ -133,7 +133,7 @@ public:
 protected:
     HashMap<String, u64> column_name2column_id_;
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     SharedPtr<String> table_entry_dir_{};
 

@@ -44,7 +44,7 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
     if (metric_type == MetricType::kInvalid) {
         Error<StorageException>("Lack index parameter metric_type");
     }
-    return MakeShared<IndexIVFFlat>(Move(file_name), Move(column_names), centroids_count, metric_type);
+    return MakeShared<IndexIVFFlat>(std::move(file_name), std::move(column_names), centroids_count, metric_type);
 }
 
 bool IndexIVFFlat::operator==(const IndexIVFFlat &other) const {
@@ -80,14 +80,14 @@ String IndexIVFFlat::ToString() const {
     return ss.str();
 }
 
-Json IndexIVFFlat::Serialize() const {
-    Json res = IndexBase::Serialize();
+nlohmann::json IndexIVFFlat::Serialize() const {
+    nlohmann::json res = IndexBase::Serialize();
     res["centroids_count"] = centroids_count_;
     res["metric_type"] = MetricTypeToString(metric_type_);
     return res;
 }
 
-SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const Json &) {
+SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
     Error<StorageException>("Not implemented");
     return nullptr;
 }

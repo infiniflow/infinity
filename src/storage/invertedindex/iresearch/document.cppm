@@ -68,7 +68,7 @@ export struct TextField : public IndexField {
     mutable IRSAnalyzer *stream_;
 
     TextField(const String &name, IndexFeatures index_features, const Features &flags, IRSAnalyzer *stream)
-        : IndexField(name, index_features, flags), stream_(Move(stream)) {}
+        : IndexField(name, index_features, flags), stream_(std::move(stream)) {}
 
     TokenStream &get_tokens() const override {
         stream_->reset(f_);

@@ -27,10 +27,10 @@ namespace infinity {
 
 static String FragmentTitle(u64 fragment_id, bool is_head) {
     if (!is_head) {
-        return "FRAGMENT #" + ToStr(fragment_id);
+        return "FRAGMENT #" + std::to_string(fragment_id);
     }
 
-    return "FRAGMENT (" + ToStr(fragment_id) + ")";
+    return "FRAGMENT (" + std::to_string(fragment_id) + ")";
 }
 
 void ExplainFragment::Explain(PlanFragment *fragment_ptr, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

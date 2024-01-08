@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "network/thrift_server.h"
 #include <csignal>
 #include <cstdlib>
-#include "network/thrift_server.h"
 
 import compilation_config;
 import stl;
@@ -27,15 +27,15 @@ namespace {
 
 infinity::DBServer db_server;
 
-//infinity::Thread threaded_thrift_thread;
-//infinity::ThreadedThriftServer threaded_thrift_server;
+// infinity::Thread threaded_thrift_thread;
+// infinity::ThreadedThriftServer threaded_thrift_server;
 
 infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
-//infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
+// infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
-infinity::Mutex server_mutex;
-infinity::CondVar server_cv;
+std::mutex server_mutex;
+std::condition_variable server_cv;
 
 bool server_running = false;
 
@@ -43,9 +43,9 @@ infinity::Thread shut_down_thread;
 
 void ShutdownServer() {
 
-    infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+    std::unique_lock<std::mutex> lock(server_mutex);
     server_running = true;
-    server_cv.wait(lock, [&]{ return !server_running; });
+    server_cv.wait(lock, [&] { return !server_running; });
 
     //            threaded_thrift_server.Shutdown();
     //            threaded_thrift_thread.join();
@@ -56,7 +56,6 @@ void ShutdownServer() {
     //            non_block_pool_thrift_server.Shutdown();
 
     db_server.Shutdown();
-
 }
 
 void SignalHandler(int signal_number, siginfo_t *, void *) {
@@ -65,7 +64,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGQUIT:
         case SIGTERM: {
 
-            infinity::UniqueLock<infinity::Mutex> lock(server_mutex);
+            std::unique_lock<std::mutex> lock(server_mutex);
             server_running = false;
             server_cv.notify_one();
 
@@ -82,7 +81,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             printf("Other type of signal: %d\n", signal_number);
         }
     }
-//    exit(0);
+    //    exit(0);
 }
 
 void RegisterSignal() {
@@ -101,18 +100,18 @@ void RegisterSignal() {
 namespace infinity {
 
 void ParseArguments(int argc, char **argv, StartupParameter &parameters) {
-    CxxOptions options("./infinity_main", "");
+    cxxopts::Options options("./infinity_main", "");
 
     options.add_options()("h,help", "Display this help and exit") // NOLINT
         ("f,config",
          "Specify the config file path. No default config file",
-         cxx_value<String>()->default_value("")) // NOLINT
+         MakeShared<cxxopts::values::standard_value<String>>()->default_value("")) // NOLINT
         ;
 
-    ParseResult result = options.parse(argc, argv);
+    cxxopts::ParseResult result = options.parse(argc, argv);
 
     if (result.count("help")) {
-        Printf("{}", options.help());
+        fmt::print("{}", options.help());
         return;
     }
 
@@ -127,21 +126,21 @@ void ParseArguments(int argc, char **argv, StartupParameter &parameters) {
 auto main(int argc, char **argv) -> int {
     using namespace infinity;
 
-    Printf(" __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
-           "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
-           "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"
-           "|  | |  . `  | |   __|  |  | |  . `  | |  |     |  |       \\_    _/   \n"
-           "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
-           "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
+    fmt::print(" __  .__   __.  _______  __  .__   __.  __  .___________.____    ____ \n"
+               "|  | |  \\ |  | |   ____||  | |  \\ |  | |  | |           |\\   \\  /   / \n"
+               "|  | |   \\|  | |  |__   |  | |   \\|  | |  | `---|  |----` \\   \\/   /  \n"
+               "|  | |  . `  | |   __|  |  | |  . `  | |  |     |  |       \\_    _/   \n"
+               "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
+               "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
-    Printf("Infinity, version: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
-           version_major(),
-           version_minor(),
-           version_patch(),
-           current_system_time(),
-           build_type(),
-           git_branch_name(),
-           git_commit_id());
+    fmt::print("Infinity, version: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
+               version_major(),
+               version_minor(),
+               version_patch(),
+               current_system_time(),
+               build_type(),
+               git_branch_name(),
+               git_commit_id());
 
     StartupParameter parameters;
     ParseArguments(argc, argv, parameters);
@@ -152,15 +151,15 @@ auto main(int argc, char **argv) -> int {
 
     InfinityContext::instance().config()->PrintAll();
 
-//    threaded_thrift_server.Init(9090);
-//    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+    //    threaded_thrift_server.Init(9090);
+    //    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
     u32 thrift_server_port = InfinityContext::instance().config()->sdk_port();
 
     pool_thrift_server.Init(thrift_server_port, 128);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
-//    non_block_pool_thrift_server.Init(9070, 64);
-//    non_block_pool_thrift_server.Start();
+    //    non_block_pool_thrift_server.Init(9070, 64);
+    //    non_block_pool_thrift_server.Start();
     shut_down_thread = infinity::Thread([&]() { ShutdownServer(); });
     db_server.Run();
 

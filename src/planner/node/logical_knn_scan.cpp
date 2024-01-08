@@ -30,7 +30,7 @@ module logical_knn_scan;
 namespace infinity {
 
 LogicalKnnScan::LogicalKnnScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref)
-    : LogicalNode(node_id, LogicalNodeType::kKnnScan), base_table_ref_(Move(base_table_ref)) {}
+    : LogicalNode(node_id, LogicalNodeType::kKnnScan), base_table_ref_(std::move(base_table_ref)) {}
 
 Vector<ColumnBinding> LogicalKnnScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;

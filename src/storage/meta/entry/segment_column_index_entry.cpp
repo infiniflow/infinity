@@ -46,7 +46,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
                                                                           CreateIndexParam *param) {
     // FIXME: estimate index size.
     UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Allocate(Move(file_worker));
+    auto buffer = buffer_manager->Allocate(std::move(file_worker));
     auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
     segment_column_index_entry->min_ts_ = create_ts;
     segment_column_index_entry->max_ts_ = create_ts;
@@ -58,7 +58,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
                                                                            BufferManager *buffer_manager,
                                                                            CreateIndexParam *param) {
     UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Get(Move(file_worker));
+    auto buffer = buffer_manager->Get(std::move(file_worker));
     return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
 }
 
@@ -72,7 +72,7 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
                 while (true) {
                     SizeT idx = create_index_idx.fetch_add(1);
                     if (idx % 10000 == 0) {
-                        LOG_INFO(Format("Insert index: {}", idx));
+                        LOG_INFO(fmt::format("Insert index: {}", idx));
                     }
                     if (idx >= vertex_n) {
                         break;
@@ -158,9 +158,9 @@ void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferM
 bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     String &index_name = *this->column_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
-    LOG_TRACE(Format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
+    LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     if (this->max_ts_ <= this->checkpoint_ts_ || this->min_ts_ > checkpoint_ts) {
-        LOG_TRACE(Format("Segment: {}, Index: {} has been flushed at some previous checkpoint, or is not visible at current checkpoint.",
+        LOG_TRACE(fmt::format("Segment: {}, Index: {} has been flushed at some previous checkpoint, or is not visible at current checkpoint.",
                          segment_id,
                          index_name));
         return false;
@@ -175,18 +175,18 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     }
 
     this->checkpoint_ts_ = checkpoint_ts;
-    LOG_TRACE(Format("Segment: {}, Index: {} is flushed", segment_id, index_name));
+    LOG_TRACE(fmt::format("Segment: {}, Index: {} is flushed", segment_id, index_name));
     return true;
 }
 
-Json SegmentColumnIndexEntry::Serialize() {
+nlohmann::json SegmentColumnIndexEntry::Serialize() {
     if (this->deleted_) {
         Error<StorageException>("Segment Column index entry can't be deleted.");
     }
 
-    Json index_entry_json;
+    nlohmann::json index_entry_json;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         index_entry_json["segment_id"] = this->segment_id_;
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
@@ -196,7 +196,7 @@ Json SegmentColumnIndexEntry::Serialize() {
     return index_entry_json;
 }
 
-UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const Json &index_entry_json,
+UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nlohmann::json &index_entry_json,
                                                                         ColumnIndexEntry *column_index_entry,
                                                                         BufferManager *buffer_mgr,
                                                                         TableEntry *table_entry) {

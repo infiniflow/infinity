@@ -31,7 +31,7 @@ public:
     static SharedPtr<KnnScanFunction> Make(NewCatalog *catalog, const String &func_name);
 
 public:
-    inline explicit KnnScanFunction(String name, TableFunctionType function) : TableFunction(Move(name), {}, Move(function)) {}
+    inline explicit KnnScanFunction(String name, TableFunctionType function) : TableFunction(std::move(name), {}, std::move(function)) {}
 
 private:
 };

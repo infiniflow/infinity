@@ -68,7 +68,7 @@ void ShortBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_co
     }
     for (u8 i = 0; i < posting_values->GetSize(); ++i) {
         const PostingValue *value = posting_values->GetValue(i);
-        Memcpy(GetRow(dst, dst_col_count, value), GetRow(src, src_col_count, value), src_size * value->GetSize());
+        std::memcpy(GetRow(dst, dst_col_count, value), GetRow(src, src_col_count, value), src_size * value->GetSize());
     }
 }
 

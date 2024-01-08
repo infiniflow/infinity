@@ -43,7 +43,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
                                                                         bind_context_ptr->group_by_table_name_,
                                                                         bind_context_ptr->group_by_table_index_,
-                                                                        ToStr(groupby_index),
+                                                                        std::to_string(groupby_index),
                                                                         groupby_index,
                                                                         depth);
 
@@ -61,7 +61,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
             SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
                                                                         bind_context_ptr->aggregate_table_name_,
                                                                         bind_context_ptr->aggregate_table_index_,
-                                                                        ToStr(aggregate_index),
+                                                                        std::to_string(aggregate_index),
                                                                         aggregate_index,
                                                                         depth);
 
@@ -92,7 +92,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
         return result;
 
     } else {
-        Error<PlannerException>(Format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
+        Error<PlannerException>(fmt::format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
     }
     return nullptr;
 }
@@ -122,7 +122,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
         SharedPtr<ColumnExpression> result = ColumnExpression::Make(func_expr_ptr->Type(),
                                                                     bind_context_ptr->aggregate_table_name_,
                                                                     bind_context_ptr->aggregate_table_index_,
-                                                                    ToStr(aggregate_index),
+                                                                    std::to_string(aggregate_index),
                                                                     aggregate_index,
                                                                     depth);
 

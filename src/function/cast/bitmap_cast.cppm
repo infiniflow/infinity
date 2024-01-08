@@ -35,7 +35,7 @@ export inline BoundCastFunc BindBitmapCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BitmapT, VarcharT, BitmapTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Can't cast from Time type to {}", target.ToString()));
+            Error<TypeException>(fmt::format("Can't cast from Time type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);

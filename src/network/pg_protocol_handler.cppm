@@ -25,7 +25,7 @@ namespace infinity {
 
 export class PGProtocolHandler {
 public:
-    explicit PGProtocolHandler(const SharedPtr<AsioSocket> &socket);
+    explicit PGProtocolHandler(const SharedPtr<boost::asio::ip::tcp::socket> &socket);
 
     u32 read_startup_header();
 

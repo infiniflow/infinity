@@ -38,7 +38,7 @@ void BGTaskProcessor::Stop() {
     LOG_INFO("Shutdown the background processor.");
 }
 
-void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(Move(bg_task)); }
+void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
 
 void BGTaskProcessor::Process() {
     bool running{true};

@@ -30,7 +30,7 @@ class DBEntry;
 
 export struct ViewMeta {
 public:
-    explicit ViewMeta(SharedPtr<String> name, DBEntry *db_entry) : view_name_(Move(name)), db_entry_(db_entry) {}
+    explicit ViewMeta(SharedPtr<String> name, DBEntry *db_entry) : view_name_(std::move(name)), db_entry_(db_entry) {}
 
 public:
     static Status CreateNewEntry(ViewMeta *table_meta,
@@ -54,7 +54,7 @@ private:
     inline void *GetDBEntry() { return this->db_entry_; }
     
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     SharedPtr<String> view_name_{};
 
     DBEntry *db_entry_{};

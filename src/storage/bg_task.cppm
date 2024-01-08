@@ -35,14 +35,14 @@ export struct BGTask {
     bool async_{false};
 
     bool complete_{false};
-    Mutex mutex_{};
-    CondVar cv_{};
+    std::mutex mutex_{};
+    std::condition_variable cv_{};
 
     void Wait() {
         if (async_) {
             return;
         }
-        UniqueLock<Mutex> locker(mutex_);
+        std::unique_lock<std::mutex> locker(mutex_);
         cv_.wait(locker, [this] { return complete_; });
     }
 
@@ -50,7 +50,7 @@ export struct BGTask {
         if (async_) {
             return;
         }
-        UniqueLock<Mutex> locker(mutex_);
+        std::unique_lock<std::mutex> locker(mutex_);
         complete_ = true;
         cv_.notify_one();
     }

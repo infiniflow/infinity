@@ -671,25 +671,25 @@ String ColumnVector::ToString(SizeT row_index) const {
             return buffer_->GetCompactBit(row_index) ? "true" : "false";
         }
         case kTinyInt: {
-            return ToStr(((TinyIntT *)data_ptr_)[row_index]);
+            return std::to_string(((TinyIntT *)data_ptr_)[row_index]);
         }
         case kSmallInt: {
-            return ToStr(((SmallIntT *)data_ptr_)[row_index]);
+            return std::to_string(((SmallIntT *)data_ptr_)[row_index]);
         }
         case kInteger: {
-            return ToStr(((IntegerT *)data_ptr_)[row_index]);
+            return std::to_string(((IntegerT *)data_ptr_)[row_index]);
         }
         case kBigInt: {
-            return ToStr(((BigIntT *)data_ptr_)[row_index]);
+            return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
         case kHugeInt: {
             Error<TypeException>("Not implemented");
         }
         case kFloat: {
-            return ToStr(((FloatT *)data_ptr_)[row_index]);
+            return std::to_string(((FloatT *)data_ptr_)[row_index]);
         }
         case kDouble: {
-            return ToStr(((DoubleT *)data_ptr_)[row_index]);
+            return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
         case kDecimal: {
             Error<TypeException>("Not implemented");
@@ -787,7 +787,7 @@ Value ColumnVector::GetValue(SizeT index) const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index >= tail_index_) {
-        Error<TypeException>(Format("Attempt to access an invalid index of column vector: {}", ToStr(index)));
+        Error<TypeException>(fmt::format("Attempt to access an invalid index of column vector: {}", std::to_string(index)));
     }
 
     // Not valid, make a same data type with null indicator
@@ -900,16 +900,16 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index > tail_index_) {
-        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                       ToStr(index),
-                                       ToStr(tail_index_),
-                                       ToStr(capacity_)));
+        Error<StorageException>(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                                       std::to_string(index),
+                                       std::to_string(tail_index_),
+                                       std::to_string(capacity_)));
     }
 
     // TODO: Check if the value type is same as column vector type
     // TODO: if not, try to cast
     if (value.type() != *data_type_) {
-        Error<StorageException>(Format("Attempt to store a different type value into column vector: {}, column vector type: {}",
+        Error<StorageException>(fmt::format("Attempt to store a different type value into column vector: {}, column vector type: {}",
                                        value.type().ToString(),
                                        data_type_->ToString()));
     }
@@ -1025,9 +1025,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             target_ref.length_ = varchar_len;
             if (varchar_len <= VARCHAR_INLINE_LENGTH) {
                 // Only prefix is enough to contain all string data.
-                Memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
+                std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
-                Memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
+                std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
                 auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_str.c_str(), varchar_len);
                 target_ref.vector_.chunk_id_ = chunk_id;
                 target_ref.vector_.chunk_offset_ = chunk_offset;
@@ -1040,10 +1040,10 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             std::tie(src_ptr, src_size) = value.GetEmbedding();
             if (src_size != data_type_->Size()) {
                 Error<TypeException>(
-                    Format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
+                    fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
-            Memcpy(dst_ptr, src_ptr, src_size);
+            std::memcpy(dst_ptr, src_ptr, src_size);
             break;
         }
         default: {
@@ -1055,7 +1055,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
 
 void ColumnVector::Finalize(SizeT index) {
     if (index > capacity_) {
-        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+        Error<StorageException>(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     tail_index_ = index;
 }
@@ -1065,13 +1065,13 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (index > capacity_) {
-        Error<StorageException>(Format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
+        Error<StorageException>(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     if (index > tail_index_) {
-        Error<StorageException>(Format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                       ToStr(index),
-                                       ToStr(tail_index_),
-                                       ToStr(capacity_)));
+        Error<StorageException>(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                                       std::to_string(index),
+                                       std::to_string(tail_index_),
+                                       std::to_string(capacity_)));
     }
     // We assume the value_ptr point to the same type data.
 
@@ -1126,9 +1126,9 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             target_ref.length_ = varchar_len;
             if (src_ref.IsInlined()) {
                 // Only prefix is enough to contain all string data.
-                Memcpy(target_ref.short_.data_, src_ref.short_.data_, varchar_len);
+                std::memcpy(target_ref.short_.data_, src_ref.short_.data_, varchar_len);
             } else {
-                Memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
+                std::memcpy(target_ref.vector_.prefix_, src_ref.value_.prefix_, VARCHAR_PREFIX_LEN);
                 auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ref.value_.ptr_, varchar_len);
                 target_ref.vector_.chunk_id_ = chunk_id;
                 target_ref.vector_.chunk_offset_ = chunk_offset;
@@ -1197,7 +1197,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
             ptr_t ptr = data_ptr_ + index * data_type_->Size();
-            Memcpy(ptr, raw_ptr, data_type_->Size());
+            std::memcpy(ptr, raw_ptr, data_type_->Size());
             break;
         }
         case kRowID: {
@@ -1235,7 +1235,7 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
         }
     }
     if (tail_index_ >= capacity_) {
-        Error<StorageException>(Format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+        Error<StorageException>(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
     }
     if (data_type_->type() == LogicalType::kEmbedding) {
         SetByRawPtr(tail_index_++, value_ptr);
@@ -1251,12 +1251,12 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
 
     if (*this->data_type_ != *other.data_type_) {
         Error<StorageException>(
-            Format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
+            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
     }
 
     if (this->tail_index_ + count > this->capacity_) {
         Error<StorageException>(
-            Format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_));
     }
 
     switch (data_type_->type()) {
@@ -1307,10 +1307,10 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
                 dst_ref.length_ = src_ref.length_;
                 dst_ref.is_value_ = src_ref.is_value_;
                 if (src_ref.IsInlined()) {
-                    Memcpy(&dst_ref.short_, &src_ref.short_, src_ref.length_);
+                    std::memcpy(&dst_ref.short_, &src_ref.short_, src_ref.length_);
                 } else {
                     // Assume the source must be column vector type.
-                    Memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
+                    std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
                     auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(other.buffer_->fix_heap_mgr_.get(),
                                                                                                src_ref.vector_.chunk_id_,
                                                                                                src_ref.vector_.chunk_offset_,
@@ -1385,7 +1385,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 ptr_t src_ptr = base_src_ptr + (from + idx) * data_type_->Size();
                 ptr_t dst_ptr = base_dst_ptr + idx * data_type_->Size();
-                Memcpy(dst_ptr, src_ptr, data_type_->Size());
+                std::memcpy(dst_ptr, src_ptr, data_type_->Size());
             }
             break;
         }
@@ -1456,7 +1456,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
              const_ptr_t ptr = column_buffer.GetAll();
              const_ptr_t src_ptr = ptr + start_row * data_type_size_;
              ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
-             Memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
+             std::memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
              this->tail_index_ += appended_rows;
              break;
          }
@@ -1469,9 +1469,9 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
                  auto varchar_dst = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
                  varchar_dst->is_value_ = false;
                  if(src_size <= VARCHAR_INLINE_LEN) {
-                     Memcpy(varchar_dst->short_.data_, src_ptr, src_size);
+                     std::memcpy(varchar_dst->short_.data_, src_ptr, src_size);
                  } else {
-                     Memcpy(varchar_dst->vector_.prefix_, src_ptr, VARCHAR_PREFIX_LEN);
+                     std::memcpy(varchar_dst->vector_.prefix_, src_ptr, VARCHAR_PREFIX_LEN);
                      auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
                      varchar_dst->vector_.chunk_id_ = chunk_id;
                      varchar_dst->vector_.chunk_offset_ = chunk_offset;
@@ -1488,12 +1488,12 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 //         case kBlob:
          case kMixed:
          case kNull: {
-             LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
+             LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
              Error<NotImplementException>("Not supported now in append data in column");
          }
          case kMissing:
          case kInvalid: {
-             LOG_ERROR(Format("Invalid data type {}", data_type_->ToString()));
+             LOG_ERROR(fmt::format("Invalid data type {}", data_type_->ToString()));
              Error<StorageException>("Invalid data type");
          }
          default: {
@@ -1506,7 +1506,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
     if (data_type_->type() != LogicalType::kRowID) {
-        Error<StorageException>(Format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
+        Error<StorageException>(fmt::format("Only RowID column vector supports this method, current data type: {}", data_type_->ToString()));
     }
     if (row_count == 0) {
         return 0;
@@ -1529,9 +1529,9 @@ SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
 
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
-        LOG_ERROR(Format("{} isn't supported", data_type_->ToString()));
+        LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
         Error<StorageException>(
-            Format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
+            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString()));
         ;
     }
     if (this->buffer_.get() != other.buffer_.get()) {
@@ -1619,7 +1619,7 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return other.data_type_->type() == LogicalType::kBoolean &&
                VectorBuffer::CompactBitIsSame(this->buffer_, this->tail_index_, other.buffer_, other.tail_index_);
     } else {
-        return 0 == Memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
+        return 0 == std::memcmp(this->data_ptr_, other.data_ptr_, this->tail_index_ * this->data_type_size_);
     }
     return true;
 }
@@ -1629,7 +1629,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        Error<StorageException>(Format("Not supported vector_type {}", int(vector_type_)));
+        Error<StorageException>(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
     size += sizeof(i32);
@@ -1650,7 +1650,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        Error<NotImplementException>(Format("Not supported vector_type {}", int(vector_type_)));
+        Error<NotImplementException>(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);
@@ -1658,10 +1658,10 @@ void ColumnVector::WriteAdv(char *&ptr) const {
     WriteBufAdv<i32>(ptr, tail_index_);
     if (vector_type_ == ColumnVectorType::kCompactBit) {
         SizeT byte_size = (this->tail_index_ + 7) / 8;
-        Memcpy(ptr, this->data_ptr_, byte_size);
+        std::memcpy(ptr, this->data_ptr_, byte_size);
         ptr += byte_size;
     } else {
-        Memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
+        std::memcpy(ptr, this->data_ptr_, this->tail_index_ * this->data_type_size_);
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
@@ -1686,11 +1686,11 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     column_vector->tail_index_ = tail_index;
     if (vector_type == ColumnVectorType::kCompactBit) {
         SizeT byte_size = (tail_index + 7) / 8;
-        Memcpy((void *)column_vector->data_ptr_, ptr, byte_size);
+        std::memcpy((void *)column_vector->data_ptr_, ptr, byte_size);
         ptr += byte_size;
     } else {
         i32 data_type_size = data_type->Size();
-        Memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
+        std::memcpy((void *)column_vector->data_ptr_, ptr, tail_index * data_type_size);
         ptr += tail_index * data_type_size;
     }
     // read variable part

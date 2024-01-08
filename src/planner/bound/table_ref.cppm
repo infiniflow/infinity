@@ -23,7 +23,7 @@ namespace infinity {
 
 export class TableRef {
 public:
-    explicit TableRef(TableRefType type, String alias) : type_(type), alias_(Move(alias)) {}
+    explicit TableRef(TableRefType type, String alias) : type_(type), alias_(std::move(alias)) {}
     virtual ~TableRef() = default;
 
     [[nodiscard]] inline TableRefType type() const { return type_; }

@@ -86,10 +86,10 @@ void Bitmask::Resize(SizeT new_count) {
         SharedPtr<BitmaskBuffer> new_buffer_ptr = BitmaskBuffer::Make(new_count);
         u64 *new_data_ptr = new_buffer_ptr->data_ptr_.get();
 
-        // TODO: use Memcpy but not assignment
+        // TODO: use std::memcpy but not assignment
         void *source_ptr = (void *)data_ptr_;
         void *target_ptr = (void *)new_data_ptr;
-        Memcpy(target_ptr, source_ptr, count_ / BitmaskBuffer::BYTE_BITS);
+        std::memcpy(target_ptr, source_ptr, count_ / BitmaskBuffer::BYTE_BITS);
 
         // Reset part of new buffer was already initialized as true in BitmaskBuffer::Initialize before.
         buffer_ptr = new_buffer_ptr;
@@ -268,7 +268,7 @@ void Bitmask::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, (i8)all_true);
     if (!all_true) {
         i32 bytes = BitmaskBuffer::UnitCount(count_) * sizeof(u64);
-        Memcpy(ptr, data_ptr_, bytes);
+        std::memcpy(ptr, data_ptr_, bytes);
         ptr += bytes;
     }
 }
@@ -280,7 +280,7 @@ SharedPtr<Bitmask> Bitmask::ReadAdv(char *&ptr, i32) {
     if (!all_true) {
         i32 bytes = BitmaskBuffer::UnitCount(count) * sizeof(u64);
         bitmask->SetAllFalse();
-        Memcpy(bitmask->data_ptr_, ptr, bytes);
+        std::memcpy(bitmask->data_ptr_, ptr, bytes);
         ptr += bytes;
     }
     return bitmask;

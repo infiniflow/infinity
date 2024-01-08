@@ -26,7 +26,7 @@ namespace infinity {
 
 export class Database {
 public:
-    explicit Database(const String &db_name, SharedPtr<BaseSession> session) : db_name_(db_name), session_(Move(session)) {}
+    explicit Database(const String &db_name, SharedPtr<BaseSession> session) : db_name_(db_name), session_(std::move(session)) {}
 
     QueryResult CreateTable(const String &table_name,
                             Vector<ColumnDef *> column_defs,

@@ -439,7 +439,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_TRUE(column_vector.initialized);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_str1);
@@ -467,7 +467,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_EQ(column_vector.vector_type(), clone_column_vector.vector_type());
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kShortStr);
@@ -503,7 +503,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         column_vector.AppendByPtr((ptr_t)(&mixed_str1));
 
@@ -518,7 +518,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_a) {
 
     ColumnVector column_constant(data_type);
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         column_constant.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
         column_constant.SetValue(0, column_vector.GetValue(i));
         column_constant.Finalize(1);
@@ -539,7 +539,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_str1);
@@ -548,7 +548,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kShortStr);
@@ -568,7 +568,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_vector_select) {
     EXPECT_EQ(target_column_vector.Size(), DEFAULT_VECTOR_SIZE / 2);
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE / 2; ++i) {
-        String str = ToStr(2 * i);
+        String str = std::to_string(2 * i);
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kShortStr);
@@ -586,7 +586,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     column_vector.Initialize();
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         MixedT mixed_str1 = MixedType::MakeString(str);
         Value v = Value::MakeMixedData(mixed_str1);
         EXPECT_EQ(v.GetValue<MixedT>(), mixed_str1);
@@ -595,7 +595,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
     }
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
-        String str = ToStr(i);
+        String str = std::to_string(i);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kShortStr);
@@ -614,7 +614,7 @@ TEST_F(ColumnVectorMixedTest, mixed_short_str_column_slice_init) {
 
     for (i64 i = 0; i < count; ++i) {
         i64 src_idx = start_idx + i;
-        String str = ToStr(src_idx);
+        String str = std::to_string(src_idx);
         Value vx = target_column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kMixed);
         EXPECT_EQ(vx.value_.mixed_value.type, MixedValueType::kShortStr);

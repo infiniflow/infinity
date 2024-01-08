@@ -36,7 +36,7 @@ public:
                             TableEntry *table_entry_ptr,
                             const Vector<Pair<SizeT, SharedPtr<BaseExpression>>> &update_columns,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kUpdate, Move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr),
+        : PhysicalOperator(PhysicalOperatorType::kUpdate, std::move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr),
           update_columns_(update_columns) {}
 
     ~PhysicalUpdate() override = default;

@@ -42,7 +42,7 @@ SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column
             analyzer = parameter->param_value_;
         }
     }
-    return MakeShared<IndexFullText>(file_name, Move(column_names), analyzer);
+    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -79,13 +79,13 @@ String IndexFullText::ToString() const {
     return output_str;
 }
 
-Json IndexFullText::Serialize() const {
-    Json res = IndexBase::Serialize();
+nlohmann::json IndexFullText::Serialize() const {
+    nlohmann::json res = IndexBase::Serialize();
     res["analyzer"] = analyzer_;
     return res;
 }
 
-SharedPtr<IndexFullText> IndexFullText::Deserialize(const Json &) {
+SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
     Error<StorageException>("Not implemented");
     return nullptr;
 }

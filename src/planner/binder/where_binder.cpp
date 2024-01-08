@@ -52,7 +52,7 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
     }
 
     if (result.get() == nullptr) {
-        Error<PlannerException>(Format("Can't bind the expr: {}", expr.GetName()));
+        Error<PlannerException>(fmt::format("Can't bind the expr: {}", expr.GetName()));
     }
     return result;
 }

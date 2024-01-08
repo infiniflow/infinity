@@ -60,7 +60,7 @@ bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState 
 
 void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorState *op_state) {
     if (op_state->data_block_array_.empty()) {
-        op_state->data_block_array_.emplace_back(Move(op_state->input_data_block_));
+        op_state->data_block_array_.emplace_back(std::move(op_state->input_data_block_));
         LOG_TRACE("Physical MergeAggregate execute first block");
     } else {
         auto agg_op = dynamic_cast<PhysicalAggregate *>(this->left());
@@ -120,7 +120,7 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
     } else if (function_name == "COUNT_STAR") {
         // no action for "COUNT_STAR"
     } else {
-        Error<NotImplementException>(Format("Function type {} not Implement.", function_name));
+        Error<NotImplementException>(fmt::format("Function type {} not Implement.", function_name));
     }
 }
 

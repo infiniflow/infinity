@@ -114,7 +114,7 @@ public:
 
     void FlushProfiler(TaskProfiler &&profiler) {
         if(query_profiler_) {
-            query_profiler_->Flush(Move(profiler));
+            query_profiler_->Flush(std::move(profiler));
         }
     }
 

@@ -33,7 +33,7 @@ public:
                                                    i64 column_index,
                                                    i64 depth,
                                                    Optional<SpecialType> special = None) {
-        return MakeShared<ColumnExpression>(Move(data_type), Move(table_name), table_index, Move(column_name), column_index, depth, special);
+        return MakeShared<ColumnExpression>(std::move(data_type), std::move(table_name), table_index, std::move(column_name), column_index, depth, special);
     }
 
 public:

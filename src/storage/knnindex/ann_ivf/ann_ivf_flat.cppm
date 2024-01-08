@@ -93,7 +93,7 @@ public:
         if (!begin_) {
             Error<ExecutorException>("IVFFlat isn't begin");
         }
-        n_probes = Min(n_probes, base_ivf->partition_num_);
+        n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
             return;
         }
@@ -155,7 +155,7 @@ public:
         if (!begin_) {
             Error<ExecutorException>("IVFFlat isn't begin");
         }
-        n_probes = Min(n_probes, base_ivf->partition_num_);
+        n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
             return;
         }

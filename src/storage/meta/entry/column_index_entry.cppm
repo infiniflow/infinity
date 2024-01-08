@@ -53,10 +53,10 @@ public:
                                                            SharedPtr<String> index_dir,
                                                            TxnTimeStamp begin_ts);
 
-    Json Serialize(TxnTimeStamp max_commit_ts);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<ColumnIndexEntry>
-    Deserialize(const Json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
+    Deserialize(const nlohmann::json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
 public:
     // Getter
@@ -77,7 +77,7 @@ private:
     static String IndexFileName(const String &index_name, u32 segment_id);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     TableIndexEntry *table_index_entry_{};
     u64 column_id_{};

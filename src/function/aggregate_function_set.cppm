@@ -26,7 +26,7 @@ namespace infinity {
 
 export class AggregateFunctionSet final : public FunctionSet {
 public:
-    explicit AggregateFunctionSet(String name) : FunctionSet(Move(name), FunctionType::kAggregate) {}
+    explicit AggregateFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kAggregate) {}
 
     ~AggregateFunctionSet() final;
 

@@ -25,7 +25,7 @@ namespace infinity {
 
 export class Table {
 public:
-    Table(String table_name, SharedPtr<BaseSession> session) : table_name_(Move(table_name)), session_(Move(session)) {}
+    Table(String table_name, SharedPtr<BaseSession> session) : table_name_(std::move(table_name)), session_(std::move(session)) {}
 
     QueryResult CreateIndex(const String &index_name, Vector<IndexInfo *> *index_info_list, CreateIndexOptions create_index_options);
 

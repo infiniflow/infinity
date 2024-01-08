@@ -36,7 +36,7 @@ export MetricType StringToMetricType(const String &str);
 export class IndexBase {
 protected:
     explicit IndexBase(String file_name, IndexType index_type, Vector<String> column_names)
-        : index_type_(index_type), file_name_(Move(file_name)), column_names_(Move(column_names)){};
+        : index_type_(index_type), file_name_(std::move(file_name)), column_names_(std::move(column_names)){};
 
 public:
     virtual ~IndexBase() = default;
@@ -57,9 +57,9 @@ public:
 
     virtual String ToString() const;
 
-    virtual Json Serialize() const;
+    virtual nlohmann::json Serialize() const;
 
-    static SharedPtr<IndexBase> Deserialize(const Json &index_def_json);
+    static SharedPtr<IndexBase> Deserialize(const nlohmann::json &index_def_json);
 
     inline String column_name() { return column_names_[0]; }
 

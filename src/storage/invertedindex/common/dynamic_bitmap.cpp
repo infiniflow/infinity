@@ -50,10 +50,10 @@ void DynamicBitmap::Expand(u32 index) {
     u32 *data = pool_ ? (u32 *)pool_->Allocate(sizeof(u32) * alloc_slot_count) : new u32[alloc_slot_count];
 
     if (data_ != nullptr) {
-        Memcpy(data, data_, slot_count_ * sizeof(u32));
+        std::memcpy(data, data_, slot_count_ * sizeof(u32));
 
         u8 initValue = init_set_ ? 0xFF : 0;
-        Memset(data + slot_count_, initValue, (alloc_slot_count - slot_count_) * sizeof(u32));
+        std::memset(data + slot_count_, initValue, (alloc_slot_count - slot_count_) * sizeof(u32));
 
         if (pool_) {
             pool_->Deallocate((void *)data_, sizeof(u32) * slot_count_);
@@ -66,7 +66,7 @@ void DynamicBitmap::Expand(u32 index) {
         item_count_ = slot_count_ * SLOT_SIZE;
     } else {
         u8 initValue = init_set_ ? 0xFF : 0;
-        Memset(data + slot_count_, initValue, (alloc_slot_count - slot_count_) * sizeof(u32));
+        std::memset(data + slot_count_, initValue, (alloc_slot_count - slot_count_) * sizeof(u32));
 
         data_ = data;
         slot_count_ = alloc_slot_count;
@@ -86,7 +86,7 @@ DynamicBitmap *DynamicBitmap::CloneWithOnlyValidData() const {
     if (GetData() != nullptr) {
         new_bitmap->data_ =
             new_bitmap->pool_ ? (u32 *)new_bitmap->pool_->Allocate(sizeof(u32) * new_bitmap->slot_count_) : new u32[new_bitmap->slot_count_];
-        Memcpy(new_bitmap->data_, data_, new_bitmap->slot_count_ * sizeof(u32));
+        std::memcpy(new_bitmap->data_, data_, new_bitmap->slot_count_ * sizeof(u32));
     } else {
         new_bitmap->data_ = nullptr;
     }

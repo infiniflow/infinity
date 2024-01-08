@@ -26,7 +26,7 @@ namespace infinity {
 
 export class ScalarFunctionSet final : public FunctionSet {
 public:
-    explicit ScalarFunctionSet(String name) : FunctionSet(Move(name), FunctionType::kScalar) {}
+    explicit ScalarFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kScalar) {}
 
     ~ScalarFunctionSet() final;
 

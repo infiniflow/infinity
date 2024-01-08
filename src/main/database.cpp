@@ -39,9 +39,9 @@ QueryResult Database::CreateTable(const String &table_name,
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     create_table_info->table_name_ = table_name;
-    create_table_info->column_defs_ = Move(column_defs);
-    create_table_info->constraints_ = Move(constraints);
-    create_statement->create_info_ = Move(create_table_info);
+    create_table_info->column_defs_ = std::move(column_defs);
+    create_table_info->constraints_ = std::move(constraints);
+    create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
 }

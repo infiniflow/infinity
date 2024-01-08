@@ -65,7 +65,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(Format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            Error<TypeException>(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -75,7 +75,7 @@ struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -84,7 +84,7 @@ struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
         Error<FunctionException>(
-            Format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -130,7 +130,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
-    Error<NotImplementException>(Format("Not implemented"));
+    Error<NotImplementException>(fmt::format("Not implemented"));
     return false;
 }
 
@@ -144,19 +144,19 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
 // Cast SmallInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -211,19 +211,19 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
 // Cast Integer to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -232,7 +232,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, SmallIntT &target) {
-    if (source < i16_min || source > i16_max) {
+    if (source < std::numeric_limits<i16>::min() || source > std::numeric_limits<i16>::max()) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -281,19 +281,19 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
         Error<TypeException>("Integer digits number should less than 14.");
     }
-    Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
 }
 
 // Cast BigInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, TinyIntT &target) {
-    if (source < i8_min || source > i8_max) {
+    if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
         return false;
     }
     target = static_cast<TinyIntT>(source);
@@ -302,7 +302,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, TinyIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, SmallIntT &target) {
-    if (source < i16_min || source > i16_max) {
+    if (source < std::numeric_limits<i16>::min() || source > std::numeric_limits<i16>::max()) {
         return false;
     }
     target = static_cast<SmallIntT>(source);
@@ -311,7 +311,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, SmallIntT &target) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, IntegerT &target) {
-    if (source < i32_min || source > i32_max) {
+    if (source < std::numeric_limits<i32>::min() || source > std::numeric_limits<i32>::max()) {
         return false;
     }
     target = static_cast<IntegerT>(source);
@@ -354,12 +354,12 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
         return true;
     }
     // TODO: High performance itoa needed here.
-    String tmp_str = ToStr(source);
+    String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ <= VARCHAR_INLINE_LEN) {
-        Memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+        std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        Memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
         }

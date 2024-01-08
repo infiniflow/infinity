@@ -64,7 +64,7 @@ struct MinState<TinyIntT, TinyIntT> {
 public:
     TinyIntT value_;
 
-    void Initialize() { this->value_ = i8_max; }
+    void Initialize() { this->value_ = std::numeric_limits<i8>::max(); }
 
     void Update(const TinyIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -80,7 +80,7 @@ struct MinState<SmallIntT, SmallIntT> {
 public:
     SmallIntT value_;
 
-    void Initialize() { this->value_ = i16_max; }
+    void Initialize() { this->value_ = std::numeric_limits<i16>::max(); }
 
     void Update(const SmallIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -96,7 +96,7 @@ struct MinState<IntegerT, IntegerT> {
 public:
     IntegerT value_;
 
-    void Initialize() { this->value_ = i32_max; }
+    void Initialize() { this->value_ = std::numeric_limits<i32>::max();; }
 
     void Update(const IntegerT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -112,7 +112,7 @@ struct MinState<BigIntT, BigIntT> {
 public:
     BigIntT value_;
 
-    void Initialize() { this->value_ = i64_max; }
+    void Initialize() { this->value_ = std::numeric_limits<i64>::max();; }
 
     void Update(const BigIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -129,8 +129,8 @@ public:
     HugeIntT value_;
 
     void Initialize() {
-        this->value_.lower = i64_max;
-        this->value_.upper = i64_max;
+        this->value_.lower = std::numeric_limits<i64>::max();;
+        this->value_.upper = std::numeric_limits<i64>::max();;
     }
 
     void Update(const HugeIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
@@ -147,7 +147,7 @@ struct MinState<FloatT, FloatT> {
 public:
     FloatT value_;
 
-    void Initialize() { this->value_ = f32_max; }
+    void Initialize() { this->value_ = std::numeric_limits<f32>::max(); }
 
     void Update(const FloatT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -163,7 +163,7 @@ struct MinState<DoubleT, DoubleT> {
 public:
     DoubleT value_;
 
-    void Initialize() { this->value_ = f64_max; }
+    void Initialize() { this->value_ = std::numeric_limits<f64>::max(); }
 
     void Update(const DoubleT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 

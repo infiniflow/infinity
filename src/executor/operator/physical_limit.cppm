@@ -34,6 +34,8 @@ class DataBlock;
 
 export class LimitCounter {
 public:
+    virtual ~LimitCounter() = default;
+
     // Returns the left index after offset
     virtual SizeT Offset(SizeT row_count) = 0;
 
@@ -43,13 +45,15 @@ public:
     virtual bool IsLimitOver() = 0;
 };
 
-export class AtomicCounter : public LimitCounter {
+export class AtomicCounter final : public LimitCounter {
 public:
     AtomicCounter(i64 offset, i64 limit) : offset_(offset), limit_(limit) {}
 
-    SizeT Offset(SizeT row_count);
+    ~AtomicCounter() final = default;
 
-    SizeT Limit(SizeT row_count);
+    SizeT Offset(SizeT row_count) final;
+
+    SizeT Limit(SizeT row_count) final;
 
     bool IsLimitOver();
 
@@ -58,13 +62,15 @@ private:
     ai64 limit_{};
 };
 
-export class UnSyncCounter : public LimitCounter {
+export class UnSyncCounter final : public LimitCounter {
 public:
     UnSyncCounter(i64 offset, i64 limit) : offset_(offset), limit_(limit) {}
 
-    SizeT Offset(SizeT row_count);
+    ~UnSyncCounter() final = default;
 
-    SizeT Limit(SizeT row_count);
+    SizeT Offset(SizeT row_count) final;
+
+    SizeT Limit(SizeT row_count) final;
 
     bool IsLimitOver();
 
@@ -73,7 +79,7 @@ private:
     i64 limit_{};
 };
 
-export class PhysicalLimit : public PhysicalOperator {
+export class PhysicalLimit final : public PhysicalOperator {
 public:
     explicit PhysicalLimit(u64 id,
                            UniquePtr<PhysicalOperator> left,
@@ -81,9 +87,9 @@ public:
                            SharedPtr<BaseExpression> offset_expr,
                            SharedPtr<Vector<LoadMeta>> load_metas);
 
-    ~PhysicalLimit() override = default;
+    ~PhysicalLimit() final = default;
 
-    void Init() override;
+    void Init() final;
 
     static bool Execute(QueryContext *query_context,
                         const Vector<UniquePtr<DataBlock>> &input_blocks,
@@ -92,17 +98,15 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
+    [[nodiscard]] inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
+    [[nodiscard]] inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override {
-        return left_->TaskletCount();
-    }
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
 
-    inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
+    [[nodiscard]] inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
 
-    inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
+    [[nodiscard]] inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
 
 private:
     SharedPtr<BaseExpression> limit_expr_{};

@@ -44,7 +44,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
         Error<ExecutorException>(
-            Format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
+            fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
         ;
     }
 
@@ -77,16 +77,16 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     const String &table_name = *table_entry_->GetTableName();
     txn->Append(db_name, table_name, output_block);
 
-    UniquePtr<String> result_msg = MakeUnique<String>(Format("INSERTED {} Rows", output_block->row_count()));
+    UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {
         // Generate the result table
         Vector<SharedPtr<ColumnDef>> column_defs;
         SharedPtr<TableDef> result_table_def_ptr = MakeShared<TableDef>(MakeShared<String>("default"), MakeShared<String>("Tables"), column_defs);
         output_ = MakeShared<DataTable>(result_table_def_ptr, TableType::kDataTable);
-        output_->SetResultMsg(Move(result_msg));
+        output_->SetResultMsg(std::move(result_msg));
     } else {
         InsertOperatorState *insert_operator_state = static_cast<InsertOperatorState *>(operator_state);
-        insert_operator_state->result_msg_ = Move(result_msg);
+        insert_operator_state->result_msg_ = std::move(result_msg);
     }
     operator_state->SetComplete();
     return true;

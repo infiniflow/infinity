@@ -23,7 +23,7 @@ export void PrintStacktrace(const String& err_msg);
 
 export class Exception : public StdException {
 public:
-    explicit Exception(String message) : message_(Move(message)) {}
+    explicit Exception(String message) : message_(std::move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
 
 protected:
@@ -59,7 +59,7 @@ String Exception::BuildMessage(Args... params) {
 
 template <typename T, typename... Args>
 String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... params) {
-    values.push_back(Move(param));
+    values.push_back(std::move(param));
     return BuildMessageInternal(values, params...);
 }
 
@@ -153,7 +153,7 @@ export template <typename ExceptionType>
 inline void
 Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line()) {
     String err_msg = message;
-    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
     throw ExceptionType(err_msg);
 }
 

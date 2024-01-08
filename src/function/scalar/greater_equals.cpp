@@ -42,16 +42,16 @@ inline void GreaterEqualsFunction::Run(VarcharT, VarcharT, bool &) {
 
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {
-//            result = (Memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) >= 0);
+//            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) >= 0);
 //            return;
 //        }
 //    } else if (right.IsInlined()) {
 //        ;
 //    } else {
 //        // Both left and right are not inline
-//        u16 min_len = Min(right.length, left.length);
-//        if (Memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) >= 0) {
-//            result = (Memcmp(left.ptr, right.ptr, min_len) >= 0);
+//        u16 min_len = std::min(right.length, left.length);
+//        if (std::memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) >= 0) {
+//            result = (std::memcmp(left.ptr, right.ptr, min_len) >= 0);
 //            return;
 //        }
 //    }

@@ -28,7 +28,7 @@ namespace infinity {
 export class LogicalFilter : public LogicalNode {
 public:
     explicit LogicalFilter(u64 node_id, SharedPtr<BaseExpression> expression)
-        : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(Move(expression)) {}
+        : LogicalNode(node_id, LogicalNodeType::kFilter), expression_(std::move(expression)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
 

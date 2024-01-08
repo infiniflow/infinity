@@ -34,7 +34,7 @@ public:
                                   char delimiter,
                                   CopyFileType type)
         : LogicalNode(node_id, LogicalNodeType::kImport), table_entry_(table_entry), file_type_(type),
-          file_path_(Move(file_path)), header_(header), delimiter_(delimiter) {}
+          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

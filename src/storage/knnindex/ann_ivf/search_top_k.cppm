@@ -32,7 +32,7 @@ namespace infinity {
 template <typename TypeX, typename TypeY, typename ID, typename DistType>
 void search_top_1_simple_with_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances) {
     for (u32 i = 0; i < nx; ++i) {
-        DistType min_dist = LimitMax<DistType>();
+        DistType min_dist = std::numeric_limits<DistType>::max();
         u32 min_idx = 0;
         for (u32 j = 0; j < ny; ++j) {
             DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);
@@ -58,7 +58,7 @@ void search_top_1_with_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const 
 template <typename DistType, typename TypeX, typename TypeY, typename ID>
 void search_top_1_simple_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels) {
     for (u32 i = 0; i < nx; ++i) {
-        DistType min_dist = LimitMax<DistType>();
+        DistType min_dist = std::numeric_limits<DistType>::max();
         u32 min_idx = 0;
         for (u32 j = 0; j < ny; ++j) {
             DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);

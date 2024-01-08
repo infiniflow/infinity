@@ -99,10 +99,10 @@ public:
     explicit IRSDataStore(const String &table_name, const String &directory);
     ~IRSDataStore();
     struct DataSnapshot {
-        DataSnapshot(IRSDirectoryReader &&reader) : reader_(Move(reader)) {}
+        DataSnapshot(IRSDirectoryReader &&reader) : reader_(std::move(reader)) {}
         DataSnapshot &operator=(DataSnapshot &&rhs) noexcept {
             if (this != &rhs) {
-                reader_ = Move(rhs.reader_);
+                reader_ = std::move(rhs.reader_);
             }
             return *this;
         }
@@ -143,7 +143,7 @@ private:
     IRSDirectory::ptr irs_directory_;
     IRSIndexWriter::ptr index_writer_;
     IRSIndexWriter::Transaction recovery_txn_;
-    Mutex commit_mutex_;
+    std::mutex commit_mutex_;
     DataSnapshotPtr snapshot_;
     UniquePtr<IRSAsync> async_;
     SharedPtr<MaintenanceState> maintenance_state_;

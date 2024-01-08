@@ -25,7 +25,7 @@ namespace infinity {
 
 class TableFunctionSet final : public FunctionSet {
 public:
-    explicit TableFunctionSet(String name) : FunctionSet(Move(name), FunctionType::kTable) {}
+    explicit TableFunctionSet(String name) : FunctionSet(std::move(name), FunctionType::kTable) {}
 
     ~TableFunctionSet() final;
 

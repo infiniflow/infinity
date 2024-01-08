@@ -39,7 +39,7 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
             if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
                 ++it1;
             } else if ((*it1)->commit_ts_ < (*it2)->commit_ts_) {
-                list1.insert(it1, Move(*it2));
+                list1.insert(it1, std::move(*it2));
                 ++it2;
             } else {
                 (*it1)->MergeFrom(**it2);
@@ -51,7 +51,7 @@ void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &l
 
     while(it2 != list2.end()) {
         if ((*it2)->entry_type_ != EntryType::kDummy) {
-            list1.insert(it1, Move(*it2));
+            list1.insert(it1, std::move(*it2));
         }
         ++it2;
     }

@@ -131,7 +131,7 @@ void BindContext::AddSubqueryBinding(const String &name,
                                      u64 table_index,
                                      SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                      SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kSubquery, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
     // Consider the subquery as the table
     table_names_.emplace_back(name);
@@ -143,7 +143,7 @@ void BindContext::AddCTEBinding(const String &name,
                                 u64 table_index,
                                 SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                 SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kCTE, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
     // Consider the CTE as the table
     table_names_.emplace_back(name);
@@ -155,7 +155,7 @@ void BindContext::AddViewBinding(const String &name,
                                  u64 table_index,
                                  SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                  SharedPtr<Vector<String>> column_names) {
-    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, Move(column_types), Move(column_names));
+    auto binding = Binding::MakeBinding(BindingType::kView, name, table_index, std::move(column_types), std::move(column_names));
     AddBinding(binding);
 }
 
@@ -169,9 +169,9 @@ void BindContext::AddTableBinding(const String &table_alias,
                                         table_alias,
                                         table_index,
                                         table_collection_entry_ptr,
-                                        Move(column_types),
-                                        Move(column_names),
-                                        Move(block_index));
+                                        std::move(column_types),
+                                        std::move(column_names),
+                                        std::move(block_index));
     AddBinding(binding);
     table_names_.emplace_back(table_alias);
     table_name2table_index_[table_alias] = table_index;
@@ -201,7 +201,7 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_name2index_pair : other_ptr->table_name2table_index_) {
         const String &table_name = table_name2index_pair.first;
         if (table_name2table_index_.contains(table_name)) {
-            Error<PlannerException>(Format("{} was bound before", table_name));
+            Error<PlannerException>(fmt::format("{} was bound before", table_name));
         }
         table_name2table_index_[table_name] = table_name2index_pair.second;
     }
@@ -209,7 +209,7 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_index2name_pair : other_ptr->table_table_index2table_name_) {
         u64 table_index = table_index2name_pair.first;
         if (table_table_index2table_name_.contains(table_index)) {
-            Error<PlannerException>(Format("Table index: {} is bound before", table_index));
+            Error<PlannerException>(fmt::format("Table index: {} is bound before", table_index));
         }
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
@@ -217,7 +217,7 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (auto &name_binding_pair : other_ptr->binding_by_name_) {
         auto &binding_name = name_binding_pair.first;
         if (binding_by_name_.contains(binding_name)) {
-            Error<PlannerException>(Format("Table: {} was bound before", binding_name));
+            Error<PlannerException>(fmt::format("Table: {} was bound before", binding_name));
         }
         this->binding_by_name_.emplace(name_binding_pair);
     }
@@ -262,7 +262,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             // TODO: What will happen, when different tables have the same column name?
             Vector<String> &binding_names = binding_names_by_column_[column_name_ref];
             if (binding_names.size() > 1) {
-                Error<PlannerException>(Format("Ambiguous column table_name: {}", column_identifier.ToString()));
+                Error<PlannerException>(fmt::format("Ambiguous column table_name: {}", column_identifier.ToString()));
             }
 
             String &binding_name = binding_names[0];
@@ -270,7 +270,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
             auto binding_iter = binding_by_name_.find(binding_name);
             if (binding_iter == binding_by_name_.end()) {
                 // Found the binding, but the binding don't have the column, which should happen.
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
+                Error<PlannerException>(fmt::format("{} doesn't exist.", column_identifier.ToString()));
             }
 
             const auto &binding = binding_iter->second;
@@ -286,7 +286,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
                 // Found the binding, but the binding don't have the column, which should happen.
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
+                Error<PlannerException>(fmt::format("{} doesn't exist.", column_identifier.ToString()));
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.
@@ -309,7 +309,7 @@ SharedPtr<ColumnExpression> BindContext::ResolveColumnId(const ColumnIdentifier 
                 bound_column_expr->source_position_ = SourcePosition(binding_context_id_, ExprSourceType::kBinding);
                 bound_column_expr->source_position_.binding_name_ = binding->table_name_;
             } else {
-                Error<PlannerException>(Format("{} doesn't exist.", column_identifier.ToString()));
+                Error<PlannerException>(fmt::format("{} doesn't exist.", column_identifier.ToString()));
             }
         } else {
             // Table isn't found in current bind context, maybe its parent has it.

@@ -37,8 +37,8 @@ module connection;
 
 namespace infinity {
 
-Connection::Connection(AsioIOService &io_service)
-    : socket_(MakeShared<AsioSocket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
+Connection::Connection(boost::asio::io_service &io_service)
+    : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
     if(session_ == nullptr) {
@@ -137,7 +137,7 @@ void Connection::HandleRequest() {
 
 void Connection::HandlerSimpleQuery(QueryContext *query_context) {
     const String &query = pg_handler_->read_command_body();
-    LOG_TRACE(Format("Query: {}", query));
+    LOG_TRACE(fmt::format("Query: {}", query));
 
     // Start to execute the query.
     QueryResult result = query_context->Query(query);
@@ -334,7 +334,7 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             break;
         }
         default: {
-            message = Format("SELECT {}", ToStr(query_result.result_table_->row_count()));
+            message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));
         }
     }
 

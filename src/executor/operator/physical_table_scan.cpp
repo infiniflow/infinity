@@ -142,7 +142,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
         BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
-        auto write_size = Min(write_capacity, SizeT(row_end - row_begin));
+        auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
 
         if (write_size > 0) {
             read_offset = row_begin;

@@ -52,7 +52,7 @@ namespace infinity {
  */
 SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     //    if (print) {
-    //        LOG_TRACE(Format("{}", sql_text));
+    //        LOG_TRACE(fmt::format("{}", sql_text));
     //    }
 
     //    UniquePtr<SessionManager> session_manager = MakeUnique<SessionManager>();

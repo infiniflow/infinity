@@ -61,9 +61,9 @@ public:
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Connect failed";
-            LOG_ERROR(Format("THRIFT ERROR: Connect failed"));
+            LOG_ERROR(fmt::format("THRIFT ERROR: Connect failed"));
         } else {
-            std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
             response.session_id = infinity->GetSessionId();
             response.success = true;
@@ -75,13 +75,13 @@ public:
         if (infinity == nullptr) {
             response.success = false;
             response.error_msg = "Disconnect failed";
-            LOG_ERROR(Format("THRIFT ERROR: Disconnect failed"));
+            LOG_ERROR(fmt::format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
             infinity->RemoteDisconnect();
-            std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.erase(session_id);
-            LOG_TRACE(Format("THRIFT : Disconnect success"));
+            LOG_TRACE(fmt::format("THRIFT : Disconnect success"));
             response.success = true;
         }
     }
@@ -185,7 +185,7 @@ public:
         auto table = database->GetTable(request.table_name);
 
         Path path(
-            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+            fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
 
         ImportOptions import_options;
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
@@ -197,7 +197,7 @@ public:
     void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
         LocalFileSystem fs;
         Path path(
-            Format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+            fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
         if (request.index != 0) {
             FileWriter file_writer(fs, path.c_str(), request.data.size(), FileFlags::WRITE_FLAG | FileFlags::APPEND_FLAG);
             file_writer.Write(request.data.data(), request.data.size());
@@ -207,7 +207,7 @@ public:
             if (fs.Exists(path.c_str())) {
                 auto exist_file_size = LocalFileSystem::GetFileSizeByPath(path.c_str());
                 if ((i64)exist_file_size != request.total_size) {
-                    LOG_TRACE(Format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
+                    LOG_TRACE(fmt::format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
                     fs.DeleteFile(path.c_str());
                 } else {
                     response.__set_success(true);
@@ -219,7 +219,7 @@ public:
             file_writer.Write(request.data.data(), request.data.size());
             file_writer.Flush();
         }
-        LOG_TRACE(Format("Upload file name: {} , index: {}", path.c_str(), request.index));
+        LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
         response.__set_success(true);
         response.__set_can_skip(false);
     }
@@ -249,8 +249,8 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
     }
 
     void
@@ -271,16 +271,16 @@ public:
             VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
             i32 length = varchar.length_;
             if (varchar.IsInlined()) {
-                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                Memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
             } else {
                 auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
                 column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
                                                                     varchar.vector_.chunk_id_,
                                                                     varchar.vector_.chunk_offset_,
                                                                     varchar.length_);
-                Memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                Memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
             }
             current_offset += sizeof(i32) + varchar.length_;
         }
@@ -289,7 +289,7 @@ public:
             Error<NetworkException>("Bug");
         }
 
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
@@ -298,8 +298,8 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
@@ -307,8 +307,8 @@ public:
         auto size = column_vector->data_type()->Size() * row_count;
         String dst;
         dst.resize(size);
-        Memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(Move(dst));
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
         output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
     }
 
@@ -446,14 +446,14 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
 
         // auto end4 = std::chrono::steady_clock::now();
         // phase_4_duration_ += end4 - start4;
         //
         // if (count_ % 10000 == 0) {
-        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //     LOG_ERROR(fmt::format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
         //                      phase_1_duration_.count(),
         //                      phase_2_duration_.count(),
         //                      phase_3_duration_.count(),
@@ -464,7 +464,7 @@ public:
         //     phase_3_duration_ = std::chrono::duration<double>();
         //     phase_4_duration_ = std::chrono::duration<double>();
         // } else if (count_ % 1000 == 0) {
-        //     LOG_ERROR(Format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
+        //     LOG_ERROR(fmt::format("Phase 1: {} Phase 2: {} Phase 3: {} Phase 4: {}  Total: {} seconds",
         //                      phase_1_duration_.count(),
         //                      phase_2_duration_.count(),
         //                      phase_3_duration_.count(),
@@ -531,7 +531,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -553,7 +553,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -576,7 +576,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg("Database not found");
-            LOG_ERROR(Format("THRIFT ERROR: Database not found"));
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not found"));
         }
     }
 
@@ -587,7 +587,7 @@ public:
         } else {
             response.__set_success(false);
             response.__set_error_msg("Table not found");
-            LOG_ERROR(Format("THRIFT ERROR: Table not found"));
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not found"));
         }
     }
 
@@ -632,7 +632,7 @@ public:
     }
 
 private:
-    Mutex infinity_session_map_mutex_{};
+    std::mutex infinity_session_map_mutex_{};
     HashMap<u64, SharedPtr<Infinity>> infinity_session_map_{};
 
     // SizeT count_ = 0;
@@ -643,7 +643,7 @@ private:
 
 private:
     SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        std::lock_guard<Mutex> lock(infinity_session_map_mutex_);
+        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
         if (infinity_session_map_.count(session_id) > 0) {
             return infinity_session_map_[session_id];
         } else {
@@ -658,7 +658,7 @@ private:
         } else {
             response.__set_success(false);
             response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(Format("THRIFT ERROR: {}", result.ErrorStr()));
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
     }
 
@@ -1061,7 +1061,7 @@ public:
     infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
 
-        LOG_TRACE(Format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
+        LOG_TRACE(fmt::format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
                          sock->getSocketInfo(),
                          sock->getPeerHost(),
                          sock->getPeerAddress(),

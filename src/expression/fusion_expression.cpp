@@ -34,7 +34,7 @@ String FusionExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-    String expr_str = Format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
+    String expr_str = fmt::format("FUSION('{}', '{}')", method_, options_ ? options_->ToString() : "");
     return expr_str;
 }
 

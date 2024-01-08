@@ -145,15 +145,15 @@ String IndexBase::ToString() const {
     return ss.str();
 }
 
-Json IndexBase::Serialize() const {
-    Json res;
+nlohmann::json IndexBase::Serialize() const {
+    nlohmann::json res;
     res["file_name"] = file_name_;
     res["index_type"] = IndexInfo::IndexTypeToString(index_type_);
     res["column_names"] = column_names_;
     return res;
 }
 
-SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
+SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json) {
     SharedPtr<IndexBase> res = nullptr;
     String index_type_name = index_def_json["index_type"];
     IndexType index_type = IndexInfo::StringToIndexType(index_type_name);
@@ -163,7 +163,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
         case IndexType::kIVFFlat: {
             size_t centroids_count = index_def_json["centroids_count"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
-            auto ptr = MakeShared<IndexIVFFlat>(file_name, Move(column_names), centroids_count, metric_type);
+            auto ptr = MakeShared<IndexIVFFlat>(file_name, std::move(column_names), centroids_count, metric_type);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
@@ -173,13 +173,13 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const Json &index_def_json) {
             SizeT ef = index_def_json["ef"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
-            auto ptr = MakeShared<IndexHnsw>(file_name, Move(column_names), metric_type, encode_type, M, ef_construction, ef);
+            auto ptr = MakeShared<IndexHnsw>(file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
         case IndexType::kIRSFullText: {
             String analyzer = index_def_json["analyzer"];
-            auto ptr = MakeShared<IndexFullText>(file_name, Move(column_names), analyzer);
+            auto ptr = MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

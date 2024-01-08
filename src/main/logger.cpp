@@ -22,29 +22,29 @@ import third_party;
 
 namespace infinity {
 
-static SharedPtr<spd_stdout_color_sink> stdout_sinker = nullptr;
-static SharedPtr<spd_rotating_file_sink> rotating_file_sinker = nullptr;
+static SharedPtr<spdlog::sinks::stdout_color_sink_mt> stdout_sinker = nullptr;
+static SharedPtr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nullptr;
 
-SharedPtr<spd_logger> infinity_logger = nullptr;
+SharedPtr<spdlog::logger> infinity_logger = nullptr;
 
 void Logger::Initialize(const Config *config_ptr) {
     if (stdout_sinker.get() == nullptr) {
-        stdout_sinker = MakeShared<spd_stdout_color_sink>(); // NOLINT
+        stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
     }
 
     SizeT log_max_size = config_ptr->log_max_size();
     SizeT log_file_rotate_count = config_ptr->log_file_rotate_count();
 
     if (rotating_file_sinker.get() == nullptr) {
-        rotating_file_sinker = MakeShared<spd_rotating_file_sink>(*config_ptr->log_file_path(), log_max_size,
+        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(*config_ptr->log_file_path(), log_max_size,
                                                                   log_file_rotate_count); // NOLINT
     }
 
-    Vector<spd_sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
+    Vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
 
-    infinity_logger = MakeShared<spd_logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
+    infinity_logger = MakeShared<spdlog::logger>("infinity", sinks.begin(), sinks.end()); // NOLINT
     infinity_logger->set_pattern("[%H:%M:%S.%e] [%t] [%^%l%$] %v");
-    RegisterLogger(infinity_logger);
+    spdlog::details::registry::instance().register_logger(infinity_logger);
 
     SetLogLevel(config_ptr->log_level());
 
@@ -53,7 +53,7 @@ void Logger::Initialize(const Config *config_ptr) {
 
 void Logger::Shutdown() {
     if (stdout_sinker.get() != nullptr && rotating_file_sinker.get() != nullptr) {
-        ShutdownLogger();
+        spdlog::shutdown();
         stdout_sinker = nullptr;
         rotating_file_sinker = nullptr;
         infinity_logger = nullptr;

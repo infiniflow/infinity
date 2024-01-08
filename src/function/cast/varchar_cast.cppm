@@ -34,7 +34,7 @@ export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kVarchar) {
-        Error<TypeException>(Format("Expect Varchar type, but it is {}", source.ToString()));
+        Error<TypeException>(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
     }
     switch (target.type()) {
         case kBoolean: {
@@ -62,7 +62,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
         case kDecimal: {
-            Error<NotImplementException>(Format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
+            Error<NotImplementException>(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case kVarchar: {
             Error<TypeException>("Attempt to cast from varchar to varchar");
@@ -138,7 +138,7 @@ struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &) {
         Error<FunctionException>(
-            Format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
@@ -177,7 +177,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, TinyIntT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.short_.data_, &endptr, 10);
+        value = std::strtol(source.short_.data_, &endptr, 10);
         len = (endptr - source.short_.data_);
     } else {
         // No tiny int isn't inline
@@ -197,7 +197,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.short_.data_, &endptr, 10);
+        value = std::strtol(source.short_.data_, &endptr, 10);
     } else {
         // No tiny int isn't inline
         return false;
@@ -216,7 +216,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        value = StrToL(source.short_.data_, &endptr, 10);
+        value = std::strtol(source.short_.data_, &endptr, 10);
     } else {
         return false;
     }
@@ -236,9 +236,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToL(source.short_.data_, &endptr, 10);
+        target = std::strtol(source.short_.data_, &endptr, 10);
     } else {
-        target = StrToL(source.value_.ptr_, &endptr, 10);
+        target = std::strtol(source.value_.ptr_, &endptr, 10);
     }
     if (len != source.length_) {
         return false;
@@ -262,9 +262,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, FloatT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToF(source.short_.data_, &endptr);
+        target = std::strtof(source.short_.data_, &endptr);
     } else {
-        target = StrToF(source.value_.ptr_, &endptr);
+        target = std::strtof(source.value_.ptr_, &endptr);
     }
     if (len != source.length_) {
         return false;
@@ -278,9 +278,9 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
     char *endptr{nullptr};
     SizeT len{0};
     if (source.IsInlined()) {
-        target = StrToD(source.short_.data_, &endptr);
+        target = std::strtod(source.short_.data_, &endptr);
     } else {
-        target = StrToD(source.value_.ptr_, &endptr);
+        target = std::strtod(source.value_.ptr_, &endptr);
     }
     if (len != source.length_) {
         return false;

@@ -10,7 +10,7 @@ namespace infinity {
 
 export template <typename T>
 class SpecificConcurrentQueue {
-    ConcurrentQueue<T> queue_;
+    moodycamel::ConcurrentQueue<T> queue_;
 
 public:
     void Enqueue(const T &item);

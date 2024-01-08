@@ -39,8 +39,8 @@ public:
                        ViewMeta *view_meta,
                        u64 txn_id,
                        TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kView), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(Move(view_name)),
-          column_types_(Move(column_types)), column_names_(Move(column_names)), view_meta_(view_meta) {
+        : BaseEntry(EntryType::kView), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(std::move(view_name)),
+          column_types_(std::move(column_types)), column_names_(std::move(column_names)), view_meta_(view_meta) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
@@ -54,7 +54,7 @@ public:
     inline const SharedPtr<String> &view_name() const { return view_name_; }
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
 
     SharedPtr<CreateViewInfo> create_view_info_;
 

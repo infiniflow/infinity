@@ -109,7 +109,7 @@ private:
     void Init() {
         max_layer_ = -1;
         enterpoint_ = -1;
-        Fill(graph_, graph_ + max_vertex_num_ * level0_size_, 0);
+        std::fill(graph_, graph_ + max_vertex_num_ * level0_size_, 0);
         // for (VertexType vertex_i = 0; vertex_i < max_vertex_num_; ++vertex_i) {
         //     VertexL0Mut vertex = GetLevel0Mut(vertex_i);
         //     *vertex.GetNeighbors().second = 0;
@@ -246,7 +246,7 @@ public:
         for (VertexType vertex_i = 0; vertex_i < cur_vertex_n; ++vertex_i) {
             VertexL0 vertex = GetLevel0(vertex_i);
             int cur_max_layer = vertex.GetLayers().second;
-            max_layer = Max(cur_max_layer, max_layer);
+            max_layer = std::max(cur_max_layer, max_layer);
             assert(cur_max_layer >= 0 && cur_max_layer <= max_layer_);
             auto [neighbors, neighbor_n] = vertex.GetNeighbors();
             assert(neighbor_n <= int(Mmax0));

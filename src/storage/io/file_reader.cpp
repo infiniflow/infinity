@@ -16,14 +16,14 @@ module;
 
 #include <algorithm>
 
+module file_reader;
+
 import stl;
 import file_system;
 import file_system_type;
 
 import infinity_exception;
 import third_party;
-
-module file_reader;
 
 namespace infinity {
 
@@ -41,7 +41,7 @@ u8 FileReader::ReadByte() {
     if (buffer_offset_ >= buffer_size_) {
         already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
         if (already_read_size_ == 0) {
-            Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()));
+            Error<StorageException>(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
         }
         buffer_offset_ = 0;
         buffer_start_ += already_read_size_;
@@ -89,9 +89,9 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
     while (true) {
         i64 byte_count1 = end_pos - buffer;
         i64 byte_count2 = already_read_size_ - buffer_offset_;
-        i64 to_read = Min(byte_count1, byte_count2);
+        i64 to_read = std::min(byte_count1, byte_count2);
         if (to_read > 0) {
-            Memcpy(buffer, data_.get() + buffer_offset_, to_read);
+            std::memcpy(buffer, data_.get() + buffer_offset_, to_read);
             buffer_offset_ += to_read;
             start_pos += to_read;
         }
@@ -103,7 +103,7 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             buffer_offset_ = 0;
             already_read_size_ = fs_.Read(*file_handler_, data_.get(), buffer_size_);
             if (already_read_size_ == 0) {
-                Error<StorageException>(Format("No enough data from file: {}", file_handler_->path_.string()));
+                Error<StorageException>(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
             }
         } else {
             return;

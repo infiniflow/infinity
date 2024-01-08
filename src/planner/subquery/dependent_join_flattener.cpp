@@ -77,7 +77,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoin(const SharedPtr
 SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const SharedPtr<LogicalNode> &subquery_plan) {
     // 1. Validates if the logical node was checked in operator2correlated_expression_map_ before.
     if (!operator2correlated_expression_map_.contains(subquery_plan->node_id())) {
-        Error<PlannerException>(Format("Logical node {} wasn't detected before.", subquery_plan->node_id()));
+        Error<PlannerException>(fmt::format("Logical node {} wasn't detected before.", subquery_plan->node_id()));
     }
 
     // 2. if no correlated expression in this operator. which means all correlated expressions are unnested
@@ -188,7 +188,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
 
             u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();
             String alias = "logical_join";
-            alias += ToStr(logical_node_id);
+            alias += std::to_string(logical_node_id);
             SharedPtr<LogicalJoin> logical_join = MakeShared<LogicalJoin>(logical_node_id,
                                                                           JoinType::kInner,
                                                                           alias,
@@ -272,7 +272,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kShow:
         case LogicalNodeType::kExplain:
         case LogicalNodeType::kPrepare: {
-            Error<PlannerException>(Format("Logical node {} should be involved in subquery.", subquery_plan->name()));
+            Error<PlannerException>(fmt::format("Logical node {} should be involved in subquery.", subquery_plan->name()));
         }
         case LogicalNodeType::kInvalid: {
             Error<PlannerException>("Invalid logical operator node");
@@ -304,7 +304,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     column_ids.emplace_back(correlated_columns[0]->binding().column_idx);
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (correlated_columns[idx]->binding().table_idx != table_index) {
-            Error<PlannerException>(Format("Correlated column are from different table."));
+            Error<PlannerException>(fmt::format("Correlated column are from different table."));
         }
         column_names->emplace_back(correlated_columns[idx]->column_name());
         column_types->emplace_back(MakeShared<DataType>(correlated_columns[idx]->Type()));
@@ -313,7 +313,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
 
     const Binding *table_binding_ptr = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
     if (table_binding_ptr == nullptr) {
-        Error<PlannerException>(Format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
+        Error<PlannerException>(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
     }
 
 //    NewCatalog *catalog = query_context_->storage()->catalog();
@@ -331,7 +331,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     // Generate cross product
     u64 logical_node_id = bind_context_ptr_->GetNewLogicalNodeId();
     String alias = "cross_product";
-    alias += ToStr(logical_node_id);
+    alias += std::to_string(logical_node_id);
     SharedPtr<LogicalCrossProduct> cross_product_node = MakeShared<LogicalCrossProduct>(logical_node_id, alias, subquery_plan, logical_table_scan);
 
     this->base_binding_.table_idx = table_index;

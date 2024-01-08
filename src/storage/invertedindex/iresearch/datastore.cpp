@@ -74,11 +74,11 @@ constexpr SizeT DEFAULT_CONSOLIDATION_INTERVAL_MSEC = 1000;
 
 template <typename T>
 void IRSAsync::Queue(SizeT id, T &&fn) {
-    T t = Move(fn);
+    T t = std::move(fn);
     if (0 == id)
-        pool_0_.push(Move(t));
+        pool_0_.push(std::move(t));
     else if (1 == id)
-        pool_1_.push(Move(t));
+        pool_1_.push(std::move(t));
 }
 
 void IRSAsync::ClearQueue() {
@@ -125,14 +125,14 @@ struct ConsolidationTask : Task {
 };
 
 void ConsolidationTask::operator()(int id) {
-    LOG_INFO(Format("ConsolidationTask id {}", id));
-    if ((true == state_->cancel_.load(MemoryOrderRelease)) && (false == optimize_))
+    LOG_INFO(fmt::format("ConsolidationTask id {}", id));
+    if ((true == state_->cancel_.load(std::memory_order::release)) && (false == optimize_))
         return;
     std::this_thread::sleep_for(std::chrono::milliseconds(consolidation_interval_));
-    state_->pending_consolidations_.fetch_sub(1, MemoryOrderRelease);
+    state_->pending_consolidations_.fetch_sub(1, std::memory_order::release);
 
     if (optimize_) {
-        LOG_INFO(Format("ConsolidationTask optimize {}", id));
+        LOG_INFO(fmt::format("ConsolidationTask optimize {}", id));
         store_->GetWriter()->Consolidate(irs::index_utils::MakePolicy(irs::index_utils::ConsolidateCount()));
         store_->GetWriter()->Commit();
     } else {
@@ -141,11 +141,11 @@ void ConsolidationTask::operator()(int id) {
 
     if (consolidation_interval_ != std::chrono::milliseconds::zero()) {
         // reschedule
-        auto count = state_->pending_consolidations_.load(MemoryOrderAcquire);
+        auto count = state_->pending_consolidations_.load(std::memory_order::acquire);
         if (count > 0) {
-            if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, MemoryOrderAcqrel)) {
+            if (state_->pending_consolidations_.compare_exchange_weak(count, count + 1, std::memory_order::acq_rel)) {
                 ConsolidationTask task(*this);
-                async_->Queue(1, Move(task));
+                async_->Queue(1, std::move(task));
             }
         }
     }
@@ -169,11 +169,11 @@ struct CommitTask : Task {
 };
 
 void CommitTask::operator()(int id) {
-    if (true == state_->cancel_.load(MemoryOrderRelease))
+    if (true == state_->cancel_.load(std::memory_order::release))
         return;
-    LOG_INFO(Format("CommitTask id {}", id));
+    LOG_INFO(fmt::format("CommitTask id {}", id));
     std::this_thread::sleep_for(std::chrono::milliseconds(commit_interval_));
-    state_->pending_commits_.fetch_sub(1, MemoryOrderRelease);
+    state_->pending_commits_.fetch_sub(1, std::memory_order::release);
     Finalize();
     store_->Commit();
 }
@@ -181,9 +181,9 @@ void CommitTask::operator()(int id) {
 void CommitTask::Finalize() {
     constexpr size_t kMaxPendingConsolidations = 3;
     CommitTask task(*this);
-    state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue(0, Move(task));
-    if (state_->pending_consolidations_.load(MemoryOrderRelease) < kMaxPendingConsolidations) {
+    state_->pending_commits_.fetch_add(1, std::memory_order::release);
+    async_->Queue(0, std::move(task));
+    if (state_->pending_consolidations_.load(std::memory_order::release) < kMaxPendingConsolidations) {
         store_->ScheduleConsolidation();
     }
 }
@@ -224,9 +224,9 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
         return std::make_pair(info, irs::FeatureWriterFactory{});
     };
 
-    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), Move(format), OpenMode(open_mode), options);
+    index_writer_ = IRSIndexWriter::Make(*(irs_directory_), std::move(format), OpenMode(open_mode), options);
     auto reader = index_writer_->GetSnapshot();
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
 
     AnalyzerPool::instance().Set(SEGMENT);
     AnalyzerPool::instance().Set(JIEBA);
@@ -236,16 +236,16 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
 
 IRSDataStore::~IRSDataStore() { StopSchedule(); }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, Move(snapshot), MemoryOrderRelease); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), std::memory_order::release); }
 
-IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, MemoryOrderAcquire); }
+IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, std::memory_order::acquire); }
 
 void IRSDataStore::Commit() {
-    UniqueLock<Mutex> lk(commit_mutex_);
+    std::unique_lock<std::mutex> lk(commit_mutex_);
     index_writer_->Commit();
     auto reader = index_writer_->GetSnapshot();
     reader->Reopen();
-    auto data = MakeShared<DataSnapshot>(Move(reader));
+    auto data = MakeShared<DataSnapshot>(std::move(reader));
     StoreSnapshot(data);
 }
 
@@ -255,8 +255,8 @@ void IRSDataStore::ScheduleCommit() {
     task.async_ = async_.get();
     task.store_ = this;
     task.commit_interval_ = std::chrono::milliseconds(DEFAULT_COMMIT_INTERVAL);
-    maintenance_state_->pending_commits_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<CommitTask>(0, Move(task));
+    maintenance_state_->pending_commits_.fetch_add(1, std::memory_order::release);
+    async_->Queue<CommitTask>(0, std::move(task));
 }
 
 void IRSDataStore::ScheduleConsolidation() {
@@ -266,8 +266,8 @@ void IRSDataStore::ScheduleConsolidation() {
     task.store_ = this;
     task.optimize_ = false;
     task.consolidation_interval_ = std::chrono::milliseconds{DEFAULT_CONSOLIDATION_INTERVAL_MSEC};
-    maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(1, Move(task));
+    maintenance_state_->pending_consolidations_.fetch_add(1, std::memory_order::release);
+    async_->Queue<ConsolidationTask>(1, std::move(task));
 }
 
 void IRSDataStore::ScheduleOptimize() {
@@ -276,13 +276,13 @@ void IRSDataStore::ScheduleOptimize() {
     task.async_ = async_.get();
     task.store_ = this;
     task.optimize_ = true;
-    maintenance_state_->pending_consolidations_.fetch_add(1, MemoryOrderRelease);
-    async_->Queue<ConsolidationTask>(1, Move(task));
+    maintenance_state_->pending_consolidations_.fetch_add(1, std::memory_order::release);
+    async_->Queue<ConsolidationTask>(1, std::move(task));
 }
 
 void IRSDataStore::StopSchedule() {
     async_->ClearQueue();
-    maintenance_state_->cancel_.store(true, MemoryOrderRelease);
+    maintenance_state_->cancel_.store(true, std::memory_order::release);
 }
 
 void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
@@ -302,14 +302,14 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
             if (!stream.get()) {
                 throw StorageException("Dict path of Jieba analyzer is not valid");
             }
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else if (index_base->analyzer_ == SEGMENT) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else if (index_base->analyzer_.empty()) {
             // TODO use segmentation analyzer if analyzer is not set
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(Move(stream));
+            analyzers.push_back(std::move(stream));
         } else {
             throw StorageException("Non existing analyzer");
         }
@@ -438,7 +438,7 @@ ViewSnapshot *IRSDataStore::GetViewSnapshot() {
 ViewSnapshot::ViewSnapshot(IRSDirectoryReader *reader) : reader_(reader) {
     segments_.reserve(reader_->size());
     for (auto &subreader : *reader_) {
-        segments_.emplace_back(Move(ViewSegment(subreader)));
+        segments_.emplace_back(ViewSegment(subreader));
     }
 }
 
@@ -462,12 +462,12 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
     auto arg_format = irs::type<irs::text_format::csv>::get();
     auto scr = irs::scorers::get(scorer, arg_format, scorer_arg);
     if (!scr) {
-        LOG_ERROR(Format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
+        LOG_ERROR(fmt::format("Unable to instantiate scorer '{}' with argument format csv with arguments '{}'", scorer, scorer_arg));
         return -1;
     }
 
     const IRSDirectoryReader &reader = GetDirectoryReader();
-    LOG_INFO(Format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
+    LOG_INFO(fmt::format("Index stats: segments={}, docs={},live-docs={}", reader->size(), reader->docs_count(), reader->live_docs_count()));
     irs::Scorers order = irs::Scorers::Prepare(scr.get());
 
     irs::filter::prepared::ptr filter = flt->prepare({
@@ -477,7 +477,7 @@ int IRSDataStore::Search(IrsFilter *flt, const Map<String, String> &options, Sco
 
     SizeT topn(DEFAULT_TOPN);
     if (auto it = options.find("topn"); it != options.end()) {
-        topn = StrToInt(it->second);
+        topn = std::stoi(it->second);
     }
 
     sorted.reserve(topn);

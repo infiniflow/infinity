@@ -13,18 +13,14 @@
 // limitations under the License.
 module;
 
+export module logger;
+
 import stl;
 import third_party;
 
-export module logger;
-
-//import config;
-//import third_party;
-//import stl;
-
 namespace infinity {
 
-export extern SharedPtr<spd_logger> infinity_logger;
+export extern SharedPtr<spdlog::logger> infinity_logger;
 
 class Config;
 

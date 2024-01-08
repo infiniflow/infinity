@@ -28,7 +28,7 @@ public:
 
     static constexpr const u64 UNIT_BITS = 64; // i64 bits count
     static constexpr const u64 BYTE_BITS = 8;  // one byte bit count
-    static constexpr const u64 UNIT_MAX = u64_max;
+    static constexpr const u64 UNIT_MAX = std::numeric_limits<u64>::max();;
     static constexpr const u64 UNIT_MIN = 0;
 
 public:

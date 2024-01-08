@@ -36,7 +36,7 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        Error<PlannerException>(Format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
+        Error<PlannerException>(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
     return nullptr;
 }
@@ -131,6 +131,6 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     return false;
 }
 
-String CastExpression::ToString() const { return Format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
+String CastExpression::ToString() const { return fmt::format("Cast({} AS {})", arguments_[0]->Name(), target_type_.ToString()); }
 
 } // namespace infinity

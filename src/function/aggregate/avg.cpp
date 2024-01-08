@@ -40,7 +40,7 @@ public:
 
     inline ptr_t Finalize() { Error<NotImplementException>("Finalize average state."); }
 
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>(Format("Average state type size: {}", data_type.ToString())); }
+    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>(fmt::format("Average state type size: {}", data_type.ToString())); }
 };
 
 template <>
@@ -56,8 +56,8 @@ public:
     }
 
     inline void Update(const TinyIntT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -89,8 +89,8 @@ public:
     }
 
     inline void Update(const SmallIntT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -123,8 +123,8 @@ public:
     }
 
     inline void Update(const IntegerT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -157,8 +157,8 @@ public:
     }
 
     inline void Update(const BigIntT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -191,8 +191,8 @@ public:
     }
 
     inline void Update(const FloatT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -225,8 +225,8 @@ public:
     }
 
     inline void Update(const DoubleT *__restrict input, SizeT idx) {
-        if (count_ == i64_max) {
-            Error<ExecutorException>(Format("Data count exceeds: {}", count_));
+        if (count_ == std::numeric_limits<i64>::max()) {
+            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];

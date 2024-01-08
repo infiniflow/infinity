@@ -38,13 +38,13 @@ friend struct NewCatalog;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, SharedPtr<String> name, DBEntry *db_entry)
-        : db_entry_dir_(db_entry_dir), table_name_(Move(name)), db_entry_(db_entry) {}
+        : db_entry_dir_(db_entry_dir), table_name_(std::move(name)), db_entry_(db_entry) {}
 
     SharedPtr<String> ToString();
 
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<TableMeta> Deserialize(const Json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
+    static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(TableMeta &other);
 
@@ -68,7 +68,7 @@ private:
     Tuple<TableEntry *, Status> GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 

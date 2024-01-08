@@ -34,8 +34,8 @@ class DBEntry : public BaseEntry {
 
 public:
     inline explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(Format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
-          db_name_(Move(db_name)) {
+        : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
+          db_name_(std::move(db_name)) {
         begin_ts_ = begin_ts;
         txn_id_ = txn_id;
     }
@@ -44,9 +44,9 @@ public:
 
     SharedPtr<String> ToString();
 
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<DBEntry> Deserialize(const Json &db_entry_json, BufferManager *buffer_mgr);
+    static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 
     virtual void MergeFrom(BaseEntry &other);
 
@@ -74,7 +74,7 @@ private:
     Status GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
     HashMap<String, UniquePtr<TableMeta>> tables_{}; // NOTE : can use SharedPtr<String> as key.

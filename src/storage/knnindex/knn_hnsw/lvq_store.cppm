@@ -45,7 +45,7 @@ public:
     static constexpr SizeT PADDING_SIZE = 32;
 
 private:
-    constexpr static SizeT max_bucket_idx_ = LimitMax<CompressType>() - LimitMin<CompressType>(); // 255 for i8
+    constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
 
     // Decompress: Q = scale * C + bias + Mean
     using ScalarType = DataType; // type for scale and bias
@@ -114,7 +114,7 @@ public:
 
 private:
     LVQStore(DataStoreMeta meta, This::InitArgs init_args)
-        : meta_(Move(meta)),                                                                                                                      //
+        : meta_(std::move(meta)),                                                                                                                      //
           compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), PADDING_SIZE)),                                                  //
           compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), PADDING_SIZE)),                                        //
           ptr_(static_cast<char *>(operator new[](compress_data_offset_ + compress_data_size_ * max_vec_num(), std::align_val_t(PADDING_SIZE)))), //
@@ -124,14 +124,14 @@ private:
 
     void Init() {
         // MeanType *mean = GetMeanMut();
-        // Fill(mean, mean + dim(), 0);
-        Fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
+        // std::fill(mean, mean + dim(), 0);
+        std::fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
     }
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
         DataStoreMeta meta(max_vec_num, dim);
-        auto ret = This(Move(meta), Move(init_args));
+        auto ret = This(std::move(meta), std::move(init_args));
         ret.Init();
         return ret;
     }
@@ -141,12 +141,12 @@ public:
     LVQStore &operator=(This &&other) = delete;
 
     LVQStore(This &&other)
-        : meta_(Move(other.meta_)),                         //
+        : meta_(std::move(other.meta_)),                         //
           compress_data_offset_(other.compress_data_size_), //
           compress_data_size_(other.compress_data_offset_), //
           ptr_(other.ptr_),                                 //
           buffer_plain_size_(other.buffer_plain_size_),     //
-          plain_data_(Move(other.plain_data_))              //
+          plain_data_(std::move(other.plain_data_))              //
     {
         const_cast<char *&>(other.ptr_) = nullptr;
     }
@@ -165,7 +165,7 @@ public:
 
     static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
         DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
-        auto ret = This(Move(meta), Move(init_args));
+        auto ret = This(std::move(meta), std::move(init_args));
         file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
         return ret;
     }
@@ -187,22 +187,22 @@ private:
         auto [scale_p, bias_p] = lvq.GetScalarMut();
         CompressType *compress = lvq.GetCompressVecMut();
 
-        ScalarType lower = LimitMax<ScalarType>();
-        ScalarType upper = -LimitMax<ScalarType>();
+        ScalarType lower = std::numeric_limits<ScalarType>::max();
+        ScalarType upper = -std::numeric_limits<ScalarType>::max();
         for (SizeT j = 0; j < dim(); ++j) {
             auto x = static_cast<ScalarType>(vec[j] - mean[j]);
-            lower = Min(lower, x);
-            upper = Max(upper, x);
+            lower = std::min(lower, x);
+            upper = std::max(upper, x);
         }
         ScalarType scale = (upper - lower) / max_bucket_idx_;
-        ScalarType bias = lower - LimitMin<CompressType>() * scale;
+        ScalarType bias = lower - std::numeric_limits<CompressType>::min() * scale;
         if (scale == 0) {
-            Fill(compress, compress + dim(), 0);
+            std::fill(compress, compress + dim(), 0);
         } else {
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                if(!(c <= LimitMax<CompressType>() && c >= LimitMin<CompressType>())) {
+                if(!(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min())) {
                     Error<StorageException>("CompressVec error");
                 }
                 compress[j] = c;
@@ -262,7 +262,7 @@ private:
             ++vec_i;
         }
         *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
-        plain_data_ = PlainStore<DataType>::Make(Min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
+        plain_data_ = PlainStore<DataType>::Make(std::min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
         return cur_vec_num() - vec_num;
     }
 
@@ -274,7 +274,7 @@ public:
     SizeT AddVec(Iterator query_iter, SizeT vec_num) {
         if (SizeT idx = plain_data_.AddVec(query_iter, vec_num); idx != DataStoreMeta::ERR_IDX) {
             return meta_.cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(Move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
+        } else if (SizeT idx = MergeCompress(std::move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
             return idx;
         } else {
             return ERR_IDX;
@@ -299,7 +299,7 @@ public:
     QueryType MakeQuery(const DataType *vec) const {
         auto ptr = MakeUnique<char[]>(compress_data_size_);
         CompressVec(vec, LVQData(ptr.get()));
-        return QueryType{Move(ptr)};
+        return QueryType{std::move(ptr)};
     }
 
     void Compress() {

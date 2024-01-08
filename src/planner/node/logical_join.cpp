@@ -33,7 +33,7 @@ LogicalJoin::LogicalJoin(u64 node_id,
                          Vector<SharedPtr<BaseExpression>> conditions,
                          const SharedPtr<LogicalNode> &left,
                          const SharedPtr<LogicalNode> &right)
-    : LogicalNode(node_id, LogicalNodeType::kJoin), alias_(Move(alias)), join_type_(join_type), conditions_(Move(conditions)) {
+    : LogicalNode(node_id, LogicalNodeType::kJoin), alias_(std::move(alias)), join_type_(join_type), conditions_(std::move(conditions)) {
     this->set_left_node(left);
     this->set_right_node(right);
 }

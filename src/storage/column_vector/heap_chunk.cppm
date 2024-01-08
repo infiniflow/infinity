@@ -69,7 +69,7 @@ public:
 private:
     Vector<UniquePtr<HeapChunk>> chunks_;
     u64 current_chunk_size_{CHUNK_SIZE};
-    u64 current_chunk_idx_{u64_max};
+    u64 current_chunk_idx_{std::numeric_limits<u64>::max()};
 };
 
 } // namespace infinity

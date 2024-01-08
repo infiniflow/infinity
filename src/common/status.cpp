@@ -46,12 +46,12 @@ Status &Status::operator=(Status &&s) noexcept {
 
 void Status::MoveStatus(Status &s) {
     code_ = s.code_;
-    msg_ = Move(s.msg_);
+    msg_ = std::move(s.msg_);
 }
 
 void Status::MoveStatus(Status &&s) {
     code_ = s.code_;
-    msg_ = Move(s.msg_);
+    msg_ = std::move(s.msg_);
     s.msg_ = nullptr;
 }
 

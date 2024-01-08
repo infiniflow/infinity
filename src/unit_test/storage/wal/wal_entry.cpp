@@ -216,7 +216,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-            Println("WAL ENTRY COMMIT TS:", ToStr(wal_entry->commit_ts));
+            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts));
             for (const auto &cmd : wal_entry->cmds) {
                 Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
             }
@@ -239,7 +239,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 replay_entries.push_back(wal_entry);
             } else {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-                Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
+                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 Println("Catalog Path: {}", catalog_path);
                 break;
             }
@@ -260,7 +260,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     // phase 3: replay the entries
     Println("Start to replay the entries", "");
     for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", ToStr(entry->commit_ts));
+        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts));
         for (const auto &cmd : entry->cmds) {
             Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
         }
@@ -282,7 +282,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         if (wal_entry.get() == nullptr) {
             break;
         }
-        Println("WAL ENTRY COMMIT TS:", ToStr(wal_entry->commit_ts));
+        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts));
         for (const auto &cmd : wal_entry->cmds) {
             Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
         }
@@ -304,7 +304,7 @@ TEST_F(WalEntryTest, WalListIterator) {
                 replay_entries.push_back(wal_entry);
             } else {
                 std::tie(max_commit_ts, catalog_path) = wal_entry->GetCheckpointInfo();
-                Println("Checkpoint Max Commit Ts: {}", ToStr(max_commit_ts));
+                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
                 Println("Catalog Path: {}", catalog_path);
                 break;
             }
@@ -325,7 +325,7 @@ TEST_F(WalEntryTest, WalListIterator) {
     // phase 3: replay the entries
     Println("Start to replay the entries", "");
     for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", ToStr(entry->commit_ts));
+        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts));
         for (const auto &cmd : entry->cmds) {
             Println("  WAL CMD: ", WalManager::WalCommandTypeToString(cmd->GetType()));
         }

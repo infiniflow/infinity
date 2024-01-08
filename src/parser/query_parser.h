@@ -342,7 +342,7 @@ namespace infinity {
       std::swap (as<T> (), that.as<T> ());
     }
 
-    /// Move the content of \a that to this.
+    /// std::move the content of \a that to this.
     ///
     /// Destroys \a that.
     template <typename T>
@@ -359,7 +359,7 @@ namespace infinity {
     }
 
 # if 201103L <= YY_CPLUSPLUS
-    /// Move the content of \a that to this.
+    /// std::move the content of \a that to this.
     template <typename T>
     void
     move (self_type&& that)
@@ -596,7 +596,7 @@ namespace infinity {
       {}
 
 #if 201103L <= YY_CPLUSPLUS
-      /// Move constructor.
+      /// std::move constructor.
       basic_symbol (basic_symbol&& that)
         : Base (std::move (that))
         , value ()
@@ -810,7 +810,7 @@ switch (yykind)
       by_kind () YY_NOEXCEPT;
 
 #if 201103L <= YY_CPLUSPLUS
-      /// Move constructor.
+      /// std::move constructor.
       by_kind (by_kind&& that) YY_NOEXCEPT;
 #endif
 
@@ -1480,7 +1480,7 @@ switch (yykind)
       typedef basic_symbol<by_state> super_type;
       /// Construct an empty symbol.
       stack_symbol_type ();
-      /// Move or copy construction.
+      /// std::move or copy construction.
       stack_symbol_type (YY_RVREF (stack_symbol_type) that);
       /// Steal the contents from \a sym to build this.
       stack_symbol_type (state_type s, YY_MOVE_REF (symbol_type) sym);

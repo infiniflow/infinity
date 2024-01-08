@@ -17,11 +17,11 @@ module;
 #include <cstdlib>
 #include <execinfo.h>
 
+module infinity_exception;
+
 import stl;
 import logger;
 import third_party;
-
-module infinity_exception;
 
 namespace infinity {
 
@@ -31,17 +31,17 @@ void PrintStacktrace(const String &err_msg) {
     int stack_num = backtrace(array, trace_stack_depth);
     char **stacktrace = backtrace_symbols(array, stack_num);
 
-    LOG_CRITICAL(Format("Error: {}", err_msg));
+    LOG_CRITICAL(fmt::format("Error: {}", err_msg));
     for (int i = 0; i < stack_num; ++i) {
         String info = stacktrace[i];
-        LOG_CRITICAL(Format("{}, {}", i, info));
+        LOG_CRITICAL(fmt::format("{}, {}", i, info));
     }
     free(stacktrace);
 }
 
 void Error(const String &message, const char *file_name, u32 line) {
     String err_msg = message;
-    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(ToStr(line));
+    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
     PrintStacktrace(err_msg);
     throw Exception(err_msg);
 }

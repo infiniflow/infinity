@@ -55,7 +55,7 @@ public:
         if(!query_context_->is_enable_profiling()) {
             return ;
         }
-        query_context_->FlushProfiler(Move(profiler));
+        query_context_->FlushProfiler(std::move(profiler));
     }
 
     void FinishTask();
@@ -74,14 +74,14 @@ public:
 
 
     inline SharedPtr<DataTable> GetResult() {
-        UniqueLock<Mutex> lk(locker_);
+        std::unique_lock<std::mutex> lk(locker_);
         cv_.wait(lk, [&] { return completed_; });
 
         return GetResultInternal();
     }
 
     inline void Complete() {
-        UniqueLock<Mutex> lk(locker_);
+        std::unique_lock<std::mutex> lk(locker_);
         completed_ = true;
         cv_.notify_one();
     }
@@ -103,8 +103,8 @@ protected:
 protected:
     atomic_u64 task_n_{0};
 
-    Mutex locker_{};
-    CondVar cv_{};
+    std::mutex locker_{};
+    std::condition_variable cv_{};
 
     PlanFragment *fragment_ptr_{};
     //    HashMap<u64, UniquePtr<FragmentTask>> tasks_;

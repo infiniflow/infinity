@@ -93,7 +93,7 @@ TEST_F(PolygonTypeTest, polygon1) {
     EXPECT_EQ(polygon4.bounding_box.lower_right.y, 2.1);
 
     PolygonT polygon5(1);
-    polygon5 = Move(polygon2);
+    polygon5 = std::move(polygon2);
     EXPECT_EQ(polygon5.PointCount(), 2);
     EXPECT_EQ(polygon5.GetPoint(0).x, PointT(1.0, 2.1).x);
     EXPECT_EQ(polygon5.GetPoint(0).y, PointT(1.0, 2.1).y);
@@ -108,7 +108,7 @@ TEST_F(PolygonTypeTest, polygon1) {
     EXPECT_EQ(polygon2.PointCount(), 0);
     EXPECT_EQ(polygon2.ptr, nullptr);
 
-    PolygonT polygon6(Move(polygon4));
+    PolygonT polygon6(std::move(polygon4));
     EXPECT_EQ(polygon6.PointCount(), 2);
     EXPECT_EQ(polygon6.GetPoint(0).x, PointT(1.0, 2.1).x);
     EXPECT_EQ(polygon6.GetPoint(0).y, PointT(1.0, 2.1).y);

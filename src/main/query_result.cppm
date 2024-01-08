@@ -28,8 +28,8 @@ public:
     BaseResult(BaseResult& other): status_(other.status_), result_table_(other.result_table_) {}
 
     BaseResult& operator=(BaseResult&& other)  noexcept {
-        status_ = Move(other.status_);
-        result_table_ = Move(other.result_table_);
+        status_ = std::move(other.status_);
+        result_table_ = std::move(other.result_table_);
         return *this;
     }
 

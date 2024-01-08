@@ -113,7 +113,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             break;
         }
         default:
-            Error<StorageException>(Format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+            Error<StorageException>(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
@@ -327,7 +327,7 @@ i32 WalEntry::GetSizeInBytes() const {
 
 void WalEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
-    Memcpy(ptr, this, sizeof(WalEntryHeader));
+    std::memcpy(ptr, this, sizeof(WalEntryHeader));
     ptr += sizeof(WalEntryHeader);
     WriteBufAdv(ptr, static_cast<i32>(cmds.size()));
     SizeT cmd_count = cmds.size();
@@ -484,13 +484,13 @@ WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
     ifs.read(buf.data(), wal_size);
     ifs.close();
 
-    return WalEntryIterator(Move(buf), wal_size);
+    return WalEntryIterator(std::move(buf), wal_size);
 }
 
 SharedPtr<WalEntry> WalEntryIterator::Next() {
     if (end_ > buf_.data()) {
         i32 entry_size;
-        Memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
+        std::memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
         end_ = end_ - entry_size;
         auto entry = WalEntry::ReadAdv(end_, entry_size);
         end_ = end_ - entry_size;

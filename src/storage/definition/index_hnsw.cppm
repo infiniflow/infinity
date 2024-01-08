@@ -45,7 +45,7 @@ public:
               SizeT M,
               SizeT ef_construction,
               SizeT ef)
-        : IndexBase(file_name, IndexType::kHnsw, Move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
+        : IndexBase(file_name, IndexType::kHnsw, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
           ef_construction_(ef_construction), ef_(ef) {}
 
     ~IndexHnsw() final = default;
@@ -61,7 +61,7 @@ public:
 
     virtual String ToString() const override;
 
-    virtual Json Serialize() const override;
+    virtual nlohmann::json Serialize() const override;
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};

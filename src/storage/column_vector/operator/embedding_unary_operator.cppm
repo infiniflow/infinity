@@ -78,6 +78,10 @@ public:
                 Error<NotImplementException>("Heterogeneous embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
+            case ColumnVectorType::kCompactBit: {
+                Error<NotImplementException>("Compact Bit embedding is not implemented yet.");
+                // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
+            }
         }
     }
 

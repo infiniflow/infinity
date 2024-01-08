@@ -36,8 +36,8 @@ public:
                                   SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                   u64 id,
                                   SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCreateDatabase, nullptr, nullptr, id, load_metas), schema_name_(Move(schema_name)),
-          conflict_type_(conflict_type), output_names_(Move(output_names)), output_types_(Move(output_types)) {}
+        : PhysicalOperator(PhysicalOperatorType::kCreateDatabase, nullptr, nullptr, id, load_metas), schema_name_(std::move(schema_name)),
+          conflict_type_(conflict_type), output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalCreateSchema() override = default;
 

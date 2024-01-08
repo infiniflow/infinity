@@ -56,7 +56,7 @@ void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
         case KnnDistanceType::kHamming: {
             auto merge_knn_max = MakeShared<MergeKnn<DataType, CompareMax>>(query_count_, topk_);
             merge_knn_max->Begin();
-            merge_knn_base_ = Move(merge_knn_max);
+            merge_knn_base_ = std::move(merge_knn_max);
             heap_type_ = MergeKnnHeapType::kMaxHeap;
             break;
         }
@@ -64,7 +64,7 @@ void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
         case KnnDistanceType::kInnerProduct: {
             auto merge_knn_min = MakeShared<MergeKnn<DataType, CompareMin>>(query_count_, topk_);
             merge_knn_min->Begin();
-            merge_knn_base_ = Move(merge_knn_min);
+            merge_knn_base_ = std::move(merge_knn_min);
             heap_type_ = MergeKnnHeapType::kMinHeap;
             break;
         }

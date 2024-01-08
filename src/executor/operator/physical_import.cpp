@@ -109,10 +109,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
-        Error<ExecutorException>(Format("Read dimension which length isn't {}.", nbytes));
+        Error<ExecutorException>(fmt::format("Read dimension which length isn't {}.", nbytes));
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Error<ExecutorException>(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
@@ -134,7 +134,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Error<ExecutorException>(Format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            Error<ExecutorException>(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
         }
         ptr_t dst_ptr = buf_ptr + last_block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -168,8 +168,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
             buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         }
     }
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", vector_n));
-    import_op_state->result_msg_ = Move(result_msg);
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -223,8 +223,8 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     }
     NewCatalog::IncreaseTableRowCount(table_entry_, parser_context->row_count_);
 
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", parser_context->row_count_));
-    import_op_state->result_msg_ = Move(result_msg);
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context->row_count_));
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -236,7 +236,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        Error<ExecutorException>(Format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        Error<ExecutorException>(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
 
     Txn *txn = query_context->GetTxn();
@@ -255,17 +255,17 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         }
         StringView json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
         start_pos = end_pos + 1;
-        Json line_json = Json::parse(json_sv);
+        nlohmann::json line_json = nlohmann::json::parse(json_sv);
 
         if (segment_entry->Room() <= 0) {
-            LOG_INFO(Format("Segment {} saved", segment_entry->segment_id()));
+            LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
             SaveSegmentData(txn_store, segment_entry);
             u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
             segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry_, segment_id, txn->GetBufferMgr());
         }
         BlockEntry *block_entry = segment_entry->GetLastEntry();
         if (block_entry->GetAvailableCapacity() <= 0) {
-            LOG_INFO(Format("Block {} saved", block_entry->block_id()));
+            LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
             segment_entry->AppendBlockEntry(MakeUnique<BlockEntry>(segment_entry.get(),
                                                                    segment_entry->block_entries().size(),
                                                                    0,
@@ -283,8 +283,8 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         SaveSegmentData(txn_store, segment_entry);
     }
 
-    auto result_msg = MakeUnique<String>(Format("IMPORT {} Rows", table_entry_->row_count()));
-    import_op_state->result_msg_ = Move(result_msg);
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) { Error<NotImplementException>("Import JSON is not implemented yet."); }
@@ -296,7 +296,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
 
     SizeT table_column_count = parser_context->table_entry_->ColumnCount();
     if (csv_column_count != table_column_count) {
-        parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
+        parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
 
         parser.Abort(); // return zsv_status_cancelled
         return;
@@ -307,7 +307,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
         auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
         const char *table_col_name = parser_context->table_entry_->GetColumnDefByID(idx)->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
-            parser_context->err_msg_ = MakeShared<String>(Format("Unmatched column name({} != {})", csv_col_name, table_col_name));
+            parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
             parser.Abort(); // return zsv_status_cancelled
             return;
@@ -393,7 +393,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count != table_entry->ColumnCount()) {
         UniquePtr<String> err_msg =
-            MakeUnique<String>(Format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
+            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
         LOG_ERROR(*err_msg);
         Error<StorageException>(*err_msg);
     }
@@ -505,7 +505,7 @@ void AppendEmbeddingJsonl(BlockColumnEntry *block_column_entry, const Vector<T> 
     block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(embedding.data()), embedding.size() * sizeof(T), nullptr);
 }
 
-void PhysicalImport::JSONLRowHandler(const Json &line_json, BlockEntry *block_entry) {
+void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, BlockEntry *block_entry) {
     SizeT column_n = table_entry_->ColumnCount();
     SizeT row_cnt = block_entry->row_count();
     for (SizeT i = 0; i < column_n; ++i) {
@@ -602,14 +602,14 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
     block_row_counts.reserve(block_entries.size());
     for (auto &block_entry : block_entries) {
         block_entry->FlushData(block_entry->row_count());
-        auto size = Max(block_entries.size(), static_cast<SizeT>(block_entry->block_id() + 1));
+        auto size = std::max(block_entries.size(), static_cast<SizeT>(block_entry->block_id() + 1));
         block_row_counts.resize(size);
         block_row_counts[block_entry->block_id()] = block_entry->row_count();
     }
 
-    LOG_TRACE(Format("Block rows count {}", block_row_counts.size()));
+    LOG_TRACE(fmt::format("Block rows count {}", block_row_counts.size()));
     for (SizeT i = 0; i < block_row_counts.size(); ++i) {
-        LOG_TRACE(Format("Block {} row count {}", i, block_row_counts[i]));
+        LOG_TRACE(fmt::format("Block {} row count {}", i, block_row_counts[i]));
     }
 
     const String &db_name = *txn_store->table_entry_->GetDBName();

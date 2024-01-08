@@ -31,13 +31,13 @@ export struct DBMeta {
 friend struct NewCatalog;
 
 public:
-    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(Move(name)), data_dir_(data_dir) {}
+    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(std::move(name)), data_dir_(data_dir) {}
 
     SharedPtr<String> ToString();
 
-    Json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<DBMeta> Deserialize(const Json &db_meta_json, BufferManager *buffer_mgr);
+    static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
 
     void MergeFrom(DBMeta &other);
 
@@ -65,7 +65,7 @@ private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
-    RWMutex rw_locker_{};
+    std::shared_mutex rw_locker_{};
     // Ordered by commit_ts from latest to oldest.
     List<UniquePtr<BaseEntry>> entry_list_{};
 };

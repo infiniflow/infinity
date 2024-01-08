@@ -41,11 +41,11 @@ inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVe
     Error<NotImplementException>("Not implement");
 
 //    if (second < 0) {
-//        Error<ExecutorException>(Format("substring start offset should >= 0, currently it is {}", second));
+//        Error<ExecutorException>(fmt::format("substring start offset should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third < 0) {
-//        Error<ExecutorException>(Format("substring length should >= 0, currently it is {}", second));
+//        Error<ExecutorException>(fmt::format("substring length should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third == 0) {
@@ -73,12 +73,12 @@ inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVe
 //    ptr_t source_ptr = first.GetDataPtr();
 //    if (copied_length <= VarcharT::INLINE_LENGTH) {
 //        // inline varchar
-//        Memcpy(result.prefix, source_ptr + start_offset, copied_length);
+//        std::memcpy(result.prefix, source_ptr + start_offset, copied_length);
 //        result.length = copied_length;
 //    } else {
-//        Memcpy(result.prefix, source_ptr + start_offset, VarcharT::INLINE_LENGTH);
+//        std::memcpy(result.prefix, source_ptr + start_offset, VarcharT::INLINE_LENGTH);
 //        result.ptr = column_vector_ptr->buffer_->fix_heap_mgr_->Allocate(copied_length);
-//        Memcpy(result.ptr, source_ptr + start_offset, copied_length);
+//        std::memcpy(result.ptr, source_ptr + start_offset, copied_length);
 //    }
 
     return true;

@@ -59,19 +59,19 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
-    UniqueLock<RWMutex> w_locker(this->rw_locker_);
-    this->index_by_segment_.emplace(segment_id, Move(index_entry));
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
+    this->index_by_segment_.emplace(segment_id, std::move(index_entry));
 }
 
-Json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
+nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
         Error<StorageException>("Column index entry can't be deleted.");
     }
 
-    Json json;
+    nlohmann::json json;
     Vector<SegmentColumnIndexEntry *> segment_column_index_entry_candidates;
     {
-        SharedLock<RWMutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
         json["txn_id"] = this->txn_id_.load();
         json["begin_ts"] = this->begin_ts_;
@@ -94,7 +94,7 @@ Json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json;
 }
 
-UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_index_entry_json,
+UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &column_index_entry_json,
                                                           TableIndexEntry *table_index_entry,
                                                           BufferManager *buffer_mgr,
                                                           TableEntry *table_entry) {
@@ -118,7 +118,7 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const Json &column_ind
         for (const auto &index_by_segment_json : column_index_entry_json["index_by_segment"]) {
             UniquePtr<SegmentColumnIndexEntry> segment_column_index_entry =
                 SegmentColumnIndexEntry::Deserialize(index_by_segment_json, column_index_entry.get(), buffer_mgr, table_entry);
-            column_index_entry->index_by_segment_.emplace(segment_column_index_entry->segment_id(), Move(segment_column_index_entry));
+            column_index_entry->index_by_segment_.emplace(segment_column_index_entry->segment_id(), std::move(segment_column_index_entry));
         }
     }
 
@@ -167,14 +167,14 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
         case IndexType::kIRSFullText: {
             //            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
             UniquePtr<String> err_msg =
-                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
             break;
         }
         default: {
             UniquePtr<String> err_msg =
-                MakeUnique<String>(Format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }
@@ -187,7 +187,7 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
     return file_worker;
 }
 
-String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return Format("seg{}.idx", segment_id, index_name); }
+String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return fmt::format("seg{}.idx", segment_id, index_name); }
 
 Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes) {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
