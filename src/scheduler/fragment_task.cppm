@@ -93,7 +93,9 @@ public:
     UniquePtr<SinkState> sink_state_{};
 
 private:
-    Atomic<FragmentTaskStatus> status_{FragmentTaskStatus::kPending};
+    std::mutex mutex_;
+
+    FragmentTaskStatus status_{FragmentTaskStatus::kPending};
 
     void *fragment_context_{};
     bool is_terminator_{false};

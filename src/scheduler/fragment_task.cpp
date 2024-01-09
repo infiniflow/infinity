@@ -115,8 +115,12 @@ u64 FragmentTask::FragmentId() const {
 bool FragmentTask::IsComplete() { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
 
 bool FragmentTask::TryIntoWorkerLoop() {
-    auto expect_status = FragmentTaskStatus::kPending;
-    return status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kRunning);
+    std::unique_lock lock(mutex_);
+    if (status_ != FragmentTaskStatus::kPending) {
+        return false;
+    }
+    status_ = FragmentTaskStatus::kRunning;
+    return true;
 }
 
 // Stream fragment source has no data
@@ -129,8 +133,9 @@ bool FragmentTask::QuitFromWorkerLoop() {
     }
     auto *queue_state = static_cast<QueueSourceState *>(source_state_.get());
 
-    auto expect_status = FragmentTaskStatus::kRunning;
-    if (queue_state->source_queue_.Empty() && status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kPending)) {
+    std::unique_lock lock(mutex_);
+    if (queue_state->source_queue_.Empty() && status_ == FragmentTaskStatus::kRunning) {
+        status_ = FragmentTaskStatus::kPending;
         LOG_WARN(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
