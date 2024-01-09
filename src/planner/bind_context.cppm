@@ -113,13 +113,13 @@ public:
     u64 knn_table_index_{};
 
     // Bound CTE
-    HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_;
+    HashSet<SharedPtr<CommonTableExpressionInfo>> bound_cte_set_{};
 
     // Bound View
-    HashSet<String> bound_view_set_;
+    HashSet<String> bound_view_set_{};
 
     // Bound Table (base table)
-    HashSet<String> bound_table_set_;
+    HashSet<String> bound_table_set_{};
 
     // Bound subquery (TODO: How to get the subquery name?)
     HashSet<String> bound_subquery_set_;
