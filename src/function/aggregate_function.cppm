@@ -107,9 +107,8 @@ public:
                                AggregateUpdateFuncType update_func,
                                AggregateFinalizeFuncType finalize_func)
         : Function(std::move(name), FunctionType::kAggregate), init_func_(std::move(init_func)), update_func_(std::move(update_func)),
-          finalize_func_(std::move(finalize_func)), argument_type_(std::move(argument_type)), return_type_(std::move(return_type)), state_size_(state_size) {
-        state_data_ = SharedPtr<char[]>(new char[state_size_]());
-    }
+          finalize_func_(std::move(finalize_func)), argument_type_(std::move(argument_type)), return_type_(std::move(return_type)),
+          state_size_(state_size) {}
 
     void CastArgumentTypes(BaseExpression &input_argument);
 
@@ -117,7 +116,7 @@ public:
 
     [[nodiscard]] String ToString() const override;
 
-    [[nodiscard]] ptr_t GetState() const { return state_data_.get(); }
+    UniquePtr<char[]> InitState() const { return MakeUnique<char[]>(state_size_); }
 
     [[nodiscard]] String GetFuncName() const { return name_; }
 
@@ -129,7 +128,6 @@ public:
     DataType argument_type_;
     DataType return_type_;
 
-    SharedPtr<char[]> state_data_{nullptr};
     SizeT state_size_{};
 };
 
@@ -143,7 +141,6 @@ inline AggregateFunction UnaryAggregate(const String &name, const DataType &inpu
                              AggregateOperation::StateUpdate<AggregateState, InputType>,
                              AggregateOperation::StateFinalize<AggregateState, ResultType>);
 }
-
 
 class CountStarAggregateOperation {
 public:
@@ -176,8 +173,7 @@ public:
     }
 };
 
-
-export template <typename AggregateState,typename ResultType>
+export template <typename AggregateState, typename ResultType>
 inline auto CountStarAggregate(String &name, const DataType &input_type, const DataType &return_type) -> AggregateFunction {
     auto agg_function = AggregateFunction(name,
                                           input_type,

@@ -49,7 +49,7 @@ import create_index_data;
 import logger;
 import task_scheduler;
 import plan_fragment;
-
+import aggregate_expression;
 module fragment_context;
 
 namespace infinity {
@@ -114,6 +114,15 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
     return operator_state;
 }
 
+UniquePtr<OperatorState> MakeAggregateState(PhysicalAggregate *physical_aggregate, FragmentTask *task) {
+    Vector<UniquePtr<char[]>> states;
+    for (auto &expr : physical_aggregate->aggregates_) {
+        auto agg_expr = std::static_pointer_cast<AggregateExpression>(expr);
+        states.push_back(agg_expr->aggregate_function_.InitState());
+    }
+    return MakeUnique<AggregateOperatorState>(std::move(states));
+}
+
 UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
     KnnExpression *knn_expr = physical_merge_knn->knn_expression_.get();
     UniquePtr<OperatorState> operator_state = MakeUnique<MergeKnnOperatorState>();
@@ -151,7 +160,8 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeKnnScanState(physical_knn_scan, task, fragment_ctx);
         }
         case PhysicalOperatorType::kAggregate: {
-            return MakeTaskStateTemplate<AggregateOperatorState>(physical_ops[operator_id]);
+            auto physical_aggregate = static_cast<PhysicalAggregate *>(physical_ops[operator_id]);
+            return MakeAggregateState(physical_aggregate, task);
         }
         case PhysicalOperatorType::kMergeAggregate: {
             return MakeTaskStateTemplate<MergeAggregateOperatorState>(physical_ops[operator_id]);

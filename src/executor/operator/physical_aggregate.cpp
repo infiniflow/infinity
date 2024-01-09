@@ -16,6 +16,7 @@ module;
 
 #include <string>
 #include <vector>
+#include <memory>
 import stl;
 import txn;
 import query_context;
@@ -33,7 +34,7 @@ import default_values;
 import parser;
 import expression_state;
 import expression_evaluator;
-
+import aggregate_expression;
 module physical_aggregate;
 namespace infinity {
 
@@ -53,7 +54,8 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     if (group_count == 0) {
         // Aggregate without group by expression
         // e.g. SELECT count(a) FROM table;
-        auto result = SimpleAggregateExecute(prev_op_state->data_block_array_, aggregate_operator_state->data_block_array_);
+        auto result =
+            SimpleAggregateExecute(prev_op_state->data_block_array_, aggregate_operator_state->data_block_array_, aggregate_operator_state->states_);
         prev_op_state->data_block_array_.clear();
         if (prev_op_state->Complete()) {
             aggregate_operator_state->SetComplete();
@@ -567,7 +569,9 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 #endif
 }
 
-bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks) {
+bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
+                                               Vector<UniquePtr<DataBlock>> &output_blocks,
+                                               Vector<UniquePtr<char[]>> &states) {
     SizeT aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
         Error<ExecutorException>("Simple Aggregate without aggregate expression.");
@@ -595,7 +599,7 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
 
     for (i64 idx = 0; auto &expr : aggregates_) {
         // expression state
-        expr_states.emplace_back(ExpressionState::CreateState(expr));
+        expr_states.emplace_back(ExpressionState::CreateState(std::static_pointer_cast<AggregateExpression>(expr), states[idx].get()));
 
         SharedPtr<DataType> output_type = MakeShared<DataType>(expr->Type());
 
@@ -622,12 +626,9 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
 
         SizeT expression_count = aggregates_count;
         // calculate every columns value
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
-                LOG_TRACE("Physical aggregate Execute");
-                evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
-            }
+        for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
+            LOG_TRACE("Physical aggregate Execute");
+            evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
         output_data_block->Finalize();
         // {

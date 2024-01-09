@@ -66,10 +66,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         BooleanT result;
-        result = *(BooleanT *)func.finalize_func_(func.GetState());
+        result = *(BooleanT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, false);
     }
@@ -94,10 +95,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         TinyIntT result;
-        result = *(TinyIntT *)func.finalize_func_(func.GetState());
+        result = *(TinyIntT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, -128);
     }
@@ -122,10 +124,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         SmallIntT result;
-        result = *(SmallIntT *)func.finalize_func_(func.GetState());
+        result = *(SmallIntT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, -std::numeric_limits<SmallIntT>::max());
     }
@@ -150,10 +153,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         IntegerT result;
-        result = *(IntegerT *)func.finalize_func_(func.GetState());
+        result = *(IntegerT *)func.finalize_func_(data_state.get());
 
         EXPECT_EQ(result, -std::numeric_limits<IntegerT>::max());
     }
@@ -178,10 +182,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         BigIntT result;
-        result = *(BigIntT *)func.finalize_func_(func.GetState());
+        result = *(BigIntT *)func.finalize_func_(data_state.get());
 
         EXPECT_EQ(result, -std::numeric_limits<BigIntT>::max());
     }
@@ -206,10 +211,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         FloatT result;
-        result = *(FloatT *)func.finalize_func_(func.GetState());
+        result = *(FloatT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, FloatT(-2 * (i64)(row_count - 1)));
     }
@@ -234,10 +240,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, DoubleT(-2 * (i64)(row_count - 1)));
     }
@@ -264,10 +271,11 @@ TEST_F(MinFunctionTest, min_func) {
         }
         data_block.Finalize();
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         HugeIntT result;
-        result = *(HugeIntT *)func.finalize_func_(func.GetState());
+        result = *(HugeIntT *)func.finalize_func_(data_state.get());
 
         EXPECT_EQ(result.lower, -2 * (row_count - 1));
     }
