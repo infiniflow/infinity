@@ -385,12 +385,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         if (result_n < 0) {
                             result_n = result_n1;
                         } else if (result_n != (i64)result_n1) {
-                            throw ExecutorException("Bug");
+                            throw ExecutorException("KnnScan: result_n mismatch");
                         }
 
                         switch (knn_scan_shared_data->knn_distance_type_) {
                             case KnnDistanceType::kInvalid: {
-                                throw ExecutorException("Bug");
+                                throw ExecutorException("Invalid distance type");
                             }
                             case KnnDistanceType::kL2:
                             case KnnDistanceType::kHamming: {
