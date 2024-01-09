@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "thrift_server.h"
+module;
 
 #include <memory>
 #include <thrift/TToString.h>
@@ -29,6 +29,8 @@
 
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
+
+module thrift_server;
 
 import infinity;
 import stl;
@@ -49,6 +51,12 @@ import infinity_context;
 import config;
 import data_block;
 import query_options;
+
+ using namespace apache::thrift;
+ using namespace apache::thrift::concurrency;
+ using namespace apache::thrift::protocol;
+ using namespace apache::thrift::transport;
+ using namespace apache::thrift::server;
 
 namespace infinity {
 
