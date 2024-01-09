@@ -43,10 +43,10 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
-    source_queue_.Dequeue(fragment_data_base); // FIXME
-    // if (!source_queue_.TryDequeue(fragment_data_base)) {
-    //     Error<ExecutorException>("Bug");
-    // }
+    // source_queue_.Dequeue(fragment_data_base); // FIXME
+    if (!source_queue_.TryDequeue(fragment_data_base)) {
+        Error<ExecutorException>("Bug");
+    }
 
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {

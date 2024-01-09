@@ -121,7 +121,7 @@ bool FragmentTask::TryIntoWorkerLoop() {
 
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {
-    return false; // FIXME
+    // return false; // FIXME
     // If reach here, child fragment must be stream
     if (source_state_->state_type_ != SourceStateType::kQueue) {
         // fragment's source is not from queue
