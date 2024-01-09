@@ -93,7 +93,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 
     // 2 full text search
     ScoredIds result;
-    SharedPtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
+    UniquePtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
     if (dataStore == nullptr) {
         throw ExecutorException(
             fmt::format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));

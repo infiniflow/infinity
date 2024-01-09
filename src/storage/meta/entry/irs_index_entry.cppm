@@ -33,6 +33,7 @@ class IndexFullText;
 export struct IrsIndexEntry : public BaseEntry {
 public:
     IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, u64 txn_id, TxnTimeStamp begin_ts);
+    ~IrsIndexEntry() override = default;
 
     static SharedPtr<IrsIndexEntry> NewIrsIndexEntry(TableIndexEntry *table_index_entry,
                                                      u64 txn_id,
@@ -54,6 +55,6 @@ public:
     const TableIndexEntry *table_index_entry_{};
     SharedPtr<String> index_dir_{};
     HashMap<u64, SharedPtr<IndexFullText>> index_info_map_{};
-    SharedPtr<IRSDataStore> irs_index_{};
+    UniquePtr<IRSDataStore> irs_index_{};
 };
 } // namespace infinity

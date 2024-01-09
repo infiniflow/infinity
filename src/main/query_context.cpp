@@ -121,7 +121,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
-        SharedPtr<LogicalNode>& logical_plan = logical_planner_->LogicalPlan();
+        SharedPtr<LogicalNode> logical_plan = logical_planner_->LogicalPlan();
         StopProfile(QueryPhase::kLogicalPlan);
 
         // Apply optimized rule to the logical plan
