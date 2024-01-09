@@ -33,9 +33,9 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
         for filename in filenames:
             file = os.path.join(dirpath, filename)
 
-            filename = os.path.basename(file)
-            if "fulltext" in filename or "fusion" in filename:
-                continue
+            # filename = os.path.basename(file)
+            # if "fulltext" in filename or "fusion" in filename:
+            #     continue
 
             process = subprocess.run([sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, error = process.stdout, process.stderr
@@ -128,5 +128,5 @@ if __name__ == "__main__":
     generate4(args.generate_if_exists, args.copy)
     generate5(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
-    # python_skd_test(python_test_dir)
+    python_skd_test(python_test_dir)
     test_process(args.path, args.test, args.data, args.copy)
