@@ -121,6 +121,7 @@ bool FragmentTask::TryIntoWorkerLoop() {
 
 // Stream fragment source has no data
 bool FragmentTask::QuitFromWorkerLoop() {
+    return false; // FIXME
     // If reach here, child fragment must be stream
     if (source_state_->state_type_ != SourceStateType::kQueue) {
         // fragment's source is not from queue
@@ -130,10 +131,10 @@ bool FragmentTask::QuitFromWorkerLoop() {
 
     auto expect_status = FragmentTaskStatus::kRunning;
     if (queue_state->source_queue_.Empty() && status_.compare_exchange_strong(expect_status, FragmentTaskStatus::kPending)) {
-        LOG_TRACE(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
+        LOG_WARN(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
-    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
+    LOG_WARN(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
     return false;
 }
 

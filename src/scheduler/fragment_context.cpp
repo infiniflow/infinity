@@ -438,30 +438,26 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
 }
 
 FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
-    : fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
-      unfinished_child_n_(fragment_ptr->Children().size()), notifier_(notifier) {}
+    : notifier_(notifier), fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
+      unfinished_child_n_(fragment_ptr->Children().size()) {}
 
 void FragmentContext::TryFinishFragment() {
     auto fragment_id = fragment_ptr_->FragmentID();
+    auto *parent_plan_fragment = fragment_ptr_->GetParent();
 
-    // after notify, the data structure may be destroyed
     if (!TryFinishFragmentInner()) {
         LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
-        if (fragment_type_ != FragmentType::kParallelStream) {
-            return;
+        if (fragment_type_ == FragmentType::kParallelStream) {
+            auto *parent_plan_fragment = fragment_ptr_->GetParent();
+            if (parent_plan_fragment) {
+                auto *scheduler = query_context_->scheduler();
+                LOG_WARN(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
+                scheduler->ScheduleFragment(parent_plan_fragment);
+            }
         }
-        auto *parent_plan_fragment = fragment_ptr_->GetParent();
-        if (parent_plan_fragment == nullptr) {
-            return;
-        }
-
-        auto *scheduler = query_context_->scheduler();
-        LOG_TRACE(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
-        scheduler->ScheduleFragment(parent_plan_fragment);
     } else {
         LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_id));
 
-        auto *parent_plan_fragment = fragment_ptr_->GetParent();
         if (parent_plan_fragment != nullptr) {
             auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
             if (parent_fragment_ctx->TryStartFragment()) {
@@ -474,6 +470,9 @@ void FragmentContext::TryFinishFragment() {
                 scheduler->ScheduleFragment(parent_plan_fragment);
             }
         }
+    }
+    if (undone_task_n_.fetch_sub(1) == 1) {
+        // after notify, the data structure may be destroyed
         notifier_->Notify();
     }
 }
@@ -1161,6 +1160,15 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     }
 
     return result_table;
+}
+
+void FragmentContext::DumpFragmentCtx() {
+    for (auto &task : tasks_) {
+        LOG_WARN(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+    }
+    for (auto iter = fragment_ptr_->GetOperators().begin(); iter != fragment_ptr_->GetOperators().end(); ++iter) {
+        LOG_WARN(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+    }
 }
 
 } // namespace infinity

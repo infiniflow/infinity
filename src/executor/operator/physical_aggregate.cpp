@@ -27,7 +27,7 @@ import data_block;
 import utility;
 import logger;
 import column_vector;
-
+import third_party;
 import infinity_exception;
 import default_values;
 import parser;
@@ -324,7 +324,8 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         }
 
         if (output_row_idx != datablock_size) {
-            Error<ExecutorException>("Expected block size: " + std::to_string(datablock_size) + ", but only copied data size: " + std::to_string(output_row_idx));
+            Error<ExecutorException>("Expected block size: " + std::to_string(datablock_size) +
+                                     ", but only copied data size: " + std::to_string(output_row_idx));
         }
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -619,12 +620,37 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
         ExpressionEvaluator evaluator;
         evaluator.Init(input_data_block);
 
+        // {
+        //     auto row = input_data_block->row_count();
+        //     if (row == 0) {
+        //         // LOG_WARN("EEE");
+        //     } else {
+        //         auto v = input_data_block->GetValue(0, 0);
+        //         auto ti = v.value_.tiny_int;
+        //         auto si = v.value_.small_int;
+        //         auto i = v.value_.integer;
+        //         // LOG_WARN(fmt::format("Agg Input: {}, {},{} {} {}", u64(input_data_block), row, ti, si, i));
+        //     }
+        // }
+
         SizeT expression_count = aggregates_count;
         // calculate every columns value
         for (SizeT expr_idx = 0; expr_idx < expression_count; ++expr_idx) {
             LOG_TRACE("Physical aggregate Execute");
             evaluator.Execute(aggregates_[expr_idx], expr_states[expr_idx], output_data_block->column_vectors[expr_idx]);
         }
+        // {
+        //     auto row = output_data_block->row_count();
+        //     if (row == 0) {
+        //         // LOG_WARN("EEE");
+        //     } else {
+        //         auto v = output_data_block->GetValue(0, 0);
+        //         auto ti = v.value_.tiny_int;
+        //         auto si = v.value_.small_int;
+        //         auto i = v.value_.integer;
+        //         // LOG_WARN(fmt::format("Agg Output: {}, {},{} {} {}", u64(output_data_block), row, ti, si, i));
+        //     }
+        // }
         output_data_block->Finalize();
     }
     return true;

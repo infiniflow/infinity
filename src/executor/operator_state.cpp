@@ -43,9 +43,10 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
-    if (!source_queue_.TryDequeue(fragment_data_base)) {
-        Error<ExecutorException>("Bug");
-    }
+    source_queue_.Dequeue(fragment_data_base); // FIXME
+    // if (!source_queue_.TryDequeue(fragment_data_base)) {
+    //     Error<ExecutorException>("Bug");
+    // }
 
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {
@@ -114,6 +115,25 @@ bool QueueSourceState::GetData() {
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
             // merge_aggregate_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
             merge_aggregate_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+
+            // {
+            //     auto row = merge_aggregate_op_state->input_data_block_->row_count();
+            //     if (row == 0) {
+            //         // LOG_WARN("FFF");
+            //     } else {
+            //         auto v = merge_aggregate_op_state->input_data_block_->GetValue(0, 0);
+            //         auto ti = v.value_.tiny_int;
+            //         auto si = v.value_.small_int;
+            //         auto i = v.value_.integer;
+            //         LOG_WARN(fmt::format("Merge Agg: task id {}, fragment id {}, completed {}, {} {} {}",
+            //                              fragment_data->task_id_,
+            //                              fragment_data->fragment_id_,
+            //                              completed,
+            //                              ti,
+            //                              si,
+            //                              i));
+            //     }
+            // }
             merge_aggregate_op_state->input_complete_ = completed;
             break;
         }

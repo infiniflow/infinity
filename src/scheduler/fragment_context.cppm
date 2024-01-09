@@ -25,6 +25,8 @@ import data_table;
 import data_block;
 import knn_scan_data;
 import create_index_data;
+import logger;
+import third_party;
 
 export module fragment_context;
 
@@ -83,7 +85,10 @@ public:
 
     virtual ~FragmentContext() = default;
 
-    inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
+    inline void IncreaseTask() {
+        unfinished_task_n_.fetch_add(1);
+        undone_task_n_.fetch_add(1);
+    }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
         if (!query_context_->is_enable_profiling()) {
@@ -120,6 +125,8 @@ public:
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
+    void DumpFragmentCtx();
+
 private:
     bool TryStartFragment() {
         u64 unfinished_child = unfinished_child_n_.fetch_sub(1);
@@ -152,6 +159,7 @@ protected:
     FragmentType fragment_type_{FragmentType::kInvalid};
 
     atomic_u64 unfinished_task_n_{0};
+    atomic_u64 undone_task_n_{0};
     atomic_u64 unfinished_child_n_{0};
 };
 

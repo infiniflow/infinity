@@ -361,6 +361,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_context,
                                                       QueueSinkState *queue_sink_state,
                                                       OperatorState *task_operator_state) {
+    // if (task_operator_state->operator_type_ == PhysicalOperatorType::kAggregate) {
+    //     LOG_WARN(fmt::format("Sink Agg task id {}, fragment id {}", queue_sink_state->task_id_, queue_sink_state->fragment_id_));
+    // }
     if (queue_sink_state->error_message_.get() != nullptr) {
         LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
         auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
