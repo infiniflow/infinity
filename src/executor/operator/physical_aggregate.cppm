@@ -82,6 +82,8 @@ public:
     Vector<HashRange> GetHashRanges(i64 parallel_count) const;
 
 private:
+    std::mutex mutex_;
+
     SharedPtr<DataTable> input_table_{};
     u64 groupby_index_{};
     u64 aggregate_index_{};
