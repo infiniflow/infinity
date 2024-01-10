@@ -157,10 +157,10 @@ void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<
 }
 
 void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
-                                  BooleanT prepare,
-                                  u64 column_id,
-                                  const IndexBase *index_base,
-                                  SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
+                                      bool prepare,
+                                      u64 column_id,
+                                      const IndexBase *index_base,
+                                      SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
@@ -209,11 +209,11 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
             auto InsertHnsw = [&](auto &hnsw_index) {
                 u32 segment_offset = 0;
                 Vector<u64> row_ids;
-                for (const auto &block_entry : this->SegmentEntry::block_entries_) {
+                for (const auto &block_entry : this->block_entries_) {
                     SizeT block_row_cnt = block_entry->row_count();
 
                     for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
-                        RowID row_id(this->SegmentEntry::segment_id_, segment_offset + block_offset);
+                        RowID row_id(this->segment_id_, segment_offset + block_offset);
                         row_ids.push_back(row_id.ToUint64());
                     }
                     segment_offset += DEFAULT_BLOCK_CAPACITY;
@@ -306,8 +306,8 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
                                                                  TxnTimeStamp create_ts,
                                                                  BufferManager *buffer_mgr,
                                                                  TxnTableStore *txn_store,
-                                                                 BooleanT prepare,
-                                                                 BooleanT is_replay) {
+                                                                 bool prepare,
+                                                                 bool is_replay) {
     u64 column_id = column_def->id();
     const IndexBase *index_base = column_index_entry->index_base_ptr();
     UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(this->row_count_, index_base, column_def.get());

@@ -237,7 +237,7 @@ Tuple<TableIndexEntry *, Status> NewCatalog::CreateIndex(TableEntry *table_entry
                                                          u64 txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr,
-                                                         BooleanT is_replay,
+                                                         bool is_replay,
                                                          String replay_table_index_dir) {
 
     return table_entry->CreateIndex(index_def, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
@@ -264,8 +264,8 @@ void NewCatalog::CreateIndexFile(TableEntry *table_entry,
                                  TableIndexEntry *table_index_entry,
                                  TxnTimeStamp begin_ts,
                                  BufferManager *buffer_mgr,
-                                 BooleanT prepare,
-                                 BooleanT is_replay) {
+                                 bool prepare,
+                                 bool is_replay) {
     return table_entry->CreateIndexFile(txn_store, table_index_entry, begin_ts, buffer_mgr, prepare, is_replay);
 }
 
@@ -276,7 +276,7 @@ Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *t
     return Status::OK();
 }
 
-void NewCatalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, BooleanT is_replay) {
+void NewCatalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     return TableEntry::CommitCreateIndex(txn_indexes_store_, is_replay);
 }
 

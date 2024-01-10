@@ -60,7 +60,7 @@ private:
                                                  u64 txn_id,
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr,
-                                                 BooleanT is_replay = false,
+                                                 bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
     Tuple<TableIndexEntry *, Status>
@@ -74,10 +74,10 @@ private:
                          TableIndexEntry *table_index_entry,
                          TxnTimeStamp begin_ts,
                          BufferManager *buffer_mgr,
-                         BooleanT prepare,
-                         BooleanT is_replay);
+                         bool prepare,
+                         bool is_replay);
 
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, BooleanT is_replay);
+    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }
 

@@ -65,7 +65,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
                                                          u64 txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr,
-                                                         BooleanT is_replay,
+                                                         bool is_replay,
                                                          String replay_table_index_dir) {
     if (index_def->index_name_->empty()) {
         // Index name shouldn't be empty
@@ -212,8 +212,8 @@ void TableEntry::CreateIndexFile(void *txn_store,
                                  TableIndexEntry *table_index_entry,
                                  TxnTimeStamp begin_ts,
                                  BufferManager *buffer_mgr,
-                                 BooleanT prepare,
-                                 BooleanT is_replay) {
+                                 bool prepare,
+                                 bool is_replay) {
     IrsIndexEntry *irs_index_entry = table_index_entry->irs_index_entry().get();
     if (irs_index_entry != nullptr) {
 
@@ -244,7 +244,7 @@ void TableEntry::CreateIndexFile(void *txn_store,
     }
 }
 
-void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, BooleanT is_replay) {
+void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
         for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
