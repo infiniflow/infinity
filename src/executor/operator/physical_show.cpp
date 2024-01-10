@@ -1360,7 +1360,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index path
-                Value value = Value::MakeVarchar(*column_index_entry->index_dir());
+                Value value = Value::MakeVarchar(*column_index_entry->col_index_dir());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }

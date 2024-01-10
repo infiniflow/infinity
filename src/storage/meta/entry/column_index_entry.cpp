@@ -38,10 +38,10 @@ namespace infinity {
 ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                    TableIndexEntry *table_index_entry,
                                    u64 column_id,
-                                   SharedPtr<String> index_dir,
+                                   SharedPtr<String> col_index_dir,
                                    u64 txn_id,
                                    TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), column_id_(column_id), index_dir_(index_dir),
+    : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), column_id_(column_id), col_index_dir_(col_index_dir),
       index_base_(index_base) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
@@ -51,11 +51,11 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
                                                                   u64 column_id,
                                                                   TableIndexEntry *table_index_entry,
                                                                   u64 txn_id,
-                                                                  SharedPtr<String> index_dir,
+                                                                  SharedPtr<String> col_index_dir,
                                                                   TxnTimeStamp begin_ts) {
     //    SharedPtr<String> index_dir =
     //        DetermineIndexDir(*TableIndexMeta::GetTableEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
-    return MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
+    return MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
@@ -78,7 +78,7 @@ nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json["commit_ts"] = this->commit_ts_.load();
         json["deleted"] = this->deleted_;
         json["column_id"] = this->column_id_;
-        json["index_dir"] = *this->index_dir();
+        json["col_index_dir"] = *this->col_index_dir();
         json["index_base"] = this->index_base_->Serialize();
 
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
@@ -107,10 +107,10 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     TxnTimeStamp begin_ts = column_index_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = column_index_entry_json["commit_ts"];
     u64 column_id = column_index_entry_json["column_id"];
-    auto index_dir = MakeShared<String>(column_index_entry_json["index_dir"]);
+    auto col_index_dir = MakeShared<String>(column_index_entry_json["col_index_dir"]);
     SharedPtr<IndexBase> index_base = IndexBase::Deserialize(column_index_entry_json["index_base"]);
 
-    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, index_dir, txn_id, begin_ts);
+    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
     column_index_entry->commit_ts_.store(commit_ts);
     column_index_entry->deleted_ = deleted;
 
@@ -146,7 +146,7 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
             auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
             switch (elem_type) {
                 case kElemFloat: {
-                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(this->index_dir(),
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(this->col_index_dir(),
                                                                              file_name,
                                                                              index_base,
                                                                              column_def,
@@ -161,7 +161,7 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
         }
         case IndexType::kHnsw: {
             auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
-            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
+            file_worker = MakeUnique<HnswFileWorker>(this->col_index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
             break;
         }
         case IndexType::kIRSFullText: {

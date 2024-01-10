@@ -41,9 +41,10 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
                                                                        ConflictType conflict_type,
                                                                        u64 txn_id,
                                                                        TxnTimeStamp begin_ts,
-                                                                       TxnManager *txn_mgr) {
-
-    auto [table_index_entry, status] = CreateTableIndexEntryInternal(index_def, txn_id, begin_ts, txn_mgr);
+                                                                       TxnManager *txn_mgr,
+                                                                       bool is_replay,
+                                                                       String replay_table_index_dir) {
+    auto [table_index_entry, status] = CreateTableIndexEntryInternal(index_def, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
     switch (conflict_type) {
         case ConflictType::kError: {
             return {table_index_entry, status};
@@ -62,8 +63,12 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
     }
 }
 
-Tuple<TableIndexEntry *, Status>
-TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def,
+                                                                               u64 txn_id,
+                                                                               TxnTimeStamp begin_ts,
+                                                                               TxnManager *txn_mgr,
+                                                                               bool is_replay,
+                                                                               String replay_table_index_dir) {
     TableIndexEntry *table_index_entry_ptr{nullptr};
 
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
@@ -75,7 +80,7 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Create a new table index entry
-        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
         table_index_entry_ptr = table_index_entry.get();
         this->entry_list_.emplace_front(std::move(table_index_entry));
         LOG_TRACE("New table index entry is added.");
@@ -84,7 +89,7 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry *header_base_entry = this->entry_list_.front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
             table_index_entry_ptr = table_index_entry.get();
             this->entry_list_.emplace_front(std::move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
@@ -96,7 +101,8 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
             if (begin_ts > header_entry->commit_ts_) {
                 if (header_entry->deleted_) {
                     // No conflict
-                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                    auto table_index_entry =
+                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->entry_list_.emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
@@ -109,8 +115,8 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                 }
             } else {
                 // Write-Write conflict
-                UniquePtr<String> err_msg =
-                    MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
+                UniquePtr<String> err_msg = MakeUnique<String>(
+                    fmt::format("Write-write conflict: There is a committed TableIndexEntry which is later than current transaction."));
                 LOG_ERROR(*err_msg);
                 return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
             }
@@ -125,7 +131,8 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                         // Same txn
                         if (header_entry->deleted_) {
                             // No conflict
-                            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                            auto table_index_entry =
+                                TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
                             table_index_entry_ptr = table_index_entry.get();
                             this->entry_list_.emplace_front(std::move(table_index_entry));
                             LOG_TRACE("New table index entry is added.");
@@ -155,7 +162,8 @@ TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_d
                     this->entry_list_.erase(this->entry_list_.begin());
 
                     // Append new one
-                    auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts);
+                    auto table_index_entry =
+                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->entry_list_.emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
@@ -243,7 +251,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
             return {table_index_entry_ptr, Status::OK()};
         } else {
             // Not same txn, issue WW conflict
-            UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.");
+            UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted table index entry.");
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
         }

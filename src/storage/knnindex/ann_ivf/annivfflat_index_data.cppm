@@ -35,6 +35,7 @@ struct AnnIVFFlatIndexData {
     Vector<CentroidsDataType> centroids_;
     Vector<Vector<u32>> ids_;
     Vector<Vector<VectorDataType>> vectors_;
+    AnnIVFFlatIndexData() = default;
     AnnIVFFlatIndexData(MetricType metric, u32 dimension, u32 partition_num)
         : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), ids_(partition_num_),
           vectors_(partition_num_) {}

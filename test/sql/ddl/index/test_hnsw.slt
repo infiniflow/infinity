@@ -21,5 +21,12 @@ DROP INDEX idx1 ON test_hnsw;
 
 # default parameters
 statement ok
-CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+
+# duplicate index name
+statement error
+CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+
+statement ok
+CREATE INDEX IF NOT EXISTS idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
 

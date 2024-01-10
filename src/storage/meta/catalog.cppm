@@ -147,7 +147,9 @@ public:
                                                                ConflictType conflict_type,
                                                                u64 txn_id,
                                                                TxnTimeStamp begin_ts,
-                                                               TxnManager *txn_mgr);
+                                                               TxnManager *txn_mgr,
+                                                 bool is_replay = false,
+                                                 String replay_table_index_dir = "");
 
     Tuple<TableIndexEntry *, Status> DropIndex(const String &db_name,
                                                const String &table_name,
@@ -162,11 +164,12 @@ public:
                                 TableIndexEntry *table_index_entry,
                                 TxnTimeStamp begin_ts,
                                 BufferManager *buffer_mgr,
-                                bool prepare);
+                                bool prepare,
+                                bool is_replay = false);
 
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr);
 
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_);
+    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay = false);
 
     // Append related functions
     static void Append(TableEntry *table_entry, u64 txn_id, void *txn_store, BufferManager *buffer_mgr);

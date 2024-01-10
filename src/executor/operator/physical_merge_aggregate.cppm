@@ -14,17 +14,18 @@
 
 module;
 
-import stl;
-import parser;
+import base_table_ref;
+import load_meta;
 import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import load_meta;
-import base_table_ref;
+
 import infinity_exception;
 import value;
 import data_block;
+import stl;
+import parser;
 
 export module physical_merge_aggregate;
 

@@ -122,6 +122,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool &prepare_success)
 
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl() {
+    data_ = new AnnIVFFlatIndexData<DataType>();
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->ReadIndexInner(*file_handler_);
 }

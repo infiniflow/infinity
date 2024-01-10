@@ -93,12 +93,15 @@ public:
     Tuple<TableEntry *, Status> GetTableEntry(const String &db_name, const String &table_name);
 
     // Index OPs
-    // If `prepare` is false, the index will be created in single thread. (called by `PhysicalCreateIndex`)
+    // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
     Status CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare);
 
     Status CreateIndexDo(TableEntry *table_entry, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes);
+
+    // write wal
+    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &indef);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 

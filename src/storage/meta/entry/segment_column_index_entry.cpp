@@ -156,27 +156,28 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
 void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { Error<NotImplementException>("Not implemented"); }
 
 bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
-    String &index_name = *this->column_index_entry_->index_dir();
+    String &index_name = *this->column_index_entry_->col_index_dir();
     u64 segment_id = this->segment_id_;
-    LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     if (this->max_ts_ <= this->checkpoint_ts_ || this->min_ts_ > checkpoint_ts) {
         LOG_TRACE(fmt::format("Segment: {}, Index: {} has been flushed at some previous checkpoint, or is not visible at current checkpoint.",
-                         segment_id,
-                         index_name));
+                              segment_id,
+                              index_name));
         return false;
     }
-    if (this->buffer_ == nullptr) {
-        LOG_WARN("Index entry is not initialized");
-        return false;
-    }
+
+    this->checkpoint_ts_ = checkpoint_ts;
+    LOG_TRACE(fmt::format("Segment: {}, Index: {} checkpoint is change to {}", segment_id, index_name, this->checkpoint_ts_));
+    return true;
+}
+
+void SegmentColumnIndexEntry::SaveIndexFile() {
+    String &index_name = *this->column_index_entry_->col_index_dir();
+    u64 segment_id = this->segment_id_;
+    LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     if (this->buffer_->Save()) {
         this->buffer_->Sync();
         this->buffer_->CloseFile();
     }
-
-    this->checkpoint_ts_ = checkpoint_ts;
-    LOG_TRACE(fmt::format("Segment: {}, Index: {} is flushed", segment_id, index_name));
-    return true;
 }
 
 nlohmann::json SegmentColumnIndexEntry::Serialize() {

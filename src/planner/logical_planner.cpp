@@ -69,6 +69,7 @@ import index_ivfflat;
 import index_hnsw;
 import index_full_text;
 import base_table_ref;
+import catalog;
 
 namespace infinity {
 
@@ -458,6 +459,17 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     if (index_info_list.empty()) {
         Error<PlannerException>("No index info.");
     }
+
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
+
+    auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
+
+    if (index_name_map.contains(*index_name)) {
+        if (create_index_info->conflict_type_ == ConflictType::kError)
+            Error<PlannerException>(fmt::format("Duplicated index name: {}", *index_name));
+    }
+
     for (IndexInfo *index_info : index_info_list) {
         SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {
@@ -486,9 +498,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         }
         index_def_ptr->index_array_.emplace_back(base_index_ptr);
     }
-
-    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
 
     auto logical_create_index_operator =
         MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, index_def_ptr, create_index_info->conflict_type_);

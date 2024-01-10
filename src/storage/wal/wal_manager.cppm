@@ -59,7 +59,7 @@ public:
 
     void Checkpoint();
 
-    void Checkpoint(ForceCheckpointTask* ckp_task);
+    void Checkpoint(ForceCheckpointTask *ckp_task);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
