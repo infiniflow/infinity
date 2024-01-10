@@ -80,7 +80,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;
     auto &middle_result_count = merge_top_op_state->middle_result_count_;
     u32 input_result_count =
-        std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), u32{}, [](u32 sum, const auto &data_block) -> u32 {
+        std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 sum, const auto &data_block) -> u32 {
             return sum + data_block->row_count();
         });
     if (middle_data_block_array.empty()) {
@@ -113,10 +113,11 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
                 for (u32 i = 0; i < sort_expr_count_; ++i) {
                     auto compare_result =
                         sort_functions_[i](middle_data[i]->data(), middle.block_offset_, input_data[i]->data(), input.block_offset_);
-                    if (compare_result > 0) {
-                        return true;
-                    } else if (compare_result < 0) {
-                        return false;
+                    switch (compare_result) {
+                        case OrderBySingleResult::kPreferLeft:
+                            return true;
+                        case OrderBySingleResult::kPreferRight:
+                            return false;
                     }
                 }
                 return true;

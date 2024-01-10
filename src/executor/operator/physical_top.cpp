@@ -38,8 +38,8 @@ namespace infinity {
 
 class TopSolver {
 public:
-    explicit TopSolver(u32 limit, u32 sort_expr_count, const Vector<StdFunction<i8(void *, u32, void *, u32)>> &sort_functions)
-        : limit(limit), sort_expr_count(sort_expr_count), sort_functions(sort_functions) {
+    explicit TopSolver(u32 limit, u32 sort_expr_count, const Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> &sort_functions)
+        : limit_(limit), sort_expr_count_(sort_expr_count), sort_functions_(sort_functions) {
         Init();
     }
     u32 WriteTopResultsToOutput(const Vector<Vector<SharedPtr<ColumnVector>>> &eval_columns,
@@ -48,86 +48,90 @@ public:
         ResetInput(eval_columns);
         SolveTop();
         WriteToOutput(input_data_block_array, output_data_block_array);
-        return size;
+        return size_;
     }
 
 private:
-    u32 size{};
-    u32 limit{};
-    u32 sort_expr_count{};
-    const Vector<StdFunction<i8(void *, u32, void *, u32)>> &sort_functions;
-    UniquePtr<Pair<u32, u32>[]> candidate_local_row_ids;
-    Pair<u32, u32> *row_ids_ptr = nullptr; // with offset, start from 1, for heap sort
-    const Vector<Vector<SharedPtr<ColumnVector>>> *input_data = nullptr;
+    u32 size_{};
+    u32 limit_{};
+    u32 sort_expr_count_{};
+    const Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> &sort_functions_;
+    UniquePtr<Pair<u32, u32>[]> candidate_local_row_ids_;
+    Pair<u32, u32> *row_ids_ptr_ = nullptr; // with offset, start from 1, for heap sort
+    const Vector<Vector<SharedPtr<ColumnVector>>> *input_data_ = nullptr;
     void Init() {
-        candidate_local_row_ids = MakeUniqueForOverwrite<Pair<u32, u32>[]>(limit);
-        row_ids_ptr = candidate_local_row_ids.get() - 1;
+        candidate_local_row_ids_ = MakeUniqueForOverwrite<Pair<u32, u32>[]>(limit_);
+        row_ids_ptr_ = candidate_local_row_ids_.get() - 1;
     }
     void ResetInput(const Vector<Vector<SharedPtr<ColumnVector>>> &eval_columns) {
-        size = 0;
-        input_data = &eval_columns;
+        size_ = 0;
+        input_data_ = &eval_columns;
     }
     void HeapifyDown(u32 index, auto compare) {
-        if (index == 0 || (index << 1) > size) {
+        if (index == 0 || (index << 1) > size_) {
             return;
         }
-        auto tmp_id = row_ids_ptr[index];
-        for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-            if (sub + 1 <= size && compare(row_ids_ptr[sub + 1], row_ids_ptr[sub])) {
+        auto tmp_id = row_ids_ptr_[index];
+        for (u32 sub; (sub = (index << 1)) <= size_; index = sub) {
+            if (sub + 1 <= size_ && compare(row_ids_ptr_[sub + 1], row_ids_ptr_[sub])) {
                 ++sub;
             }
-            if (!compare(row_ids_ptr[sub], tmp_id)) {
+            if (!compare(row_ids_ptr_[sub], tmp_id)) {
                 break;
             }
-            row_ids_ptr[index] = row_ids_ptr[sub];
+            row_ids_ptr_[index] = row_ids_ptr_[sub];
         }
-        row_ids_ptr[index] = tmp_id;
+        row_ids_ptr_[index] = tmp_id;
     }
     void AddCandidate(Pair<u32, u32> add_id, auto compare) {
-        if (size == limit) {
-            if (compare(row_ids_ptr[1], add_id)) {
-                row_ids_ptr[1] = add_id;
+        // when heap is full, only add candidate when compare(heap_top, add_id) is true
+        if (size_ == limit_) {
+            if (compare(row_ids_ptr_[1], add_id)) {
+                row_ids_ptr_[1] = add_id;
                 HeapifyDown(1, compare);
             }
         } else {
-            ++size;
-            row_ids_ptr[size] = add_id;
-            if (size == limit) {
-                for (u32 index = size / 2; index > 0; --index) {
+            ++size_;
+            row_ids_ptr_[size_] = add_id;
+            if (size_ == limit_) {
+                for (u32 index = size_ / 2; index > 0; --index) {
                     HeapifyDown(index, compare);
                 }
             }
         }
     }
     void SortResult(auto compare) {
-        auto size_backup = size;
-        if (size < limit) {
-            for (u32 index = size / 2; index > 0; --index) {
+        auto size_backup = size_;
+        if (size_ < limit_) {
+            for (u32 index = size_ / 2; index > 0; --index) {
                 HeapifyDown(index, compare);
             }
         }
-        while (size > 1) {
-            std::swap(row_ids_ptr[size], row_ids_ptr[1]);
-            --size;
+        while (size_ > 1) {
+            std::swap(row_ids_ptr_[size_], row_ids_ptr_[1]);
+            --size_;
             HeapifyDown(1, compare);
         }
-        size = size_backup;
+        size_ = size_backup;
     }
     void SolveTop() {
+        // compare_id_for_heap: for heap sort
+        // example: x = heap_top, y = candidate, return true if y should be put into heap
         auto compare_id_for_heap = [&](Pair<u32, u32> x, Pair<u32, u32> y) -> bool {
-            for (u32 i = 0; i < sort_expr_count; ++i) {
-                auto compare_result = sort_functions[i]((*input_data)[x.first][i]->data(), x.second, (*input_data)[y.first][i]->data(), y.second);
-                if (compare_result < 0) {
-                    return true;
-                } else if (compare_result > 0) {
-                    return false;
+            for (u32 i = 0; i < sort_expr_count_; ++i) {
+                auto compare_result = sort_functions_[i]((*input_data_)[x.first][i]->data(), x.second, (*input_data_)[y.first][i]->data(), y.second);
+                switch (compare_result) {
+                    case OrderBySingleResult::kPreferRight:
+                        return true;
+                    case OrderBySingleResult::kPreferLeft:
+                        return false;
                 }
             }
             return false;
         };
-        const u32 input_block_cnt = input_data->size();
+        const u32 input_block_cnt = input_data_->size();
         for (u32 block_id = 0; block_id < input_block_cnt; ++block_id) {
-            const u32 row_cnt = (*input_data)[block_id][0]->Size();
+            const u32 row_cnt = (*input_data_)[block_id][0]->Size();
             for (u32 row_id = 0; row_id < row_cnt; ++row_id) {
                 AddCandidate({block_id, row_id}, compare_id_for_heap);
             }
@@ -138,7 +142,7 @@ private:
         auto const &db_types = input_data_block_array[0]->types();
         {
             // prepare output blocks
-            i64 row_cnt = size;
+            i64 row_cnt = size_;
             do {
                 auto data_block = DataBlock::MakeUniquePtr();
                 // u32 need_capacity = Min(DEFAULT_BLOCK_CAPACITY, row_cnt);
@@ -153,12 +157,12 @@ private:
         auto output_block_ptr = output_data_block_array[output_block_id].get();
         u32 next_candidate_id = 0;
         // handle one input block in one loop
-        while (next_candidate_id < size) {
-            u32 input_block_id = candidate_local_row_ids[next_candidate_id].first;
+        while (next_candidate_id < size_) {
+            u32 input_block_id = candidate_local_row_ids_[next_candidate_id].first;
             auto input_block_ptr = input_data_block_array[input_block_id].get();
             // handle one input row in one loop
-            while (next_candidate_id < size) {
-                auto [block_id, row_id] = candidate_local_row_ids[next_candidate_id];
+            while (next_candidate_id < size_) {
+                auto [block_id, row_id] = candidate_local_row_ids_[next_candidate_id];
                 if (block_id != input_block_id) {
                     break;
                 }
@@ -178,9 +182,9 @@ private:
 };
 
 template <OrderType compare_order, typename T>
-struct physical_top_compare_function {
-    static i8 compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
-        auto compare_T = [](const T &x, const T &y) -> bool {
+struct PhysicalTopCompareSingleValue {
+    static OrderBySingleResult compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
+        auto compare_prefer_left = [](const T &x, const T &y) -> bool {
             if constexpr (compare_order == OrderType::kAsc) {
                 return x < y;
             } else {
@@ -189,71 +193,74 @@ struct physical_top_compare_function {
         };
         auto &left = (static_cast<T *>(left_ptr))[left_id];
         auto &right = (static_cast<T *>(right_ptr))[right_id];
-        if (compare_T(left, right)) {
-            return 1;
+        if (compare_prefer_left(left, right)) {
+            return OrderBySingleResult::kPreferLeft;
         } else if (left == right) {
-            return 0;
+            return OrderBySingleResult::kEqual;
         } else {
-            return -1;
+            return OrderBySingleResult::kPreferRight;
         }
     }
 };
 
 template <OrderType compare_order>
-struct physical_top_compare_function<compare_order, BooleanT> {
-    static i8 compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
+struct PhysicalTopCompareSingleValue<compare_order, BooleanT> {
+    static OrderBySingleResult compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
+        // extract one bit from compact bit set, starting from ptr, with offset id
+        // byte count: id / 8
+        // extra bit count: id % 8
         auto extract_bool = [](u8 *ptr, u32 id) -> bool { return (ptr[id / 8] >> (id % 8)) & u8(1); };
-        auto compare_bool = [](bool x, bool y) -> i8 {
+        auto compare_bool_prefer_left = [](bool x, bool y) -> OrderBySingleResult {
             if (x == y)
-                return 0;
+                return OrderBySingleResult::kEqual;
             if constexpr (compare_order == OrderType::kAsc) {
-                return y ? 1 : -1;
+                return y ? OrderBySingleResult::kPreferLeft : OrderBySingleResult::kPreferRight;
             } else {
-                return x ? 1 : -1;
+                return x ? OrderBySingleResult::kPreferLeft : OrderBySingleResult::kPreferRight;
             }
         };
-        return compare_bool(extract_bool(static_cast<u8 *>(left_ptr), left_id), extract_bool(static_cast<u8 *>(right_ptr), right_id));
+        return compare_bool_prefer_left(extract_bool(static_cast<u8 *>(left_ptr), left_id), extract_bool(static_cast<u8 *>(right_ptr), right_id));
     }
 };
 
 template <OrderType compare_order>
-inline StdFunction<i8(void *, u32, void *, u32)> get_sort_function_template(SharedPtr<BaseExpression> &sort_expression) {
+inline StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     switch (auto switch_type = sort_expression->Type().type(); switch_type) {
         case LogicalType::kBoolean: {
-            return physical_top_compare_function<compare_order, BooleanT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, BooleanT>::compare;
         }
         case LogicalType::kTinyInt: {
-            return physical_top_compare_function<compare_order, TinyIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TinyIntT>::compare;
         }
         case LogicalType::kSmallInt: {
-            return physical_top_compare_function<compare_order, SmallIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, SmallIntT>::compare;
         }
         case LogicalType::kInteger: {
-            return physical_top_compare_function<compare_order, IntegerT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, IntegerT>::compare;
         }
         case LogicalType::kBigInt: {
-            return physical_top_compare_function<compare_order, BigIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, BigIntT>::compare;
         }
         case LogicalType::kFloat: {
-            return physical_top_compare_function<compare_order, FloatT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, FloatT>::compare;
         }
         case LogicalType::kDouble: {
-            return physical_top_compare_function<compare_order, DoubleT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DoubleT>::compare;
         }
         case LogicalType::kDate: {
-            return physical_top_compare_function<compare_order, DateT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DateT>::compare;
         }
         case LogicalType::kTime: {
-            return physical_top_compare_function<compare_order, TimeT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TimeT>::compare;
         }
         case LogicalType::kDateTime: {
-            return physical_top_compare_function<compare_order, DateTimeT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DateTimeT>::compare;
         }
         case LogicalType::kTimestamp: {
-            return physical_top_compare_function<compare_order, TimestampT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TimestampT>::compare;
         }
         case LogicalType::kRowID: {
-            return physical_top_compare_function<compare_order, RowID>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, RowID>::compare;
         }
         default: {
             Error<NotImplementException>(
@@ -262,13 +269,13 @@ inline StdFunction<i8(void *, u32, void *, u32)> get_sort_function_template(Shar
     }
 }
 
-inline StdFunction<i8(void *, u32, void *, u32)> get_sort_function(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
+StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
     switch (compare_order) {
         case OrderType::kAsc: {
-            return get_sort_function_template<OrderType::kAsc>(sort_expression);
+            return GenerateSortFunctionTemplate<OrderType::kAsc>(sort_expression);
         }
         case OrderType::kDesc: {
-            return get_sort_function_template<OrderType::kDesc>(sort_expression);
+            return GenerateSortFunctionTemplate<OrderType::kDesc>(sort_expression);
         }
         default: {
             Error<NotImplementException>(
@@ -285,22 +292,22 @@ void PhysicalTop::Init() {
     }
     sort_functions_.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
-        sort_functions_.emplace_back(get_sort_function(order_by_types_[i], sort_expressions_[i]));
+        sort_functions_.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));
     }
 }
 
 // Behavior now: always sort the output results
 bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto prev_op_state = operator_state->prev_op_state_;
-    if ((offset_ != u32{}) and !(prev_op_state->Complete())) {
+    if ((offset_ != 0) and !(prev_op_state->Complete())) {
         Error<ExecutorException>("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = operator_state->data_block_array_;
     // sometimes the input_data_block_array is empty, but the operator is not complete
-    if (std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), u32{}, [](u32 x, const auto &y) -> u32 {
+    if (std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
             return x + y->row_count();
-        }) == u32{}) {
+        }) == 0) {
         if (prev_op_state->Complete()) {
             operator_state->SetComplete();
         }
@@ -321,7 +328,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
 }
 
 void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<UniquePtr<DataBlock>> &output_data_block_array) {
-    if (offset == u32{}) {
+    if (offset == 0) {
         return;
     }
     if (offset >= total_row_cnt) {

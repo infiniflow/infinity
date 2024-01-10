@@ -27,6 +27,7 @@ import base_expression;
 import load_meta;
 import infinity_exception;
 import base_table_ref;
+import physical_top;
 
 namespace infinity {
 
@@ -65,13 +66,13 @@ public:
     }
 
 private:
-    SharedPtr<BaseTableRef> base_table_ref_;                           // necessary for InputLoad
-    u32 limit_{};                                                      // limit value
-    u32 offset_{};                                                     // offset value
-    u32 sort_expr_count_{};                                            // number of expressions to sort
-    Vector<OrderType> order_by_types_;                                 // ASC or DESC
-    Vector<SharedPtr<BaseExpression>> sort_expressions_;               // expressions to sort
-    Vector<StdFunction<i8(void *, u32, void *, u32)>> sort_functions_; // sort functions
+    SharedPtr<BaseTableRef> base_table_ref_;                                            // necessary for InputLoad
+    u32 limit_{};                                                                       // limit value
+    u32 offset_{};                                                                      // offset value
+    u32 sort_expr_count_{};                                                             // number of expressions to sort
+    Vector<OrderType> order_by_types_;                                                  // ASC or DESC
+    Vector<SharedPtr<BaseExpression>> sort_expressions_;                                // expressions to sort
+    Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> sort_functions_; // sort functions
 };
 
 } // namespace infinity

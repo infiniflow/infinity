@@ -33,6 +33,12 @@ import physical_limit;
 
 namespace infinity {
 
+export enum class OrderBySingleResult : i8 {
+    kEqual = 0,
+    kPreferLeft = 1,
+    kPreferRight = -1,
+};
+
 export class PhysicalTop : public PhysicalOperator {
 public:
     explicit PhysicalTop(u64 id,
@@ -72,12 +78,12 @@ public:
                                                                   const Vector<UniquePtr<DataBlock>> &data_block_array);
 
 private:
-    u32 limit_{};                                                      // limit value
-    u32 offset_{};                                                     // offset value
-    u32 sort_expr_count_{};                                            // number of expressions to sort
-    Vector<OrderType> order_by_types_;                                 // ASC or DESC
-    Vector<SharedPtr<BaseExpression>> sort_expressions_;               // expressions to sort
-    Vector<StdFunction<i8(void *, u32, void *, u32)>> sort_functions_; // sort functions
+    u32 limit_{};                                                                       // limit value
+    u32 offset_{};                                                                      // offset value
+    u32 sort_expr_count_{};                                                             // number of expressions to sort
+    Vector<OrderType> order_by_types_;                                                  // ASC or DESC
+    Vector<SharedPtr<BaseExpression>> sort_expressions_;                                // expressions to sort
+    Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> sort_functions_; // sort functions
     // TODO: save a common threshold value for all tasks
 };
 
