@@ -463,7 +463,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
 
-    SharedPtr<IndexBase> base_index_ptr{nullptr};
     auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
 
     if (index_name_map.contains(*index_name)) {
@@ -472,7 +471,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     }
 
     for (IndexInfo *index_info : index_info_list) {
-
+        SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {
             case IndexType::kIRSFullText: {
                 base_index_ptr = IndexFullText::Make(create_index_info->table_name_ + "_" + *index_name,
