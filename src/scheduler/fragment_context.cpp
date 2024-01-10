@@ -34,6 +34,8 @@ import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
 import physical_create_index_do;
+import physical_top;
+import physical_merge_top;
 
 import global_block_id;
 import knn_expression;
@@ -49,8 +51,10 @@ import physical_merge_knn;
 import merge_knn_data;
 import create_index_data;
 import logger;
-
+import task_scheduler;
 import plan_fragment;
+import aggregate_expression;
+import expression_state;
 
 namespace infinity {
 
@@ -114,6 +118,15 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
     return operator_state;
 }
 
+UniquePtr<OperatorState> MakeAggregateState(PhysicalAggregate *physical_aggregate, FragmentTask *task) {
+    Vector<UniquePtr<char[]>> states;
+    for (auto &expr : physical_aggregate->aggregates_) {
+        auto agg_expr = std::static_pointer_cast<AggregateExpression>(expr);
+        states.push_back(agg_expr->aggregate_function_.InitState());
+    }
+    return MakeUnique<AggregateOperatorState>(std::move(states));
+}
+
 UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn, FragmentTask *task) {
     KnnExpression *knn_expr = physical_merge_knn->knn_expression_.get();
     UniquePtr<OperatorState> operator_state = MakeUnique<MergeKnnOperatorState>();
@@ -125,6 +138,28 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
                                                                                         knn_expr->distance_type_,
                                                                                         physical_merge_knn->table_ref_);
 
+    return operator_state;
+}
+
+UniquePtr<OperatorState> MakeTopState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<TopOperatorState>();
+    auto &expr_states = operator_state->expr_states_;
+    auto &sort_expressions = (static_cast<PhysicalTop *>(physical_op))->GetSortExpressions();
+    expr_states.reserve(sort_expressions.size());
+    for (auto &expr : sort_expressions) {
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
+    return operator_state;
+}
+
+UniquePtr<OperatorState> MakeMergeTopState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<MergeTopOperatorState>();
+    auto &expr_states = operator_state->expr_states_;
+    auto &sort_expressions = (static_cast<PhysicalMergeTop *>(physical_op))->GetSortExpressions();
+    expr_states.reserve(sort_expressions.size());
+    for (auto &expr : sort_expressions) {
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
     return operator_state;
 }
 
@@ -151,7 +186,8 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeKnnScanState(physical_knn_scan, task, fragment_ctx);
         }
         case PhysicalOperatorType::kAggregate: {
-            return MakeTaskStateTemplate<AggregateOperatorState>(physical_ops[operator_id]);
+            auto physical_aggregate = static_cast<PhysicalAggregate *>(physical_ops[operator_id]);
+            return MakeAggregateState(physical_aggregate, task);
         }
         case PhysicalOperatorType::kMergeAggregate: {
             return MakeTaskStateTemplate<MergeAggregateOperatorState>(physical_ops[operator_id]);
@@ -186,10 +222,10 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<MergeLimitOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kTop: {
-            return MakeTaskStateTemplate<TopOperatorState>(physical_ops[operator_id]);
+            return MakeTopState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeTop: {
-            return MakeTaskStateTemplate<MergeTopOperatorState>(physical_ops[operator_id]);
+            return MakeMergeTopState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kProjection: {
             return MakeTaskStateTemplate<ProjectionOperatorState>(physical_ops[operator_id]);
@@ -326,10 +362,7 @@ void CollectTasks(Vector<SharedPtr<String>> &result, PlanFragment *fragment_ptr)
     }
 }
 
-void FragmentContext::BuildTask(QueryContext *query_context,
-                                FragmentContext *parent_context,
-                                PlanFragment *fragment_ptr,
-                                Vector<FragmentTask *> &task_array) {
+void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Notifier *notifier) {
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
@@ -342,15 +375,15 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
-            fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
         case FragmentType::kParallelMaterialize: {
-            fragment_context = MakeUnique<ParallelMaterializedFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<ParallelMaterializedFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
         case FragmentType::kParallelStream: {
-            fragment_context = MakeUnique<ParallelStreamFragmentCtx>(fragment_ptr, query_context);
+            fragment_context = MakeUnique<ParallelStreamFragmentCtx>(fragment_ptr, query_context, notifier);
             break;
         }
     }
@@ -419,7 +452,7 @@ void FragmentContext::BuildTask(QueryContext *query_context,
     if (fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : fragment_ptr->Children()) {
-            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), task_array);
+            FragmentContext::BuildTask(query_context, fragment_context.get(), child_fragment.get(), notifier);
         }
     }
     switch (fragment_operators[0]->operator_type()) {
@@ -430,7 +463,6 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             if (explain_op->explain_type() == ExplainType::kPipeline) {
                 CollectTasks(result, fragment_ptr->Children()[0].get());
                 explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
-                task_array.clear();
                 break;
             }
         }
@@ -438,25 +470,42 @@ void FragmentContext::BuildTask(QueryContext *query_context,
             break;
     }
 
-    for (const auto &task : tasks) {
-        task_array.emplace_back(task.get());
-    }
-
     fragment_ptr->SetContext(std::move(fragment_context));
 }
 
-FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context)
-    : fragment_ptr_(fragment_ptr), fragment_type_(fragment_ptr->GetFragmentType()), query_context_(query_context){};
+FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
+    : notifier_(notifier), fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
+      unfinished_child_n_(fragment_ptr->Children().size()) {}
 
-void FragmentContext::FinishTask() {
-    u64 unfinished_task = task_n_.fetch_sub(1);
-    auto sink_op = GetSinkOperator();
+void FragmentContext::TryFinishFragment() {
+    auto fragment_id = fragment_ptr_->FragmentID();
+    auto *parent_plan_fragment = fragment_ptr_->GetParent();
 
-    if (unfinished_task == 1 && sink_op->sink_type() == SinkType::kResult) {
-        LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
-        Complete();
+    if (!TryFinishFragmentInner()) {
+        LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
+        if (fragment_type_ == FragmentType::kParallelStream) {
+            auto *parent_plan_fragment = fragment_ptr_->GetParent();
+            if (parent_plan_fragment) {
+                auto *scheduler = query_context_->scheduler();
+                LOG_WARN(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
+                scheduler->ScheduleFragment(parent_plan_fragment);
+            }
+        }
     } else {
-        LOG_TRACE(fmt::format("Not all tasks in fragment: {} are completed", fragment_ptr_->FragmentID()));
+        LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_id));
+
+        if (parent_plan_fragment != nullptr) {
+            auto *parent_fragment_ctx = parent_plan_fragment->GetContext();
+            if (parent_fragment_ctx->TryStartFragment()) {
+                // All child fragment are finished.
+
+                auto *scheduler = query_context_->scheduler();
+                LOG_TRACE(fmt::format("Schedule fragment: {} because fragment {} has finished.",
+                                      parent_plan_fragment->FragmentID(),
+                                      fragment_ptr_->FragmentID()));
+                scheduler->ScheduleFragment(parent_plan_fragment);
+            }
+        }
     }
 }
 
@@ -473,32 +522,34 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
     switch (fragment_context->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-            serial_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                                                                   knn_scan_operator->filter_expression_,
-                                                                                                   std::move(knn_scan_operator->block_column_entries_),
-                                                                                                   std::move(knn_scan_operator->index_entries_),
-                                                                                                   std::move(knn_expr->opt_params_),
-                                                                                                   knn_expr->topn_,
-                                                                                                   knn_expr->dimension_,
-                                                                                                   1,
-                                                                                                   knn_expr->query_embedding_.ptr,
-                                                                                                   knn_expr->embedding_data_type_,
-                                                                                                   knn_expr->distance_type_);
+            serial_materialize_fragment_ctx->knn_scan_shared_data_ =
+                MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                              knn_scan_operator->filter_expression_,
+                                              std::move(knn_scan_operator->block_column_entries_),
+                                              std::move(knn_scan_operator->index_entries_),
+                                              std::move(knn_expr->opt_params_),
+                                              knn_expr->topn_,
+                                              knn_expr->dimension_,
+                                              1,
+                                              knn_expr->query_embedding_.ptr,
+                                              knn_expr->embedding_data_type_,
+                                              knn_expr->distance_type_);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
-            parallel_materialize_fragment_ctx->knn_scan_shared_data_ = MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
-                                                                                                     knn_scan_operator->filter_expression_,
-                                                                                                     std::move(knn_scan_operator->block_column_entries_),
-                                                                                                     std::move(knn_scan_operator->index_entries_),
-                                                                                                     std::move(knn_expr->opt_params_),
-                                                                                                     knn_expr->topn_,
-                                                                                                     knn_expr->dimension_,
-                                                                                                     1,
-                                                                                                     knn_expr->query_embedding_.ptr,
-                                                                                                     knn_expr->embedding_data_type_,
-                                                                                                     knn_expr->distance_type_);
+            parallel_materialize_fragment_ctx->knn_scan_shared_data_ =
+                MakeUnique<KnnScanSharedData>(knn_scan_operator->base_table_ref_,
+                                              knn_scan_operator->filter_expression_,
+                                              std::move(knn_scan_operator->block_column_entries_),
+                                              std::move(knn_scan_operator->index_entries_),
+                                              std::move(knn_expr->opt_params_),
+                                              knn_expr->topn_,
+                                              knn_expr->dimension_,
+                                              1,
+                                              knn_expr->query_embedding_.ptr,
+                                              knn_expr->embedding_data_type_,
+                                              knn_expr->distance_type_);
             break;
         }
         default: {
@@ -561,8 +612,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kMergeTop:
         case PhysicalOperatorType::kMergeSort:
         case PhysicalOperatorType::kMergeKnn:
-        case PhysicalOperatorType::kFusion:
-        case PhysicalOperatorType::kCreateIndexFinish: {
+        case PhysicalOperatorType::kFusion: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     fmt::format("{} should be serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -581,7 +631,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                     fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
             }
             for (auto &task : tasks_) {
-                task->source_state_ = MakeUnique<QueueSourceState>();
+                task->source_state_ = MakeUnique<EmptySourceState>();
             }
             break;
         }
@@ -634,6 +684,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kCreateTable:
         case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateIndexPrepare:
+        case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
@@ -676,7 +727,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                Error<SchedulerException>(
+                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -691,10 +743,10 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kParallelAggregate:
-        case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kTop: {
+        case PhysicalOperatorType::kHash: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                Error<SchedulerException>(
+                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -712,7 +764,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kLimit: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                Error<SchedulerException>(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                Error<SchedulerException>(
+                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -769,10 +822,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
-        case PhysicalOperatorType::kKnnScan:
-        case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexDo: {
+        case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
                 Error<SchedulerException>(
                     fmt::format("{} should in parallel/serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -851,6 +903,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -864,6 +917,16 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            if (fragment_type_ != FragmentType::kParallelMaterialize) {
+                Error<SchedulerException>(
+                    fmt::format("{} should in parallel materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
+            }
+            for (auto &task : tasks_) {
+                task->sink_state_ = MakeUnique<MessageSinkState>();
+            }
             break;
         }
         case PhysicalOperatorType::kCommand:
@@ -943,7 +1006,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
             Error<SchedulerException>("Invalid fragment type");
         }
         case FragmentType::kSerialMaterialize: {
-            std::unique_lock<std::mutex> locker(locker_);
             parallel_count = 1;
             tasks_.reserve(parallel_count);
             tasks_.emplace_back(MakeUnique<FragmentTask>(this, 0, operator_count));
@@ -952,7 +1014,6 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case FragmentType::kParallelMaterialize:
         case FragmentType::kParallelStream: {
-            std::unique_lock<std::mutex> locker(locker_);
             tasks_.reserve(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_.emplace_back(MakeUnique<FragmentTask>(this, task_id, operator_count));
@@ -1131,6 +1192,15 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     }
 
     return result_table;
+}
+
+void FragmentContext::DumpFragmentCtx() {
+    for (auto &task : tasks_) {
+        LOG_WARN(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+    }
+    for (auto iter = fragment_ptr_->GetOperators().begin(); iter != fragment_ptr_->GetOperators().end(); ++iter) {
+        LOG_WARN(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+    }
 }
 
 } // namespace infinity

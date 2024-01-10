@@ -102,6 +102,28 @@ public:
         full_cv_.notify_one();
     }
 
+    bool TryDequeue(T& task) {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        if (queue_.empty()) {
+            return false;
+        }
+        task = queue_.front();
+        queue_.pop_front();
+        full_cv_.notify_one();
+        return true;
+    }
+
+    bool TryDequeueBulk(Vector<T> &output_array) {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        if (queue_.empty()) {
+            return false;
+        }
+        output_array.insert(output_array.end(), queue_.begin(), queue_.end());
+        queue_.clear();
+        full_cv_.notify_one();
+        return true;
+    }
+
     [[nodiscard]] SizeT Size() const {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return queue_.size();

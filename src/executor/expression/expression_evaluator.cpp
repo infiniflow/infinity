@@ -86,15 +86,17 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
         Error<ExecutorException>("Return type isn't matched with the output column vector");
     }
 
+    auto data_state = state->agg_state_;
+
     // 1. Initialize the aggregate state.
-    expr->aggregate_function_.init_func_(expr->aggregate_function_.GetState());
+    expr->aggregate_function_.init_func_(data_state);
 
     // 2. Loop to fill the aggregate state
-    expr->aggregate_function_.update_func_(expr->aggregate_function_.GetState(), child_output_col);
+    expr->aggregate_function_.update_func_(data_state, child_output_col);
 
     // 3. Get the aggregate result and append to output column vector.
 
-    const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(expr->aggregate_function_.GetState());
+    const_ptr_t result_ptr = expr->aggregate_function_.finalize_func_(data_state);
     output_column_vector->AppendByPtr(result_ptr);
 
     in_aggregate_ = false;
@@ -116,15 +118,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
     expr->func_.function(child_output, output_column_vector, child_output->Size(), cast_parameters);
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &) {
+void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     Error<ExecutorException>("Case execution");
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &) {
+void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     Error<ExecutorException>("Column expression");
 }
 
@@ -174,9 +172,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     output_column_vector = input_data_block_->column_vectors[column_index];
 }
 
-void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &,
-                                  SharedPtr<ExpressionState> &,
-                                  SharedPtr<ColumnVector> &) {
+void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     Error<ExecutorException>("IN execution isn't implemented yet.");
 }
 

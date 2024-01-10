@@ -32,9 +32,9 @@ namespace infinity {
 export class ExpressionState {
 public:
     // Static functions
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<BaseExpression> &expression);
+    static SharedPtr<ExpressionState> CreateState(const SharedPtr<BaseExpression> &expression, char * = nullptr);
 
-    static SharedPtr<ExpressionState> CreateState(const SharedPtr<AggregateExpression> &agg_expr);
+    static SharedPtr<ExpressionState> CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state);
 
     static SharedPtr<ExpressionState> CreateState(const SharedPtr<CaseExpression> &agg_expr);
 
@@ -54,6 +54,8 @@ public:
     Vector<SharedPtr<ExpressionState>> &Children() { return children_; }
 
     SharedPtr<ColumnVector> &OutputColumnVector() { return column_vector_; }
+
+    char *agg_state_{};
 
 private:
     Vector<SharedPtr<ExpressionState>> children_;

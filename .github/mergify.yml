@@ -15,7 +15,8 @@ queue_rules:
     queue_conditions:
       # Mergify receives `queue` or `requeue` command, queues the PR if following conditions are all true.
       - "#approved-reviews-by>=1"
-      - "check-success=tests"
+      - "check-success=tests / debug_tests"
+      - "check-success=tests / release_tests and benchmark"
     merge_conditions:
       - "check-success=tests"
     merge_method: squash

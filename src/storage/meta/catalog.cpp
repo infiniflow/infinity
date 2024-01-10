@@ -231,22 +231,13 @@ Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnMana
     return Status::OK();
 }
 
-Tuple<TableEntry *, TableIndexEntry *, Status> NewCatalog::CreateIndex(const String &db_name,
-                                                                       const String &table_name,
-                                                                       const SharedPtr<IndexDef> &index_def,
-                                                                       ConflictType conflict_type,
-                                                                       u64 txn_id,
-                                                                       TxnTimeStamp begin_ts,
-                                                                       TxnManager *txn_mgr) {
-    auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
-    if (!table_status.ok()) {
-        LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));
-        return {nullptr, nullptr, table_status};
-    }
-
-    auto [table_index_entry, index_status] = table_entry->CreateIndex(index_def, conflict_type, txn_id, begin_ts, txn_mgr);
-
-    return {table_entry, table_index_entry, index_status};
+Tuple<TableIndexEntry *, Status> NewCatalog::CreateIndex(TableEntry *table_entry,
+                                                         const SharedPtr<IndexDef> &index_def,
+                                                         ConflictType conflict_type,
+                                                         u64 txn_id,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnManager *txn_mgr) {
+    return table_entry->CreateIndex(index_def, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
 Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,

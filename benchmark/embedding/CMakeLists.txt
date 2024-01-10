@@ -25,8 +25,3 @@ target_link_libraries(
         benchmark_profiler
         onnxruntime_mlas
 )
-add_executable(split_data
-        split_data.cpp
-        helper.cpp
-        helper.h
-)

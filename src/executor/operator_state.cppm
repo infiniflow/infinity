@@ -26,6 +26,7 @@ import parser;
 import merge_knn_data;
 import create_index_data;
 import blocking_queue;
+import expression_state;
 
 export module operator_state;
 
@@ -54,7 +55,10 @@ export struct OperatorState {
 
 // Aggregate
 export struct AggregateOperatorState : public OperatorState {
-    inline explicit AggregateOperatorState() : OperatorState(PhysicalOperatorType::kAggregate) {}
+    inline explicit AggregateOperatorState(Vector<UniquePtr<char[]>> states)
+        : OperatorState(PhysicalOperatorType::kAggregate), states_(std::move(states)) {}
+
+    Vector<UniquePtr<char[]>> states_;
 };
 
 // Merge Aggregate
@@ -62,7 +66,7 @@ export struct MergeAggregateOperatorState : public OperatorState {
     inline explicit MergeAggregateOperatorState() : OperatorState(PhysicalOperatorType::kMergeAggregate) {}
 
     /// Since merge agg is the first op, no previous operator state. This ptr is to get input data.
-    //Vector<UniquePtr<DataBlock>> input_data_blocks_{nullptr};
+    // Vector<UniquePtr<DataBlock>> input_data_blocks_{nullptr};
     UniquePtr<DataBlock> input_data_block_{nullptr};
     bool input_complete_{false};
 };
@@ -93,7 +97,7 @@ export struct TableScanOperatorState : public OperatorState {
 export struct KnnScanOperatorState : public OperatorState {
     inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
 
-//    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
+    //    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
     UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
 };
 
@@ -166,11 +170,17 @@ export struct MergeLimitOperatorState : public OperatorState {
 // Merge Top
 export struct MergeTopOperatorState : public OperatorState {
     inline explicit MergeTopOperatorState() : OperatorState(PhysicalOperatorType::kMergeTop) {}
+    Vector<SharedPtr<ExpressionState>> expr_states_;         // expression states
+    Vector<UniquePtr<DataBlock>> middle_sorted_data_blocks_; // middle result
+    u32 middle_result_count_{};
+    Vector<UniquePtr<DataBlock>> input_data_blocks_;
+    bool input_complete_{false};
 };
 
 // Top
 export struct TopOperatorState : public OperatorState {
     inline explicit TopOperatorState() : OperatorState(PhysicalOperatorType::kTop) {}
+    Vector<SharedPtr<ExpressionState>> expr_states_; // expression states
 };
 
 // Projection
@@ -216,7 +226,7 @@ export struct InsertOperatorState : public OperatorState {
 export struct ImportOperatorState : public OperatorState {
     inline explicit ImportOperatorState() : OperatorState(PhysicalOperatorType::kImport) {}
 
-//    Vector<SharedPtr<DataBlock>> output_{};
+    //    Vector<SharedPtr<DataBlock>> output_{};
     SharedPtr<TableDef> table_def_{};
     // For insert, update, delete, update
     UniquePtr<String> result_msg_{};
@@ -250,14 +260,13 @@ export struct CreateIndexPrepareOperatorState : public OperatorState {
 export struct CreateIndexDoOperatorState : public OperatorState {
     inline explicit CreateIndexDoOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexDo) {}
 
-    bool input_complete_ = false;
+    UniquePtr<String> result_msg_{};
     CreateIndexSharedData *create_index_shared_data_;
 };
 
 export struct CreateIndexFinishOperatorState : public OperatorState {
     inline explicit CreateIndexFinishOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexFinish) {}
 
-    bool input_complete_ = false;
     UniquePtr<String> error_message_{};
 };
 

@@ -83,10 +83,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             }
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }
@@ -119,10 +120,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }
@@ -155,10 +157,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             EXPECT_EQ(v.value_.integer, static_cast<IntegerT>(2 * i));
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }
@@ -191,10 +194,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             EXPECT_EQ(v.value_.big_int, static_cast<BigIntT>(2 * i));
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }
@@ -227,10 +231,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             EXPECT_FLOAT_EQ(v.value_.float32, static_cast<FloatT>(2 * i));
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }
@@ -263,10 +268,11 @@ TEST_F(AvgFunctionTest, avg_func) {
             EXPECT_FLOAT_EQ(v.value_.float64, static_cast<DoubleT>(2 * i));
         }
 
-        func.init_func_(func.GetState());
-        func.update_func_(func.GetState(), data_block.column_vectors[0]);
+        auto data_state = func.InitState();
+        func.init_func_(data_state.get());
+        func.update_func_(data_state.get(), data_block.column_vectors[0]);
         DoubleT result;
-        result = *(DoubleT *)func.finalize_func_(func.GetState());
+        result = *(DoubleT *)func.finalize_func_(data_state.get());
 
         EXPECT_FLOAT_EQ(result, sum / row_count);
     }

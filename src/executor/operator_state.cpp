@@ -19,7 +19,8 @@ import stl;
 import physical_operator_type;
 import fragment_data;
 import infinity_exception;
-
+import logger;
+import third_party;
 module operator_state;
 
 namespace infinity {
@@ -32,6 +33,8 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
         if (pending_tasks == 0) {
             num_tasks_.erase(it);
         }
+    } else {
+        Error<ExecutorException>("Get unexpected data from child fragment");
     }
 }
 
@@ -40,7 +43,9 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 // True or false doesn't mean the source data is error or not.
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
-    source_queue_.Dequeue(fragment_data_base);
+    if (!source_queue_.TryDequeue(fragment_data_base)) {
+        Error<ExecutorException>("This task should not be scheduled if the source queue is empty");
+    }
 
     switch (fragment_data_base->type_) {
         case FragmentDataType::kData: {
@@ -104,22 +109,43 @@ bool QueueSourceState::GetData() {
             }
             break;
         }
+        case PhysicalOperatorType::kMergeTop: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            auto top_op_state = (MergeTopOperatorState *)next_op_state;
+            top_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (!top_op_state->input_complete_) {
+                top_op_state->input_complete_ = completed;
+            }
+            if (top_op_state->input_complete_) {
+                source_queue_.NotAllowEnqueue();
+            }
+            break;
+        }
         case PhysicalOperatorType::kMergeAggregate: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
             // merge_aggregate_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
             merge_aggregate_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+
+            // {
+            //     auto row = merge_aggregate_op_state->input_data_block_->row_count();
+            //     if (row == 0) {
+            //         // LOG_WARN("FFF");
+            //     } else {
+            //         auto v = merge_aggregate_op_state->input_data_block_->GetValue(0, 0);
+            //         auto ti = v.value_.tiny_int;
+            //         auto si = v.value_.small_int;
+            //         auto i = v.value_.integer;
+            //         LOG_WARN(fmt::format("Merge Agg: task id {}, fragment id {}, completed {}, {} {} {}",
+            //                              fragment_data->task_id_,
+            //                              fragment_data->fragment_id_,
+            //                              completed,
+            //                              ti,
+            //                              si,
+            //                              i));
+            //     }
+            // }
             merge_aggregate_op_state->input_complete_ = completed;
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexDo: {
-            auto *create_index_do_op_state = static_cast<CreateIndexDoOperatorState *>(next_op_state);
-            create_index_do_op_state->input_complete_ = completed;
-            break;
-        }
-        case PhysicalOperatorType::kCreateIndexFinish: {
-            auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(next_op_state);
-            create_index_finish_op_state->input_complete_ = completed;
             break;
         }
         default: {

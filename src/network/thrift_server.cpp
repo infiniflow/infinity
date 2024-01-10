@@ -300,7 +300,7 @@ public:
         }
 
         if (current_offset != (i32)all_size) {
-            Error<NetworkException>("Bug");
+            Error<NetworkException>("Varchar data size not match");
         }
 
         output_column_field.column_vectors.emplace_back(std::move(dst));

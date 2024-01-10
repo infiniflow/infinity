@@ -112,6 +112,22 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             }
             break;
         }
+        case PhysicalOperatorType::kTop: {
+            auto top_output_state = static_cast<TopOperatorState *>(task_op_state);
+            if (top_output_state->data_block_array_.empty()) {
+                if (materialize_sink_state->Error()) {
+                    materialize_sink_state->empty_result_ = true;
+                } else {
+                    Error<ExecutorException>("Empty sort output");
+                }
+            } else {
+                for (auto &data_block : top_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                top_output_state->data_block_array_.clear();
+            }
+            break;
+        }
         case PhysicalOperatorType::kSort: {
             SortOperatorState *sort_output_state = static_cast<SortOperatorState *>(task_op_state);
             if (sort_output_state->data_block_array_.empty()) {
@@ -137,7 +153,10 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                     Error<ExecutorException>("Empty agg output");
                 }
             } else {
-                materialize_sink_state->data_block_array_ = std::move(agg_output_state->data_block_array_);
+                for (auto &data_block : agg_output_state->data_block_array_) {
+                    materialize_sink_state->data_block_array_.emplace_back(std::move(data_block));
+                }
+                agg_output_state->data_block_array_.clear();
             }
             break;
         }
@@ -338,6 +357,16 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(insert_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *create_index_prepare_output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(create_index_prepare_output_state->result_msg_);
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexDo: {
+            auto *create_index_do_output_state = static_cast<CreateIndexDoOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(create_index_do_output_state->result_msg_);
+            break;
+        }
         default: {
             Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
             break;
@@ -348,6 +377,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
 void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_context,
                                                       QueueSinkState *queue_sink_state,
                                                       OperatorState *task_operator_state) {
+    // if (task_operator_state->operator_type_ == PhysicalOperatorType::kAggregate) {
+    //     LOG_WARN(fmt::format("Sink Agg task id {}, fragment id {}", queue_sink_state->task_id_, queue_sink_state->fragment_id_));
+    // }
     if (queue_sink_state->error_message_.get() != nullptr) {
         LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
         auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
@@ -362,38 +394,26 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
         return;
     }
     SizeT output_data_block_count = task_operator_state->data_block_array_.size();
-    switch (task_operator_state->operator_type_) {
-        case PhysicalOperatorType::kCreateIndexPrepare:
-        case PhysicalOperatorType::kCreateIndexDo: {
-            for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-                next_fragment_queue->Enqueue(MakeShared<FragmentNone>(queue_sink_state->fragment_id_));
-            }
-            break;
+    for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
+        auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
+                                                      std::move(task_operator_state->data_block_array_[idx]),
+                                                      queue_sink_state->task_id_,
+                                                      idx,
+                                                      output_data_block_count);
+        if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
+            fragment_data->data_idx_ = None;
         }
-        default: {
-            for (SizeT idx = 0; idx < output_data_block_count; ++idx) {
-                auto fragment_data = MakeShared<FragmentData>(queue_sink_state->fragment_id_,
-                                                              std::move(task_operator_state->data_block_array_[idx]),
-                                                              queue_sink_state->task_id_,
-                                                              idx,
-                                                              output_data_block_count);
-                if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
-                    fragment_data->data_idx_ = None;
-                }
 
-                for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
-                    // when the Enqueue returns false,
-                    // it means that the downstream has collected enough data,
-                    // preventing the Queue from Enqueue in data again to avoid redundant calculations.
-                    if (!next_fragment_queue->Enqueue(fragment_data)) {
-                        task_operator_state->SetComplete();
-                    }
-                }
+        for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
+            // when the Enqueue returns false,
+            // it means that the downstream has collected enough data,
+            // preventing the Queue from Enqueue in data again to avoid redundant calculations.
+            if (!next_fragment_queue->Enqueue(fragment_data)) {
+                task_operator_state->SetComplete();
             }
-            task_operator_state->data_block_array_.clear();
-            break;
         }
     }
+    task_operator_state->data_block_array_.clear();
 }
 
 } // namespace infinity

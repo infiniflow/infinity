@@ -215,9 +215,9 @@ void WalManager::Flush() {
             int32_t act_size = ptr - buf.data();
             if (exp_size != act_size)
                 LOG_ERROR(fmt::format("WalManager::Flush WalEntry estimated size {} differ "
-                                 "with the actual one {}",
-                                 exp_size,
-                                 act_size));
+                                      "with the actual one {}",
+                                      exp_size,
+                                      act_size));
             ofs_.write(buf.data(), ptr - buf.data());
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id, entry->commit_ts));
             if (entry->cmds[0]->GetType() != WalCommandType::CHECKPOINT) {
@@ -314,9 +314,9 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = true;
 
     LOG_INFO(fmt::format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                    ckp_task->txn_->TxnID(),
-                    ckp_task->txn_->BeginTS(),
-                    max_commit_ts));
+                         ckp_task->txn_->TxnID(),
+                         ckp_task->txn_->BeginTS(),
+                         max_commit_ts));
 
     ckp_task->txn_->Checkpoint(max_commit_ts, is_full_checkpoint);
 
@@ -642,8 +642,12 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i
 }
 
 void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_id, i64 commit_ts) {
-    auto [table_entry, table_index_entry, index_def_entry_status] =
-        storage_->catalog()->CreateIndex(cmd.db_name_, cmd.table_name_, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        Error<StorageException>(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
+    }
+    auto [table_index_entry, index_def_entry_status] =
+        storage_->catalog()->CreateIndex(table_entry, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr);
     if (!index_def_entry_status.ok()) {
         Error<StorageException>("Wal Replay: Create index failed");
     }

@@ -46,6 +46,7 @@ import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
+import logical_top;
 import logical_cross_product;
 import logical_join;
 import logical_show;
@@ -106,12 +107,22 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             if (order_by_expressions_.size() != order_by_types_.size()) {
                 Error<PlannerException>("Unknown error on order by expression");
             }
-            SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
-            sort->set_left_node(root);
-            root = sort;
-        }
 
-        if (limit_expression_.get() != nullptr) {
+            if (limit_expression_.get() == nullptr) {
+                SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
+                sort->set_left_node(root);
+                root = sort;
+            } else {
+                SharedPtr<LogicalNode> top = MakeShared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
+                                                                    static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                                    limit_expression_,
+                                                                    offset_expression_,
+                                                                    order_by_expressions_,
+                                                                    order_by_types_);
+                top->set_left_node(root);
+                root = top;
+            }
+        } else if (limit_expression_.get() != nullptr) {
             auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_);
             limit->set_left_node(root);
             root = limit;

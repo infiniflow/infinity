@@ -187,6 +187,8 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kSort:
             break;
+        case LogicalNodeType::kTop:
+            break;
     }
     LogicalNodeVisitor::VisitNodeExpression(op);
     LogicalNodeVisitor::VisitNodeChildren(op);

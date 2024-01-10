@@ -384,12 +384,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node, Shared
     }
 
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->schema_name_;
+        auto &&db_name = create_node->base_table_ref_->schema_name();
+        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *db_name;
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + *create_node->table_name_;
+        auto &&table_name = create_node->base_table_ref_->table_name();
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *table_name;
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -800,7 +802,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalAggregate *aggregate_node, Share
 
     // Aggregate Table index
     {
-        String aggregate_table_index = String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(aggregate_node->AggregateTableIndex());
+        String aggregate_table_index =
+            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(aggregate_node->AggregateTableIndex());
         result->emplace_back(MakeShared<String>(aggregate_table_index));
     }
 

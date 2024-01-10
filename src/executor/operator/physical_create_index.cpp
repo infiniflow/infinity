@@ -33,7 +33,7 @@ void PhysicalCreateIndex::Init() {}
 
 bool PhysicalCreateIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    Status status = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_, conflict_type_, false);
+    Status status = txn->CreateIndex(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_, false);
     if (!status.ok()) {
         operator_state->error_message_ = std::move(status.msg_);
     }
