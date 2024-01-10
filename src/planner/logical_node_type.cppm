@@ -33,6 +33,7 @@ export enum class LogicalNodeType : u8 {
     kFilter,
     kProjection,
     kSort,
+    kTop,
 
     // DML
     kDelete,

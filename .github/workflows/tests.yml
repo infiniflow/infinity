@@ -163,5 +163,5 @@ jobs:
       run: ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
 
     - name: Benchmark sift check 8 threads result
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && !failure() }}
       run: ./tools/ci_tools/check_benchmark_result.py sift_8 $HOME/benchmark/benchmark_sift_8_threads.log

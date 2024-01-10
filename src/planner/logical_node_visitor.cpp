@@ -32,6 +32,7 @@ import logical_limit;
 import logical_filter;
 import logical_project;
 import logical_sort;
+import logical_top;
 import logical_insert;
 import logical_update;
 import logical_knn_scan;
@@ -106,6 +107,13 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         case LogicalNodeType::kSort: {
             auto &node = (LogicalSort &)op;
             for (auto &expression : node.expressions_) {
+                VisitExpression(expression);
+            }
+            break;
+        }
+        case LogicalNodeType::kTop: {
+            auto &node = (LogicalTop &)op;
+            for (auto &expression : node.sort_expressions_) {
                 VisitExpression(expression);
             }
             break;

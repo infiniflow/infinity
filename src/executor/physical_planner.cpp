@@ -101,6 +101,7 @@ import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
+import logical_top;
 import logical_cross_product;
 import logical_join;
 import logical_show;
@@ -240,6 +241,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kLimit: {
             result = BuildLimit(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kTop: {
+            result = BuildTop(logical_operator);
             break;
         }
         case LogicalNodeType::kFilter: {
@@ -659,6 +664,60 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                               logical_limit->limit_expression_,
                                               logical_limit->offset_expression_,
                                               logical_operator->load_metas());
+    }
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto logical_operator_top = static_cast<LogicalTop *>(logical_operator.get());
+    if (logical_operator_top->right_node()) {
+        Error<PlannerException>("Top node shouldn't have right child.");
+    }
+    auto &input_logical_node = logical_operator_top->left_node();
+    if (!input_logical_node) {
+        Error<PlannerException>("Top node has no input node.");
+    }
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+    i64 merge_offset{};
+    i64 merge_limit = (static_pointer_cast<ValueExpression>(logical_operator_top->limit_expression_))->GetValue().value_.big_int;
+    if (auto &offset = logical_operator_top->offset_expression_; offset != nullptr) {
+        merge_offset = (static_pointer_cast<ValueExpression>(offset))->GetValue().value_.big_int;
+        merge_limit += merge_offset;
+    }
+    if (merge_offset < 0 or merge_limit <= merge_offset) {
+        Error<PlannerException>("Limit <= 0 or offset < 0");
+    }
+    if (merge_offset >= std::numeric_limits<u32>::max()) {
+        Error<PlannerException>("Offset is too large");
+    }
+    if (merge_limit >= std::numeric_limits<u32>::max()) {
+        Error<PlannerException>("Limit is too large");
+    }
+    if (input_physical_operator->TaskletCount() <= 1) {
+        // only Top
+        return MakeUnique<PhysicalTop>(logical_operator_top->node_id(),
+                                       std::move(input_physical_operator),
+                                       merge_limit,
+                                       merge_offset, // start from offset
+                                       logical_operator_top->sort_expressions_,
+                                       logical_operator_top->order_by_types_,
+                                       logical_operator_top->load_metas());
+    } else {
+        // need MergeTop
+        auto child_top_op = MakeUnique<PhysicalTop>(logical_operator_top->node_id(),
+                                                    std::move(input_physical_operator),
+                                                    merge_limit,
+                                                    u32{}, // start from 0
+                                                    logical_operator_top->sort_expressions_,
+                                                    logical_operator_top->order_by_types_,
+                                                    logical_operator_top->load_metas());
+        return MakeUnique<PhysicalMergeTop>(query_context_ptr_->GetNextNodeID(),
+                                            logical_operator_top->base_table_ref_,
+                                            std::move(child_top_op),
+                                            merge_limit,
+                                            merge_offset, // start from offset
+                                            logical_operator_top->sort_expressions_,
+                                            logical_operator_top->order_by_types_,
+                                            logical_operator_top->load_metas());
     }
 }
 
