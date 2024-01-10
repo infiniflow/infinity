@@ -85,6 +85,8 @@ private:
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildLimit(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildTop(const SharedPtr<LogicalNode> &logical_operator) const;
+
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const;

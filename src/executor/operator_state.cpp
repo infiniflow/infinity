@@ -109,6 +109,18 @@ bool QueueSourceState::GetData() {
             }
             break;
         }
+        case PhysicalOperatorType::kMergeTop: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            auto top_op_state = (MergeTopOperatorState *)next_op_state;
+            top_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (!top_op_state->input_complete_) {
+                top_op_state->input_complete_ = completed;
+            }
+            if (top_op_state->input_complete_) {
+                source_queue_.NotAllowEnqueue();
+            }
+            break;
+        }
         case PhysicalOperatorType::kMergeAggregate: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;

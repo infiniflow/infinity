@@ -14,24 +14,35 @@
 
 module;
 
+export module physical_merge_top;
+
 import stl;
 import parser;
 import query_context;
 import operator_state;
+import expression_state;
 import physical_operator;
 import physical_operator_type;
+import base_expression;
 import load_meta;
 import infinity_exception;
-
-export module physical_merge_top;
+import base_table_ref;
+import physical_top;
 
 namespace infinity {
 
 export class PhysicalMergeTop final : public PhysicalOperator {
 public:
-    explicit PhysicalMergeTop(SharedPtr<Vector<String>> output_names, SharedPtr<Vector<SharedPtr<DataType>>> output_types, u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeTop, nullptr, nullptr, id, load_metas), output_names_(std::move(output_names)),
-          output_types_(std::move(output_types)) {}
+    explicit PhysicalMergeTop(u64 id,
+                              SharedPtr<BaseTableRef> base_table_ref,
+                              UniquePtr<PhysicalOperator> left,
+                              u32 limit,
+                              u32 offset,
+                              Vector<SharedPtr<BaseExpression>> sort_expressions,
+                              Vector<OrderType> order_by_types,
+                              SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kMergeTop, std::move(left), nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
+          limit_(limit), offset_(offset), order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)) {}
 
     ~PhysicalMergeTop() override = default;
 
@@ -39,18 +50,29 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
-        return 0;
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
+
+    // for OperatorState
+    inline auto const &GetSortExpressions() const { return sort_expressions_; }
+
+    // for InputLoad
+    // necessary because MergeTop may be the first operator in a pipeline
+    void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
+        table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
 private:
-    SharedPtr<Vector<String>> output_names_{};
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    SharedPtr<BaseTableRef> base_table_ref_;                                            // necessary for InputLoad
+    u32 limit_{};                                                                       // limit value
+    u32 offset_{};                                                                      // offset value
+    u32 sort_expr_count_{};                                                             // number of expressions to sort
+    Vector<OrderType> order_by_types_;                                                  // ASC or DESC
+    Vector<SharedPtr<BaseExpression>> sort_expressions_;                                // expressions to sort
+    Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> sort_functions_; // sort functions
 };
 
 } // namespace infinity

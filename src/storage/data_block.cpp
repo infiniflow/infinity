@@ -137,6 +137,9 @@ void DataBlock::UnInit() {
 }
 
 void DataBlock::Reset() {
+    if (!initialized) {
+        Error<StorageException>("Should not reset an uninitialized block.");
+    }
 
     // Reset behavior:
     // Reset each column into just initialized status.
@@ -149,11 +152,15 @@ void DataBlock::Reset() {
     }
 
     row_count_ = 0;
+    finalized = false;
 }
 
 //TODO: May cause error when capacity is larger than the originally allocated size
 //TODO: Initialize() parameter may not be ColumnVectorType::kFlat ?
 void DataBlock::Reset(SizeT capacity) {
+    if (!initialized) {
+        Error<StorageException>("Should not reset an uninitialized block.");
+    }
     // Reset behavior:
     // Reset each column into just initialized status.
     // No data is appended into any column.
@@ -164,6 +171,7 @@ void DataBlock::Reset(SizeT capacity) {
     }
     row_count_ = 0;
     capacity_ = capacity;
+    finalized = false;
 }
 
 Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return column_vectors[column_index]->GetValue(row_index); }

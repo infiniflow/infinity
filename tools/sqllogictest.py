@@ -8,6 +8,7 @@ from generate_fvecs import generate as generate2
 from generate_sort import generate as generate3
 from generate_limit import generate as generate4
 from generate_aggregate import generate as generate5
+from generate_top import generate as generate6
 
 
 def python_skd_test(python_test_dir: str):
@@ -79,7 +80,7 @@ if __name__ == "__main__":
         "-g",
         "--generate",
         type=bool,
-        default=False,
+        default=True,
         dest="generate_if_exists",
     )
     parser.add_argument(
@@ -127,6 +128,7 @@ if __name__ == "__main__":
     generate3(args.generate_if_exists, args.copy)
     generate4(args.generate_if_exists, args.copy)
     generate5(args.generate_if_exists, args.copy)
+    generate6(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
     python_skd_test(python_test_dir)
     test_process(args.path, args.test, args.data, args.copy)

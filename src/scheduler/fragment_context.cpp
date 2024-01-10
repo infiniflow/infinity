@@ -32,6 +32,8 @@ import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
 import physical_create_index_do;
+import physical_top;
+import physical_merge_top;
 
 import global_block_id;
 import knn_expression;
@@ -50,6 +52,8 @@ import logger;
 import task_scheduler;
 import plan_fragment;
 import aggregate_expression;
+import expression_state;
+
 module fragment_context;
 
 namespace infinity {
@@ -137,6 +141,28 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
     return operator_state;
 }
 
+UniquePtr<OperatorState> MakeTopState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<TopOperatorState>();
+    auto &expr_states = operator_state->expr_states_;
+    auto &sort_expressions = (static_cast<PhysicalTop *>(physical_op))->GetSortExpressions();
+    expr_states.reserve(sort_expressions.size());
+    for (auto &expr : sort_expressions) {
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
+    return operator_state;
+}
+
+UniquePtr<OperatorState> MakeMergeTopState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<MergeTopOperatorState>();
+    auto &expr_states = operator_state->expr_states_;
+    auto &sort_expressions = (static_cast<PhysicalMergeTop *>(physical_op))->GetSortExpressions();
+    expr_states.reserve(sort_expressions.size());
+    for (auto &expr : sort_expressions) {
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
+    return operator_state;
+}
+
 UniquePtr<OperatorState>
 MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops, FragmentTask *task, FragmentContext *fragment_ctx) {
     switch (physical_ops[operator_id]->operator_type()) {
@@ -196,10 +222,10 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<MergeLimitOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kTop: {
-            return MakeTaskStateTemplate<TopOperatorState>(physical_ops[operator_id]);
+            return MakeTopState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeTop: {
-            return MakeTaskStateTemplate<MergeTopOperatorState>(physical_ops[operator_id]);
+            return MakeMergeTopState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kProjection: {
             return MakeTaskStateTemplate<ProjectionOperatorState>(physical_ops[operator_id]);
@@ -717,8 +743,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kParallelAggregate:
-        case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kTop: {
+        case PhysicalOperatorType::kHash: {
             if (fragment_type_ != FragmentType::kParallelStream) {
                 Error<SchedulerException>(
                     fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
@@ -797,6 +822,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:
         case PhysicalOperatorType::kKnnScan: {
             if (fragment_type_ != FragmentType::kParallelMaterialize && fragment_type_ != FragmentType::kSerialMaterialize) {
