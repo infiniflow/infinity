@@ -267,8 +267,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status
-Txn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare) {
+Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -276,8 +275,7 @@ Txn::CreateIndex(const String &db_name, const String &table_name, const SharedPt
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [table_entry, table_index_entry, index_status] =
-        catalog_->CreateIndex(db_name, table_name, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (!index_status.ok()) {
         return index_status;
     }
@@ -289,6 +287,7 @@ Txn::CreateIndex(const String &db_name, const String &table_name, const SharedPt
     txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
 
     TxnTableStore *table_store{nullptr};
+    auto &&table_name = *table_entry->GetTableName();
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
         txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
     }
@@ -297,15 +296,13 @@ Txn::CreateIndex(const String &db_name, const String &table_name, const SharedPt
     // Create Index Synchronously
     NewCatalog::CreateIndexFile(table_entry, table_store, table_index_entry, begin_ts, GetBufferMgr(), prepare);
 
-    wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def));
+    if (!prepare) {
+        wal_entry_->cmds.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_def));
+    }
     return index_status;
 }
 
-Status Txn::CreateIndexDo(const String &db_name, const String &table_name, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes) {
-    auto [table_entry, status] = GetTableEntry(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
+Status Txn::CreateIndexDo(TableEntry *table_entry, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes) {
     auto *table_store = GetTxnTableStore(table_entry);
     auto iter = table_store->txn_indexes_store_.find(index_name);
     if (iter == table_store->txn_indexes_store_.end()) {

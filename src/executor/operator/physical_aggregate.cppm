@@ -67,7 +67,9 @@ public:
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     HashTable hash_table_;
 
-    bool SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks);
+    bool SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
+                                Vector<UniquePtr<DataBlock>> &output_blocks,
+                                Vector<UniquePtr<char[]>> &states);
 
     inline u64 GroupTableIndex() const { return groupby_index_; }
 

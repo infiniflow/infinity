@@ -32,6 +32,11 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
     for dirpath, dirnames, filenames in os.walk(slt_dir):
         for filename in filenames:
             file = os.path.join(dirpath, filename)
+
+            # filename = os.path.basename(file)
+            # if "fulltext" in filename or "fusion" in filename:
+            #     continue
+
             process = subprocess.run([sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, error = process.stdout, process.stderr
             if process.returncode != 0:

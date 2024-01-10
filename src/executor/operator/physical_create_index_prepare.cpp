@@ -33,7 +33,7 @@ import buffer_handle;
 import index_hnsw;
 import default_values;
 import txn_store;
-
+import base_table_ref;
 import hnsw_common;
 import dist_func_l2;
 import dist_func_ip;
@@ -45,22 +45,20 @@ module physical_create_index_prepare;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
-                                                       SharedPtr<String> schema_name,
-                                                       SharedPtr<String> table_name,
+                                                       SharedPtr<BaseTableRef> base_table_ref,
                                                        SharedPtr<IndexDef> index_definition,
                                                        ConflictType conflict_type,
                                                        SharedPtr<Vector<String>> output_names,
                                                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                        SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndexPrepare, nullptr, nullptr, id, load_metas), schema_name_(schema_name),
-      table_name_(table_name), index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names),
-      output_types_(output_types) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateIndexPrepare, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
+      index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types) {}
 
 void PhysicalCreateIndexPrepare::Init() {}
 
 bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    Status status = txn->CreateIndex(*schema_name_, *table_name_, index_def_ptr_, conflict_type_, true);
+    Status status = txn->CreateIndex(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_, true);
     if (!status.ok()) {
         operator_state->error_message_ = std::move(status.msg_);
     }

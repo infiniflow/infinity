@@ -1,4 +1,7 @@
 statement ok
+DROP TABLE IF EXISTS t1;
+
+statement ok
 CREATE TABLE t1 (c1 int, c2 int);
 
 statement ok

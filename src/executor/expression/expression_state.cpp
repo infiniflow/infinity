@@ -42,11 +42,11 @@ module expression_state;
 
 namespace infinity {
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression) {
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpression> &expression, char *agg_state) {
 
     switch (expression->type()) {
         case ExpressionType::kAggregate:
-            return CreateState(static_pointer_cast<AggregateExpression>(expression));
+            return CreateState(static_pointer_cast<AggregateExpression>(expression), agg_state);
         case ExpressionType::kCast:
             return CreateState(static_pointer_cast<CastExpression>(expression));
         case ExpressionType::kCase:
@@ -69,12 +69,13 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
     return nullptr;
 }
 
-SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr) {
+SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state) {
     if (agg_expr->arguments().size() != 1) {
         Error<ExecutorException>("Aggregate function arguments error.");
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
+    result->agg_state_ = agg_state;
     result->AddChild(agg_expr->arguments()[0]);
 
     // Aggregate function will only have one output value.

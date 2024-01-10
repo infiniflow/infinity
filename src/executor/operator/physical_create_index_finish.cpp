@@ -44,13 +44,10 @@ bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorSta
     auto *txn = query_context->GetTxn();
     auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(operator_state);
 
-    if (create_index_finish_op_state->input_complete_) {
-        txn->AddWalCmd(MakeShared<WalCmdCreateIndex>(*db_name_, *table_name_, index_def_));
+    txn->AddWalCmd(MakeShared<WalCmdCreateIndex>(*db_name_, *table_name_, index_def_));
 
-        operator_state->SetComplete();
-        return true;
-    }
-    return false;
+    operator_state->SetComplete();
+    return true;
 }
 
 } // namespace infinity

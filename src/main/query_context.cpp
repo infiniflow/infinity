@@ -140,13 +140,14 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         StopProfile(QueryPhase::kPipelineBuild);
 
+        auto notifier = MakeUnique<Notifier>();
+
         StartProfile(QueryPhase::kTaskBuild);
-        Vector<FragmentTask *> tasks;
-        FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), tasks);
+        FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());
         StopProfile(QueryPhase::kTaskBuild);
 
         StartProfile(QueryPhase::kExecution);
-        scheduler_->Schedule(this, tasks, plan_fragment.get());
+        scheduler_->Schedule(plan_fragment.get());
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plan->operator_type();
         StopProfile(QueryPhase::kExecution);

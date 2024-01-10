@@ -318,8 +318,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
         // TODO: invalidate multiple index in one statement.
         // TODO: support other index types build in parallel.
         // use old `PhysicalCreateIndex`
-        return PhysicalCreateIndex::Make(schema_name,
-                                         table_name,
+        return PhysicalCreateIndex::Make(logical_create_index->base_table_ref(),
                                          logical_create_index->index_definition(),
                                          logical_create_index->conflict_type(),
                                          logical_create_index->GetOutputNames(),
@@ -330,8 +329,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
 
     // use new `PhysicalCreateIndexPrepare` `PhysicalCreateIndexDo` `PhysicalCreateIndexFinish`
     auto create_index_prepare = MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
-                                                                       schema_name,
-                                                                       table_name,
+                                                                       logical_create_index->base_table_ref(),
                                                                        logical_create_index->index_definition(),
                                                                        logical_create_index->conflict_type(),
                                                                        logical_create_index->GetOutputNames(),

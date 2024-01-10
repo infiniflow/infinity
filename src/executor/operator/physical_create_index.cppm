@@ -23,6 +23,7 @@ import physical_operator_type;
 import index_def;
 import load_meta;
 import infinity_exception;
+import base_table_ref;
 
 export module physical_create_index;
 
@@ -43,31 +44,29 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    static inline UniquePtr<PhysicalCreateIndex> Make(SharedPtr<String> schema_name,
-                                                      SharedPtr<String> table_name,
+    static inline UniquePtr<PhysicalCreateIndex> Make(SharedPtr<BaseTableRef> base_table_ref,
                                                       SharedPtr<IndexDef> index_definition,
                                                       ConflictType conflict_type,
                                                       SharedPtr<Vector<String>> output_names,
                                                       SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                       u64 id,
                                                       SharedPtr<Vector<LoadMeta>> load_metas) {
-        return MakeUnique<PhysicalCreateIndex>(schema_name, table_name, index_definition, conflict_type, output_names, output_types, id, load_metas);
+        return MakeUnique<PhysicalCreateIndex>(base_table_ref, index_definition, conflict_type, output_names, output_types, id, load_metas);
     }
 
-    PhysicalCreateIndex(SharedPtr<String> schema_name,
-                        SharedPtr<String> table_name,
+    PhysicalCreateIndex(SharedPtr<BaseTableRef> base_table_ref,
                         SharedPtr<IndexDef> index_definition,
                         ConflictType conflict_type,
                         SharedPtr<Vector<String>> output_names,
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                         u64 id,
                         SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id, load_metas), schema_name_(schema_name), table_name_(table_name),
+        : PhysicalOperator(PhysicalOperatorType::kCreateIndex, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
           index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types) {}
 
 public:
-    const SharedPtr<String> schema_name_{};
-    const SharedPtr<String> table_name_{};
+    const SharedPtr<BaseTableRef> base_table_ref_{};
+
     const SharedPtr<IndexDef> index_def_ptr_{};
     const ConflictType conflict_type_{};
 
