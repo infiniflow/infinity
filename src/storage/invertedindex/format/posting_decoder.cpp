@@ -20,8 +20,6 @@ PostingDecoder::PostingDecoder(const PostingFormatOption &posting_format_option)
     : term_meta_(nullptr), doc_id_encoder_(nullptr), tf_list_encoder_(nullptr), doc_payload_encoder_(nullptr), position_encoder_(nullptr),
       decoded_doc_count_(0), decoded_pos_count_(0), posting_data_length_(0), posting_format_option_(posting_format_option) {}
 
-PostingDecoder::~PostingDecoder() {}
-
 void PostingDecoder::Init(TermMeta *term_meta,
                           const SharedPtr<ByteSliceReader> &posting_list_reader,
                           const SharedPtr<ByteSliceReader> &position_list_reader,

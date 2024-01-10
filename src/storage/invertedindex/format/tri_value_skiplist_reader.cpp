@@ -17,8 +17,6 @@ TriValueSkipListReader::TriValueSkipListReader(const TriValueSkipListReader &oth
     : current_doc_id_(other.current_doc_id_), current_offset_(other.current_offset_), current_ttf_(other.current_ttf_),
       prev_doc_id_(other.prev_doc_id_), prev_offset_(other.prev_offset_), prev_ttf_(other.prev_ttf_), current_cursor_(0), num_in_buffer_(0) {}
 
-TriValueSkipListReader::~TriValueSkipListReader() {}
-
 void TriValueSkipListReader::InitMember() {
     skipped_item_count_ = -1;
     current_doc_id_ = 0;

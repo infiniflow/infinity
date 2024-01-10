@@ -14,8 +14,6 @@ public:
 
     TriValueSkipListReader(const TriValueSkipListReader &other) noexcept;
 
-    ~TriValueSkipListReader();
-
 public:
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);
 

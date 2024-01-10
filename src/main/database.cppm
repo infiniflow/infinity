@@ -39,7 +39,7 @@ public:
 
     QueryResult DescribeTable(const String &table_name);
 
-    SharedPtr<Table> GetTable(const String &table_name);
+    UniquePtr<Table> GetTable(const String &table_name);
 
     [[nodiscard]] const String &db_name() const { return db_name_; }
 

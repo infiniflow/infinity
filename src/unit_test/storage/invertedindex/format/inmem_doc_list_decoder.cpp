@@ -17,7 +17,6 @@ public:
         doc_list_encoder_ = nullptr;
         doc_list_decoder_ = nullptr;
     }
-    ~InMemDocListDecoderTest() {}
 
     void SetUp() override {
         buffer_pool_ = new RecyclePool(10240);

@@ -12,11 +12,7 @@ namespace infinity {
 SkipListReader::SkipListReader() : start_(0), end_(0), skipped_item_count_(-1) {}
 
 SkipListReader::SkipListReader(const SkipListReader &other)
-    : start_(other.start_), end_(other.end_), byte_slice_reader_(other.byte_slice_reader_), skipped_item_count_(other.skipped_item_count_)
-
-{}
-
-SkipListReader::~SkipListReader() {}
+    : start_(other.start_), end_(other.end_), byte_slice_reader_(other.byte_slice_reader_), skipped_item_count_(other.skipped_item_count_) {}
 
 void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
     if (start > byte_slice_list->GetTotalSize()) {

@@ -15,7 +15,6 @@ namespace infinity {
 export class PostingDecoder {
 public:
     PostingDecoder(const PostingFormatOption &option);
-    ~PostingDecoder();
 
     void Init(TermMeta *term_meta,
               const SharedPtr<ByteSliceReader> &posting_list_reader,

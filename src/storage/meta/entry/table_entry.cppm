@@ -33,7 +33,6 @@ import status;
 
 namespace infinity {
 
-class DBEntry;
 class IndexDef;
 struct TableIndexEntry;
 class IrsIndexEntry;

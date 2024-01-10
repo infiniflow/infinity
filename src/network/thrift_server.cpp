@@ -52,11 +52,11 @@ import config;
 import data_block;
 import query_options;
 
- using namespace apache::thrift;
- using namespace apache::thrift::concurrency;
- using namespace apache::thrift::protocol;
- using namespace apache::thrift::transport;
- using namespace apache::thrift::server;
+using namespace apache::thrift;
+using namespace apache::thrift::concurrency;
+using namespace apache::thrift::protocol;
+using namespace apache::thrift::transport;
+using namespace apache::thrift::server;
 
 namespace infinity {
 
@@ -192,8 +192,11 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         auto table = database->GetTable(request.table_name);
 
-        Path path(
-            fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+        Path path(fmt::format("{}_{}_{}_{}",
+                              *InfinityContext::instance().config()->temp_dir().get(),
+                              request.db_name,
+                              request.table_name,
+                              request.file_name));
 
         ImportOptions import_options;
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
@@ -204,8 +207,11 @@ public:
 
     void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
         LocalFileSystem fs;
-        Path path(
-            fmt::format("{}_{}_{}_{}", *InfinityContext::instance().config()->temp_dir().get(), request.db_name, request.table_name, request.file_name));
+        Path path(fmt::format("{}_{}_{}_{}",
+                              *InfinityContext::instance().config()->temp_dir().get(),
+                              request.db_name,
+                              request.table_name,
+                              request.file_name));
         if (request.index != 0) {
             FileWriter file_writer(fs, path.c_str(), request.data.size(), FileFlags::WRITE_FLAG | FileFlags::APPEND_FLAG);
             file_writer.Write(request.data.data(), request.data.size());
@@ -386,10 +392,10 @@ public:
         // offset = new ParsedExpr();
 
         // limit
-//        ParsedExpr *limit = nullptr;
-//        if (request.__isset.limit_expr == true) {
-//            limit = GetParsedExprFromProto(request.limit_expr);
-//        }
+        //        ParsedExpr *limit = nullptr;
+        //        if (request.__isset.limit_expr == true) {
+        //            limit = GetParsedExprFromProto(request.limit_expr);
+        //        }
 
         // auto end2 = std::chrono::steady_clock::now();
         // phase_2_duration_ += end2 - start2;
@@ -650,14 +656,16 @@ private:
     // std::chrono::duration<double> phase_4_duration_{};
 
 private:
-    SharedPtr<Infinity> GetInfinityBySessionID(i64 session_id) {
-        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
-        if (infinity_session_map_.count(session_id) > 0) {
-            return infinity_session_map_[session_id];
-        } else {
+    Infinity* GetInfinityBySessionID(i64 session_id) {
+        infinity_session_map_mutex_.lock();
+        auto iter = infinity_session_map_.find(session_id);
+        infinity_session_map_mutex_.unlock();
+
+        if(iter == infinity_session_map_.end()) {
             Error<NetworkException>("session id not found");
         }
-        return nullptr;
+
+        return iter->second.get();
     }
 
     static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {
@@ -1070,10 +1078,10 @@ public:
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
 
         LOG_TRACE(fmt::format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
-                         sock->getSocketInfo(),
-                         sock->getPeerHost(),
-                         sock->getPeerAddress(),
-                         sock->getPeerPort()));
+                              sock->getSocketInfo(),
+                              sock->getPeerHost(),
+                              sock->getPeerAddress(),
+                              sock->getPeerPort()));
 
         return new InfinityServiceHandler;
     }
