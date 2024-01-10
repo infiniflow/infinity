@@ -481,10 +481,6 @@ void FragmentContext::TryFinishFragment() {
             }
         }
     }
-    if (undone_task_n_.fetch_sub(1) == 1) {
-        // after notify, the data structure may be destroyed
-        notifier_->Notify();
-    }
 }
 
 Vector<PhysicalOperator *> &FragmentContext::GetOperators() { return fragment_ptr_->GetOperators(); }

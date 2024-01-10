@@ -16,7 +16,6 @@ module;
 
 #include <sstream>
 
-import fragment_context;
 import profiler;
 import plan_fragment;
 import stl;
@@ -95,11 +94,6 @@ void FragmentTask::OnExecute(i64) {
         }
     }
 
-    if (source_complete && source_state_->error_message_.get() != nullptr) {
-        sink_state_->error_message_ = std::move(source_state_->error_message_);
-        status_ = FragmentTaskStatus::kError;
-    }
-
     if (execute_success or sink_state_->error_message_.get() != nullptr) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, fragment_context, sink_state_.get());
@@ -112,7 +106,7 @@ u64 FragmentTask::FragmentId() const {
 }
 
 // Finished **OR** Error
-bool FragmentTask::IsComplete() { return sink_state_->prev_op_state_->Complete() || status_ == FragmentTaskStatus::kError; }
+bool FragmentTask::IsComplete() { return sink_state_->prev_op_state_->Complete(); }
 
 bool FragmentTask::TryIntoWorkerLoop() {
     std::unique_lock lock(mutex_);
@@ -155,8 +149,8 @@ void FragmentTask::CompleteTask() {
     // One thread reach here
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
-    } else if (status_ != FragmentTaskStatus::kError) {
-        Error<SchedulerException>("Bug");
+    } else {
+        Error<SchedulerException>("Status should be error");
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));

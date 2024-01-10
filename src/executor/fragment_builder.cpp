@@ -34,15 +34,14 @@ module fragment_builder;
 
 namespace infinity {
 
-Pair<SizeT, UniquePtr<PlanFragment>> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op) {
-    SizeT fragment_n1 = fragment_id_;
+UniquePtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op) {
     auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
     plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
     BuildFragments(phys_op, plan_fragment.get());
     if (plan_fragment->GetSourceNode() == nullptr) {
         plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
     }
-    return {SizeT(fragment_id_ - fragment_n1), std::move(plan_fragment)};
+    return std::move(plan_fragment);
 }
 
 void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr) {
@@ -64,7 +63,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
         case ExplainType::kPipeline: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            auto [_fragment_n, explain_child_fragment] = this->BuildFragment(phys_op->left());
+            auto explain_child_fragment = this->BuildFragment(phys_op->left());
 
             // Generate explain context of the child fragment
             ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);

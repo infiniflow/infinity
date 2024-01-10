@@ -137,10 +137,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kPipelineBuild);
         // Fragment Builder, only for test now.
         // SharedPtr<PlanFragment> plan_fragment = fragment_builder.Build(physical_plan);
-        auto [fragment_n, plan_fragment] = fragment_builder_->BuildFragment(physical_plan.get());
+        auto plan_fragment = fragment_builder_->BuildFragment(physical_plan.get());
         StopProfile(QueryPhase::kPipelineBuild);
 
-        auto notifier = MakeUnique<Notifier>(fragment_n);
+        auto notifier = MakeUnique<Notifier>();
 
         StartProfile(QueryPhase::kTaskBuild);
         FragmentContext::BuildTask(this, nullptr, plan_fragment.get(), notifier.get());

@@ -55,22 +55,35 @@ export String FragmentType2String(FragmentType type) {
 }
 
 export class Notifier {
-    SizeT unfinished_fragment_n_;
+    SizeT running_task_n_;
+    bool finished_;
 
     std::mutex locker_{};
     std::condition_variable cv_{};
 
 public:
-    Notifier(SizeT fragment_n) : unfinished_fragment_n_(fragment_n) {}
+    Notifier() : running_task_n_(0), finished_(false) {}
 
     void Wait() {
         std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return unfinished_fragment_n_ == 0; });
+        cv_.wait(lk, [&] { return finished_; });
     }
 
-    void Notify() {
+    bool StartTask() {
         std::unique_lock<std::mutex> lk(locker_);
-        if (--unfinished_fragment_n_ == 0) {
+        if (finished_) {
+            return false;
+        }
+        ++running_task_n_;
+        return true;
+    }
+
+    void FinishTask(bool finish) {
+        std::unique_lock<std::mutex> lk(locker_);
+        if (finish) {
+            finished_ = true;
+        }
+        if (--running_task_n_ == 0 && finished_) {
             cv_.notify_one();
         }
     }
@@ -85,10 +98,7 @@ public:
 
     virtual ~FragmentContext() = default;
 
-    inline void IncreaseTask() {
-        unfinished_task_n_.fetch_add(1);
-        undone_task_n_.fetch_add(1);
-    }
+    inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
         if (!query_context_->is_enable_profiling()) {
@@ -127,6 +137,8 @@ public:
 
     void DumpFragmentCtx();
 
+    Notifier *notifier() { return notifier_; }
+
 private:
     bool TryStartFragment() {
         u64 unfinished_child = unfinished_child_n_.fetch_sub(1);
@@ -159,7 +171,6 @@ protected:
     FragmentType fragment_type_{FragmentType::kInvalid};
 
     atomic_u64 unfinished_task_n_{0};
-    atomic_u64 undone_task_n_{0};
     atomic_u64 unfinished_child_n_{0};
 };
 

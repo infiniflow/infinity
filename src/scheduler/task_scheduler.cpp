@@ -31,6 +31,7 @@ import fragment_context;
 import default_values;
 import physical_operator_type;
 import physical_operator;
+import physical_sink;
 
 module task_scheduler;
 
@@ -164,27 +165,47 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         if (fragment_task->IsTerminator()) {
             break;
         }
+        auto *fragment_ctx = fragment_task->fragment_context();
+        if (!fragment_ctx->notifier()->StartTask()) {
+            --worker_workloads_[worker_id];
+            iter = task_lists.erase(iter);
+            continue;
+        }
 
         fragment_task->OnExecute(worker_id);
         fragment_task->SetLastWorkID(worker_id);
 
-        if (fragment_task->IsComplete()) {
-            --worker_workloads_[worker_id];
-            fragment_task->CompleteTask();
-            iter = task_lists.erase(iter);
-        } else if (fragment_task->QuitFromWorkerLoop()) {
-            --worker_workloads_[worker_id];
-            iter = task_lists.erase(iter);
+        bool finish = false;
+
+        if (fragment_task->status() != FragmentTaskStatus::kError) {
+            if (fragment_task->IsComplete()) {
+                auto *sink_op = fragment_ctx->GetSinkOperator();
+                finish = sink_op->sink_type() == SinkType::kResult;
+                --worker_workloads_[worker_id];
+                fragment_task->CompleteTask();
+                iter = task_lists.erase(iter);
+            } else if (fragment_task->QuitFromWorkerLoop()) {
+                --worker_workloads_[worker_id];
+                iter = task_lists.erase(iter);
+            } else {
+                ++iter;
+            }
         } else {
-            ++iter;
+            finish = true;
+            --worker_workloads_[worker_id];
+            iter = task_lists.erase(iter);
         }
+        fragment_ctx->notifier()->FinishTask(finish);
     }
 }
 
 void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
     StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
         auto *fragment_ctx = fragment->GetContext();
-        LOG_INFO(fmt::format("Fragment id: {}, type: {}, ctx: {}", fragment->FragmentID(), FragmentType2String(fragment->GetFragmentType()), u64(fragment_ctx)));
+        LOG_INFO(fmt::format("Fragment id: {}, type: {}, ctx: {}",
+                             fragment->FragmentID(),
+                             FragmentType2String(fragment->GetFragmentType()),
+                             u64(fragment_ctx)));
         fragment_ctx->DumpFragmentCtx();
         for (auto &child : fragment->Children()) {
             TraverseFragmentTree(child.get());
