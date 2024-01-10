@@ -60,8 +60,13 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
     txn_id_ = txn_id;
 }
 
-Tuple<TableIndexEntry *, Status>
-TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
+                                                         ConflictType conflict_type,
+                                                         u64 txn_id,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnManager *txn_mgr,
+                                                         bool is_replay,
+                                                         String replay_table_index_dir) {
     if (index_def->index_name_->empty()) {
         // Index name shouldn't be empty
         Error<StorageException>("Attempt to create no name index.");
@@ -93,7 +98,7 @@ TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def, ConflictType confl
     }
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_def->index_name_));
-    return table_index_meta->CreateTableIndexEntry(index_def, conflict_type, txn_id, begin_ts, txn_mgr);
+    return table_index_meta->CreateTableIndexEntry(index_def, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
 Tuple<TableIndexEntry *, Status>
@@ -207,7 +212,8 @@ void TableEntry::CreateIndexFile(void *txn_store,
                                  TableIndexEntry *table_index_entry,
                                  TxnTimeStamp begin_ts,
                                  BufferManager *buffer_mgr,
-                                 bool prepare) {
+                                 bool prepare,
+                                 bool is_replay) {
     IrsIndexEntry *irs_index_entry = table_index_entry->irs_index_entry().get();
     if (irs_index_entry != nullptr) {
 
@@ -226,7 +232,8 @@ void TableEntry::CreateIndexFile(void *txn_store,
             SharedPtr<ColumnDef> column_def = this->columns_[column_id];
             for (const auto &[segment_id, segment_entry] : this->segment_map_) {
                 SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
-                    segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr, prepare);
+                    segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr, prepare, is_replay);
+
                 column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
             }
         } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
@@ -237,12 +244,12 @@ void TableEntry::CreateIndexFile(void *txn_store,
     }
 }
 
-void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_) {
+void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
         for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
             for (auto &[segment_id, segment_column_index] : segment_index_map) {
-                table_index_entry->CommitCreateIndex(column_id, segment_id, segment_column_index);
+                table_index_entry->CommitCreateIndex(column_id, segment_id, segment_column_index, is_replay);
             }
         }
         if (table_index_entry->irs_index_entry().get() != nullptr) {

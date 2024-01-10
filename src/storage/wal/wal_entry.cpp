@@ -18,16 +18,16 @@ module;
 
 module wal;
 
-import stl;
+import crc;
 import serialize;
-import table_def;
 import data_block;
-
+import table_def;
+import index_def;
 import infinity_exception;
+
+import stl;
 import parser;
 import third_party;
-import index_def;
-import crc;
 
 namespace infinity {
 
@@ -101,8 +101,9 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::CREATE_INDEX: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
+            String table_index_dir = ReadBufAdv<String>(ptr);
             SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_def);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, table_index_dir, index_def);
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -124,14 +125,14 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
 
 bool WalCmdCreateTable::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateTable *>(&other);
-    return other_cmd != nullptr && IsEqual(db_name, other_cmd->db_name) && table_def.get() != nullptr && other_cmd->table_def.get() != nullptr &&
-           *table_def == *other_cmd->table_def;
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && table_def_.get() != nullptr && other_cmd->table_def_.get() != nullptr &&
+           *table_def_ == *other_cmd->table_def_;
 }
 
 bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_.get() != nullptr &&
-           other_cmd->index_def_.get() != nullptr && *index_def_ == *other_cmd->index_def_;
+           other_cmd->index_def_.get() != nullptr && *index_def_ == *other_cmd->index_def_ && table_index_dir_ == other_cmd->table_index_dir_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -141,8 +142,8 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
-    if (other_cmd == nullptr || !IsEqual(db_name, other_cmd->db_name) || !IsEqual(table_name, other_cmd->table_name) ||
-        segment_dir != other_cmd->segment_dir || segment_id != other_cmd->segment_id || block_entries_size != other_cmd->block_entries_size ||
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
+        segment_dir_ != other_cmd->segment_dir_ || segment_id_ != other_cmd->segment_id_ || block_entries_size_ != other_cmd->block_entries_size_ ||
         row_counts_.size() != other_cmd->row_counts_.size())
         return false;
     return true;
@@ -150,19 +151,19 @@ bool WalCmdImport::operator==(const WalCmd &other) const {
 
 bool WalCmdAppend::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdAppend *>(&other);
-    if (other_cmd == nullptr || !IsEqual(db_name, other_cmd->db_name) || !IsEqual(table_name, other_cmd->table_name))
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_))
         return false;
     return true;
 }
 
 bool WalCmdDelete::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDelete *>(&other);
-    if (other_cmd == nullptr || !IsEqual(db_name, other_cmd->db_name) || !IsEqual(table_name, other_cmd->table_name) ||
-        row_ids.size() != other_cmd->row_ids.size()) {
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
+        row_ids_.size() != other_cmd->row_ids_.size()) {
         return false;
     }
-    for (SizeT i = 0; i < row_ids.size(); i++) {
-        if (row_ids[i] != other_cmd->row_ids[i]) {
+    for (SizeT i = 0; i < row_ids_.size(); i++) {
+        if (row_ids_[i] != other_cmd->row_ids_[i]) {
             return false;
         }
     }
@@ -174,20 +175,21 @@ bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
 }
 
-i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
+i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
-i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size(); }
+i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
 i32 WalCmdCreateTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + this->table_def->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + this->table_def_->GetSizeInBytes();
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + this->index_def_->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           this->table_index_dir_.size() + this->index_def_->GetSizeInBytes();
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size();
 }
 
 i32 WalCmdDropIndex::GetSizeInBytes() const {
@@ -196,48 +198,49 @@ i32 WalCmdDropIndex::GetSizeInBytes() const {
 }
 
 i32 WalCmdImport::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
-           this->segment_dir.size() + sizeof(u32) + sizeof(u16) + this->row_counts_.size() * sizeof(u16);
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           this->segment_dir_.size() + sizeof(u32) + sizeof(u16) + this->row_counts_.size() * sizeof(u16);
 }
 
 i32 WalCmdAppend::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + block->GetSizeInBytes();
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + block_->GetSizeInBytes();
 }
 
 i32 WalCmdDelete::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name.size() + sizeof(i32) + this->table_name.size() + sizeof(i32) +
-           row_ids.size() * sizeof(RowID);
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           row_ids_.size() * sizeof(RowID);
 }
 
 i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
-    WriteBufAdv(buf, this->db_name);
+    WriteBufAdv(buf, this->db_name_);
 }
 
 void WalCmdDropDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_DATABASE);
-    WriteBufAdv(buf, this->db_name);
+    WriteBufAdv(buf, this->db_name_);
 }
 
 void WalCmdCreateTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_TABLE);
-    WriteBufAdv(buf, this->db_name);
-    this->table_def->WriteAdv(buf);
+    WriteBufAdv(buf, this->db_name_);
+    this->table_def_->WriteAdv(buf);
 }
 
 void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_INDEX);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->table_index_dir_);
     index_def_->WriteAdv(buf);
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DROP_TABLE);
-    WriteBufAdv(buf, this->db_name);
-    WriteBufAdv(buf, this->table_name);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
 }
 
 void WalCmdDropIndex::WriteAdv(char *&buf) const {
@@ -249,11 +252,11 @@ void WalCmdDropIndex::WriteAdv(char *&buf) const {
 
 void WalCmdImport::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::IMPORT);
-    WriteBufAdv(buf, this->db_name);
-    WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, this->segment_dir);
-    WriteBufAdv(buf, this->segment_id);
-    WriteBufAdv(buf, this->block_entries_size);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->segment_dir_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->block_entries_size_);
     for (const auto &row_count : this->row_counts_) {
         WriteBufAdv(buf, row_count);
     }
@@ -261,19 +264,19 @@ void WalCmdImport::WriteAdv(char *&buf) const {
 
 void WalCmdAppend::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::APPEND);
-    WriteBufAdv(buf, this->db_name);
-    WriteBufAdv(buf, this->table_name);
-    block->WriteAdv(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    block_->WriteAdv(buf);
 }
 
 void WalCmdDelete::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::DELETE);
-    WriteBufAdv(buf, this->db_name);
-    WriteBufAdv(buf, this->table_name);
-    WriteBufAdv(buf, static_cast<i32>(this->row_ids.size()));
-    SizeT row_count = this->row_ids.size();
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->row_ids_.size()));
+    SizeT row_count = this->row_ids_.size();
     for (SizeT idx = 0; idx < row_count; ++idx) {
-        const auto &row_id = this->row_ids[idx];
+        const auto &row_id = this->row_ids_[idx];
         WriteBufAdv(buf, row_id);
     }
 }
@@ -286,12 +289,12 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {
-    if (this->txn_id != other.txn_id || this->commit_ts != other.commit_ts || this->cmds.size() != other.cmds.size()) {
+    if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {
         return false;
     }
-    for (u32 i = 0; i < this->cmds.size(); i++) {
-        const SharedPtr<WalCmd> &cmd1 = this->cmds[i];
-        const SharedPtr<WalCmd> &cmd2 = other.cmds[i];
+    for (u32 i = 0; i < this->cmds_.size(); i++) {
+        const SharedPtr<WalCmd> &cmd1 = this->cmds_[i];
+        const SharedPtr<WalCmd> &cmd2 = other.cmds_[i];
         if (cmd1.get() == nullptr || cmd2.get() == nullptr || (*cmd1).operator!=(*cmd2)) {
             return false;
         }
@@ -303,9 +306,9 @@ bool WalEntry::operator!=(const WalEntry &other) const { return !operator==(othe
 
 i32 WalEntry::GetSizeInBytes() const {
     i32 size = sizeof(WalEntryHeader) + sizeof(i32);
-    SizeT cmd_count = cmds.size();
+    SizeT cmd_count = cmds_.size();
     for (SizeT idx = 0; idx < cmd_count; ++idx) {
-        const auto &cmd = cmds[idx];
+        const auto &cmd = cmds_[idx];
         size += cmd->GetSizeInBytes();
     }
     size += sizeof(i32); // pad
@@ -329,20 +332,20 @@ void WalEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
     std::memcpy(ptr, this, sizeof(WalEntryHeader));
     ptr += sizeof(WalEntryHeader);
-    WriteBufAdv(ptr, static_cast<i32>(cmds.size()));
-    SizeT cmd_count = cmds.size();
+    WriteBufAdv(ptr, static_cast<i32>(cmds_.size()));
+    SizeT cmd_count = cmds_.size();
     for (SizeT idx = 0; idx < cmd_count; ++idx) {
-        const auto &cmd = cmds[idx];
+        const auto &cmd = cmds_[idx];
         cmd->WriteAdv(ptr);
     }
     i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
     auto *header = (WalEntryHeader *)saved_ptr;
-    header->size = size;
-    header->checksum = 0;
+    header->size_ = size;
+    header->checksum_ = 0;
     // CRC32IEEE is equivalent to boost::crc_32_type on
     // little-endian machine.
-    header->checksum = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
+    header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
 SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
@@ -352,17 +355,17 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     auto *header = (WalEntryHeader *)ptr;
-    entry->size = header->size;
-    entry->checksum = header->checksum;
-    entry->txn_id = header->txn_id;
-    entry->commit_ts = header->commit_ts;
-    i32 size2 = *(i32 *)(ptr + entry->size - sizeof(i32));
-    if (entry->size != size2) {
+    entry->size_ = header->size_;
+    entry->checksum_ = header->checksum_;
+    entry->txn_id_ = header->txn_id_;
+    entry->commit_ts_ = header->commit_ts_;
+    i32 size2 = *(i32 *)(ptr + entry->size_ - sizeof(i32));
+    if (entry->size_ != size2) {
         return nullptr;
     }
-    header->checksum = 0;
-    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size);
-    if (entry->checksum != checksum2) {
+    header->checksum_ = 0;
+    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_);
+    if (entry->checksum_ != checksum2) {
         return nullptr;
     }
     ptr += sizeof(WalEntryHeader);
@@ -373,7 +376,7 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
             Error<StorageException>("ptr goes out of range when reading WalEntry");
         }
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
-        entry->cmds.push_back(cmd);
+        entry->cmds_.push_back(cmd);
     }
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
@@ -384,7 +387,7 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
 }
 
 Pair<i64, String> WalEntry::GetCheckpointInfo() const {
-    for (const auto &cmd : cmds) {
+    for (const auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
             return {checkpoint_cmd->max_commit_ts_, checkpoint_cmd->catalog_path_};
@@ -392,8 +395,9 @@ Pair<i64, String> WalEntry::GetCheckpointInfo() const {
     }
     return {-1, ""};
 }
+
 bool WalEntry::IsCheckPoint() const {
-    for (const auto &cmd : cmds) {
+    for (const auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             return true;
         }
@@ -402,75 +406,103 @@ bool WalEntry::IsCheckPoint() const {
 }
 
 bool WalEntry::IsFullCheckPoint() const {
-    for (const auto &cmd : cmds) {
+    for (const auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT && dynamic_cast<const WalCmdCheckpoint *>(cmd.get())->is_full_checkpoint_) {
             return true;
         }
     }
     return false;
 }
+
 String WalEntry::ToString() const {
     std::stringstream ss;
     ss << "wal entry" << std::endl;
     ss << "wal entry header" << std::endl;
-    ss << "txn_id: " << txn_id << std::endl;
-    ss << "commit_ts: " << commit_ts << std::endl;
-    ss << "size: " << size << std::endl;
-    for (const auto &cmd : cmds) {
+    ss << "txn_id: " << txn_id_ << std::endl;
+    ss << "commit_ts: " << commit_ts_ << std::endl;
+    ss << "size: " << size_ << std::endl;
+    for (const auto &cmd : cmds_) {
         ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
             ss << "catalog path: " << checkpoint_cmd->catalog_path_ << std::endl;
             ss << "max commit ts: " << checkpoint_cmd->max_commit_ts_ << std::endl;
             ss << "is full checkpoint: " << checkpoint_cmd->is_full_checkpoint_ << std::endl;
-        }
-        if (cmd->GetType() == WalCommandType::IMPORT) {
+        } else if (cmd->GetType() == WalCommandType::IMPORT) {
             auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
-            ss << "db name: " << import_cmd->db_name << std::endl;
-            ss << "table name: " << import_cmd->table_name << std::endl;
-            ss << "segment dir: " << import_cmd->segment_dir << std::endl;
-            ss << "segment id: " << import_cmd->segment_id << std::endl;
-            ss << "block entries size: " << import_cmd->block_entries_size << std::endl;
-        }
-        if (cmd->GetType() == WalCommandType::APPEND) {
+            ss << "db name: " << import_cmd->db_name_ << std::endl;
+            ss << "table name: " << import_cmd->table_name_ << std::endl;
+            ss << "segment dir: " << import_cmd->segment_dir_ << std::endl;
+            ss << "segment id: " << import_cmd->segment_id_ << std::endl;
+            ss << "block entries size: " << import_cmd->block_entries_size_ << std::endl;
+        } else if (cmd->GetType() == WalCommandType::APPEND) {
             auto append_cmd = dynamic_cast<const WalCmdAppend *>(cmd.get());
-            ss << "db name: " << append_cmd->db_name << std::endl;
-            ss << "table name: " << append_cmd->table_name << std::endl;
-            ss << append_cmd->block->ToString();
+            ss << "db name: " << append_cmd->db_name_ << std::endl;
+            ss << "table name: " << append_cmd->table_name_ << std::endl;
+            ss << append_cmd->block_->ToString();
+        } else if (cmd->GetType() == WalCommandType::DELETE) {
+            auto delete_cmd = dynamic_cast<const WalCmdDelete *>(cmd.get());
+            ss << "db name: " << delete_cmd->db_name_ << std::endl;
+            ss << "table name: " << delete_cmd->table_name_ << std::endl;
+            ss << "row ids: ";
+            for (const auto &row_id : delete_cmd->row_ids_) {
+                ss << row_id.ToString() << " ";
+            }
+            ss << std::endl;
+        } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
+            auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
+            ss << "db name: " << create_index_cmd->db_name_ << std::endl;
+            ss << "table name: " << create_index_cmd->table_name_ << std::endl;
+            ss << "table index dir: " << create_index_cmd->table_index_dir_ << std::endl;
+            ss << "index def: " << create_index_cmd->index_def_->ToString() << std::endl;
         }
     }
     return ss.str();
 }
 
 String WalCmd::WalCommandTypeToString(WalCommandType type) {
+    String command{};
     switch (type) {
         case WalCommandType::INVALID:
-            return "INVALID";
+            command = "INVALID";
+            break;
         case WalCommandType::CREATE_DATABASE:
-            return "CREATE_DATABASE";
+            command = "CREATE_DATABASE";
+            break;
         case WalCommandType::DROP_DATABASE:
-            return "DROP_DATABASE";
+            command = "DROP_DATABASE";
+            break;
         case WalCommandType::CREATE_TABLE:
-            return "CREATE_TABLE";
+            command = "CREATE_TABLE";
+            break;
         case WalCommandType::DROP_TABLE:
-            return "DROP_TABLE";
+            command = "DROP_TABLE";
+            break;
         case WalCommandType::ALTER_INFO:
-            return "ALTER_INFO";
+            command = "ALTER_INFO";
+            break;
         case WalCommandType::IMPORT:
-            return "IMPORT";
+            command = "IMPORT";
+            break;
         case WalCommandType::APPEND:
-            return "APPEND";
+            command = "APPEND";
+            break;
         case WalCommandType::DELETE:
-            return "DELETE";
+            command = "DELETE";
+            break;
         case WalCommandType::CHECKPOINT:
-            return "CHECKPOINT";
+            command = "CHECKPOINT";
+            break;
         case WalCommandType::CREATE_INDEX:
-            return "CREATE_INDEX";
+            command = "CREATE_INDEX";
+            break;
         case WalCommandType::DROP_INDEX:
-            return "DROP_INDEX";
+            command = "DROP_INDEX";
+            break;
         default:
             Error<StorageException>("Unknown command type");
     }
+    return command;
 }
 
 WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
@@ -499,7 +531,6 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
         return nullptr;
     }
 }
-
 
 SharedPtr<WalEntry> WalListIterator::Next() {
     if (iter_.get() != nullptr) {

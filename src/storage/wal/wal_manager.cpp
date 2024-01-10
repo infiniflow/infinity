@@ -136,7 +136,7 @@ void WalManager::Stop() {
     // pop all the entries in the queue. and notify the condition variable.
     std::lock_guard guard(mutex_);
     for (const auto &entry : que_) {
-        Txn *txn = txn_mgr->GetTxn(entry->txn_id);
+        Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
         if (txn != nullptr) {
             txn->CancelCommitBottom();
         }
@@ -206,8 +206,8 @@ void WalManager::Flush() {
         auto [max_commit_ts, wal_size] = GetWalState();
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
-            if (entry->cmds.empty()) {
-                Error<StorageException>(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id));
+            if (entry->cmds_.empty()) {
+                Error<StorageException>(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
             int32_t exp_size = entry->GetSizeInBytes();
             Vector<char> buf(exp_size);
@@ -220,9 +220,9 @@ void WalManager::Flush() {
                                       exp_size,
                                       act_size));
             ofs_.write(buf.data(), ptr - buf.data());
-            LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id, entry->commit_ts));
-            if (entry->cmds[0]->GetType() != WalCommandType::CHECKPOINT) {
-                max_commit_ts = entry->commit_ts;
+            LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
+            if (entry->cmds_[0]->GetType() != WalCommandType::CHECKPOINT) {
+                max_commit_ts = entry->commit_ts_;
                 wal_size += act_size;
             }
         }
@@ -230,7 +230,7 @@ void WalManager::Flush() {
         TxnManager *txn_mgr = storage_->txn_manager();
         for (const auto &entry : que2_) {
             // Commit sequentially so they get visible in the same order with wal.
-            Txn *txn = txn_mgr->GetTxn(entry->txn_id);
+            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
             if (txn != nullptr) {
                 txn->CommitBottom();
             }
@@ -286,7 +286,7 @@ void WalManager::Checkpoint() {
         txn_mgr = storage_->txn_manager();
         txn = txn_mgr->CreateTxn();
         txn->Begin();
-        LOG_INFO(fmt::format("created txn for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
+        LOG_INFO(fmt::format("Created txn for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
 
         txn->Checkpoint(max_commit_ts, is_full_checkpoint);
         txn_mgr->CommitTxn(txn);
@@ -493,7 +493,7 @@ i64 WalManager::ReplayWalFile() {
 
             LOG_TRACE(wal_entry->ToString());
 
-            if (wal_entry->commit_ts > max_commit_ts) {
+            if (wal_entry->commit_ts_ > max_commit_ts) {
                 replay_entries.push_back(wal_entry);
             } else {
                 break;
@@ -517,17 +517,17 @@ i64 WalManager::ReplayWalFile() {
     i64 last_txn_id = 0;
     SizeT replay_count = 0;
     for (; replay_count < replay_entries.size(); ++replay_count) {
-        if (replay_entries[replay_count]->commit_ts > max_commit_ts) {
+        if (replay_entries[replay_count]->commit_ts_ > max_commit_ts) {
             break;
         }
     }
 
     for (; replay_count < replay_entries.size(); ++replay_count) {
-        if (replay_entries[replay_count]->commit_ts <= max_commit_ts) {
+        if (replay_entries[replay_count]->commit_ts_ <= max_commit_ts) {
             Error<StorageException>("Wal Replay: Commit ts should be greater than max commit ts");
         }
-        system_start_ts = replay_entries[replay_count]->commit_ts;
-        last_txn_id = replay_entries[replay_count]->txn_id;
+        system_start_ts = replay_entries[replay_count]->commit_ts_;
+        last_txn_id = replay_entries[replay_count]->txn_id_;
         if (replay_entries[replay_count]->IsCheckPoint()) {
             LOG_TRACE(fmt::format("Replay Skip checkpoint entry: {}", replay_entries[replay_count]->ToString()));
             continue;
@@ -567,38 +567,38 @@ void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
     LOG_INFO("WalManager::Checkpoint end to gc wal files");
 }
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
-    for (const auto &cmd : entry.cmds) {
-        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalManager::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts));
+    for (const auto &cmd : entry.cmds_) {
+        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalManager::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
             case WalCommandType::CREATE_DATABASE:
-                WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::DROP_DATABASE:
-                WalCmdDropDatabaseReplay(*dynamic_cast<const WalCmdDropDatabase *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdDropDatabaseReplay(*dynamic_cast<const WalCmdDropDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::CREATE_TABLE:
-                WalCmdCreateTableReplay(*dynamic_cast<const WalCmdCreateTable *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdCreateTableReplay(*dynamic_cast<const WalCmdCreateTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::DROP_TABLE:
-                WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::ALTER_INFO:
                 Error<NotImplementException>("WalCmdAlterInfo Replay Not implemented");
                 break;
             case WalCommandType::CREATE_INDEX:
-                WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::DROP_INDEX:
-                WalCmdDropIndexReplay(*dynamic_cast<const WalCmdDropIndex *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdDropIndexReplay(*dynamic_cast<const WalCmdDropIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::IMPORT:
-                WalCmdImportReplay(*dynamic_cast<const WalCmdImport *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdImportReplay(*dynamic_cast<const WalCmdImport *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::APPEND:
-                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdAppendReplay(*dynamic_cast<const WalCmdAppend *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::DELETE:
-                WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id, entry.commit_ts);
+                WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::CHECKPOINT:
                 break;
@@ -608,7 +608,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     }
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name, txn_id, commit_ts, storage_->txn_manager());
+    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager());
     if (!status.ok()) {
         Error<StorageException>("Wal Replay: Create database failed");
     }
@@ -617,7 +617,7 @@ void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64
 void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_id, i64 commit_ts) {
 
     auto [table_entry, table_status] =
-        storage_->catalog()->CreateTable(cmd.db_name, txn_id, commit_ts, cmd.table_def, ConflictType::kIgnore, storage_->txn_manager());
+        storage_->catalog()->CreateTable(cmd.db_name_, txn_id, commit_ts, cmd.table_def_, ConflictType::kIgnore, storage_->txn_manager());
 
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Create table failed" + *table_status.msg_);
@@ -626,7 +626,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, u64 txn_i
 }
 
 void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn_id, i64 commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->DropDatabase(cmd.db_name, txn_id, commit_ts, nullptr);
+    auto [db_entry, status] = storage_->catalog()->DropDatabase(cmd.db_name_, txn_id, commit_ts, nullptr);
     if (!status.ok()) {
         Error<StorageException>("Wal Replay: Drop database failed");
     }
@@ -635,7 +635,7 @@ void WalManager::WalCmdDropDatabaseReplay(const WalCmdDropDatabase &cmd, u64 txn
 
 void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, u64 txn_id, i64 commit_ts) {
     auto [table_entry, table_status] =
-        storage_->catalog()->DropTableByName(cmd.db_name, cmd.table_name, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
+        storage_->catalog()->DropTableByName(cmd.db_name_, cmd.table_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
     if (!table_status.ok()) {
         Error<StorageException>("Wal Replay: Drop table failed {}", table_status.message());
     }
@@ -647,17 +647,27 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, u64 txn_i
     if (!table_status.ok()) {
         Error<StorageException>(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
-    auto [table_index_entry, index_def_entry_status] =
-        storage_->catalog()->CreateIndex(table_entry, cmd.index_def_, ConflictType::kError, txn_id, commit_ts, nullptr);
-    if (!index_def_entry_status.ok()) {
-        Error<StorageException>("Wal Replay: Create index failed");
-    }
+
+    auto [table_index_entry, index_def_entry_status] = storage_->catalog()->CreateIndex(table_entry,
+                                                                                        cmd.index_def_,
+                                                                                        ConflictType::kError,
+                                                                                        txn_id,
+                                                                                        commit_ts,
+                                                                                        nullptr,
+                                                                                        true, /*is_replay*/
+                                                                                        cmd.table_index_dir_);
 
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    NewCatalog::CreateIndexFile(table_entry, table_store.get(), table_index_entry, commit_ts, storage_->buffer_manager(), false);
-    NewCatalog::CommitCreateIndex(table_store->txn_indexes_store_);
+    NewCatalog::CreateIndexFile(table_entry,
+                                table_store.get(),
+                                table_index_entry,
+                                commit_ts,
+                                storage_->buffer_manager(),
+                                false /*prepare*/,
+                                true /*is_replay*/);
+    NewCatalog::CommitCreateIndex(table_store->txn_indexes_store_, true /*is_replay*/);
     table_index_entry->Commit(commit_ts);
 }
 
@@ -674,15 +684,15 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, u64 txn_id, i
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 commit_ts) {
 
-    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir);
-    auto segment_entry = SegmentEntry::MakeReplaySegmentEntry(table_entry, cmd.segment_id, segment_dir_ptr, commit_ts);
+    auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir_);
+    auto segment_entry = SegmentEntry::MakeReplaySegmentEntry(table_entry, cmd.segment_id_, segment_dir_ptr, commit_ts);
 
-    for (int id = 0; id < cmd.block_entries_size; ++id) {
+    for (int id = 0; id < cmd.block_entries_size_; ++id) {
         auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(),
                                                   id,
                                                   0,
@@ -696,24 +706,24 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
         segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
     }
 
-    NewCatalog::ImportSegment(table_entry, cmd.segment_id, segment_entry);
+    NewCatalog::ImportSegment(table_entry, cmd.segment_id_, segment_entry);
 }
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, u64 txn_id, i64 commit_ts) {
-    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
-    table_store->Delete(cmd.row_ids);
+    table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
     NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 commit_ts) {
-    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name, cmd.table_name, txn_id, commit_ts);
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         Error<StorageException>(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
@@ -721,7 +731,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
 
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
-    table_store->Append(cmd.block);
+    table_store->Append(cmd.block_);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
     table_store->append_state_ = std::move(append_state);

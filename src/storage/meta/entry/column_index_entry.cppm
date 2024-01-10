@@ -50,7 +50,7 @@ public:
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
                                                            u64 txn_id,
-                                                           SharedPtr<String> index_dir,
+                                                           SharedPtr<String> col_index_dir,
                                                            TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
@@ -60,7 +60,7 @@ public:
 
 public:
     // Getter
-    const SharedPtr<String> &index_dir() const { return index_dir_; }
+    const SharedPtr<String> &col_index_dir() const { return col_index_dir_; }
     u64 column_id() const { return column_id_; }
     const IndexBase *index_base_ptr() const { return index_base_.get(); }
     TableIndexEntry *table_index_entry() const { return table_index_entry_; }
@@ -81,7 +81,7 @@ private:
 
     TableIndexEntry *table_index_entry_{};
     u64 column_id_{};
-    SharedPtr<String> index_dir_{};
+    SharedPtr<String> col_index_dir_{}; // xxxx/col1
     const SharedPtr<IndexBase> index_base_{};
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};
 };
