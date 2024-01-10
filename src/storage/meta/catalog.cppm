@@ -142,8 +142,7 @@ public:
     static Status RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnManager *txn_mgr);
 
     // Index Related methods
-    Tuple<TableEntry *, TableIndexEntry *, Status> CreateIndex(const String &db_name,
-                                                               const String &table_name,
+    Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
                                                                const SharedPtr<IndexDef> &index_def,
                                                                ConflictType conflict_type,
                                                                u64 txn_id,

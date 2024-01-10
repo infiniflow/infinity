@@ -21,7 +21,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-
+import base_table_ref;
 import index_def;
 
 export module physical_create_index_prepare;
@@ -30,8 +30,7 @@ namespace infinity {
 export class PhysicalCreateIndexPrepare : public PhysicalOperator {
 public:
     PhysicalCreateIndexPrepare(u64 id,
-                               SharedPtr<String> schema_name,
-                               SharedPtr<String> table_name,
+                               SharedPtr<BaseTableRef> base_table_ref,
                                SharedPtr<IndexDef> index_definition,
                                ConflictType conflict_type,
                                SharedPtr<Vector<String>> output_names,
@@ -50,8 +49,8 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
 public:
-    const SharedPtr<String> schema_name_{};
-    const SharedPtr<String> table_name_{};
+    const SharedPtr<BaseTableRef> base_table_ref_{};
+
     const SharedPtr<IndexDef> index_def_ptr_{};
     const ConflictType conflict_type_{};
 
