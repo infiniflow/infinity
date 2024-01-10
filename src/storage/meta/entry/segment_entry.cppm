@@ -55,6 +55,12 @@ public:
 
     void MergeFrom(infinity::BaseEntry &other) override;
 
+    void WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
+                            BooleanT prepare,
+                            u64 column_id,
+                            const IndexBase *index_base,
+                            SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
+
 public:
     const String &DirPath() { return *segment_dir_; }
 
@@ -99,7 +105,8 @@ protected:
                                                        TxnTimeStamp create_ts,
                                                        BufferManager *buffer_mgr,
                                                        TxnTableStore *txn_store,
-                                                       bool prepare);
+                                                       BooleanT prepare,
+                                                       BooleanT is_replay);
 
     void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16 start_pos, u16 row_count);
 

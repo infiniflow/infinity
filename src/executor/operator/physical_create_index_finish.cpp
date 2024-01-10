@@ -16,6 +16,8 @@ module;
 
 import stl;
 import parser;
+import third_party;
+import logger;
 import physical_operator_type;
 import physical_operator;
 import query_context;
@@ -23,6 +25,7 @@ import operator_state;
 import load_meta;
 import index_def;
 import wal;
+import infinity_exception;
 
 module physical_create_index_finish;
 
@@ -35,17 +38,18 @@ PhysicalCreateIndexFinish::PhysicalCreateIndexFinish(u64 id,
                                                      SharedPtr<Vector<String>> output_names,
                                                      SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                                                      SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, std::move(left), nullptr, id, load_metas), db_name_(db_name), table_name_(table_name),
-      index_def_(index_def), output_names_(output_names), output_types_(output_types) {}
+    : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, std::move(left), nullptr, id, load_metas), db_name_(db_name),
+      table_name_(table_name), index_def_(index_def), output_names_(output_names), output_types_(output_types) {}
 
 void PhysicalCreateIndexFinish::Init() {}
 
 bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
     auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(operator_state);
-
-    txn->AddWalCmd(MakeShared<WalCmdCreateIndex>(*db_name_, *table_name_, index_def_));
-
+    auto status = txn->CreateIndexFinish(*db_name_, *table_name_, index_def_);
+    if (!status.ok()) {
+        Error<ExecutorException>(fmt::format("Create index finish failed: {}", status.message()));
+    }
     operator_state->SetComplete();
     return true;
 }

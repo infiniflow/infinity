@@ -99,7 +99,7 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     if (put_wal_entry_ == nullptr)
         return;
     std::unique_lock<std::mutex> lk(mutex_);
-    priority_que_[entry->commit_ts] = entry;
+    priority_que_[entry->commit_ts_] = entry;
     auto it = priority_que_.begin();
     while (it != priority_que_.end() && it->second.get() != nullptr) {
         put_wal_entry_(it->second);

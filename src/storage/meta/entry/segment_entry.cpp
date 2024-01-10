@@ -156,21 +156,12 @@ void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<
     }
 }
 
-SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntry *column_index_entry,
-                                                                 SharedPtr<ColumnDef> column_def,
-                                                                 TxnTimeStamp create_ts,
-                                                                 BufferManager *buffer_mgr,
-                                                                 TxnTableStore *txn_store,
-                                                                 bool prepare) {
-    u64 column_id = column_def->id();
-    //    SharedPtr<IndexDef> index_def = index_def_entry->index_def_;
-    const IndexBase *index_base = column_index_entry->index_base_ptr();
-    //    UniquePtr<CreateIndexParam> create_index_param = MakeUnique<CreateIndexParam>(index_base, column_def.get());
-    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(this->row_count_, index_base, column_def.get());
-    SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
-        SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, this->segment_id_, create_ts, buffer_mgr, create_index_param.get());
+void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
+                                  BooleanT prepare,
+                                  u64 column_id,
+                                  const IndexBase *index_base,
+                                  SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
     switch (index_base->index_type_) {
-
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Error<StorageException>("AnnIVFFlat supports embedding type.");
@@ -214,25 +205,29 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
 
             BufferHandle buffer_handle = segment_column_index_entry->GetIndex();
+
             auto InsertHnsw = [&](auto &hnsw_index) {
                 u32 segment_offset = 0;
                 Vector<u64> row_ids;
-                for (const auto &block_entry : this->block_entries_) {
+                for (const auto &block_entry : this->SegmentEntry::block_entries_) {
                     SizeT block_row_cnt = block_entry->row_count();
 
                     for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
-                        RowID row_id(this->segment_id_, segment_offset + block_offset);
+                        RowID row_id(this->SegmentEntry::segment_id_, segment_offset + block_offset);
                         row_ids.push_back(row_id.ToUint64());
                     }
                     segment_offset += DEFAULT_BLOCK_CAPACITY;
                 }
                 OneColumnIterator<float> one_column_iter(this, column_id);
                 if (!prepare) {
+                    // Single thread insert
                     hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
                 } else {
+                    // Multi thread insert data, write file in the physical create index finish stage.
                     hnsw_index->StoreData(one_column_iter, row_ids.data(), row_ids.size());
                 }
             };
+
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     switch (index_hnsw->encode_type_) {
@@ -292,15 +287,34 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
             break;
         }
         case IndexType::kIRSFullText: {
-            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }
         default: {
-            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }
+    }
+}
+
+SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntry *column_index_entry,
+                                                                 SharedPtr<ColumnDef> column_def,
+                                                                 TxnTimeStamp create_ts,
+                                                                 BufferManager *buffer_mgr,
+                                                                 TxnTableStore *txn_store,
+                                                                 BooleanT prepare,
+                                                                 BooleanT is_replay) {
+    u64 column_id = column_def->id();
+    const IndexBase *index_base = column_index_entry->index_base_ptr();
+    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(this->row_count_, index_base, column_def.get());
+    auto segment_column_index_entry =
+        SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, this->segment_id_, create_ts, buffer_mgr, create_index_param.get());
+    if (!is_replay) {
+        WriteIndexToMemory(column_def, prepare, column_id, index_base, segment_column_index_entry);
     }
     txn_store->CreateIndexFile(column_index_entry->table_index_entry(), column_id, this->segment_id_, segment_column_index_entry);
     return segment_column_index_entry;
@@ -364,16 +378,16 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
     }
     for (BlockEntry *block_entry : block_entries) {
         LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                         block_entry->checkpoint_ts(),
-                         block_entry->min_row_ts(),
-                         block_entry->max_row_ts(),
-                         max_commit_ts));
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
         block_entry->Flush(max_commit_ts);
         LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                         block_entry->checkpoint_ts(),
-                         block_entry->min_row_ts(),
-                         block_entry->max_row_ts(),
-                         max_commit_ts));
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
         // WARNING: this operation may influence data visibility
         //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
         //            continue;
@@ -487,7 +501,8 @@ UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_coun
             return MakeUnique<CreateFullTextParam>(index_base, column_def);
         }
         default: {
-            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
             Error<StorageException>(*err_msg);
         }

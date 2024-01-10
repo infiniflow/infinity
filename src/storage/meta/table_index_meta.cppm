@@ -45,8 +45,13 @@ public:
     Tuple<TableIndexEntry *, Status> GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
 
 private:
-    Tuple<TableIndexEntry *, Status>
-    CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+                                                           ConflictType conflict_type,
+                                                           u64 txn_id,
+                                                           TxnTimeStamp begin_ts,
+                                                           TxnManager *txn_mgr,
+                                                           bool is_replay,
+                                                           String replay_table_index_dir);
 
     Tuple<TableIndexEntry *, Status> DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
@@ -60,11 +65,18 @@ private:
 
     void MergeFrom(TableIndexMeta &other);
 
-    Tuple<TableIndexEntry *, Status>
-    CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def,
+                                                                   u64 txn_id,
+                                                                   TxnTimeStamp begin_ts,
+                                                                   TxnManager *txn_mgr,
+                                                                   bool is_replay,
+                                                                   String replay_table_index_dir);
 
     Tuple<TableIndexEntry *, Status> DropTableIndexEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
+public:
+    String index_name() const { return *index_name_; }
+    List <UniquePtr<BaseEntry>> &entry_list() { return entry_list_; }
 private:
     //    std::shared_mutex rw_locker_{};
     SharedPtr<String> index_name_{};

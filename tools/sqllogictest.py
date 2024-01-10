@@ -37,14 +37,14 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
             # if "fulltext" in filename or "fusion" in filename:
             #     continue
 
+            print("Start running test file: " + file)
             process = subprocess.run([sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, error = process.stdout, process.stderr
             if process.returncode != 0:
                 raise Exception(f"An error occurred: {error.decode()}")  # Prints the error message.
             else:
                 print(f"Output: {output.decode()}")  # Prints the output.
-            print("Finished running test file: " + file)
-            print("-" * 100)
+            print("=" * 99)
             test_cnt += 1
 
     print("Finished {} tests.".format(test_cnt))
