@@ -137,7 +137,7 @@ QueryResult Infinity::ListDatabases() {
     return result;
 }
 
-SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
+UniquePtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -145,10 +145,10 @@ SharedPtr<Database> Infinity::GetDatabase(const String &db_name) {
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
-    command_statement->command_info_ = MakeShared<UseCmd>(db_name.c_str());
+    command_statement->command_info_ = MakeUnique<UseCmd>(db_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     if (result.status_.ok()) {
-        return MakeShared<Database>(db_name, session_);
+        return MakeUnique<Database>(db_name, session_);
     } else {
         return nullptr;
     }

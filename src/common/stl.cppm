@@ -42,6 +42,7 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <random>
 
 export module stl;
 
@@ -51,6 +52,8 @@ using std::experimental::source_location;
 // using std::stringstream;
 using std::forward;
 using std::move;
+
+using std::swap;
 
 using std::max;
 using std::min;
@@ -67,9 +70,14 @@ using std::strtod;
 using std::memcpy;
 using std::memset;
 using std::memcmp;
+using std::strlen;
+
+using std::time;
+using std::printf;
 
 using std::is_same;
 using std::fill;
+using std::lower_bound;
 
 using std::shared_mutex;
 using std::mutex;
@@ -84,9 +92,52 @@ using std::isalpha;
 using std::isalnum;
 using std::pow;
 using std::log2;
+using std::sqrt;
+using std::floor;
+using std::nearbyint;
+using std::isnan;
+using std::isinf;
+using std::fmod;
+using std::fabs;
+using std::fill_n;
+using std::transform;
+using std::sort;
+using std::make_heap;
+using std::pop_heap;
+using std::reverse;
+using std::remove_if;
+using std::find;
+
+namespace ranges {
+
+using std::ranges::for_each;
+using std::ranges::equal;
+
+}
 
 using std::numeric_limits;
 
+using std::cout;
+using std::cerr;
+using std::endl;
+
+using std::ostream;
+using std::ofstream;
+using std::ifstream;
+using std::ios;
+
+using std::align;
+
+using std::static_pointer_cast;
+using std::dynamic_pointer_cast;
+
+namespace filesystem {
+    using std::filesystem::file_size;
+}
+
+using std::mt19937;
+using std::uniform_real_distribution;
+using std::iota;
 } // namespace std
 
 namespace infinity {

@@ -161,7 +161,8 @@ void HnswFileWorker::FreeInMemory() {
             break;
         }
         default: {
-            Error<StorageException>(fmt::format("Index should be created on float embedding column now, type: {}", EmbeddingDataType2String(embedding_type)));
+            Error<StorageException>(fmt::format("Index should be created on float embedding column now, type: {}",
+                                                EmbeddingType::EmbeddingDataType2String(embedding_type)));
         }
     }
     data_ = nullptr;

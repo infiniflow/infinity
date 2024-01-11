@@ -305,7 +305,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateSchema *create_node, Share
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -359,7 +359,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, Shared
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -402,7 +402,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node, Shared
     }
 
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type_);
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type_);
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -439,7 +439,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateCollection *create_node, S
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -471,7 +471,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropSchema *drop_node, SharedPtr
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(drop_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -509,7 +509,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropTable *drop_node, SharedPtr<
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(drop_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -547,7 +547,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropCollection *drop_node, Share
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(drop_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -1398,7 +1398,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateView *create_node, SharedP
     // Conflict type
     {
         String conflict_type_str =
-            String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(create_node->create_view_info()->conflict_type_);
+            String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(create_node->create_view_info()->conflict_type_);
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 
@@ -1436,7 +1436,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalDropView *drop_node, SharedPtr<V
 
     // Conflict type
     {
-        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictType2Str(drop_node->conflict_type());
+        String conflict_type_str = String(intent_size, ' ') + " - conflict type: " + ConflictTypeToStr(drop_node->conflict_type());
         result->emplace_back(MakeShared<String>(conflict_type_str));
     }
 }

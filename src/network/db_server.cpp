@@ -16,9 +16,10 @@ module;
 
 #include <boost/bind.hpp>
 #include <thread>
-#include "thrift_server.h"
 
 module db_server;
+
+import thrift_server;
 import infinity_context;
 import stl;
 import boost;

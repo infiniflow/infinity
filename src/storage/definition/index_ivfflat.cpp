@@ -14,9 +14,12 @@
 
 module;
 
-#include <memory>
 #include <string>
 #include <vector>
+
+import infinity_exception;
+
+module index_ivfflat;
 
 import stl;
 import index_def;
@@ -24,10 +27,6 @@ import parser;
 import third_party;
 import serialize;
 import index_base;
-
-import infinity_exception;
-
-module index_ivfflat;
 
 namespace infinity {
 

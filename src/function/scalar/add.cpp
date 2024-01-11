@@ -14,8 +14,6 @@
 
 module;
 
-#include <cmath>
-
 import stl;
 import catalog;
 

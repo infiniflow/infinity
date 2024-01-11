@@ -14,13 +14,13 @@
 
 module;
 
-#include <cppjieba/Jieba.hpp>
+export module chinese_analyzer;
 
 import stl;
+import jieba;
 import term;
 import analyzer;
 import third_party;
-export module chinese_analyzer;
 
 namespace infinity {
 

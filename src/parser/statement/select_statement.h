@@ -37,8 +37,6 @@ struct WithExpr {
 
 enum OrderType { kAsc, kDesc };
 
-std::string ToString(OrderType type);
-
 struct OrderByExpr {
     ~OrderByExpr() { delete expr_; }
     ParsedExpr *expr_{};
@@ -51,6 +49,7 @@ public:
 
     ~SelectStatement() final;
 
+    static std::string ToString(OrderType type);
     [[nodiscard]] std::string ToString() const final;
 
     BaseTableReference *table_ref_{nullptr};

@@ -14,8 +14,6 @@
 
 module;
 
-#include <iostream>
-#include <memory>
 #include <string>
 
 module catalog;

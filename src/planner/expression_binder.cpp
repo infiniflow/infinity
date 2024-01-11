@@ -14,8 +14,9 @@
 
 module;
 
-#include <cstring>
-#include <memory>
+#include <string>
+
+module expression_binder;
 
 import stl;
 import parser;
@@ -56,8 +57,6 @@ import special_function;
 import catalog;
 import query_context;
 import logger;
-
-module expression_binder;
 
 namespace infinity {
 
@@ -186,28 +185,28 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDate: {
-            SizeT date_str_len = strlen(expr.date_value_);
+            SizeT date_str_len = std::strlen(expr.date_value_);
             DateT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
             Value value = Value::MakeDate(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kTime: {
-            SizeT date_str_len = strlen(expr.date_value_);
+            SizeT date_str_len = std::strlen(expr.date_value_);
             TimeT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
             Value value = Value::MakeTime(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kDateTime: {
-            SizeT date_str_len = strlen(expr.date_value_);
+            SizeT date_str_len = std::strlen(expr.date_value_);
             DateTimeT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
             Value value = Value::MakeDateTime(date_value);
             return MakeShared<ValueExpression>(value);
         }
         case LiteralType::kTimestamp: {
-            SizeT date_str_len = strlen(expr.date_value_);
+            SizeT date_str_len = std::strlen(expr.date_value_);
             TimestampT date_value;
             date_value.FromString(expr.date_value_, date_str_len);
             Value value = Value::MakeTimestamp(date_value);
@@ -248,7 +247,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     ColumnIdentifier column_identifier = ColumnIdentifier::MakeColumnIdentifier(query_context_, expr);
     SharedPtr<ColumnExpression> column_expr = bind_context_ptr->ResolveColumnId(column_identifier, depth);
-    if (column_expr != nullptr && column_expr->IsCorrelated()) {
+    if (column_expr.get() != nullptr && column_expr->IsCorrelated()) {
         // Correlated column expression
         LOG_TRACE(fmt::format("Has correlated expr {}", column_expr->column_name()));
         bind_context_ptr->AddCorrelatedColumnExpr(column_expr);
@@ -524,7 +523,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
 
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
     SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
-    if (special_function != nullptr) {
+    if (special_function.get() != nullptr) {
         switch (special_function->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {

@@ -92,7 +92,7 @@ SharedPtr<BaseExpression> HavingBinder::BuildColExpr(const ColumnExpr &expr, Bin
         return result;
 
     } else {
-        Error<PlannerException>(fmt::format("Column {}  must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
+        Error<PlannerException>(fmt::format("Column {} must appear in the GROUP BY clause or be used in an aggregate function", expr.GetName()));
     }
     return nullptr;
 }

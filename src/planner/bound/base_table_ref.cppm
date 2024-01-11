@@ -14,8 +14,7 @@
 
 module;
 
-#include <algorithm>
-
+#include <vector>
 import stl;
 import table_ref;
 import catalog;

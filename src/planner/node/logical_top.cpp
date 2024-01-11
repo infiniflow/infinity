@@ -48,9 +48,9 @@ String LogicalTop::ToString(i64 &space) const {
     ss << ") Order by: ";
     SizeT expression_count = sort_expressions_.size();
     for (SizeT i = 0; i < expression_count - 1; ++i) {
-        ss << sort_expressions_[i]->Name() << " " << OrderBy2Str(order_by_types_[i]) << ", ";
+        ss << sort_expressions_[i]->Name() << " " << SelectStatement::ToString(order_by_types_[i]) << ", ";
     }
-    ss << sort_expressions_.back()->Name() << " " << OrderBy2Str(order_by_types_.back());
+    ss << sort_expressions_.back()->Name() << " " << SelectStatement::ToString(order_by_types_.back());
     space += arrow_str.size();
 
     return std::move(ss).str();

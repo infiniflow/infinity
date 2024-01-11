@@ -15,7 +15,6 @@
 module;
 
 #include <thread>
-#include <iostream>
 
 import stl;
 

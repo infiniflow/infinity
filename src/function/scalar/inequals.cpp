@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include <cmath>
+
 #include <type_traits>
 
 import stl;

@@ -21,7 +21,6 @@ namespace infinity {
 class SearchOptions {
 public:
     explicit SearchOptions(const std::string &options_str);
-    virtual ~SearchOptions(){};
     bool operator==(const SearchOptions &other) const;
     bool operator!=(const SearchOptions &other) const { return !(*this == other); }
 

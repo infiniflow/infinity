@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <vector>
+
+module expression_transformer;
 
 import stl;
 import base_expression;
@@ -29,8 +31,6 @@ import expression_type;
 
 import infinity_exception;
 import third_party;
-
-module expression_transformer;
 
 namespace infinity {
 

@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <vector>
+
+module bound_select_statement;
 
 import logical_node;
 import stl;
@@ -67,14 +69,13 @@ import subquery_table_ref;
 import cross_product_table_ref;
 import join_table_ref;
 import knn_expression;
-
-module bound_select_statement;
+import third_party;
 
 namespace infinity {
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
-    if (search_expr_ == nullptr) {
+    if (search_expr_.get() == nullptr) {
         SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_, query_context, bind_context);
         if (!where_conditions_.empty()) {
             SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
@@ -106,7 +107,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             if (order_by_expressions_.size() != order_by_types_.size()) {
                 Error<PlannerException>("Unknown error on order by expression");
             }
-            if (limit_expression_ == nullptr) {
+
+            if (limit_expression_.get() == nullptr) {
                 SharedPtr<LogicalNode> sort = MakeShared<LogicalSort>(bind_context->GetNewLogicalNodeId(), order_by_expressions_, order_by_types_);
                 sort->set_left_node(root);
                 root = sort;
@@ -120,7 +122,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 top->set_left_node(root);
                 root = top;
             }
-        } else if (limit_expression_ != nullptr) {
+        } else if (limit_expression_.get() != nullptr) {
             auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_);
             limit->set_left_node(root);
             root = limit;
@@ -170,7 +172,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             match_knn_nodes.push_back(logicKnnScan);
         }
 
-        if (search_expr_->fusion_expr_ != nullptr) {
+        if (search_expr_->fusion_expr_.get() != nullptr) {
             SharedPtr<LogicalNode> fusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), search_expr_->fusion_expr_);
             fusionNode->set_left_node(match_knn_nodes[0]);
             if (match_knn_nodes.size() > 1)
@@ -283,7 +285,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildCrossProductTable(SharedPtr<Ta
 
     // TODO: Merge bind context ?
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-    String alias("cross_product" + std::to_string(logical_node_id));
+    String alias(fmt::format("cross_product{}", logical_node_id));
     SharedPtr<LogicalCrossProduct> logical_cross_product_node = MakeShared<LogicalCrossProduct>(logical_node_id, alias, left_node, right_node);
     return logical_cross_product_node;
 }
@@ -298,7 +300,7 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContex
 
     // TODO: Merge bind context ?
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-    String alias("join" + std::to_string(logical_node_id));
+    String alias(fmt::format("join{}", logical_node_id));
     SharedPtr<LogicalJoin> logical_join_node =
         MakeShared<LogicalJoin>(logical_node_id, join_table_ref->join_type_, alias, join_table_ref->on_conditions_, left_node, right_node);
     return logical_join_node;
@@ -306,7 +308,7 @@ BoundSelectStatement::BuildJoinTable(SharedPtr<TableRef> &table_ref, QueryContex
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildDummyTable(SharedPtr<TableRef> &, QueryContext *, const SharedPtr<BindContext> &bind_context) {
     u64 logical_node_id = bind_context->GetNewLogicalNodeId();
-    String alias("DummyTable" + std::to_string(logical_node_id));
+    String alias(fmt::format("DummyTable{}", logical_node_id));
     SharedPtr<LogicalDummyScan> dummy_scan_node = MakeShared<LogicalDummyScan>(logical_node_id, alias, bind_context->GenerateTableIndex());
     return dummy_scan_node;
 }

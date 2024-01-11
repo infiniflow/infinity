@@ -13,8 +13,9 @@
 // limitations under the License.
 
 module;
-#include <algorithm>
+
 #include <functional>
+
 import stl;
 import knn_distance;
 import parser;

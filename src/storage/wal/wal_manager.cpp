@@ -14,7 +14,6 @@
 
 module;
 
-#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <thread>

@@ -1,9 +1,8 @@
 module;
 
-import stl;
-#include <memory>
-
 module memory_chunk;
+
+import stl;
 
 namespace infinity {
 

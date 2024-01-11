@@ -14,10 +14,11 @@
 
 module;
 
-#include <memory>
 #include <string>
-#include <sstream>
-#include <vector>
+
+module index_def;
+
+import infinity_exception;
 
 import stl;
 import serialize;
@@ -26,9 +27,6 @@ import index_hnsw;
 import index_base;
 import third_party;
 
-import infinity_exception;
-
-module index_def;
 //--------------------------------------------------
 
 namespace infinity {
@@ -44,7 +42,7 @@ bool IndexDef::operator==(const IndexDef &other) const {
 
     SizeT index_count = index_array_.size();
     for (SizeT idx = 0; idx < index_count; ++idx) {
-        if (index_array_[idx] != index_array_[idx]) {
+        if (*index_array_[idx] != *index_array_[idx]) {
             return false;
         }
     }

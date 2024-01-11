@@ -66,7 +66,7 @@ SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String 
 SharedPtr<IrsIndexEntry>
 IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry, u64 txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts) {
     auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    irs_index_entry->irs_index_ = MakeShared<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
     return irs_index_entry;
 }
 

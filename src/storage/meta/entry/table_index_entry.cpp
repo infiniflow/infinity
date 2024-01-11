@@ -14,8 +14,7 @@
 
 module;
 
-#include <ctime>
-#include <memory>
+#include <vector>
 
 module catalog;
 
@@ -195,7 +194,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
     LocalFileSystem fs;
     SharedPtr<String> index_dir;
     do {
-        u32 seed = time(nullptr);
+        u32 seed = std::time(nullptr);
         index_dir = MakeShared<String>(fmt::format("{}/{}_index_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN, seed), index_name));
     } while (!fs.CreateDirectoryNoExp(*index_dir));
     return index_dir;

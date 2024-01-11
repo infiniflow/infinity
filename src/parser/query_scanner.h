@@ -26,7 +26,7 @@ namespace infinity {
 class QueryScanner : public yyFlexLexer {
 public:
     QueryScanner(std::istream *in) : yyFlexLexer(in){};
-    virtual ~QueryScanner(){};
+    ~QueryScanner() override = default;
 
     // get rid of override virtual function warning
     using FlexLexer::yylex;

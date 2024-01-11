@@ -14,8 +14,8 @@
 
 module;
 #include <cassert>
-#include <iostream>
 #include <new>
+#include <vector>
 
 import stl;
 import hnsw_common;

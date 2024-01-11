@@ -89,7 +89,7 @@ String LogicalJoin::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << JoinType2Str(join_type_) << " on ";
+    ss << String(space, ' ') << arrow_str << JoinReference::ToString(join_type_) << " on ";
     for (auto &condition : conditions_) {
         ss << condition->Name() << " ";
     }

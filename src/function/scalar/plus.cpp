@@ -31,6 +31,7 @@ struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
         Error<NotImplementException>("Not implement");
+        return false;
     }
 };
 

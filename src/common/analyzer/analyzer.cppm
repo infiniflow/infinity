@@ -13,12 +13,13 @@
 // limitations under the License.
 
 module;
-#include <cppjieba/Jieba.hpp>
 
+export module analyzer;
+
+import jieba;
 import stl;
 import term;
 import tokenizer;
-export module analyzer;
 
 namespace infinity {
 export class Analyzer {

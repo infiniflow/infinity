@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "network/thrift_server.h"
 #include <csignal>
 #include <cstdlib>
 
@@ -22,6 +21,7 @@ import third_party;
 import db_server;
 import infinity_exception;
 import infinity_context;
+import thrift_server;
 
 namespace {
 
@@ -78,7 +78,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         }
         default: {
             // Ignore
-            printf("Other type of signal: %d\n", signal_number);
+            fmt::print("Other type of signal: %d\n", signal_number);
         }
     }
     //    exit(0);
@@ -165,6 +165,6 @@ auto main(int argc, char **argv) -> int {
 
     shut_down_thread.join();
 
-    printf("Server is shutdown\n");
+    fmt::print("Server is shutdown\n");
     return 0;
 }

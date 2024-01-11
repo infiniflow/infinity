@@ -27,8 +27,6 @@ import local_file_system;
 
 namespace infinity {
 
-
-
 class BufferManager;
 class Txn;
 struct SegmentEntry;

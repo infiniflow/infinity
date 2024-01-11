@@ -59,7 +59,7 @@ void FragmentTask::OnExecute(i64) {
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
 
     bool execute_success{false};
-    bool source_complete = source_op->Execute(fragment_context->query_context(), source_state_.get());
+    source_op->Execute(fragment_context->query_context(), source_state_.get());
     if (source_state_->error_message_.get() == nullptr) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
