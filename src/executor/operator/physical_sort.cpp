@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module physical_sort;
+
 import stl;
 import txn;
 import query_context;
@@ -33,114 +35,41 @@ import operator_state;
 import data_block;
 import infinity_exception;
 import third_party;
-
-module physical_sort;
+import physical_top;
 
 namespace infinity {
 
-#define COMPARE(type)                                                                                                                                \
-    type left_value = ((type *)(left_result_vector->data()))[left_index.offset];                                                                     \
-    type right_value = ((type *)(right_result_vector->data()))[right_index.offset];                                                                  \
-    if (left_value == right_value) {                                                                                                                 \
-        continue;                                                                                                                                    \
-    }                                                                                                                                                \
-    if (order_type == OrderType::kAsc) {                                                                                                             \
-        return left_value < right_value;                                                                                                             \
-    } else {                                                                                                                                         \
-        return left_value > right_value;                                                                                                             \
-    }
+struct BlockRawIndex {
+    SizeT block_idx;
+    SizeT offset;
+};
 
 class Comparator {
 public:
-    explicit Comparator(const Vector<UniquePtr<DataBlock>> &order_by_blocks,
-                        const Vector<OrderType> &order_by_types,
-                        Vector<SharedPtr<BaseExpression>> expressions)
-        : order_by_blocks_(order_by_blocks), order_by_types_(order_by_types), expressions_(expressions) {}
+    explicit Comparator(const CompareTwoRowAndPreferLeft &prefer_left_function,
+                        const Vector<UniquePtr<DataBlock>> &order_by_blocks,
+                        const Vector<SharedPtr<BaseExpression>> &expressions,
+                        Vector<SharedPtr<ExpressionState>> &expr_states)
+        : prefer_left_function_(prefer_left_function), order_by_blocks_(order_by_blocks), expressions_(expressions), expr_states_(expr_states) {}
 
     void Init() {
         if (order_by_blocks_.empty()) {
             return;
         }
-        eval_results_.reserve(order_by_blocks_.size());
-
-        ExpressionEvaluator expr_evaluator;
-        Vector<SharedPtr<ExpressionState>> expr_states;
-        for (SizeT expr_id = 0; expr_id < expressions_.size(); ++expr_id) {
-            expr_states.push_back(ExpressionState::CreateState(expressions_[expr_id]));
-        }
-
-        for (SizeT block_id = 0; block_id < order_by_blocks_.size(); ++block_id) {
-            Vector<SharedPtr<ColumnVector>> results;
-
-            expr_evaluator.Init(order_by_blocks_[block_id].get());
-            results.reserve(expressions_.size());
-
-            for (SizeT expr_id = 0; expr_id < expressions_.size(); ++expr_id) {
-                auto expr = expressions_[expr_id];
-                SharedPtr<ColumnVector> result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expr->Type()));
-
-                result_vector->Initialize();
-                expr_evaluator.Execute(expr, expr_states[expr_id], result_vector);
-
-                results.push_back(result_vector);
-            }
-            eval_results_.push_back(results);
-        }
+        eval_results_ = PhysicalTop::GetEvalColumns(expressions_, expr_states_, order_by_blocks_);
     }
 
     bool operator()(BlockRawIndex left_index, BlockRawIndex right_index) {
-        SizeT exprs_count = expressions_.size();
-        for (SizeT expr_idx = 0; expr_idx < exprs_count; ++expr_idx) {
-            auto expr = expressions_[expr_idx];
-            DataType type = expr->Type();
-            OrderType order_type = order_by_types_[expr_idx];
-
-            SharedPtr<ColumnVector> &left_result_vector = eval_results_[left_index.block_idx][expr_idx];
-            SharedPtr<ColumnVector> &right_result_vector = eval_results_[right_index.block_idx][expr_idx];
-
-            switch (type.type()) {
-                case kBoolean: {
-                    auto bool_left = left_result_vector->buffer_->GetCompactBit(left_index.offset);
-                    auto bool_right = right_result_vector->buffer_->GetCompactBit(left_index.offset);
-                    if (bool_left == bool_right) {
-                        continue;
-                    }
-                    if (order_type == OrderType::kAsc) {
-                        return bool_left < bool_right;
-                    } else {
-                        return bool_left > bool_right;
-                    }
-                }
-                case kTinyInt: {
-                    COMPARE(TinyIntT)
-                }
-                case kSmallInt: {
-                    COMPARE(SmallIntT)
-                }
-                case kInteger: {
-                    COMPARE(IntegerT)
-                }
-                case kBigInt: {
-                    COMPARE(BigIntT)
-                }
-                case kFloat: {
-                    COMPARE(FloatT)
-                }
-                case kDouble: {
-                    COMPARE(DoubleT)
-                }
-                default: {
-                    Error<NotImplementException>(fmt::format("{} not implemented.", type.type()));
-                }
-            }
-        }
-        return true;
+        auto &left = eval_results_[left_index.block_idx];
+        auto &right = eval_results_[right_index.block_idx];
+        return prefer_left_function_(left, left_index.offset, right, right_index.offset);
     }
 
 private:
+    const CompareTwoRowAndPreferLeft &prefer_left_function_;
     const Vector<UniquePtr<DataBlock>> &order_by_blocks_;
-    const Vector<OrderType> &order_by_types_;
-    Vector<SharedPtr<BaseExpression>> expressions_;
+    const Vector<SharedPtr<BaseExpression>> &expressions_;
+    Vector<SharedPtr<ExpressionState>> &expr_states_;
 
     // Blocks -> Expressions
     Vector<Vector<SharedPtr<ColumnVector>>> eval_results_;
@@ -219,7 +148,18 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
     }
 }
 
-void PhysicalSort::Init() {}
+void PhysicalSort::Init() {
+    auto sort_expr_count = order_by_types_.size();
+    if (sort_expr_count != expressions_.size()) {
+        Error<ExecutorException>("order_by_types_.size() != expressions_.size()");
+    }
+    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    sort_functions.reserve(sort_expr_count);
+    for (u32 i = 0; i < sort_expr_count; ++i) {
+        sort_functions.emplace_back(PhysicalTop::GenerateSortFunction(order_by_types_[i], expressions_[i]));
+    }
+    prefer_left_function_ = CompareTwoRowAndPreferLeft(std::move(sort_functions));
+}
 
 bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     auto *prev_op_state = operator_state->prev_op_state_;
@@ -238,7 +178,8 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
             block_indexes.push_back(block_index);
         }
     }
-    auto block_comparator = Comparator(pre_op_state->data_block_array_, order_by_types_, expressions_);
+    auto &expr_states = (static_cast<SortOperatorState *>(operator_state))->expr_states_;
+    auto block_comparator = Comparator(prefer_left_function_, pre_op_state->data_block_array_, expressions_, expr_states);
 
     block_comparator.Init();
     // sort block_indexes
@@ -251,7 +192,7 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
         return false;
     }
     auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
-    auto merge_comparator = Comparator(unmerge_sorted_blocks, order_by_types_, expressions_);
+    auto merge_comparator = Comparator(prefer_left_function_, unmerge_sorted_blocks, expressions_, expr_states);
     Vector<Vector<BlockRawIndex>> indexes_group;
 
     merge_comparator.Init();

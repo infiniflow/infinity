@@ -14,6 +14,8 @@
 
 module;
 
+#include <compare>
+#include <concepts>
 #include <sstream>
 
 import stl;
@@ -27,6 +29,7 @@ import value;
 import column_buffer;
 import third_party;
 import infinity_exception;
+import fix_heap;
 
 export module column_vector;
 
@@ -697,5 +700,187 @@ ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, Si
     ptr_t dst_ptr = dst + dst_idx * data_type_size_;
     std::memcpy(dst_ptr, src_ptr, data_type_size_);
 }
+
+export template <typename T, typename... U>
+concept IsAnyOf = (std::same_as<T, U> || ...);
+
+export template <typename ValueType>
+concept PointerFriendly = IsAnyOf<ValueType,
+                                  TinyIntT,
+                                  SmallIntT,
+                                  IntegerT,
+                                  BigIntT,
+                                  HugeIntT,
+                                  FloatT,
+                                  DoubleT,
+                                  DecimalT,
+                                  DateT,
+                                  TimeT,
+                                  DateTimeT,
+                                  TimestampT,
+                                  IntervalT,
+                                  RowID,
+                                  UuidT>;
+
+export template <typename ValueType>
+concept BinaryGenerateBoolean = PointerFriendly<ValueType> or IsAnyOf<ValueType, BooleanT, VarcharT>;
+
+template <typename Unsupported>
+class ColumnVectorPtrAndIdx {};
+
+// Return Iterator for BooleanT ColumnVector
+// Now support writing BooleanT results to ColumnVector and comparing BooleanT values
+// used in cases like "where x > y" ( (int > int) -> bool )
+template <>
+class ColumnVectorPtrAndIdx<BooleanT> {
+    using IteratorType = ColumnVectorPtrAndIdx<BooleanT>;
+
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : buffer_(col->buffer_.get()) {}
+    auto &operator[](SizeT index) {
+        index_ = index;
+        return *this;
+    }
+    auto &operator=(bool value) {
+        buffer_->SetCompactBit(index_, value);
+        return *this;
+    }
+    friend std::strong_ordering operator<=>(const IteratorType &left, const IteratorType &right) {
+        return left.buffer_->GetCompactBit(left.index_) <=> right.buffer_->GetCompactBit(right.index_);
+    }
+    friend bool operator==(const IteratorType &left, const IteratorType &right) {
+        return left.buffer_->GetCompactBit(left.index_) == right.buffer_->GetCompactBit(right.index_);
+    }
+
+private:
+    VectorBuffer *buffer_ = nullptr;
+    SizeT index_ = {};
+};
+
+// Return Iterator for PointerFriendly ColumnVector
+// Now only support reading values from ColumnVector
+// used in cases like "where x > y" ( (int > int) -> bool )
+template <PointerFriendly FlatType>
+class ColumnVectorPtrAndIdx<FlatType> {
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const FlatType *>(col->data())) {}
+    // Don't return reference
+    // keep compatibility with "Run(TA left, TB right, TC &result)"
+    auto &operator[](SizeT i) { return data_ptr_[i]; }
+
+private:
+    const FlatType *data_ptr_ = nullptr;
+};
+
+// Return Iterator for VarcharT ColumnVector
+// Now only support reading Varchar from ColumnVector
+// used in cases like "where c1 > c2" ( (varchar > varchar) -> bool )
+template <>
+class ColumnVectorPtrAndIdx<VarcharT> {
+    using IteratorType = ColumnVectorPtrAndIdx<VarcharT>;
+
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), fix_heap_mgr_(col->buffer_->fix_heap_mgr_.get()) {}
+    auto &operator[](SizeT i) {
+        idx_ = i;
+        return *this;
+    }
+    // Does not check type.
+    friend std::strong_ordering operator<=>(const IteratorType &left, const IteratorType &right) {
+        const VarcharT &left_value = left.data_ptr_[left.idx_];
+        const VarcharT &right_value = right.data_ptr_[right.idx_];
+        auto left_length = static_cast<u32>(left_value.length_);
+        auto right_length = static_cast<u32>(right_value.length_);
+        bool left_inline = left_value.IsInlined();
+        bool right_inline = right_value.IsInlined();
+        if (left_inline and right_inline) {
+            return compare_char_array(left_value.short_.data_, left_length, right_value.short_.data_, right_length);
+        } else {
+            // 1. compare prefix
+            // (char *)value_.prefix_ == (char *)short_.data_
+            auto left_compare_len = std::min(left_length, u32(VARCHAR_PREFIX_LEN));
+            auto right_compare_len = std::min(right_length, u32(VARCHAR_PREFIX_LEN));
+            auto compare_prefix = compare_char_array(left_value.value_.prefix_, left_compare_len, right_value.value_.prefix_, right_compare_len);
+            if (compare_prefix != std::strong_ordering::equal) {
+                return compare_prefix;
+            }
+            // 2. need to load data
+            UniquePtr<char[]> left_data;
+            UniquePtr<char[]> right_data;
+            const char *left_data_ptr = nullptr;
+            const char *right_data_ptr = nullptr;
+            if (left_inline) {
+                left_data_ptr = left_value.short_.data_;
+            } else {
+                left_data = MakeUnique<char[]>(left_length + 1); // '\0' initialized
+                left_data_ptr = left_data.get();
+                left.fix_heap_mgr_->ReadFromHeap(left_data.get(), left_value.vector_.chunk_id_, left_value.vector_.chunk_offset_, left_length);
+            }
+            if (right_inline) {
+                right_data_ptr = right_value.short_.data_;
+            } else {
+                right_data = MakeUnique<char[]>(right_length + 1); // '\0' initialized
+                right_data_ptr = right_data.get();
+                right.fix_heap_mgr_->ReadFromHeap(right_data.get(), right_value.vector_.chunk_id_, right_value.vector_.chunk_offset_, right_length);
+            }
+            // prefix = 5, compare from beginning of data, for simplicity
+            return compare_char_array(left_data_ptr, left_length, right_data_ptr, right_length);
+        }
+    }
+    friend bool operator==(const IteratorType &left, const IteratorType &right) {
+        const VarcharT &left_value = left.data_ptr_[left.idx_];
+        const VarcharT &right_value = right.data_ptr_[right.idx_];
+        auto left_length = static_cast<u32>(left_value.length_);
+        auto right_length = static_cast<u32>(right_value.length_);
+        if (left_length != right_length) {
+            return false;
+        }
+        bool left_inline = left_value.IsInlined();
+        bool right_inline = right_value.IsInlined();
+        if (left_inline != right_inline) {
+            return false;
+        }
+        if (left_inline) {
+            return std::memcmp(left_value.short_.data_, right_value.short_.data_, left_length) == 0;
+        } else {
+            // 1. compare prefix
+            // (char *)value_.prefix_ == (char *)short_.data_
+            if (std::memcmp(left_value.value_.prefix_, right_value.value_.prefix_, VARCHAR_PREFIX_LEN) != 0) {
+                return false;
+            }
+            // 2. need to load data
+            UniquePtr<char[]> left_data = MakeUnique<char[]>(left_length + 1);   // '\0' initialized
+            UniquePtr<char[]> right_data = MakeUnique<char[]>(right_length + 1); // '\0' initialized
+            left.fix_heap_mgr_->ReadFromHeap(left_data.get(), left_value.vector_.chunk_id_, left_value.vector_.chunk_offset_, left_length);
+            right.fix_heap_mgr_->ReadFromHeap(right_data.get(), right_value.vector_.chunk_id_, right_value.vector_.chunk_offset_, right_length);
+            return std::memcmp(left_data.get(), right_data.get(), left_length) == 0;
+        }
+    }
+
+private:
+    const VarcharT *data_ptr_ = nullptr;
+    FixHeapManager *fix_heap_mgr_ = nullptr;
+    SizeT idx_ = {};
+    static std::strong_ordering compare_char_array(const char *left, SizeT left_len, const char *right, SizeT right_len) {
+        for (SizeT i = 0, com_len = std::min(left_len, right_len); i < com_len; ++i) {
+            char left_char = left[i];
+            char right_char = right[i];
+            if (left_char < right_char) {
+                return std::strong_ordering::less;
+            } else if (left_char > right_char) {
+                return std::strong_ordering::greater;
+            }
+        }
+        return left_len <=> right_len;
+    }
+};
+
+// BooleanColumnWriter does not check null, range and type.
+export using BooleanColumnWriter = ColumnVectorPtrAndIdx<BooleanT>;
+
+// ColumnValueReader does not check null, range and type.
+export template <BinaryGenerateBoolean ColumnValueType>
+using ColumnValueReader = ColumnVectorPtrAndIdx<ColumnValueType>;
 
 } // namespace infinity

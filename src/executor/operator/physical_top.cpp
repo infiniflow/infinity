@@ -14,6 +14,7 @@
 
 module;
 
+#include <compare>
 #include <memory>
 #include <numeric>
 
@@ -38,8 +39,8 @@ namespace infinity {
 
 class TopSolver {
 public:
-    explicit TopSolver(u32 limit, u32 sort_expr_count, const Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> &sort_functions)
-        : limit_(limit), sort_expr_count_(sort_expr_count), sort_functions_(sort_functions) {
+    explicit TopSolver(u32 limit, const CompareTwoRowAndPreferLeft &prefer_left_function)
+        : limit_(limit), prefer_left_function_(prefer_left_function) {
         Init();
     }
     u32 WriteTopResultsToOutput(const Vector<Vector<SharedPtr<ColumnVector>>> &eval_columns,
@@ -54,8 +55,7 @@ public:
 private:
     u32 size_{};
     u32 limit_{};
-    u32 sort_expr_count_{};
-    const Vector<StdFunction<OrderBySingleResult(void *, u32, void *, u32)>> &sort_functions_;
+    const CompareTwoRowAndPreferLeft &prefer_left_function_; // sort functions
     UniquePtr<Pair<u32, u32>[]> candidate_local_row_ids_;
     Pair<u32, u32> *row_ids_ptr_ = nullptr; // with offset, start from 1, for heap sort
     const Vector<Vector<SharedPtr<ColumnVector>>> *input_data_ = nullptr;
@@ -118,21 +118,7 @@ private:
         // compare_id_for_heap: for heap sort
         // example: x = heap_top, y = candidate, return true if y should be put into heap
         auto compare_id_for_heap = [&](Pair<u32, u32> x, Pair<u32, u32> y) -> bool {
-            for (u32 i = 0; i < sort_expr_count_; ++i) {
-                auto compare_result = sort_functions_[i]((*input_data_)[x.first][i]->data(), x.second, (*input_data_)[y.first][i]->data(), y.second);
-                switch (compare_result) {
-                    case OrderBySingleResult::kPreferRight: {
-                        return true;
-                    }
-                    case OrderBySingleResult::kPreferLeft: {
-                        return false;
-                    }
-                    default: {
-                        continue;
-                    }
-                }
-            }
-            return false;
+            return !prefer_left_function_((*input_data_)[x.first], x.second, (*input_data_)[y.first], y.second);
         };
         const u32 input_block_cnt = input_data_->size();
         for (u32 block_id = 0; block_id < input_block_cnt; ++block_id) {
@@ -186,9 +172,19 @@ private:
     }
 };
 
-template <OrderType compare_order, typename T>
+StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+InvalidPhysicalTopCompareType(const DataType &type_) {
+    return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
+        Error<NotImplementException>(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
+        return std::strong_ordering::equal;
+    };
+}
+
+// general template for types without three-way comparison but with operator< and operator==
+template <OrderType compare_order, BinaryGenerateBoolean T>
 struct PhysicalTopCompareSingleValue {
-    static OrderBySingleResult compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
+    static std::strong_ordering
+    compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
         auto compare_prefer_left = [](const T &x, const T &y) -> bool {
             if constexpr (compare_order == OrderType::kAsc) {
                 return x < y;
@@ -196,40 +192,48 @@ struct PhysicalTopCompareSingleValue {
                 return y < x;
             }
         };
-        auto &left = (static_cast<T *>(left_ptr))[left_id];
-        auto &right = (static_cast<T *>(right_ptr))[right_id];
+        auto &left = (reinterpret_cast<T *>(left_col->data()))[left_id];
+        auto &right = (reinterpret_cast<T *>(right_col->data()))[right_id];
         if (compare_prefer_left(left, right)) {
-            return OrderBySingleResult::kPreferLeft;
+            return std::strong_ordering::less;
         } else if (left == right) {
-            return OrderBySingleResult::kEqual;
+            return std::strong_ordering::equal;
         } else {
-            return OrderBySingleResult::kPreferRight;
+            return std::strong_ordering::greater;
+        }
+    }
+};
+
+template <typename T>
+concept ThreeWayCompareRaw = requires(T a, T b) {
+    { a <=> b } -> std::convertible_to<std::strong_ordering>;
+};
+
+template <typename T>
+concept ThreeWayCompareReader = requires(ColumnValueReader<T> a, ColumnValueReader<T> b) {
+    { a <=> b } -> std::convertible_to<std::strong_ordering>;
+};
+
+// template for types with three-way comparison method
+template <OrderType compare_order, BinaryGenerateBoolean T>
+    requires ThreeWayCompareRaw<T> or ThreeWayCompareReader<T>
+struct PhysicalTopCompareSingleValue<compare_order, T> {
+    static std::strong_ordering
+    compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+        // Use ColumnValueReader (alias of ColumnVectorPtrAndIdx)
+        ColumnValueReader<T> left(left_col);
+        ColumnValueReader<T> right(right_col);
+        if constexpr (compare_order == OrderType::kAsc) {
+            return left[left_id] <=> right[right_id];
+        } else {
+            return right[right_id] <=> left[left_id];
         }
     }
 };
 
 template <OrderType compare_order>
-struct PhysicalTopCompareSingleValue<compare_order, BooleanT> {
-    static OrderBySingleResult compare(void *left_ptr, u32 left_id, void *right_ptr, u32 right_id) {
-        // extract one bit from compact bit set, starting from ptr, with offset id
-        // byte count: id / 8
-        // extra bit count: id % 8
-        auto extract_bool = [](u8 *ptr, u32 id) -> bool { return (ptr[id / 8] >> (id % 8)) & u8(1); };
-        auto compare_bool_prefer_left = [](bool x, bool y) -> OrderBySingleResult {
-            if (x == y)
-                return OrderBySingleResult::kEqual;
-            if constexpr (compare_order == OrderType::kAsc) {
-                return y ? OrderBySingleResult::kPreferLeft : OrderBySingleResult::kPreferRight;
-            } else {
-                return x ? OrderBySingleResult::kPreferLeft : OrderBySingleResult::kPreferRight;
-            }
-        };
-        return compare_bool_prefer_left(extract_bool(static_cast<u8 *>(left_ptr), left_id), extract_bool(static_cast<u8 *>(right_ptr), right_id));
-    }
-};
-
-template <OrderType compare_order>
-inline StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
+inline StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     switch (auto switch_type = sort_expression->Type().type(); switch_type) {
         case LogicalType::kBoolean: {
             return PhysicalTopCompareSingleValue<compare_order, BooleanT>::compare;
@@ -246,11 +250,17 @@ inline StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFu
         case LogicalType::kBigInt: {
             return PhysicalTopCompareSingleValue<compare_order, BigIntT>::compare;
         }
+        case LogicalType::kHugeInt: {
+            return PhysicalTopCompareSingleValue<compare_order, HugeIntT>::compare;
+        }
         case LogicalType::kFloat: {
             return PhysicalTopCompareSingleValue<compare_order, FloatT>::compare;
         }
         case LogicalType::kDouble: {
             return PhysicalTopCompareSingleValue<compare_order, DoubleT>::compare;
+        }
+        case LogicalType::kVarchar: {
+            return PhysicalTopCompareSingleValue<compare_order, VarcharT>::compare;
         }
         case LogicalType::kDate: {
             return PhysicalTopCompareSingleValue<compare_order, DateT>::compare;
@@ -268,23 +278,19 @@ inline StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFu
             return PhysicalTopCompareSingleValue<compare_order, RowID>::compare;
         }
         default: {
-            Error<NotImplementException>(
-                fmt::format("LogicalType number {} not implemented.", static_cast<std::underlying_type_t<LogicalType>>(switch_type)));
+            return InvalidPhysicalTopCompareType(sort_expression->Type());
         }
     }
 }
 
-StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
+StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+PhysicalTop::GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
     switch (compare_order) {
         case OrderType::kAsc: {
             return GenerateSortFunctionTemplate<OrderType::kAsc>(sort_expression);
         }
         case OrderType::kDesc: {
             return GenerateSortFunctionTemplate<OrderType::kDesc>(sort_expression);
-        }
-        default: {
-            Error<NotImplementException>(
-                fmt::format("OrderType number {} not implemented.", static_cast<std::underlying_type_t<OrderType>>(compare_order)));
         }
     }
 }
@@ -295,10 +301,12 @@ void PhysicalTop::Init() {
     if (sort_expr_count_ != sort_expressions_.size()) {
         Error<ExecutorException>("order_by_types_.size() != sort_expressions_.size()");
     }
-    sort_functions_.reserve(sort_expr_count_);
+    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    sort_functions.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
-        sort_functions_.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));
+        sort_functions.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));
     }
+    prefer_left_function_ = CompareTwoRowAndPreferLeft(std::move(sort_functions));
 }
 
 // Behavior now: always sort the output results
@@ -322,7 +330,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
         Error<ExecutorException>("output data_block_array_ is not empty");
     }
     auto eval_columns = GetEvalColumns(sort_expressions_, (static_cast<TopOperatorState *>(operator_state))->expr_states_, input_data_block_array);
-    TopSolver solve_top(limit_, sort_expr_count_, sort_functions_);
+    TopSolver solve_top(limit_, prefer_left_function_);
     auto output_row_cnt = solve_top.WriteTopResultsToOutput(eval_columns, input_data_block_array, output_data_block_array);
     input_data_block_array.clear();
     HandleOutputOffset(output_row_cnt, offset_, output_data_block_array);
