@@ -34,6 +34,7 @@ import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
 import physical_create_index_do;
+import physical_sort;
 import physical_top;
 import physical_merge_top;
 
@@ -141,6 +142,17 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
     return operator_state;
 }
 
+UniquePtr<OperatorState> MakeSortState(PhysicalOperator *physical_op) {
+    auto operator_state = MakeUnique<SortOperatorState>();
+    auto &expr_states = operator_state->expr_states_;
+    auto &sort_expressions = (static_cast<PhysicalSort *>(physical_op))->GetSortExpressions();
+    expr_states.reserve(sort_expressions.size());
+    for (auto &expr : sort_expressions) {
+        expr_states.emplace_back(ExpressionState::CreateState(expr));
+    }
+    return operator_state;
+}
+
 UniquePtr<OperatorState> MakeTopState(PhysicalOperator *physical_op) {
     auto operator_state = MakeUnique<TopOperatorState>();
     auto &expr_states = operator_state->expr_states_;
@@ -231,7 +243,7 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<ProjectionOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kSort: {
-            return MakeTaskStateTemplate<SortOperatorState>(physical_ops[operator_id]);
+            return MakeSortState(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kMergeSort: {
             return MakeTaskStateTemplate<MergeSortOperatorState>(physical_ops[operator_id]);
@@ -477,7 +489,7 @@ FragmentContext::FragmentContext(PlanFragment *fragment_ptr, QueryContext *query
     : notifier_(notifier), fragment_ptr_(fragment_ptr), query_context_(query_context), fragment_type_(fragment_ptr->GetFragmentType()),
       unfinished_child_n_(fragment_ptr->Children().size()) {}
 
-void FragmentContext::TryFinishFragment() {
+bool FragmentContext::TryFinishFragment() {
     auto fragment_id = fragment_ptr_->FragmentID();
     auto *parent_plan_fragment = fragment_ptr_->GetParent();
 
@@ -491,6 +503,7 @@ void FragmentContext::TryFinishFragment() {
                 scheduler->ScheduleFragment(parent_plan_fragment);
             }
         }
+        return false;
     } else {
         LOG_TRACE(fmt::format("All tasks in fragment: {} are completed", fragment_id));
 
@@ -506,6 +519,7 @@ void FragmentContext::TryFinishFragment() {
                 scheduler->ScheduleFragment(parent_plan_fragment);
             }
         }
+        return true;
     }
 }
 

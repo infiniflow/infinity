@@ -180,9 +180,8 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         if (fragment_task->status() != FragmentTaskStatus::kError) {
             if (fragment_task->IsComplete()) {
                 auto *sink_op = fragment_ctx->GetSinkOperator();
-                finish = sink_op->sink_type() == SinkType::kResult;
                 --worker_workloads_[worker_id];
-                fragment_task->CompleteTask();
+                finish = (fragment_task->CompleteTask()) && (sink_op->sink_type() == SinkType::kResult);
                 iter = task_lists.erase(iter);
             } else if (fragment_task->QuitFromWorkerLoop()) {
                 --worker_workloads_[worker_id];

@@ -107,7 +107,7 @@ public:
         query_context_->FlushProfiler(std::move(profiler));
     }
 
-    void TryFinishFragment();
+    bool TryFinishFragment();
 
     Vector<PhysicalOperator *> &GetOperators();
 
