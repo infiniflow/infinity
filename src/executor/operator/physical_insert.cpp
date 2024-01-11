@@ -28,6 +28,7 @@ import data_block;
 import third_party;
 import expression_evaluator;
 import base_expression;
+import default_values;
 
 import infinity_exception;
 import catalog;
@@ -44,7 +45,12 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
         Error<ExecutorException>(
-            fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
+            fmt::format("Insert values count {} isn't matched with table column count {}.", column_count, table_collection_column_count));
+        ;
+    }
+    if (row_count > DEFAULT_BLOCK_CAPACITY) {
+        Error<ExecutorException>(
+            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
         ;
     }
 

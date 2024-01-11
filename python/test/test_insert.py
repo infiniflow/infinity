@@ -214,4 +214,16 @@ class TestInsert:
         assert res.success
         res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
         assert res.success
-        db_obj.drop_table("test_insert_big_embedding_float")
+        res = db_obj.drop_table("test_insert_big_embedding_float")
+        assert res.success
+
+    def test_insert_exceed_block_size(self):
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_exceed_block_size", True)
+        table_obj = db_obj.create_table("test_insert_exceed_block_size", {
+            "c1": "float"}, None)
+        assert table_obj
+        values = [{"c1": 1} for _ in range(8193)]
+        res = table_obj.insert(values)
+        assert res.success is False
