@@ -41,11 +41,11 @@ Connection::Connection(boost::asio::io_service &io_service)
     : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
-    if(session_ == nullptr) {
+    if (session_ == nullptr) {
         // To avoid null ptr access
-        return ;
+        return;
     }
-    SessionManager* session_mgr = InfinityContext::instance().session_manager();
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
@@ -53,7 +53,7 @@ void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
-    SessionManager* session_manager = InfinityContext::instance().session_manager();
+    SessionManager *session_manager = InfinityContext::instance().session_manager();
     session_ = session_manager->CreateRemoteSession();
 
     HandleConnection();
@@ -63,10 +63,7 @@ void Connection::Run() {
     while (!terminate_connection_) {
         try {
             HandleRequest();
-        } catch (const infinity::ClientException &e) {
-            LOG_TRACE("Client is closed");
-            return;
-        } catch (const Exception &e) {
+        } catch (const std::exception &e) {
             HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
             LOG_ERROR(e.what());

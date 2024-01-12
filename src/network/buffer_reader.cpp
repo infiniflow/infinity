@@ -18,11 +18,13 @@ module;
 #include <boost/asio/read.hpp>
 
 import stl;
+import third_party;
 import pg_message;
 import ring_buffer_iterator;
 
 import infinity_exception;
 import default_values;
+import infinity_exception;
 
 module buffer_reader;
 
@@ -167,11 +169,11 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
-        Error<ClientException>("Client close the connection.");
+        UnrecoverableError(fmt::format("Client close the connection: {}", boost_error.message()));
     }
 
     if (boost_error) {
-        Error<NetworkException>(boost_error.message());
+        UnrecoverableError(boost_error.message());
     }
 
     current_pos_.increment(bytes_read);

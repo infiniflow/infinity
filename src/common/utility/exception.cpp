@@ -41,23 +41,23 @@ void PrintStacktrace(const String &err_msg) {
 
 #ifdef INFINITY_DEBUG
 
-inline void RecoverableError(Status status, const char *file_name, u32 line) {
+void RecoverableError(Status status, const char *file_name, u32 line) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
     throw RecoverableException(status);
 }
 
-inline void UnrecoverableError(const String &message, const char *file_name, u32 line) {
+void UnrecoverableError(const String &message, const char *file_name, u32 line) {
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }
 
 #elif
 
-inline void RecoverableError(Status status) {
+void RecoverableError(Status status) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
     throw RecoverableException(status);
 }
 
-inline void UnrecoverableError(const String &message) {
+void UnrecoverableError(const String &message) {
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }
 

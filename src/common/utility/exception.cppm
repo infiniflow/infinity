@@ -86,12 +86,6 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
     return BuildMessageInternal(values, params...);
 }
 
-export class ClientException : public Exception {
-public:
-    template <typename... Args>
-    explicit ClientException(Args... params) : Exception(BuildMessage(String("Client Error:"), params...)) {}
-};
-
 export class CatalogException : public Exception {
 public:
     template <typename... Args>
@@ -180,19 +174,19 @@ Error(const String &message, const char *file_name = std::source_location::curre
     throw ExceptionType(err_msg);
 }
 
-void RecoverableError(Status status,
-                      const char *file_name = std::source_location::current().file_name(),
-                      u32 line = std::source_location::current().line());
+export void RecoverableError(Status status,
+                             const char *file_name = std::source_location::current().file_name(),
+                             u32 line = std::source_location::current().line());
 
-void UnrecoverableError(const String &message,
-                        const char *file_name = std::source_location::current().file_name(),
-                        u32 line = std::source_location::current().line());
+export void UnrecoverableError(const String &message,
+                               const char *file_name = std::source_location::current().file_name(),
+                               u32 line = std::source_location::current().line());
 
 #elif
 
-void RecoverableError(Status status);
+export void RecoverableError(Status status);
 
-void UnrecoverableError(const String &message);
+export void UnrecoverableError(const String &message);
 
 #endif
 
