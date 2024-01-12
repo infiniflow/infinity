@@ -16,10 +16,37 @@ module;
 export module infinity_exception;
 
 import stl;
+import status;
 
 namespace infinity {
 
 export void PrintStacktrace(const String& err_msg);
+
+export class RecoverableException: public std::exception {
+public:
+    explicit RecoverableException(Status status) :status_(std::move(status)) {}
+    [[nodiscard]] inline const char *what() const noexcept override { return status_.message(); }
+
+    inline ErrorCode ErrorCode() const {
+        return status_.code();
+    }
+
+    inline StringView ErrorMessage() const {
+        return status_.message();
+    }
+
+private:
+    Status status_;
+};
+
+export class UnrecoverableException: public std::exception {
+public:
+    explicit UnrecoverableException(String message) : message_(std::move(message)) {}
+    [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
+
+private:
+    String message_;
+};
 
 export class Exception : public std::exception {
 public:
@@ -156,9 +183,6 @@ Error(const String &message, const char *file_name = std::source_location::curre
     err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
     throw ExceptionType(err_msg);
 }
-
-export void
-Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line());
 
 #elif
 
