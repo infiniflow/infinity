@@ -102,6 +102,7 @@ public:
     }
 };
 
+class PhysicalWalOperation;
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
@@ -143,11 +144,11 @@ public:
 
     // Index Related methods
     Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
-                                                               const SharedPtr<IndexDef> &index_def,
-                                                               ConflictType conflict_type,
-                                                               u64 txn_id,
-                                                               TxnTimeStamp begin_ts,
-                                                               TxnManager *txn_mgr,
+                                                 const SharedPtr<IndexDef> &index_def,
+                                                 ConflictType conflict_type,
+                                                 u64 txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
@@ -249,6 +250,9 @@ public:
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
+
+    // Global physical wal log
+    SharedPtr<Vector<SharedPtr<PhysicalWalOperation>>> global_operations_{};
 };
 
 } // namespace infinity

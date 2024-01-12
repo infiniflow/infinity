@@ -52,10 +52,12 @@ struct BaseEntry;
 struct TableIndexEntry;
 struct WalEntry;
 struct WalCmd;
+class PhysicalWalEntry;
+class PhysicalWalOperation;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
+    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
 
     // Txn OPs
     void Begin();
@@ -125,7 +127,7 @@ public:
 
     NewCatalog *GetCatalog() { return catalog_; }
 
-    inline u64 TxnID() const { return txn_id_; }
+    inline TransactionID TxnID() const { return txn_id_; }
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
@@ -143,13 +145,17 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
+    void AddPhysicalOperation(UniquePtr<PhysicalWalOperation> operation);
+
+    void SubPhysicalOperation();
+
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 private:
     // Txn Manager
     TxnManager *txn_mgr_{};
     NewCatalog *catalog_{};
-    u64 txn_id_{};
+    TransactionID txn_id_{};
 
     TxnContext txn_context_{};
 
@@ -169,8 +175,11 @@ private:
     // Handled database
     String db_name_{};
 
+    /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
+    // Physical log entry
+    SharedPtr<PhysicalWalEntry> local_physical_wal_entry_{};
 
     // WalManager notify the  commit bottom half is done
     std::mutex lock_{};

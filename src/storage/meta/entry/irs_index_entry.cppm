@@ -24,6 +24,7 @@ import third_party;
 
 namespace infinity {
 
+class Txn;
 struct TableIndexEntry;
 class BufferManager;
 struct TableEntry;
@@ -32,22 +33,25 @@ class IndexFullText;
 
 export struct IrsIndexEntry : public BaseEntry {
 public:
-    IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, u64 txn_id, TxnTimeStamp begin_ts);
+    IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, TransactionID txn_id, TxnTimeStamp begin_ts);
     ~IrsIndexEntry() override = default;
 
-    static SharedPtr<IrsIndexEntry> NewIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                     u64 txn_id,
-                                                     SharedPtr<String> index_dir,
-                                                     TxnTimeStamp begin_ts);
+    static SharedPtr<IrsIndexEntry>
+    NewIrsIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
 
-    void AddColumn(SharedPtr<IndexBase> index_base, u64 column_id);
+    void AddColumn(SharedPtr<IndexBase> index_base, ColumnID column_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static SharedPtr<IrsIndexEntry> Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
+    static SharedPtr<IrsIndexEntry>
+    Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
+
+public:
+    const TableIndexEntry *table_index_entry() { return table_index_entry_; }
+    const String index_dir() { return *index_dir_; }
 
 public:
     std::shared_mutex rw_locker_{};

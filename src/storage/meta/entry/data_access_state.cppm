@@ -27,8 +27,8 @@ export struct AppendRange {
     inline explicit AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count)
         : segment_id_(segment_id), block_id_(block_id), start_offset_(start_offset), row_count_(row_count) {}
 
-    u32 segment_id_;
-    u16 block_id_;
+    SegmentID segment_id_;
+    BlockID block_id_;
     u16 start_offset_;
     u16 row_count_;
 };
@@ -58,9 +58,9 @@ export struct ImportState {
 };
 
 export struct DeleteState {
-//    HashMap<u64, Vector<RowID>> rows_; // key is pair<segment_id, block_id>
+    //    HashMap<u64, Vector<RowID>> rows_; // key is pair<segment_id, block_id>
     // HashMap<<segment, block_id>, block_offset>
-    HashMap<u32, HashMap<u16, Vector<RowID>>> rows_; // use segment id, as the first level key, block id as the second level key
+    HashMap<SegmentID, HashMap<BlockID, Vector<RowID>>> rows_; // use segment id, as the first level key, block id as the second level key
 };
 
 export struct GetState {};

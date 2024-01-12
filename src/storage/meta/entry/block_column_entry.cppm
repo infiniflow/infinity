@@ -28,6 +28,7 @@ import buffer_manager;
 import column_vector;
 import local_file_system;
 import vector_buffer;
+import txn;
 
 namespace infinity {
 
@@ -37,12 +38,12 @@ export struct SegmentEntry;
 
 export struct BlockColumnEntry : public BaseEntry {
     friend struct BlockEntry;
-public:
-    static UniquePtr<BlockColumnEntry>
-    MakeNewBlockColumnEntry(const BlockEntry *block_entry, u64 column_id, BufferManager *buffer_manager, bool is_replay = false);
 
-    inline explicit BlockColumnEntry(const BlockEntry *block_entry, u64 column_id, const SharedPtr<String> &base_dir_ref)
-        : BaseEntry(EntryType::kBlockColumn), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
+public:
+    explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
+
+    static UniquePtr<BlockColumnEntry>
+    NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager, Txn *txn, bool is_replay = false);
 
     nlohmann::json Serialize();
 
@@ -50,6 +51,10 @@ public:
 
 public:
     // Getter
+    inline OutlineInfo* outline_info_ptr() const {
+        return outline_info_ ? outline_info_.get() : nullptr;
+    }
+    inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
@@ -66,20 +71,17 @@ public:
     ColumnBuffer GetColumnData(BufferManager *buffer_manager);
 
     // Append used in import and wal_replay
-    void
-    AppendRaw(SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
+    void AppendRaw(SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
 
 protected:
-
     static void
     Append(BlockColumnEntry *column_entry, u16 column_entry_offset, ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows);
-
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
 protected:
     const BlockEntry *block_entry_{nullptr};
-    u64 column_id_{};
+    ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
     BufferObj *buffer_{};
 

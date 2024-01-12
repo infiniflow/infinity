@@ -20,11 +20,11 @@ module;
 
 import stl;
 import logger;
-import third_party;
 import txn_manager;
 import txn;
 import storage;
-import infinity_exception;
+import local_file_system;
+import third_party;
 
 import catalog;
 
@@ -42,42 +42,6 @@ import infinity_exception;
 module wal;
 
 namespace infinity {
-
-// WalCommandType -> String
-String WalManager::WalCommandTypeToString(WalCommandType type) {
-    switch (type) {
-        case WalCommandType::INVALID:
-            return "INVALID";
-        case WalCommandType::CREATE_DATABASE:
-            return "CREATE_DATABASE";
-        case WalCommandType::DROP_DATABASE:
-            return "DROP_DATABASE";
-        case WalCommandType::CREATE_TABLE:
-            return "CREATE_TABLE";
-        case WalCommandType::DROP_TABLE:
-            return "DROP_TABLE";
-        case WalCommandType::ALTER_INFO:
-            return "ALTER_INFO";
-        case WalCommandType::IMPORT:
-            return "IMPORT";
-        case WalCommandType::APPEND:
-            return "APPEND";
-        case WalCommandType::DELETE:
-            return "DELETE";
-        case WalCommandType::CHECKPOINT:
-            return "CHECKPOINT";
-        case WalCommandType::CREATE_INDEX:
-            return "CREATE_INDEX";
-        case WalCommandType::DROP_INDEX:
-            return "DROP_INDEX";
-        default: {
-            Error<StorageException>("Not supported wal command type");
-        }
-    }
-}
-
-// using namespace std;
-// namespace std::filesystem = std::filesystem;
 
 WalManager::WalManager(Storage *storage,
                        String wal_path,
@@ -101,22 +65,23 @@ void WalManager::Start() {
     if (!changed)
         return;
     Path wal_dir = Path(wal_path_).parent_path();
-    if (!std::filesystem::exists(wal_dir)) {
-        std::filesystem::create_directory(wal_dir);
+    LocalFileSystem fs;
+    if (!fs.Exists(wal_dir)) {
+        fs.CreateDirectory(wal_dir);
     }
     // TODO: recovery from wal checkpoint
-    ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
+    ofs_ = StdOfStream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         Error<StorageException>(fmt::format("Failed to open wal file: {}", wal_path_));
     }
     auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
-    int64_t now = seconds_since_epoch.count();
+    i64 now = seconds_since_epoch.count();
     full_ckp_when_ = now;
     delta_ckp_when_ = now;
     max_commit_ts_ = 0;
     wal_size_ = 0;
-    flush_thread_ = std::thread([this] { Flush(); });
-    checkpoint_thread_ = std::thread([this] { CheckpointTimer(); });
+    flush_thread_ = Thread([this] { Flush(); });
+    checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
 }
 
 void WalManager::Stop() {
@@ -171,15 +136,15 @@ int WalManager::PutEntry(SharedPtr<WalEntry> entry) {
     return rc;
 }
 
-void WalManager::SetWalState(TxnTimeStamp max_commit_ts, int64_t wal_size) {
+void WalManager::SetWalState(TxnTimeStamp max_commit_ts, i64 wal_size) {
     mutex2_.lock();
     this->max_commit_ts_ = max_commit_ts;
     this->wal_size_ = wal_size;
     mutex2_.unlock();
 }
 
-Tuple<TxnTimeStamp, int64_t> WalManager::GetWalState() {
-    int64_t wal_size{0};
+Tuple<TxnTimeStamp, i64> WalManager::GetWalState() {
+    i64 wal_size{0};
     TxnTimeStamp max_commit_ts{};
     mutex2_.lock();
     max_commit_ts = this->max_commit_ts_;
@@ -208,27 +173,27 @@ void WalManager::Flush() {
             if (entry->cmds_.empty()) {
                 Error<StorageException>(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
-            int32_t exp_size = entry->GetSizeInBytes();
+            i32 exp_size = entry->GetSizeInBytes();
             Vector<char> buf(exp_size);
             char *ptr = buf.data();
             entry->WriteAdv(ptr);
-            int32_t act_size = ptr - buf.data();
-            if (exp_size != act_size)
-                LOG_ERROR(fmt::format("WalManager::Flush WalEntry estimated size {} differ "
-                                      "with the actual one {}",
-                                      exp_size,
-                                      act_size));
+            i32 act_size = ptr - buf.data();
+            if (exp_size != act_size) {
+                LOG_ERROR(fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}", exp_size, act_size));
+            }
             ofs_.write(buf.data(), ptr - buf.data());
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
+
             if (entry->cmds_[0]->GetType() != WalCommandType::CHECKPOINT) {
                 max_commit_ts = entry->commit_ts_;
                 wal_size += act_size;
             }
         }
         ofs_.flush();
+
         TxnManager *txn_mgr = storage_->txn_manager();
+        // Commit sequentially so they get visible in the same order with wal.
         for (const auto &entry : que2_) {
-            // Commit sequentially so they get visible in the same order with wal.
             Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
             if (txn != nullptr) {
                 txn->CommitBottom();
@@ -238,7 +203,8 @@ void WalManager::Flush() {
 
         // Check if the wal file is too large.
         try {
-            auto file_size = std::filesystem::file_size(wal_path_);
+            LocalFileSystem fs;
+            auto file_size = fs.GetFileSizeByPath(wal_path_);
             if (file_size > wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts);
             }
@@ -345,7 +311,8 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     LOG_INFO(fmt::format("Wal Swap to new path: {}", new_file_path.c_str()));
 
     // Rename the current wal file to a new one.
-    std::filesystem::rename(wal_path_, new_file_path);
+    LocalFileSystem fs;
+    fs.Rename(wal_path_, new_file_path);
 
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
@@ -394,7 +361,8 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
  *
  */
 i64 WalManager::ReplayWalFile() {
-    if (!std::filesystem::exists(wal_path_) || std::filesystem::file_size(wal_path_) == 0) {
+    LocalFileSystem fs;
+    if (!fs.Exists(wal_path_) || fs.GetFileSizeByPath(wal_path_) == 0) {
         storage_->InitNewCatalog();
         return 0;
     }
@@ -512,8 +480,8 @@ i64 WalManager::ReplayWalFile() {
     // phase 3: replay the entries
     LOG_INFO("Replay phase 3: replay the entries");
     std::reverse(replay_entries.begin(), replay_entries.end());
-    i64 system_start_ts = 0;
-    i64 last_txn_id = 0;
+    TxnTimeStamp system_start_ts = 0;
+    TransactionID last_txn_id = 0;
     SizeT replay_count = 0;
     for (; replay_count < replay_entries.size(); ++replay_count) {
         if (replay_entries[replay_count]->commit_ts_ > max_commit_ts) {
@@ -552,12 +520,13 @@ i64 WalManager::ReplayWalFile() {
 void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
     // Gc old wal files.
     LOG_INFO("WalManager::Checkpoint begin to gc wal files");
-    if (std::filesystem::exists(wal_path_)) {
+    LocalFileSystem fs;
+    if (fs.Exists(wal_path_)) {
         for (const auto &entry : std::filesystem::directory_iterator(Path(wal_path_).parent_path())) {
             if (entry.is_regular_file() && entry.path().string().find("wal.log.") != std::string::npos) {
                 auto suffix = entry.path().string().substr(entry.path().string().find_last_of('.') + 1);
                 if (std::stoll(suffix) < i64(full_ckp_ts)) {
-                    std::filesystem::remove(entry.path());
+                    fs.DeleteFile(entry.path());
                     LOG_TRACE(fmt::format("WalManager::Checkpoint delete wal file: {}", entry.path().string().c_str()));
                 }
             }
@@ -607,7 +576,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
     }
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, u64 txn_id, i64 commit_ts) {
-    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager());
+    auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager(), ConflictType::kIgnore);
     if (!status.ok()) {
         Error<StorageException>("Wal Replay: Create database failed");
     }
@@ -689,17 +658,17 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, u64 txn_id, i64 com
     }
 
     auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir_);
-    auto segment_entry = SegmentEntry::MakeReplaySegmentEntry(table_entry, cmd.segment_id_, segment_dir_ptr, commit_ts);
+    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, cmd.segment_id_, segment_dir_ptr, commit_ts);
 
-    for (int id = 0; id < cmd.block_entries_size_; ++id) {
-        auto block_entry = MakeUnique<BlockEntry>(segment_entry.get(),
-                                                  id,
-                                                  0,
-                                                  table_entry->ColumnCount(),
-                                                  storage_->buffer_manager(),
-                                                  cmd.row_counts_[id],
-                                                  commit_ts,
-                                                  commit_ts);
+    for (i32 id = 0; id < cmd.block_entries_size_; ++id) {
+        auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
+                                                           id,
+                                                           0,
+                                                           table_entry->ColumnCount(),
+                                                           storage_->buffer_manager(),
+                                                           cmd.row_counts_[id],
+                                                           commit_ts,
+                                                           commit_ts);
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
         segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
@@ -738,6 +707,52 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, u64 txn_id, i64 com
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
     NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
+}
+
+String WalManager::WalCommandTypeToString(WalCommandType type) {
+    String wal_cmd_type{};
+    switch (type) {
+        case WalCommandType::INVALID:
+            wal_cmd_type = "INVALID";
+            break;
+        case WalCommandType::CREATE_DATABASE:
+            wal_cmd_type = "CREATE_DATABASE";
+            break;
+        case WalCommandType::DROP_DATABASE:
+            wal_cmd_type = "DROP_DATABASE";
+            break;
+        case WalCommandType::CREATE_TABLE:
+            wal_cmd_type = "CREATE_TABLE";
+            break;
+        case WalCommandType::DROP_TABLE:
+            wal_cmd_type = "DROP_TABLE";
+            break;
+        case WalCommandType::ALTER_INFO:
+            wal_cmd_type = "ALTER_INFO";
+            break;
+        case WalCommandType::IMPORT:
+            wal_cmd_type = "IMPORT";
+            break;
+        case WalCommandType::APPEND:
+            wal_cmd_type = "APPEND";
+            break;
+        case WalCommandType::DELETE:
+            wal_cmd_type = "DELETE";
+            break;
+        case WalCommandType::CHECKPOINT:
+            wal_cmd_type = "CHECKPOINT";
+            break;
+        case WalCommandType::CREATE_INDEX:
+            wal_cmd_type = "CREATE_INDEX";
+            break;
+        case WalCommandType::DROP_INDEX:
+            wal_cmd_type = "DROP_INDEX";
+            break;
+        default: {
+            Error<StorageException>("Not supported wal command type");
+        }
+    }
+    return wal_cmd_type;
 }
 
 } // namespace infinity

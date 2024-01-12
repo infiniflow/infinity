@@ -37,6 +37,7 @@ import txn_manager;
 import iresearch_datastore;
 import index_base;
 import index_full_text;
+import wal;
 
 namespace infinity {
 
@@ -45,10 +46,11 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
-                       u64 txn_id,
+                       TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
-      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type), table_meta_(table_meta) {
+    : BaseEntry(EntryType::kTable), table_meta_(table_meta),
+      table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
+      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
@@ -56,6 +58,18 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
 
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
+}
+
+SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
+                                                SharedPtr<String> table_collection_name,
+                                                const Vector<SharedPtr<ColumnDef>> &columns,
+                                                TableEntryType table_entry_type,
+                                                TableMeta *table_meta,
+                                                TransactionID txn_id,
+                                                TxnTimeStamp begin_ts) {
+
+    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    return table_entry;
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
@@ -81,7 +95,16 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
     if (table_index_meta == nullptr) {
 
-        auto new_table_index_meta = MakeUnique<TableIndexMeta>(this, index_def->index_name_);
+        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
+
+        {
+            if (txn_mgr != nullptr) {
+                auto operation = MakeUnique<AddIndexMetaOperation>(new_table_index_meta.get());
+                LOG_TRACE(fmt::format("Add new AddDatabaseMeta Operation: {}", operation->ToString()));
+                txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+            }
+        }
+
         table_index_meta = new_table_index_meta.get();
 
         this->rw_locker_.lock();
@@ -183,6 +206,7 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
+    Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
         LOG_TRACE("No append is done.");
         return;
@@ -194,14 +218,15 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 u32 new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(this, new_segment_id, buffer_mgr);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, buffer_mgr, txn);
+
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr);
+        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
     }
 }
@@ -275,10 +300,10 @@ void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendSt
     SizeT row_count = 0;
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE(fmt::format("Commit, segment: {}, block: {} start offset: {}, count: {}",
-                         range.segment_id_,
-                         range.block_id_,
-                         range.start_offset_,
-                         range.row_count_));
+                              range.segment_id_,
+                              range.block_id_,
+                              range.start_offset_,
+                              range.row_count_));
         SegmentEntry *segment_ptr = this->segment_map_[range.segment_id_].get();
         segment_ptr->CommitAppend(txn_id, commit_ts, range.block_id_, range.start_offset_, range.row_count_);
         row_count += range.row_count_;

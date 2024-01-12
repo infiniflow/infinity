@@ -39,6 +39,7 @@ import table_detail;
 import index_def;
 import txn_store;
 import data_access_state;
+import wal;
 
 namespace infinity {
 
@@ -64,7 +65,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will lose operation
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
-NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
 
     // Check if there is db_meta with the db_name
     DBMeta *db_meta{nullptr};
@@ -83,9 +84,16 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         Path catalog_path(*this->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(db_dir, MakeShared<String>(db_name));
-        db_meta = new_db_meta.get();
+        // Physical wal log
+        UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
 
+        if (txn_mgr != nullptr) {
+            auto operation = MakeUnique<AddDatabaseMetaOperation>(new_db_meta.get());
+            LOG_TRACE(fmt::format("Add new AddDatabaseMeta Operation: {}", operation->ToString()));
+            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+        }
+
+        db_meta = new_db_meta.get();
         this->rw_locker_.lock();
         auto db_iter2 = this->databases_.find(db_name);
         if (db_iter2 == this->databases_.end()) {
@@ -96,8 +104,9 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         this->rw_locker_.unlock();
     }
 
-    LOG_TRACE(fmt::format("Add new database entry: {}", db_name));
-    return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
+    auto tuple = db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    return tuple;
 }
 
 // do not only use this method to drop database
@@ -120,7 +129,8 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn
     }
 
     LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
-    return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr);
+    Tuple<DBEntry *, Status> tuple = db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr);
+    return tuple;
 }
 
 Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts) {

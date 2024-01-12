@@ -33,15 +33,12 @@ class DBEntry : public BaseEntry {
     friend struct NewCatalog;
 
 public:
-    inline explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
-          db_name_(std::move(db_name)) {
-        begin_ts_ = begin_ts;
-        txn_id_ = txn_id;
-    }
+    explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    static SharedPtr<DBEntry>
+    NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-
     SharedPtr<String> ToString();
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -50,9 +47,13 @@ public:
 
     virtual void MergeFrom(BaseEntry &other);
 
-    [[nodiscard]] const String& db_name() const { return *db_name_; }
+    [[nodiscard]] const String &db_name() const { return *db_name_; }
 
-    [[nodiscard]] const SharedPtr<String>& db_name_ptr() const { return db_name_; }
+    [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
+
+    [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
+
+    [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,

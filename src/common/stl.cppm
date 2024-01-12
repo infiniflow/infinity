@@ -281,7 +281,14 @@ export {
 
     using StreamSize = std::streamsize;
 
-    using TxnTimeStamp = u64;
+    // TXN
+    using TxnTimeStamp = uint64_t;
+    using TransactionID = uint64_t;
+
+    // ENTRY
+    using SegmentID = uint32_t;
+    using BlockID = uint16_t;
+    using ColumnID = uint64_t;
 
     // Concurrency
     using ThreadPool = ctpl::thread_pool;
@@ -326,8 +333,6 @@ export {
     }
 
     // DB Type
-
-    using ColumnID = u32;
 
     // Exception
 

@@ -97,6 +97,13 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         txn6->CreateDatabase("db5", ConflictType::kIgnore);
         txn_mgr->CommitTxn(txn6);
 
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->DropDatabase("db1", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
+
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
@@ -113,9 +120,17 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        Status status = txn->DropDatabase("db4", ConflictType::kInvalid);
+        Status status = txn->DropDatabase("db4", ConflictType::kError);
         EXPECT_EQ(status.ok(), true);
         txn_mgr->CommitTxn(txn);
+
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            Status status = txn->CreateDatabase("db1", ConflictType::kError);
+            EXPECT_EQ(status.ok(), true);
+            txn_mgr->CommitTxn(txn);
+        }
 
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -522,7 +537,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0);
-            auto segment_entry = SegmentEntry::MakeNewSegmentEntry(table_entry, segment_id, buffer_manager);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, buffer_manager,txn4);
             EXPECT_EQ(segment_entry->segment_id(), 0);
             auto last_block_entry = segment_entry->GetLastEntry();
 

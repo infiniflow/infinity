@@ -33,6 +33,7 @@ export struct TableIndexEntry;
 
 class BufferManager;
 struct TableEntry;
+class Txn;
 
 struct ColumnIndexEntry : public BaseEntry {
     friend struct TableEntry;
@@ -41,27 +42,28 @@ struct ColumnIndexEntry : public BaseEntry {
 public:
     ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                      TableIndexEntry *table_index_entry,
-                     u64 column_id,
+                     ColumnID column_id,
                      SharedPtr<String> index_dir,
                      u64 txn_id,
                      TxnTimeStamp begin_ts);
 
-    static UniquePtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
+    static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
+                                                           Txn* txn,
                                                            u64 txn_id,
                                                            SharedPtr<String> col_index_dir,
                                                            TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static UniquePtr<ColumnIndexEntry>
+    static SharedPtr<ColumnIndexEntry>
     Deserialize(const nlohmann::json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
 public:
     // Getter
     const SharedPtr<String> &col_index_dir() const { return col_index_dir_; }
-    u64 column_id() const { return column_id_; }
+    ColumnID column_id() const { return column_id_; }
     const IndexBase *index_base_ptr() const { return index_base_.get(); }
     TableIndexEntry *table_index_entry() const { return table_index_entry_; }
     const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>& index_by_segment() const { return index_by_segment_; }
@@ -80,7 +82,7 @@ private:
     std::shared_mutex rw_locker_{};
 
     TableIndexEntry *table_index_entry_{};
-    u64 column_id_{};
+    ColumnID column_id_{};
     SharedPtr<String> col_index_dir_{}; // xxxx/col1
     const SharedPtr<IndexBase> index_base_{};
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};

@@ -34,13 +34,15 @@ import dist_func_ip;
 import hnsw_alg;
 import lvq_store;
 import plain_store;
+import wal;
 
 namespace infinity {
-SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferObj *buffer)
+SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer)
     : BaseEntry(EntryType::kSegmentColumnIndex), column_index_entry_(column_index_entry), segment_id_(segment_id), buffer_(buffer){};
 
 SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                                          u32 segment_id,
+                                                                          SegmentID segment_id,
+                                                                          Txn * txn,
                                                                           TxnTimeStamp create_ts,
                                                                           BufferManager *buffer_manager,
                                                                           CreateIndexParam *param) {
@@ -50,6 +52,13 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
     auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
     segment_column_index_entry->min_ts_ = create_ts;
     segment_column_index_entry->max_ts_ = create_ts;
+
+    {
+        if (txn != nullptr) {
+            auto operation = MakeUnique<AddSegmentColumnIndexEntryOperation>(segment_column_index_entry);
+            txn->AddPhysicalOperation(std::move(operation));
+        }
+    }
     return segment_column_index_entry;
 }
 

@@ -38,6 +38,8 @@ class TableIndexMeta {
 public:
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
+    static UniquePtr<TableIndexMeta> NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
+
 public:
     // Getter
     inline TableEntry *GetTableEntry() const { return table_entry_; }
@@ -76,13 +78,12 @@ private:
 
 public:
     String index_name() const { return *index_name_; }
-    List <UniquePtr<BaseEntry>> &entry_list() { return entry_list_; }
+    List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
 private:
-    //    std::shared_mutex rw_locker_{};
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};
 
     std::shared_mutex rw_locker_{};
-    List<UniquePtr<BaseEntry>> entry_list_{};
+    List<SharedPtr<BaseEntry>> entry_list_{};
 };
 } // namespace infinity

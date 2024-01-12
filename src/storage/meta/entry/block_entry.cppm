@@ -60,6 +60,7 @@ export struct BlockVersion {
     Vector<TxnTimeStamp> deleted_{};
 };
 
+/// class BlockEntry
 struct BlockEntry : public BaseEntry {
     friend struct TableEntry;
     friend struct SegmentEntry;
@@ -68,17 +69,24 @@ public:
     // for iterator unit test
     explicit BlockEntry() : BaseEntry(EntryType::kBlock){};
 
-    /// Normal Constructor
-    explicit BlockEntry(const SegmentEntry *segment_entry, u16 block_id, TxnTimeStamp checkpoint_ts, u64 column_count, BufferManager *buffer_mgr);
-    /// Construct a new block entry For Replay
-    explicit BlockEntry(const SegmentEntry *segment_entry,
-                        u16 block_id,
-                        TxnTimeStamp checkpoint_ts,
-                        u64 column_count,
-                        BufferManager *buffer_mgr,
-                        u16 row_count_,
-                        i16 min_row_ts_,
-                        i16 max_row_ts_);
+    // Normal Constructor
+    explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
+
+    static UniquePtr<BlockEntry> NewBlockEntry(const SegmentEntry *segment_entry,
+                                               BlockID block_id,
+                                               TxnTimeStamp checkpoint_ts,
+                                               u64 column_count,
+                                               BufferManager *buffer_mgr,
+                                               Txn *txn);
+
+    static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
+                                                     u16 block_id,
+                                                     TxnTimeStamp checkpoint_ts,
+                                                     u64 column_count,
+                                                     BufferManager *buffer_mgr,
+                                                     u16 row_count,
+                                                     TxnTimeStamp min_row_ts,
+                                                     TxnTimeStamp max_row_ts);
 
 public:
     // Used in physical import
@@ -94,22 +102,24 @@ public:
     void MergeFrom(BaseEntry &other) override;
 
 protected:
-    u16 AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
+    u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
 
-    void DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
 
-    void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts);
+    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void CommitDelete(u64 txn_id, TxnTimeStamp commit_ts);
+    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
     void FlushVersion(BlockVersion &checkpoint_version);
 
-    static SharedPtr<String> DetermineDir(const String &parent_dir, u64 block_id);
+    static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 
 public:
     // Getter
+    inline const SegmentEntry *GetSegmentEntry() const { return segment_entry_; }
+
     inline SizeT row_count() const { return row_count_; }
 
     inline SizeT row_capacity() const { return row_capacity_; }
@@ -124,7 +134,7 @@ public:
 
     u32 segment_id() const;
 
-    const SharedPtr<String> &base_dir() const { return base_dir_; }
+    const SharedPtr<String> &base_dir() const { return block_dir_; }
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
@@ -133,9 +143,9 @@ public:
 
     i32 GetAvailableCapacity();
 
-    const String &DirPath() { return *base_dir_; }
+    const String &DirPath() { return *block_dir_; }
 
-    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, BlockVersion::PATH); }
+    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, BlockVersion::PATH); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 
@@ -145,16 +155,13 @@ public:
 
 protected:
     std::shared_mutex rw_locker_{};
-
     const SegmentEntry *segment_entry_{};
 
-    SharedPtr<String> base_dir_{};
+    BlockID block_id_{};
+    SharedPtr<String> block_dir_{};
 
-    u16 block_id_{};
     u16 row_count_{};
     u16 row_capacity_{};
-
-    Vector<UniquePtr<BlockColumnEntry>> columns_;
 
     UniquePtr<BlockVersion> block_version_{};
 
@@ -162,10 +169,13 @@ protected:
     TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
     TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
-    u64 using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
+    TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
     BufferManager *buffer_{nullptr};
 
     // checkpoint state
     u16 checkpoint_row_count_{0};
+
+    // Column data
+    Vector<UniquePtr<BlockColumnEntry>> columns_;
 };
 } // namespace infinity

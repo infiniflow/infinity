@@ -50,7 +50,7 @@ bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorSta
     if (!status.ok()) {
         Error<ExecutorException>(fmt::format("Create index finish failed: {}", status.message()));
     }
-    operator_state->SetComplete();
+    create_index_finish_op_state->SetComplete();
     return true;
 }
 

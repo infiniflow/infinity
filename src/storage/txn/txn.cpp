@@ -45,8 +45,9 @@ module txn;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id)
-    : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()) {}
+Txn::Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
+    : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
+      local_physical_wal_entry_(MakeShared<PhysicalWalEntry>()) {}
 
 Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const String &table_name) {
     if (db_name_.empty()) {
@@ -174,6 +175,7 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
     } else {
         db_names_.insert(db_name);
     }
+
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
     return Status::OK();
 }
@@ -239,6 +241,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
 
     txn_tables_.insert(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
+
     return Status::OK();
 }
 
@@ -462,6 +465,10 @@ void Txn::CommitBottom() {
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
         table_index_entry->Commit(commit_ts);
     }
+
+    // Snapshot the physical operations in one txn
+    local_physical_wal_entry_->Snapshot(txn_id_, commit_ts);
+
     LOG_INFO(fmt::format("Txn: {} is committed.", txn_id_));
 
     // Notify the top half
@@ -513,6 +520,12 @@ void Txn::Rollback() {
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
+
+void Txn::AddPhysicalOperation(UniquePtr<PhysicalWalOperation> operation) {
+    local_physical_wal_entry_->operations().emplace_back(std::move(operation));
+}
+
+void Txn::SubPhysicalOperation() { local_physical_wal_entry_->operations().pop_back(); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";

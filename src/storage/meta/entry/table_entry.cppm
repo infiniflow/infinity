@@ -50,24 +50,32 @@ public:
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
                         TableMeta *table_meta,
-                        u64 txn_id,
+                        TransactionID txn_id,
                         TxnTimeStamp begin_ts);
+
+    static SharedPtr<TableEntry> NewTableEntry(const SharedPtr<String> &db_entry_dir,
+                                               SharedPtr<String> table_collection_name,
+                                               const Vector<SharedPtr<ColumnDef>> &columns,
+                                               TableEntryType table_entry_type,
+                                               TableMeta *table_meta,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts);
 
 private:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
                                                  ConflictType conflict_type,
-                                                 u64 txn_id,
+                                                 TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr,
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
     Tuple<TableIndexEntry *, Status>
-    DropIndex(const String &index_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr);
+    void RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr);
 
     void CreateIndexFile(void *txn_store,
                          TableIndexEntry *table_index_entry,
@@ -80,17 +88,17 @@ private:
 
     TableMeta *GetTableMeta() const { return table_meta_; }
 
-    void Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr);
+    void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
 
-    void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
+    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
 
-    void RollbackAppend(u64 txn_id, TxnTimeStamp commit_ts, void *txn_store);
+    void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    Status Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    Status Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
-    void CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
+    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
-    Status RollbackDelete(u64 txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
+    Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
     Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
@@ -107,9 +115,9 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
-    const BlockEntry *GetBlockEntryByID(u32 seg_id, u16 block_id) const;
+    const BlockEntry *GetBlockEntryByID(SegmentID seg_id, BlockID block_id) const;
 
-    inline const ColumnDef *GetColumnDefByID(u64 column_id) const { return columns_[column_id].get(); }
+    inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
     inline SizeT ColumnCount() const { return columns_.size(); }
 
@@ -135,12 +143,14 @@ public:
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
-    Map<u32, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
+    Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_; }
 
 protected:
-    HashMap<String, u64> column_name2column_id_;
+    TableMeta *table_meta_{};
+
+    HashMap<String, ColumnID> column_name2column_id_;
 
     std::shared_mutex rw_locker_{};
 
@@ -152,15 +162,13 @@ protected:
 
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
-    TableMeta *table_meta_{};
-
     // From data table
     Atomic<SizeT> row_count_{};
-    Map<u32, SharedPtr<SegmentEntry>> segment_map_{};
+    Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
-    // Index definition
+    // Index meta
     HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
 };
 
