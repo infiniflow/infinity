@@ -58,6 +58,14 @@ void Status::Init(ErrorCode code, const char *msg) {
     code_ = code;
 }
 
+void Status::AppendMessage(const String& msg) {
+    if (msg_.get() != nullptr) {
+        msg_->append(msg);
+    } else {
+        msg_ = MakeUnique<String>(msg);
+    }
+}
+
 // Error functions
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {

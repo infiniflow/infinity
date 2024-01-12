@@ -20,26 +20,22 @@ import status;
 
 namespace infinity {
 
-export void PrintStacktrace(const String& err_msg);
+export void PrintStacktrace(const String &err_msg);
 
-export class RecoverableException: public std::exception {
+export class RecoverableException : public std::exception {
 public:
-    explicit RecoverableException(Status status) :status_(std::move(status)) {}
+    explicit RecoverableException(Status status) : status_(std::move(status)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return status_.message(); }
 
-    inline ErrorCode ErrorCode() const {
-        return status_.code();
-    }
+    inline ErrorCode ErrorCode() const { return status_.code(); }
 
-    inline StringView ErrorMessage() const {
-        return status_.message();
-    }
+    inline StringView ErrorMessage() const { return status_.message(); }
 
 private:
     Status status_;
 };
 
-export class UnrecoverableException: public std::exception {
+export class UnrecoverableException : public std::exception {
 public:
     explicit UnrecoverableException(String message) : message_(std::move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
@@ -184,19 +180,19 @@ Error(const String &message, const char *file_name = std::source_location::curre
     throw ExceptionType(err_msg);
 }
 
+void RecoverableError(Status status,
+                      const char *file_name = std::source_location::current().file_name(),
+                      u32 line = std::source_location::current().line());
+
+void UnrecoverableError(const String &message,
+                        const char *file_name = std::source_location::current().file_name(),
+                        u32 line = std::source_location::current().line());
+
 #elif
 
-export template <typename ExceptionType>
-inline void Assert(bool is_true, const String &message) {
-    if (!(is_true)) {
-        throw ExceptionType(message);
-    }
-}
+void RecoverableError(Status status);
 
-export template <typename ExceptionType>
-inline void Error(const String &message) {
-    return Assert<ExceptionType>(false, message);
-}
+void UnrecoverableError(const String &message);
 
 #endif
 

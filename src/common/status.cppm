@@ -201,6 +201,8 @@ public:
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
 
+    void AppendMessage(const String& msg);
+
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};
 };
