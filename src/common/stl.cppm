@@ -138,6 +138,8 @@ namespace filesystem {
 using std::mt19937;
 using std::uniform_real_distribution;
 using std::iota;
+
+using std::exception;
 } // namespace std
 
 namespace infinity {
@@ -299,10 +301,6 @@ export {
     // DB Type
 
     using ColumnID = u32;
-
-    // Exception
-
-    using StdException = std::exception;
 
     // Chrono
     using Clock = std::chrono::high_resolution_clock;

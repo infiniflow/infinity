@@ -21,7 +21,7 @@ namespace infinity {
 
 export void PrintStacktrace(const String& err_msg);
 
-export class Exception : public StdException {
+export class Exception : public std::exception {
 public:
     explicit Exception(String message) : message_(std::move(message)) {}
     [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
