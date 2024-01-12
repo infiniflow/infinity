@@ -30,14 +30,14 @@ enum class JoinType {
     kAnti,
 };
 
-std::string ToString(JoinType type);
-
 class JoinReference : public BaseTableReference {
 
 public:
     explicit JoinReference() : BaseTableReference(TableRefType::kJoin) {}
 
     ~JoinReference() override;
+
+    static std::string ToString(JoinType type);
 
     std::string ToString() override;
 

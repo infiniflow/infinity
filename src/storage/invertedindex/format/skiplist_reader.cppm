@@ -11,7 +11,7 @@ export class SkipListReader {
 public:
     SkipListReader();
     SkipListReader(const SkipListReader &other);
-    virtual ~SkipListReader();
+    virtual ~SkipListReader() = default;
 
 public:
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end);

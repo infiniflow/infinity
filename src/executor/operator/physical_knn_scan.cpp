@@ -14,8 +14,8 @@
 
 module;
 
-#include <algorithm>
 #include <string>
+
 import stl;
 import query_context;
 import parser;

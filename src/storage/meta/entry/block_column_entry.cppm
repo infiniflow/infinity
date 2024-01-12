@@ -29,7 +29,6 @@ import column_vector;
 import local_file_system;
 import vector_buffer;
 
-
 namespace infinity {
 
 export struct BlockEntry;

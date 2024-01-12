@@ -14,12 +14,10 @@
 
 module;
 
-#include <algorithm>
+export module create_index_data;
 
 import stl;
 import catalog;
-
-export module create_index_data;
 
 namespace infinity {
 

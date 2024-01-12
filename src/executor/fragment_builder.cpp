@@ -41,7 +41,7 @@ UniquePtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op
     if (plan_fragment->GetSourceNode() == nullptr) {
         plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
     }
-    return std::move(plan_fragment);
+    return plan_fragment;
 }
 
 void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr) {

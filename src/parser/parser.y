@@ -1608,76 +1608,76 @@ optimize_statement: OPTIMIZE table_name {
 command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
     ParserHelper::ToLower($2);
-    $$->command_info_ = std::make_shared<infinity::UseCmd>($2);
+    $$->command_info_ = std::make_unique<infinity::UseCmd>($2);
     free($2);
 }
 | EXPORT PROFILE LONG_VALUE file_path {
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::ExportCmd>($4, infinity::ExportType::kProfileRecord, $3);
+    $$->command_info_ = std::make_unique<infinity::ExportCmd>($4, infinity::ExportType::kProfileRecord, $3);
     free($4);
 }
 | SET SESSION IDENTIFIER ON {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, true);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, true);
     free($3);
 }
 | SET SESSION IDENTIFIER OFF {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
 | SET SESSION IDENTIFIER STRING {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kString, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kString, $3, $4);
     free($3);
     free($4);
 }
 | SET SESSION IDENTIFIER LONG_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kInteger, $3, $4);
     free($3);
 }
 | SET SESSION IDENTIFIER DOUBLE_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kSession, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 };
 | SET GLOBAL IDENTIFIER ON {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, true);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, true);
     free($3);
 }
 | SET GLOBAL IDENTIFIER OFF {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kBool, $3, false);
     free($3);
 }
 | SET GLOBAL IDENTIFIER STRING {
     ParserHelper::ToLower($3);
     ParserHelper::ToLower($4);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kString, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kString, $3, $4);
     free($3);
     free($4);
 }
 | SET GLOBAL IDENTIFIER LONG_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kInteger, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kInteger, $3, $4);
     free($3);
 }
 | SET GLOBAL IDENTIFIER DOUBLE_VALUE {
     ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
+    $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
     free($3);
 };
 

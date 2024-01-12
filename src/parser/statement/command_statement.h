@@ -142,7 +142,7 @@ public:
 
     ~CommandStatement() final = default;
 
-    std::shared_ptr<CommandInfo> command_info_{};
+    std::unique_ptr<CommandInfo> command_info_{};
 
     [[nodiscard]] std::string ToString() const final;
 };

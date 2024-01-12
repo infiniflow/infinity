@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
-#include <iostream>
+
 import stl;
 import term;
 import ngram_analyzer;

@@ -14,17 +14,17 @@
 
 module;
 
-#include <memory>
-
 #include <sstream>
+
+module logical_limit;
+
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
 import base_expression;
-
-module logical_limit;
 
 namespace infinity {
 
@@ -43,7 +43,7 @@ String LogicalLimit::ToString(i64 &space) const {
     }
 
     ss << String(space, ' ') << arrow_str << "Limit (limit: " << limit_expression_->Name();
-    if (offset_expression_ != nullptr) {
+    if (offset_expression_.get() != nullptr) {
         ss << ", offset: " << offset_expression_->Name();
     }
     ss << ")";

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include <algorithm>
+
 import stl;
 export module heap_twin_operation;
 namespace infinity {

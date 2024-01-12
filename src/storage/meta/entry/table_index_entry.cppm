@@ -46,8 +46,12 @@ public:
 
     TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<TableIndexEntry>
-    NewTableIndexEntry(const SharedPtr<IndexDef> &index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static UniquePtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+                                                         TableIndexMeta *table_index_meta,
+                                                         u64 txn_id,
+                                                         TxnTimeStamp begin_ts,
+                                                         bool is_replay = false,
+                                                         String replay_table_index_dir = "");
 
     static UniquePtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
 
@@ -62,13 +66,16 @@ public:
     inline const IndexDef *index_def() const { return index_def_.get(); }
     const SharedPtr<IrsIndexEntry> &irs_index_entry() const { return irs_index_entry_; }
     HashMap<u64, UniquePtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
+    SharedPtr<String> index_dir() { return index_dir_; }
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
-    void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry);
+    // For SegmentColumnIndexEntry
+    void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);
+    // For IrsIndexEntry
     void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
 
 private:

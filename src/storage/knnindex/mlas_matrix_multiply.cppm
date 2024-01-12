@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include "../third_party/mlas/inc/mlas.h"
+#include "inc/mlas.h"
 
 export module mlas_matrix_multiply;
 

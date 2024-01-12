@@ -14,9 +14,8 @@
 
 module;
 
-#include <cppjieba/Jieba.hpp>
-
 import stl;
+import jieba;
 
 export module term;
 

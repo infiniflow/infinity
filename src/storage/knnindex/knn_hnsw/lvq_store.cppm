@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include <cmath>
+
 #include <new>
 #include <type_traits>
 #include <xmmintrin.h>

@@ -14,7 +14,7 @@
 
 module;
 
-#include <cmath>
+export module annivfflat_index_file_worker;
 
 import stl;
 import index_file_worker;
@@ -24,8 +24,6 @@ import index_base;
 import annivfflat_index_data;
 import infinity_exception;
 import index_ivfflat;
-
-export module annivfflat_index_file_worker;
 
 namespace infinity {
 
@@ -47,7 +45,7 @@ public:
                                        const IndexBase *index_base,
                                        const ColumnDef *column_def,
                                        SizeT row_count)
-        : IndexFileWorker(file_dir, file_name, index_base, column_def), default_centroid_num_((u32)sqrt(row_count)) {}
+        : IndexFileWorker(file_dir, file_name, index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -89,7 +87,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     }
     SizeT dimension = GetDimension();
 
-    const auto* index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
+    const auto *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
     auto centroids_count = index_ivfflat->centroids_count_;
     if (centroids_count == 0) {
         centroids_count = default_centroid_num_;
@@ -124,6 +122,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool &prepare_success)
 
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl() {
+    data_ = new AnnIVFFlatIndexData<DataType>();
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->ReadIndexInner(*file_handler_);
 }

@@ -186,7 +186,7 @@ struct TernaryTryOpToVarlenWrapper {
 
 using ScalarFunctionType = StdFunction<void(const DataBlock &, SharedPtr<ColumnVector> &)>;
 
-export class ScalarFunction : public Function {
+export class ScalarFunction final : public Function {
 public:
     explicit ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionType function);
 
@@ -194,13 +194,13 @@ public:
 
     [[nodiscard]] const DataType &return_type() const { return return_type_; }
 
-    [[nodiscard]] String ToString() const override;
+    [[nodiscard]] String ToString() const final;
 
 public:
-    Vector<DataType> parameter_types_;
+    Vector<DataType> parameter_types_{};
     DataType return_type_;
 
-    ScalarFunctionType function_;
+    ScalarFunctionType function_{};
 
 public:
     // Unary function

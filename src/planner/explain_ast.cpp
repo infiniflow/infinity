@@ -85,7 +85,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(schema_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -98,7 +98,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(table_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             String column_names = String(intent_size, ' ') + "columns: (";
 
@@ -134,7 +134,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(collection_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -189,7 +189,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "table_name: " + schema_info->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(schema_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(schema_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -202,7 +202,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(schema_name));
             String table_name = String(intent_size, ' ') + "table: " + table_info->table_name_;
             result->emplace_back(MakeShared<String>(table_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(table_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(table_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }
@@ -215,7 +215,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(schema_name));
             String collection_name = String(intent_size, ' ') + "table_name: " + collection_info->collection_name_;
             result->emplace_back(MakeShared<String>(collection_name));
-            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictType2Str(collection_info->conflict_type_);
+            String conflict = String(intent_size, ' ') + "conflict type: " + ConflictTypeToStr(collection_info->conflict_type_);
             result->emplace_back(MakeShared<String>(conflict));
             break;
         }

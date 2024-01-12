@@ -13,9 +13,9 @@
 // limitations under the License.
 
 module;
-#include <algorithm>
+
 #include <immintrin.h>
-#include <limits>
+
 import stl;
 import mlas_matrix_multiply;
 import vector_distance;

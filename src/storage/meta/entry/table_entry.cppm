@@ -33,7 +33,6 @@ import status;
 
 namespace infinity {
 
-class DBEntry;
 class IndexDef;
 struct TableIndexEntry;
 class IrsIndexEntry;
@@ -55,8 +54,13 @@ public:
                         TxnTimeStamp begin_ts);
 
 private:
-    Tuple<TableIndexEntry *, Status>
-    CreateIndex(const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
+                                                 ConflictType conflict_type,
+                                                 u64 txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
+                                                 bool is_replay = false,
+                                                 String replay_table_index_dir = "");
 
     Tuple<TableIndexEntry *, Status>
     DropIndex(const String &index_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -65,9 +69,14 @@ private:
 
     void RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr);
 
-    void CreateIndexFile(void *txn_store, TableIndexEntry *table_index_entry, TxnTimeStamp begin_ts, BufferManager *buffer_mgr, bool prepare);
+    void CreateIndexFile(void *txn_store,
+                         TableIndexEntry *table_index_entry,
+                         TxnTimeStamp begin_ts,
+                         BufferManager *buffer_mgr,
+                         bool prepare,
+                         bool is_replay);
 
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_);
+    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }
 

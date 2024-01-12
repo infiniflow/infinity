@@ -118,6 +118,8 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
                             return true;
                         case OrderBySingleResult::kPreferRight:
                             return false;
+                        default:
+                            continue;
                     }
                 }
                 return true;

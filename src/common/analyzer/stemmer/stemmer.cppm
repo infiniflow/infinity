@@ -14,11 +14,9 @@
 
 module;
 
-#include "api.h"
+export module stemmer;
 
 import stl;
-
-export module stemmer;
 
 namespace infinity {
 

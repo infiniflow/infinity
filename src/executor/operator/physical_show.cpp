@@ -14,7 +14,6 @@
 
 module;
 
-#include <iostream>
 #include <string>
 
 #include "statement/extra/create_index_info.h"
@@ -653,7 +652,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
             // Append column constraint to the third column
             String column_constraint;
             for (auto &constraint : column->constraints_) {
-                column_constraint += " " + ConstrainType2String(constraint);
+                column_constraint += " " + ConstrainTypeToString(constraint);
             }
 
             Value value = Value::MakeVarchar(column_constraint);
@@ -1361,7 +1360,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index path
-                Value value = Value::MakeVarchar(*column_index_entry->index_dir());
+                Value value = Value::MakeVarchar(*column_index_entry->col_index_dir());
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -1465,7 +1464,7 @@ void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vec
             // Append column constraint to the third column
             String column_constraint;
             for (auto &constraint : column->constraints_) {
-                column_constraint += " " + ConstrainType2String(constraint);
+                column_constraint += " " + ConstrainTypeToString(constraint);
             }
 
             Value value = Value::MakeVarchar(column_constraint);

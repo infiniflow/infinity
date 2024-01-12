@@ -121,10 +121,15 @@ private:
             for (u32 i = 0; i < sort_expr_count_; ++i) {
                 auto compare_result = sort_functions_[i]((*input_data_)[x.first][i]->data(), x.second, (*input_data_)[y.first][i]->data(), y.second);
                 switch (compare_result) {
-                    case OrderBySingleResult::kPreferRight:
+                    case OrderBySingleResult::kPreferRight: {
                         return true;
-                    case OrderBySingleResult::kPreferLeft:
+                    }
+                    case OrderBySingleResult::kPreferLeft: {
                         return false;
+                    }
+                    default: {
+                        continue;
+                    }
                 }
             }
             return false;

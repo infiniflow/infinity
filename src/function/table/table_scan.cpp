@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <vector>
+
+module table_scan;
 
 import stl;
 import table_function;
@@ -25,8 +27,6 @@ import global_block_id;
 import query_context;
 import column_buffer;
 import catalog;
-
-module table_scan;
 
 namespace infinity {
 

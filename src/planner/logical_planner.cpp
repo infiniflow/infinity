@@ -14,7 +14,9 @@
 
 module;
 
-#include <memory>
+#include <tuple>
+
+module logical_planner;
 
 import stl;
 import bind_context;
@@ -67,8 +69,7 @@ import index_ivfflat;
 import index_hnsw;
 import index_full_text;
 import base_table_ref;
-
-module logical_planner;
+import catalog;
 
 namespace infinity {
 
@@ -232,9 +233,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             SizeT table_column_count = table_entry->ColumnCount();
             if (value_list.size() != table_column_count) {
                 Error<PlannerException>(fmt::format("INSERT: Table column count ({}) and "
-                                               "input value count mismatch ({})",
-                                               table_column_count,
-                                               value_list.size()));
+                                                    "input value count mismatch ({})",
+                                                    table_column_count,
+                                                    value_list.size()));
             }
 
             // Create value list with table column size and null value
@@ -443,7 +444,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
-    if(table_name->empty()) {
+    if (table_name->empty()) {
         Error<PlannerException>("No index name.");
     }
     //    if (create_index_info->column_names_->size() != 1) {
@@ -458,25 +459,36 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     if (index_info_list.empty()) {
         Error<PlannerException>("No index info.");
     }
+
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
+
+    auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
+
+    if (index_name_map.contains(*index_name)) {
+        if (create_index_info->conflict_type_ == ConflictType::kError)
+            Error<PlannerException>(fmt::format("Duplicated index name: {}", *index_name));
+    }
+
     for (IndexInfo *index_info : index_info_list) {
         SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {
             case IndexType::kIRSFullText: {
-                base_index_ptr = IndexFullText::Make(create_index_info->table_name_ + "_" + *index_name,
-                                                   {index_info->column_name_},
-                                                   *(index_info->index_param_list_));
+                base_index_ptr = IndexFullText::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                                     {index_info->column_name_},
+                                                     *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kHnsw: {
-                base_index_ptr = IndexHnsw::Make(create_index_info->table_name_ + "_" + *index_name,
-                                               {index_info->column_name_},
-                                               *(index_info->index_param_list_));
+                base_index_ptr = IndexHnsw::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                                 {index_info->column_name_},
+                                                 *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kIVFFlat: {
-                base_index_ptr = IndexIVFFlat::Make(create_index_info->table_name_ + "_" + *index_name,
-                                                  {index_info->column_name_},
-                                                  *(index_info->index_param_list_));
+                base_index_ptr = IndexIVFFlat::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                                    {index_info->column_name_},
+                                                    *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kInvalid: {
@@ -486,9 +498,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         }
         index_def_ptr->index_array_.emplace_back(base_index_ptr);
     }
-
-    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
 
     auto logical_create_index_operator =
         MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, index_def_ptr, create_index_info->conflict_type_);
@@ -566,7 +575,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 
 Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
-    if (drop_schema_info->schema_name_ == query_context_ptr_->schema_name()) {
+    if (IsEqual(drop_schema_info->schema_name_, query_context_ptr_->schema_name())) {
         Error<PlannerException>(fmt::format("Can't drop using database: {}", drop_schema_info->schema_name_));
     }
 
@@ -705,7 +714,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -715,14 +724,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kSet: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
 
             this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kExport: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
 
             this->logical_plan_ = logical_command;
             break;
@@ -732,7 +741,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
 
                 this->logical_plan_ = logical_command;
             } else {

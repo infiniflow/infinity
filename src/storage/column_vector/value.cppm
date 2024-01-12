@@ -13,7 +13,6 @@
 // limitations under the License.
 module;
 
-#include <type/complex/embedding_type.h>
 import parser;
 import stl;
 

@@ -54,7 +54,7 @@ public:
 
     QueryResult ListDatabases();
 
-    SharedPtr<Database> GetDatabase(const String &db_name);
+    UniquePtr<Database> GetDatabase(const String &db_name);
 
     QueryResult Flush();
 

@@ -14,7 +14,8 @@
 
 module;
 
-#include <memory>
+module knn_scan;
+
 
 import stl;
 import data_block;
@@ -31,8 +32,6 @@ import parser;
 import knn_distance;
 import third_party;
 import logger;
-
-module knn_scan;
 
 namespace infinity {
 

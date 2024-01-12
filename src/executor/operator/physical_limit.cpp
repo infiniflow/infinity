@@ -14,7 +14,7 @@
 
 module;
 
-#include <memory>
+module physical_limit;
 
 import stl;
 import txn;
@@ -33,8 +33,6 @@ import data_block;
 import infinity_exception;
 import expression_type;
 import value_expression;
-
-module physical_limit;
 
 namespace infinity {
 
@@ -146,7 +144,7 @@ PhysicalLimit::PhysicalLimit(u64 id,
     i64 offset = 0;
     i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
 
-    if (offset_expr_ != nullptr) {
+    if (offset_expr_.get() != nullptr) {
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
 

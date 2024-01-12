@@ -14,8 +14,7 @@
 
 module;
 
-#include <ctime>
-#include <memory>
+#include <vector>
 
 module catalog;
 
@@ -59,9 +58,9 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
         if (index_base->index_type_ == IndexType::kIRSFullText) {
             index_info_map.emplace(column_id, std::static_pointer_cast<IndexFullText>(index_base));
         } else {
-            SharedPtr<String> column_index_path = MakeShared<String>(fmt::format("{}/{}", *index_dir_, index_base->column_names_[0]));
+            SharedPtr<String> column_index_dir = MakeShared<String>(fmt::format("{}/{}", *index_dir_, index_base->column_names_[0]));
             UniquePtr<ColumnIndexEntry> column_index_entry =
-                ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_path, begin_ts);
+                ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, this, txn_id, column_index_dir, begin_ts);
             column_index_map_[column_id] = std::move(column_index_entry);
         }
     }
@@ -76,22 +75,45 @@ TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, T
     txn_id_ = txn_id;
 }
 
-UniquePtr<TableIndexEntry>
-TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexDef> &index_def, TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
-    SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_def->index_name_);
-    return MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+UniquePtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+                                                               TableIndexMeta *table_index_meta,
+                                                               u64 txn_id,
+                                                               TxnTimeStamp begin_ts,
+                                                               bool is_replay,
+                                                               String replay_table_index_dir) {
+
+    if (is_replay) {
+        auto table_index_entry =
+            MakeUnique<TableIndexEntry>(index_def, table_index_meta, MakeShared<String>(replay_table_index_dir), txn_id, begin_ts);
+        return table_index_entry;
+    } else {
+        SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_def->index_name_);
+        auto table_index_entry = MakeUnique<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+        return table_index_entry;
+    }
 }
 
 UniquePtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
     return MakeUnique<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
 }
 
-void TableIndexEntry::CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
-    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
-    ColumnIndexEntry *column_index_entry = this->column_index_map_[column_id].get();
-    column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
+// For segment_column_index_entry
+void TableIndexEntry::CommitCreateIndex(u64 column_id,
+                                        u32 segment_id,
+                                        SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry,
+                                        bool is_replay) {
+    if (!is_replay) {
+        // Save index file.
+        segment_column_index_entry->SaveIndexFile();
+    }
+    {
+        std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
+        ColumnIndexEntry *column_index_entry = this->column_index_map_[column_id].get();
+        column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
+    }
 }
 
+// For irs_index_entry
 void TableIndexEntry::CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry) { this->irs_index_entry_ = irs_index_entry; }
 
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
@@ -172,7 +194,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
     LocalFileSystem fs;
     SharedPtr<String> index_dir;
     do {
-        u32 seed = time(nullptr);
+        u32 seed = std::time(nullptr);
         index_dir = MakeShared<String>(fmt::format("{}/{}_index_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN, seed), index_name));
     } while (!fs.CreateDirectoryNoExp(*index_dir));
     return index_dir;
