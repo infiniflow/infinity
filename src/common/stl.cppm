@@ -18,6 +18,7 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -26,6 +27,7 @@ module;
 #include <experimental/source_location>
 #include <filesystem>
 #include <forward_list>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <map>
@@ -86,6 +88,32 @@ using std::pow;
 using std::log2;
 
 using std::numeric_limits;
+
+using std::function;
+
+namespace chrono {
+using std::chrono::duration;
+using std::chrono::microseconds;
+using std::chrono::milliseconds;
+using std::chrono::nanoseconds;
+using std::chrono::seconds;
+
+using std::chrono::operator>;
+using std::chrono::operator>=;
+using std::chrono::operator<;
+using std::chrono::operator<=;
+using std::chrono::operator==;
+
+using std::chrono::operator+;
+using std::chrono::operator-;
+
+using std::chrono::minutes;
+using std::chrono::weeks;
+using std::chrono::years;
+
+using std::chrono::steady_clock;
+using std::chrono::time_point;
+} // namespace chrono
 
 } // namespace std
 
