@@ -95,7 +95,7 @@ QueryResult QueryContext::Query(const String &query) {
         return query_result;
     }
 
-    Error<NetworkException>("Not reachable");
+    UnrecoverableError("Not reachable");
     return QueryResult::UnusedResult();
 }
 

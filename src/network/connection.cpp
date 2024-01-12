@@ -16,6 +16,8 @@ module;
 
 #include <boost/asio/ip/tcp.hpp>
 
+module connection;
+
 import pg_protocol_handler;
 import boost;
 import stl;
@@ -32,8 +34,6 @@ import parser;
 import logical_node_type;
 import query_result;
 import session_manager;
-
-module connection;
 
 namespace infinity {
 
@@ -63,6 +63,15 @@ void Connection::Run() {
     while (!terminate_connection_) {
         try {
             HandleRequest();
+        } catch (const infinity::RecoverableException &e) {
+            LOG_TRACE("Recoverable exception");
+            return ;
+        } catch (const infinity::UnrecoverableException& e) {
+            HashMap<PGMessageType, String> error_message_map;
+            error_message_map[PGMessageType::kHumanReadableError] = e.what();
+            LOG_ERROR(e.what());
+            pg_handler_->send_error_response(error_message_map);
+            pg_handler_->send_ready_for_query();
         } catch (const std::exception &e) {
             HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
@@ -127,7 +136,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            Error<NetworkException>("Unknown PG command type");
+            UnrecoverableError("Unknown PG command type");
         }
     }
 }

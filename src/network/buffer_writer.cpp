@@ -17,14 +17,16 @@ module;
 #include <arpa/inet.h>
 #include <boost/asio/write.hpp>
 
+module buffer_writer;
+
+
 import stl;
+import third_party;
 import pg_message;
 import ring_buffer_iterator;
 
 import infinity_exception;
 import default_values;
-
-module buffer_writer;
 
 namespace infinity {
 
@@ -106,7 +108,7 @@ void BufferWriter::send_value_u32(u32 host_value) {
 
 void BufferWriter::flush(SizeT bytes) {
     if (bytes > size()) {
-        Error<NetworkException>("Can't flush more bytes than available");
+        UnrecoverableError("Can't flush more bytes than available");
     }
     const auto bytes_to_send = bytes ? bytes : size();
     SizeT bytes_sent{0};
@@ -127,11 +129,11 @@ void BufferWriter::flush(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
-        Error<NetworkException>("Write failed. Client close connection.");
+        UnrecoverableError(fmt::format("Can't flush more bytes than available: {}", boost_error.message()));
     }
 
     if (boost_error) {
-        Error<NetworkException>(boost_error.message());
+        UnrecoverableError(boost_error.message());
     }
     start_pos_.increment(bytes_sent);
 }

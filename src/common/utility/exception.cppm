@@ -86,17 +86,17 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
     return BuildMessageInternal(values, params...);
 }
 
-export class CatalogException : public Exception {
-public:
-    template <typename... Args>
-    explicit CatalogException(Args... params) : Exception(BuildMessage(String("Catalog Error:"), params...)) {}
-};
-
-export class NetworkException : public Exception {
-public:
-    template <typename... Args>
-    explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
-};
+//export class CatalogException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit CatalogException(Args... params) : Exception(BuildMessage(String("Catalog Error:"), params...)) {}
+//};
+//
+//export class NetworkException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
+//};
 
 export class PlannerException : public Exception {
 public:

@@ -444,8 +444,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
             Error<PlannerException>(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
-                                           parsed_knn_expr.dimension_,
-                                           embedding_info->Dimension()));
+                                                parsed_knn_expr.dimension_,
+                                                embedding_info->Dimension()));
         }
     }
 
@@ -522,9 +522,9 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
 }
 
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
-    SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
-    if (special_function.get() != nullptr) {
-        switch (special_function->special_type()) {
+    auto [special_function_ptr, status] = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    if (status.ok()) {
+        switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
                     Error<PlannerException>("DISTANCE() needs to be allowed only when there is only KnnScan");
@@ -543,16 +543,16 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         }
 
         String &table_name = bind_context_ptr->table_names_[0];
-        String column_name = special_function->name();
+        String column_name = special_function_ptr->name();
 
         TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
+        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
                                                                                table_name,
                                                                                bind_context_ptr->table_name2table_index_[table_name],
                                                                                column_name,
-                                                                               table_entry->ColumnCount() + special_function->extra_idx(),
+                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
                                                                                depth,
-                                                                               special_function->special_type());
+                                                                               special_function_ptr->special_type());
         return bound_column_expr;
     } else {
         return None;

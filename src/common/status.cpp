@@ -181,6 +181,14 @@ Status Status::ReadOnlySysVar(const String &sys_var) {
     return Status(ErrorCode::kSystemVarReadOnly, MakeUnique<String>(fmt::format("{} is read-only", sys_var)));
 }
 
+Status Status::FunctionNotFound(const String &function_name) {
+    return Status(ErrorCode::kFunctionNotFound, MakeUnique<String>(fmt::format("{} not found", function_name)));
+}
+
+Status Status::SpecialFunctionNotFound() {
+    return Status(ErrorCode::kSpecialFunctionNotFound);
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
@@ -220,6 +228,10 @@ Status Status::QueryCancelled(const String &query_text) {
 
 Status Status::QueryNotSupported(const String &query_text, const String &detailed_reason) {
     return Status(ErrorCode::kQueryNotSupported, MakeUnique<String>(fmt::format("Query: {} isn't supported, {}", query_text, detailed_reason)));
+}
+
+Status Status::ClientClose() {
+    return Status(ErrorCode::kClientClose);
 }
 
 // 7. System error

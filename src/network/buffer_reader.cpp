@@ -24,7 +24,8 @@ import ring_buffer_iterator;
 
 import infinity_exception;
 import default_values;
-import infinity_exception;
+import status;
+import logger;
 
 module buffer_reader;
 
@@ -133,7 +134,7 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
 
     if (null_terminator == NullTerminator::kYes) {
         if (result.back() != NULL_END) {
-            Error<NetworkException>("Last character isn't null.");
+            UnrecoverableError("Last character isn't null.");
         }
         result.pop_back();
     }
@@ -168,8 +169,13 @@ void BufferReader::receive_more(SizeT bytes) {
             boost_error);
     }
 
-    if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_read == 0) {
+    if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset) {
         UnrecoverableError(fmt::format("Client close the connection: {}", boost_error.message()));
+    }
+
+    if(bytes_read == 0) {
+        LOG_TRACE("Client is disconnected.");
+        RecoverableError(Status::ClientClose());
     }
 
     if (boost_error) {

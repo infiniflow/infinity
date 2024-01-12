@@ -72,6 +72,8 @@ export enum class ErrorCode : long {
     kNoSuchSystemVar = 3027,
     kInvalidSystemVarValue = 3028,
     kSystemVarReadOnly = 3029,
+    kFunctionNotFound = 3030,
+    kSpecialFunctionNotFound = 3031,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -87,6 +89,7 @@ export enum class ErrorCode : long {
     // 6. Query intervention
     kQueryCancelled = 6001,
     kQueryNotSupported = 6002,
+    kClientClose = 6003,
 
     // 7. System error
     kIOError = 7001,
@@ -136,6 +139,8 @@ public:
     static Status NoSysVar(const String &variable_name);
     static Status SetInvalidVarValue(const String &variable_name, const String &valid_value_range);
     static Status ReadOnlySysVar(const String &sys_var);
+    static Status FunctionNotFound(const String &function_name);
+    static Status SpecialFunctionNotFound();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -151,6 +156,7 @@ public:
     // 6. Operation intervention
     static Status QueryCancelled(const String &query_text);
     static Status QueryNotSupported(const String &query_text, const String& detailed_reason);
+    static Status ClientClose();
 
     // 7. System error
     static Status IOError(const String &detailed_info);

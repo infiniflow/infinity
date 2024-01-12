@@ -143,11 +143,11 @@ public:
 
     // Index Related methods
     Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
-                                                               const SharedPtr<IndexDef> &index_def,
-                                                               ConflictType conflict_type,
-                                                               u64 txn_id,
-                                                               TxnTimeStamp begin_ts,
-                                                               TxnManager *txn_mgr,
+                                                 const SharedPtr<IndexDef> &index_def,
+                                                 ConflictType conflict_type,
+                                                 u64 txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
@@ -200,8 +200,6 @@ public:
 
     static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    static void DeleteFunctionSet(NewCatalog *catalog, String function_name);
-
     // Table Function related methods
     static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
 
@@ -209,9 +207,7 @@ public:
 
     static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
-    static SharedPtr<SpecialFunction> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
-
-    static void DeleteTableFunction(NewCatalog *catalog, String function_name);
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 
 public:
     // Serialization and Deserialization

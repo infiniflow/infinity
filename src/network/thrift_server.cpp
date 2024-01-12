@@ -118,7 +118,7 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         CreateTableOptions create_table_opts;
         if (database == nullptr) {
-            Error<NetworkException>("Database is null");
+            UnrecoverableError("Database is null");
         }
 
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
@@ -182,8 +182,9 @@ public:
                 return CopyFileType::kJSON;
             case infinity_thrift_rpc::CopyFileType::FVECS:
                 return CopyFileType::kFVECS;
-            default:
-                Error<NetworkException>("Not implemented copy file type");
+            default: {
+                UnrecoverableError("Not implemented copy file type");
+            }
         }
     }
 
@@ -243,7 +244,7 @@ public:
                          SharedPtr<TableDef> table_def,
                          Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
         if (column_count != all_column_vectors.size()) {
-            Error<NetworkException>("Column count not match");
+            UnrecoverableError("Column count not match");
         }
         for (SizeT col_index = 0; col_index < column_count; ++col_index) {
             auto column_def = table_def->columns()[col_index];
@@ -300,7 +301,7 @@ public:
         }
 
         if (current_offset != (i32)all_size) {
-            Error<NetworkException>("Varchar data size not match");
+            UnrecoverableError("Varchar data size not match");
         }
 
         output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -342,7 +343,7 @@ public:
 
         // select list
         if (request.__isset.select_list == false) {
-            Error<NetworkException>("Select list is empty");
+            UnrecoverableError("Select list is empty");
         }
 
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
@@ -449,8 +450,9 @@ public:
                             HandleRowIDType(output_column_field, row_count, result_column_vector);
                             break;
                         }
-                        default:
-                            Error<NetworkException>("Not implemented data type");
+                        default: {
+                            UnrecoverableError("Not implemented data type");
+                        }
                     }
                 }
             }
@@ -662,7 +664,7 @@ private:
         infinity_session_map_mutex_.unlock();
 
         if(iter == infinity_session_map_.end()) {
-            Error<NetworkException>("session id not found");
+            UnrecoverableError(fmt::format("session id: {} is not found", session_id));
         }
 
         return iter->second.get();
