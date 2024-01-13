@@ -155,6 +155,8 @@ using std::ios;
 
 using std::align;
 
+using std::ptrdiff_t;
+
 using std::static_pointer_cast;
 using std::dynamic_pointer_cast;
 
@@ -182,8 +184,8 @@ export {
     template <typename T, std::size_t N>
     using Array = std::array<T, N>;
 
-    template <typename T>
-    using Vector = std::vector<T>;
+    template <typename T, typename Allocator = std::allocator<T>>
+    using Vector = std::vector<T, Allocator>;
 
     template <typename T>
     using Deque = std::deque<T>;
