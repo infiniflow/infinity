@@ -16,12 +16,13 @@ module;
 
 #include <string>
 
+module explain_ast;
+
 import stl;
 import parser;
-
+import status;
 import infinity_exception;
 
-module explain_ast;
 
 namespace infinity {
 
@@ -66,7 +67,7 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
             break;
         }
         default: {
-            Error<PlannerException>("Unexpected statement type");
+            UnrecoverableError("Unexpected statement type");
         }
     }
     return;
@@ -76,7 +77,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            Error<PlannerException>("Invalid DDL type.");
+            UnrecoverableError("Invalid DDL type.");
         }
         case DDLType::kSchema: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
@@ -104,7 +105,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
-                Error<PlannerException>("Table definition without any columns");
+                UnrecoverableError("Table definition without any columns");
             }
 
             for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -157,7 +158,7 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
     String values = String(intent_size, ' ') + "values: ";
     SizeT value_count = insert_statement->values_->size();
     if (value_count == 0) {
-        Error<PlannerException>("Insert value list is empty");
+        UnrecoverableError("Insert value list is empty");
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
         if (idx != 0)
@@ -180,7 +181,7 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
 void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            Error<PlannerException>("Invalid DDL type.");
+            UnrecoverableError("Invalid DDL type.");
         }
         case DDLType::kSchema: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
@@ -262,7 +263,7 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
-            Error<PlannerException>("No select list");
+            UnrecoverableError("No select list");
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->select_list_->at(idx);
@@ -364,7 +365,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (cross_product_ref->alias_ != nullptr) {
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
                 if (cross_product_ref->alias_->column_alias_array_ != nullptr) {
-                    Error<PlannerException>("Table reference has columns alias");
+                    Status::SyntaxError("Table reference has columns alias");
                 }
             } else {
                 from_str += ": ";
@@ -384,7 +385,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (join_reference->alias_ != nullptr) {
                 from_str += " AS " + String(join_reference->alias_->alias_);
                 if (join_reference->alias_->column_alias_array_ != nullptr) {
-                    Error<PlannerException>("Table reference has columns alias");
+                    Status::SyntaxError("Table reference has columns alias");
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -404,7 +405,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (table_reference->alias_ != nullptr) {
                 from_str += " AS " + String(table_reference->alias_->alias_);
                 if (table_reference->alias_->column_alias_array_ != nullptr) {
-                    Error<PlannerException>("Table reference has columns alias");
+                    Status::SyntaxError("Table reference has columns alias");
                 }
             }
             result->emplace_back(MakeShared<String>(from_str));
@@ -416,7 +417,7 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
             if (subquery_reference->alias_ != nullptr) {
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
                 if (subquery_reference->alias_->column_alias_array_ != nullptr) {
-                    Error<PlannerException>("Table reference has columns alias");
+                    Status::SyntaxError("Table reference has columns alias");
                 }
             } else {
                 from_str += ": ";
@@ -446,11 +447,11 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
         case ShowStmtType::kCollections: {
-            Error<PlannerException>("Show collections");
+            Status::NotSupport("Show collections");
             break;
         }
         case ShowStmtType::kViews: {
-            Error<PlannerException>("Show views");
+            Status::NotSupport("Show views");
             break;
         }
         case ShowStmtType::kTables: {

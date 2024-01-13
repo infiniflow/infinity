@@ -124,7 +124,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kInvalidStmt: {
-            Error<PlannerException>("Invalid statement type.");
+            UnrecoverableError("Invalid statement type.");
             break;
         }
     }
@@ -155,17 +155,17 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // Get table name
     if (table_name.empty()) {
-        Error<PlannerException>("Insert statement missing table table_name.");
+        UnrecoverableError("Insert statement missing table table_name.");
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
     auto [table_entry, status] = txn->GetTableByName(schema_name, table_name);
     if (!status.ok()) {
-        Error<PlannerException>(status.message());
+        RecoverableError(status);
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
-        Error<PlannerException>("Currently, collection isn't supported.");
+        RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
     // Create value list
@@ -194,7 +194,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if (statement->columns_ != nullptr) {
             SizeT statement_column_count = statement->columns_->size();
             if (statement_column_count != value_list.size()) {
-                Error<PlannerException>("INSERT: Target column count and input column count mismatch");
+                UnrecoverableError("INSERT: Target column count and input column count mismatch");
             }
 
             //        Value null_value = Value::MakeNullData();
@@ -232,10 +232,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         } else {
             SizeT table_column_count = table_entry->ColumnCount();
             if (value_list.size() != table_column_count) {
-                Error<PlannerException>(fmt::format("INSERT: Table column count ({}) and "
-                                                    "input value count mismatch ({})",
-                                                    table_column_count,
-                                                    value_list.size()));
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 table_column_count,
+                                                                 value_list.size())));
             }
 
             // Create value list with table column size and null value
@@ -273,7 +273,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 }
 
 Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<BindContext> &) {
-    Error<PlannerException>("Not supported");
+    RecoverableError(Status::NotSupport("Not supported"));
     return Status();
 }
 
@@ -310,7 +310,7 @@ Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<B
             return BuildCreateSchema(statement, bind_context_ptr);
         }
         default: {
-            Error<PlannerException>("Not supported");
+            UnrecoverableError("Not supported");
         }
     }
     return Status();
@@ -414,7 +414,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     } else {
         // Specify the view column
         if (column_count != bound_statement_ptr->names_ptr_->size()) {
-            Error<PlannerException>("Create view column count isn't matched.");
+            UnrecoverableError("Create view column count isn't matched.");
         }
         columns_ptr = MakeShared<Vector<String>>(*(create_view_info->view_columns_));
     }
@@ -445,7 +445,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
     if (table_name->empty()) {
-        Error<PlannerException>("No index name.");
+        RecoverableError(Status::InvalidIndexName("No index name."));
     }
     //    if (create_index_info->column_names_->size() != 1) {
     //        Error<NotImplementException>("Creating index only support single column now.");
@@ -457,7 +457,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
     index_def_ptr->index_array_.reserve(index_info_list.size());
     if (index_info_list.empty()) {
-        Error<PlannerException>("No index info.");
+        RecoverableError(Status::SyntaxError("No index info."));
     }
 
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
@@ -466,8 +466,9 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
 
     if (index_name_map.contains(*index_name)) {
-        if (create_index_info->conflict_type_ == ConflictType::kError)
-            Error<PlannerException>(fmt::format("Duplicated index name: {}", *index_name));
+        if (create_index_info->conflict_type_ == ConflictType::kError) {
+            RecoverableError(Status::DuplicateIndex(fmt::format("Duplicated index name: {}", *index_name)));
+        }
     }
 
     for (IndexInfo *index_info : index_info_list) {
@@ -492,7 +493,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
                 break;
             }
             case IndexType::kInvalid: {
-                Error<PlannerException>("Invalid index type.");
+                UnrecoverableError("Invalid index type.");
                 break;
             }
         }
@@ -526,7 +527,7 @@ Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindC
             return BuildDropView(statement, bind_context_ptr);
         }
         case DDLType::kInvalid: {
-            Error<PlannerException>("Invalid drop statement type.");
+            UnrecoverableError("Invalid drop statement type.");
         }
     }
     return Status();
@@ -576,7 +577,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
     if (IsEqual(drop_schema_info->schema_name_, query_context_ptr_->schema_name())) {
-        Error<PlannerException>(fmt::format("Can't drop using database: {}", drop_schema_info->schema_name_));
+        RecoverableError(Status::DroppingUsingDb(drop_schema_info->schema_name_));
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(drop_schema_info->schema_name_);
@@ -625,12 +626,12 @@ Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildPrepare(const PrepareStatement *, SharedPtr<BindContext> &) {
-    Error<PlannerException>("Prepare statement isn't supported.");
+    RecoverableError(Status::NotSupport("Prepare statement isn't supported."));
     return Status::OK();
 }
 
 Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindContext> &) {
-    Error<PlannerException>("Execute statement isn't supported.");
+    RecoverableError(Status::NotSupport("Execute statement isn't supported."));
     return Status::OK();
 }
 
@@ -650,7 +651,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
-        Error<PlannerException>(status.message());
+        RecoverableError(status);
     }
 
     // Check the file existence
@@ -658,7 +659,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Error<PlannerException>(fmt::format("File: {} doesn't exist.", statement->file_path_));
+        RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -678,7 +679,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     Txn *txn = query_context_ptr_->GetTxn();
     auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
-        Error<PlannerException>(status.message());
+        RecoverableError(status);
     }
 
     // Check the file existence
@@ -686,7 +687,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 
     String to_write_path;
     if (!fs.Exists(statement->file_path_)) {
-        Error<PlannerException>(fmt::format("File: {} doesn't exist.", fs.GetAbsolutePath(statement->file_path_)));
+        RecoverableError(Status::FileNotFound(statement->file_path_));
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -701,7 +702,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
 }
 
 Status LogicalPlanner::BuildAlter(const AlterStatement *, SharedPtr<BindContext> &) {
-    Error<PlannerException>("Alter statement isn't supported.");
+    RecoverableError(Status::NotSupport("Alter statement isn't supported."));
     return Status::OK();
 }
 
@@ -718,7 +719,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 
                 this->logical_plan_ = logical_command;
             } else {
-                Error<PlannerException>(fmt::format("Unknown database name:{}.", use_command_info->db_name()));
+                RecoverableError(status);
             }
             break;
         }
@@ -745,12 +746,12 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 
                 this->logical_plan_ = logical_command;
             } else {
-                Error<PlannerException>("Invalid command type.");
+                UnrecoverableError(*status.msg_);
             }
             break;
         }
         default: {
-            Error<PlannerException>("Invalid command type.");
+            UnrecoverableError("Invalid command type.");
         }
     }
     return Status();
@@ -790,7 +791,7 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
             return BuildShowGlobalStatus(statement, bind_context_ptr);
         }
         default: {
-            Error<PlannerException>("Unexpected show statement type.");
+            UnrecoverableError("Unexpected show statement type.");
         }
     }
     return Status();

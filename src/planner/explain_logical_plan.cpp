@@ -197,7 +197,7 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         case LogicalNodeType::kPrepare:
             break;
         default: {
-            Error<PlannerException>("Unexpected logical node type");
+            UnrecoverableError("Unexpected logical node type");
         }
     }
     if (statement->left_node().get() != nullptr) {
@@ -269,7 +269,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
     {
         SizeT column_count = create_node->table_definitions()->column_count();
         if (column_count == 0) {
-            Error<PlannerException>("No columns in the table");
+            UnrecoverableError("No columns in the table");
         }
         const Vector<SharedPtr<ColumnDef>> &columns = create_node->table_definitions()->columns();
 
@@ -401,7 +401,7 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
     {
         SizeT column_count = create_node->names_ptr()->size();
         if (column_count == 0) {
-            Error<PlannerException>("No columns in the table");
+            UnrecoverableError("No columns in the table");
         }
         String columns_str;
         columns_str.append(String(intent_size, ' ')).append(" - columns: [");
@@ -612,7 +612,7 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
         insert_str = " - values ";
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
-            Error<PlannerException>("No value list in insert statement");
+            UnrecoverableError("No value list in insert statement");
         }
         for (SizeT idx = 0; idx < value_count; ++idx) {
             if (idx != 0)
@@ -670,7 +670,7 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
         expression_str.append(String(intent_size, ' ')).append(" - expressions: [");
         SizeT expr_count = project_node->expressions_.size();
         if (expr_count == 0) {
-            Error<PlannerException>("No expression list in projection node.");
+            UnrecoverableError("No expression list in projection node.");
         }
         for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
             Explain(project_node->expressions_[idx].get(), expression_str);
@@ -751,7 +751,7 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     output_columns += " - output columns: [";
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
+        UnrecoverableError(fmt::format("No column in table: {}.", table_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += table_scan_node->GetOutputNames()->at(idx);
@@ -834,7 +834,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     output_columns += " - output columns: [";
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
-        Error<PlannerException>(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
+        UnrecoverableError(fmt::format("No column in table: {}.", knn_scan_node->TableAlias()));
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
         output_columns += knn_scan_node->GetOutputNames()->at(idx);
@@ -849,7 +849,7 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
     SizeT groups_count = aggregate_node->groups_.size();
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregate_node == 0) {
-        Error<PlannerException>("Both groups and aggregates are empty.");
+        UnrecoverableError("Both groups and aggregates are empty.");
     }
 
     {
@@ -931,7 +931,7 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         sort_expression_str += " - expressions: [";
         SizeT order_by_count = sort_node->expressions_.size();
         if (order_by_count == 0) {
-            Error<PlannerException>("ORDER BY without any expression.");
+            UnrecoverableError("ORDER BY without any expression.");
         }
 
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
@@ -1061,7 +1061,7 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
 
         SizeT conditions_count = join_node->conditions_.size();
         if (conditions_count == 0) {
-            Error<PlannerException>("JOIN without any condition.");
+            UnrecoverableError("JOIN without any condition.");
         }
 
         for (SizeT idx = 0; idx < conditions_count - 1; ++idx) {
@@ -1304,7 +1304,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
             if (aggregate_expression->arguments().size() != 1) {
-                Error<PlannerException>("More than one argument in aggregate function");
+                UnrecoverableError("More than one argument in aggregate function");
             }
             expr_str += aggregate_expression->aggregate_function_.name();
             expr_str += "(";
@@ -1315,7 +1315,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kCast: {
             CastExpression *cast_expression = (CastExpression *)base_expression;
             if (cast_expression->arguments().size() != 1) {
-                Error<PlannerException>("More than one argument in cast function");
+                UnrecoverableError("More than one argument in cast function");
             }
             expr_str += "CAST(";
             Explain(cast_expression->arguments()[0].get(), expr_str);
@@ -1397,7 +1397,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kBetween: {
             BetweenExpression *between_expression = (BetweenExpression *)base_expression;
             if (between_expression->arguments().size() != 3) {
-                Error<PlannerException>("Between expression should have three arguments.");
+                UnrecoverableError("Between expression should have three arguments.");
             }
             Explain(between_expression->arguments()[0].get(), expr_str);
             expr_str += " BETWEEN ";
@@ -1435,7 +1435,7 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kCorrelatedColumn:
 
         default: {
-            Error<PlannerException>("Unsupported expression type");
+            UnrecoverableError("Unsupported expression type");
         }
     }
 }
@@ -1505,7 +1505,7 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
     }
 
     if (import_node->left_node().get() != nullptr or import_node->right_node().get() != nullptr) {
-        Error<PlannerException>("Import node have children nodes.");
+        UnrecoverableError("Import node have children nodes.");
     }
 }
 
@@ -1572,7 +1572,7 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
     }
 
     if (export_node->left_node().get() != nullptr or export_node->right_node().get() != nullptr) {
-        Error<PlannerException>("EXPORT node have children nodes.");
+        UnrecoverableError("EXPORT node have children nodes.");
     }
 }
 

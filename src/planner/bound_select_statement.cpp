@@ -105,7 +105,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
-                Error<PlannerException>("Unknown error on order by expression");
+                UnrecoverableError("Unknown error on order by expression");
             }
 
             if (limit_expression_.get() == nullptr) {
@@ -143,16 +143,16 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         SharedPtr<LogicalNode> root = nullptr;
         SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size();
         if (num_children <= 0) {
-            Error<PlannerException>("SEARCH shall have at least one MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at least one MATCH or KNN expression");
         } else if (num_children >= 3) {
-            Error<PlannerException>("SEARCH shall have at max two MATCH or KNN expression");
+            UnrecoverableError("SEARCH shall have at max two MATCH or KNN expression");
         }
 
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(search_expr_->match_exprs_.size());
         for (auto &match_expr : search_expr_->match_exprs_) {
             if (table_ref_ptr_->type() != TableRefType::kTable) {
-                Error<PlannerException>("Not base table reference");
+                UnrecoverableError("Not base table reference");
             }
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             SharedPtr<LogicalNode> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
@@ -162,7 +162,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         bind_context->GenerateTableIndex();
         for (auto &knn_expr : search_expr_->knn_exprs_) {
             if (table_ref_ptr_->type() != TableRefType::kTable) {
-                Error<PlannerException>("Not base table reference");
+                UnrecoverableError("Not base table reference");
             }
             SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
             // FIXME: need check if there is subquery inside the where conditions
@@ -195,15 +195,15 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
-        Error<PlannerException>("Attempt to do KNN scan without table");
+        UnrecoverableError("Attempt to do KNN scan without table");
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            Error<PlannerException>("KNN is not supported on CROSS PRODUCT relation, now.");
+            UnrecoverableError("KNN is not supported on CROSS PRODUCT relation, now.");
             break;
         }
         case TableRefType::kJoin: {
-            Error<PlannerException>("KNN is not supported on JOIN relation, now.");
+            UnrecoverableError("KNN is not supported on JOIN relation, now.");
         }
         case TableRefType::kTable: {
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
@@ -216,11 +216,11 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            Error<PlannerException>("KNN is not supported on a SUBQUERY, now.");
+            UnrecoverableError("KNN is not supported on a SUBQUERY, now.");
             break;
         }
         default: {
-            Error<PlannerException>("Unexpected table type");
+            UnrecoverableError("Unexpected table type");
         }
     }
 
@@ -247,7 +247,7 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
             default: {
-                Error<PlannerException>("Unknown table reference type.");
+                UnrecoverableError("Unknown table reference type.");
             }
         }
     } else {
@@ -348,7 +348,7 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            Error<PlannerException>("Nested subquery detected");
+            UnrecoverableError("Nested subquery detected");
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

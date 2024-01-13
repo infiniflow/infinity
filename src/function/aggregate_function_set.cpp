@@ -59,7 +59,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str());
+        UnrecoverableError(ss.str());
     }
 
     if (candidates_index.size() > 1) {
@@ -70,7 +70,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        Error<PlannerException>(ss.str());
+        UnrecoverableError(ss.str());
     }
 
     return functions_[candidates_index[0]];

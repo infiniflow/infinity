@@ -74,6 +74,9 @@ export enum class ErrorCode : long {
     kSystemVarReadOnly = 3029,
     kFunctionNotFound = 3030,
     kSpecialFunctionNotFound = 3031,
+    kNotSupported = 3032,
+    kDroppingUsingDb = 3033,
+    kSessionNotFound = 3034,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -122,7 +125,7 @@ public:
     static Status DataTypeMismatch(const String &type1, const String &type2);
     static Status NameTooLong(const String &name, const String &object_type);
     static Status ReservedName(const String &name);
-    static Status SyntaxError(const String &query_text);
+    static Status SyntaxError(const String &detailed);
     static Status InvalidParameterValue(const String &parameter_name, const String &parameter_value, const String &recommend_value);
     static Status DuplicateUserName(const String &user_name);
     static Status DuplicateDatabase(const String &db_name);
@@ -141,6 +144,9 @@ public:
     static Status ReadOnlySysVar(const String &sys_var);
     static Status FunctionNotFound(const String &function_name);
     static Status SpecialFunctionNotFound();
+    static Status NotSupport(const String& detailed);
+    static Status DroppingUsingDb(const String& db_name);
+    static Status SessionNotFound(i64 session_id);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

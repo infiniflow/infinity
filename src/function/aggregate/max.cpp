@@ -14,16 +14,16 @@
 
 module;
 
+module max;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
 import parser;
 import third_party;
-
-module max;
 
 namespace infinity {
 
@@ -32,7 +32,7 @@ struct MaxState {
 public:
     ValueType value_;
 
-    void Initialize() { Error<NotImplementException>("Not implemented"); }
+    void Initialize() { RecoverableError(Status::NotSupport("Not implemented")); }
 
     void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
 

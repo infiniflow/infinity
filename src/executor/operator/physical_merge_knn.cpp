@@ -14,6 +14,8 @@
 
 module;
 
+module physical_merge_knn;
+
 import stl;
 import txn;
 import query_context;
@@ -21,7 +23,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import logger;
-
+import status;
 import infinity_exception;
 import merge_knn_data;
 import knn_result_handler;
@@ -35,8 +37,6 @@ import default_values;
 import data_block;
 import knn_expression;
 import value;
-
-module physical_merge_knn;
 
 namespace infinity {
 
@@ -75,7 +75,7 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     return true;
@@ -147,7 +147,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                         output_data_block->AppendValueByPtr(i, ptr);
                     } else {
                         if (column_type->type() != LogicalType::kVarchar) {
-                            Error<NotImplementException>("Not implement complex type reading from column buffer.");
+                            RecoverableError(Status::NotSupport("Not implement complex type reading from column buffer."));
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
                         Value value = Value::MakeVarchar(varchar_ptr, data_size);

@@ -13,6 +13,8 @@
 // limitations under the License.
 module;
 
+module physical_source;
+
 import stl;
 import txn;
 import query_context;
@@ -23,10 +25,8 @@ import physical_operator_type;
 import operator_state;
 import data_block;
 import fragment_data;
-
+import status;
 import infinity_exception;
-
-module physical_source;
 
 namespace infinity {
 
@@ -51,7 +51,7 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             return queue_source_state->GetData();
         }
         default: {
-            Error<NotImplementException>("Not support source state type");
+            RecoverableError(Status::NotSupport("Not support source state type"));
         }
     }
     return true;

@@ -33,6 +33,7 @@ import expression_evaluator;
 import default_values;
 import expression_type;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -268,8 +269,8 @@ inline StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFu
             return PhysicalTopCompareSingleValue<compare_order, RowID>::compare;
         }
         default: {
-            Error<NotImplementException>(
-                fmt::format("LogicalType number {} not implemented.", static_cast<std::underlying_type_t<LogicalType>>(switch_type)));
+            RecoverableError(Status::NotSupport(
+                fmt::format("LogicalType number {} not implemented.", static_cast<std::underlying_type_t<LogicalType>>(switch_type))));
         }
     }
 }
@@ -283,8 +284,8 @@ StdFunction<OrderBySingleResult(void *, u32, void *, u32)> GenerateSortFunction(
             return GenerateSortFunctionTemplate<OrderType::kDesc>(sort_expression);
         }
         default: {
-            Error<NotImplementException>(
-                fmt::format("OrderType number {} not implemented.", static_cast<std::underlying_type_t<OrderType>>(compare_order)));
+            RecoverableError(Status::NotSupport(
+                fmt::format("OrderType number {} not implemented.", static_cast<std::underlying_type_t<OrderType>>(compare_order))));
         }
     }
 }

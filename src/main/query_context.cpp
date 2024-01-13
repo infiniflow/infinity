@@ -83,11 +83,11 @@ QueryResult QueryContext::Query(const String &query) {
 
     if (parsed_result->IsError()) {
         StopProfile(QueryPhase::kParser);
-        Error<PlannerException>(parsed_result->error_message_);
+        UnrecoverableError(parsed_result->error_message_);
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
-        Error<PlannerException>("Only support single statement.");
+        UnrecoverableError("Only support single statement.");
     }
     StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
@@ -117,7 +117,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto state = logical_planner_->Build(statement, bind_context);
         // FIXME
         if (!state.ok()) {
-            Error<PlannerException>(state.message());
+            UnrecoverableError(state.message());
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();

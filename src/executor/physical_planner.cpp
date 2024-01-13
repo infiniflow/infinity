@@ -118,7 +118,7 @@ import value;
 import value_expression;
 import explain_physical_plan;
 import third_party;
-
+import status;
 import infinity_exception;
 
 namespace infinity {
@@ -286,7 +286,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
         default: {
-            Error<PlannerException>(fmt::format("Unknown logical node type: {}", logical_operator->name()));
+            UnrecoverableError(fmt::format("Unknown logical node type: {}", logical_operator->name()));
             //            result = MakeShared<PhysicalDummyOperator>(numeric_limits<uint64_t>::max());
         }
     }
@@ -457,10 +457,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<LogicalNode> &logical_operator) const {
     if (logical_operator->left_node().get() == nullptr) {
-        Error<PlannerException>("Logical delete node has no input node.");
+        UnrecoverableError("Logical delete node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Logical delete node shouldn't have right child.");
+        UnrecoverableError("Logical delete node shouldn't have right child.");
     }
     SharedPtr<LogicalDelete> logical_delete = dynamic_pointer_cast<LogicalDelete>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
@@ -474,10 +474,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<LogicalNode> &logical_operator) const {
     if (logical_operator->left_node().get() == nullptr) {
-        Error<PlannerException>("Logical update node has no input node.");
+        UnrecoverableError("Logical update node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Logical update node shouldn't have right child.");
+        UnrecoverableError("Logical update node shouldn't have right child.");
     }
     SharedPtr<LogicalUpdate> logical_update = dynamic_pointer_cast<LogicalUpdate>(logical_operator);
     auto input_logical_node = logical_operator->left_node();
@@ -523,7 +523,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Aggregate project node shouldn't have right child.");
+        UnrecoverableError("Aggregate project node shouldn't have right child.");
     }
     SharedPtr<LogicalAggregate> logical_aggregate = static_pointer_cast<LogicalAggregate>(logical_operator);
     UniquePtr<PhysicalOperator> input_physical_operator{};
@@ -559,10 +559,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildJoin(const SharedPtr<LogicalNo
     auto right_node = logical_operator->right_node();
 
     if (left_node.get() == nullptr) {
-        Error<PlannerException>("Join node has no left child.");
+        UnrecoverableError("Join node has no left child.");
     }
     if (right_node.get() == nullptr) {
-        Error<PlannerException>("Join node has no right child.");
+        UnrecoverableError("Join node has no right child.");
     }
 
     SharedPtr<LogicalJoin> logical_join = static_pointer_cast<LogicalJoin>(logical_operator);
@@ -587,10 +587,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCrossProduct(const SharedPtr<L
     auto right_node = logical_operator->right_node();
 
     if (left_node.get() == nullptr) {
-        Error<PlannerException>("Cross product node has no left child.");
+        UnrecoverableError("Cross product node has no left child.");
     }
     if (right_node.get() == nullptr) {
-        Error<PlannerException>("Cross product node has no right child.");
+        UnrecoverableError("Cross product node has no right child.");
     }
 
     SharedPtr<LogicalCrossProduct> logical_cross_product = static_pointer_cast<LogicalCrossProduct>(logical_operator);
@@ -611,10 +611,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildSort(const SharedPtr<LogicalNo
     auto input_logical_node = logical_operator->left_node();
 
     if (input_logical_node.get() == nullptr) {
-        Error<PlannerException>("Sort node has no input node.");
+        UnrecoverableError("Sort node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Sort node shouldn't have right child.");
+        UnrecoverableError("Sort node shouldn't have right child.");
     }
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
@@ -632,10 +632,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
     auto input_logical_node = logical_operator->left_node();
 
     if (input_logical_node.get() == nullptr) {
-        Error<PlannerException>("Limit node has no input node.");
+        UnrecoverableError("Limit node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Limit node shouldn't have right child.");
+        UnrecoverableError("Limit node shouldn't have right child.");
     }
 
     SharedPtr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
@@ -668,11 +668,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNode> &logical_operator) const {
     auto logical_operator_top = static_cast<LogicalTop *>(logical_operator.get());
     if (logical_operator_top->right_node()) {
-        Error<PlannerException>("Top node shouldn't have right child.");
+        UnrecoverableError("Top node shouldn't have right child.");
     }
     auto &input_logical_node = logical_operator_top->left_node();
     if (!input_logical_node) {
-        Error<PlannerException>("Top node has no input node.");
+        UnrecoverableError("Top node has no input node.");
     }
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
     i64 merge_offset{};
@@ -682,13 +682,13 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
         merge_limit += merge_offset;
     }
     if (merge_offset < 0 or merge_limit <= merge_offset) {
-        Error<PlannerException>("Limit <= 0 or offset < 0");
+        RecoverableError(Status::SyntaxError("Limit <= 0 or offset < 0"));
     }
     if (merge_offset >= std::numeric_limits<u32>::max()) {
-        Error<PlannerException>("Offset is too large");
+        RecoverableError(Status::SyntaxError("Offset is too large"));
     }
     if (merge_limit >= std::numeric_limits<u32>::max()) {
-        Error<PlannerException>("Limit is too large");
+        RecoverableError(Status::SyntaxError("Limit is too large"));
     }
     if (input_physical_operator->TaskletCount() <= 1) {
         // only Top
@@ -722,7 +722,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Logical project node shouldn't have right child.");
+        UnrecoverableError("Logical project node shouldn't have right child.");
     }
     SharedPtr<LogicalProject> logical_project = static_pointer_cast<LogicalProject>(logical_operator);
     UniquePtr<PhysicalOperator> input_physical_operator{};
@@ -739,10 +739,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<Log
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {
     auto input_logical_node = logical_operator->left_node();
     if (input_logical_node.get() == nullptr) {
-        Error<PlannerException>("Logical filter node has no input node.");
+        UnrecoverableError("Logical filter node has no input node.");
     }
     if (logical_operator->right_node().get() != nullptr) {
-        Error<PlannerException>("Logical filter node shouldn't have right child.");
+        UnrecoverableError("Logical filter node shouldn't have right child.");
     }
 
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
@@ -788,7 +788,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<Logi
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {
-    Error<NotImplementException>("BuildViewScan");
+    RecoverableError(Status::NotSupport("BuildViewScan"));
     return nullptr;
 }
 

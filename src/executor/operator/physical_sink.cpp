@@ -15,6 +15,9 @@
 module;
 
 #include <string>
+
+module physical_sink;
+
 import stl;
 import query_context;
 import parser;
@@ -24,11 +27,9 @@ import fragment_context;
 import third_party;
 import fragment_data;
 import data_block;
-
+import status;
 import infinity_exception;
 import logger;
-
-module physical_sink;
 
 namespace infinity {
 
@@ -161,7 +162,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
             break;
         }
         default: {
-            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_)));
+            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_op_state->operator_type_))));
         }
     }
 }
@@ -340,7 +341,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             break;
         }
         default: {
-            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
         }
     }
 }
@@ -368,7 +369,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             break;
         }
         default: {
-            Error<NotImplementException>(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_)));
+            RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
             break;
         }
     }

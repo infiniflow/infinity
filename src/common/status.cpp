@@ -58,7 +58,7 @@ void Status::Init(ErrorCode code, const char *msg) {
     code_ = code;
 }
 
-void Status::AppendMessage(const String& msg) {
+void Status::AppendMessage(const String &msg) {
     if (msg_.get() != nullptr) {
         msg_->append(msg);
     } else {
@@ -109,8 +109,8 @@ Status Status::ReservedName(const String &name) {
     return Status(ErrorCode::kReservedName, MakeUnique<String>(fmt::format("{} is a reserved name", name)));
 }
 
-Status Status::SyntaxError(const String &query_text) {
-    return Status(ErrorCode::kSyntaxError, MakeUnique<String>(fmt::format("Invalid syntax: {}", query_text)));
+Status Status::SyntaxError(const String &detailed_info) {
+    return Status(ErrorCode::kSyntaxError, MakeUnique<String>(fmt::format("{}", detailed_info)));
 }
 
 Status Status::InvalidParameterValue(const String &parameter_name, const String &parameter_value, const String &recommend_value) {
@@ -185,8 +185,16 @@ Status Status::FunctionNotFound(const String &function_name) {
     return Status(ErrorCode::kFunctionNotFound, MakeUnique<String>(fmt::format("{} not found", function_name)));
 }
 
-Status Status::SpecialFunctionNotFound() {
-    return Status(ErrorCode::kSpecialFunctionNotFound);
+Status Status::SpecialFunctionNotFound() { return Status(ErrorCode::kSpecialFunctionNotFound); }
+
+Status Status::NotSupport(const String &detailed_info) { return Status(ErrorCode::kNotSupported, MakeUnique<String>(detailed_info)); }
+
+Status Status::DroppingUsingDb(const String &db_name) {
+    return Status(ErrorCode::kDroppingUsingDb, MakeUnique<String>(fmt::format("Can't drop using database: {}", db_name)));
+}
+
+Status Status::SessionNotFound(i64 session_id) {
+    return Status(ErrorCode::kSessionNotFound, MakeUnique<String>(fmt::format("Session id: {} isn't found", session_id)));
 }
 
 // 4. TXN fail
@@ -230,9 +238,7 @@ Status Status::QueryNotSupported(const String &query_text, const String &detaile
     return Status(ErrorCode::kQueryNotSupported, MakeUnique<String>(fmt::format("Query: {} isn't supported, {}", query_text, detailed_reason)));
 }
 
-Status Status::ClientClose() {
-    return Status(ErrorCode::kClientClose);
-}
+Status Status::ClientClose() { return Status(ErrorCode::kClientClose); }
 
 // 7. System error
 Status Status::IOError(const String &detailed_info) {

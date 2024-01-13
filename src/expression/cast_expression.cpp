@@ -36,7 +36,7 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        Error<PlannerException>(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
+        UnrecoverableError(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
     return nullptr;
 }
@@ -45,7 +45,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
     switch (target.type()) {
         case LogicalType::kNull:
         case LogicalType::kInvalid:
-            Error<PlannerException>("Invalid data type");
+            UnrecoverableError("Invalid data type");
         default:;
     }
 
@@ -125,7 +125,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         default: {
-            Error<PlannerException>("Invalid data type");
+            UnrecoverableError("Invalid data type");
         }
     }
     return false;

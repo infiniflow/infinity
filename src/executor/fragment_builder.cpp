@@ -14,6 +14,8 @@
 
 module;
 
+module fragment_builder;
+
 import stl;
 import plan_fragment;
 import physical_operator;
@@ -22,15 +24,13 @@ import physical_sink;
 import physical_source;
 import physical_explain;
 import physical_knn_scan;
-
+import status;
 import infinity_exception;
 import parser;
 import explain_fragment;
 import fragment_context;
 import logger;
 import third_party;
-
-module fragment_builder;
 
 namespace infinity {
 
@@ -50,7 +50,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
     switch (explain_op->explain_type()) {
 
         case ExplainType::kAnalyze: {
-            Error<NotImplementException>("Not implement: Query analyze");
+            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
         }
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
@@ -84,7 +84,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
 void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr) {
     switch (phys_op->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            Error<PlannerException>("Invalid physical operator type\"");
+            UnrecoverableError("Invalid physical operator type");
         }
         case PhysicalOperatorType::kExplain: {
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);

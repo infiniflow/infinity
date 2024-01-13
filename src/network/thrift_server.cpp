@@ -51,6 +51,7 @@ import infinity_context;
 import config;
 import data_block;
 import query_options;
+import status;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -664,7 +665,7 @@ private:
         infinity_session_map_mutex_.unlock();
 
         if(iter == infinity_session_map_.end()) {
-            UnrecoverableError(fmt::format("session id: {} is not found", session_id));
+            RecoverableError(Status::SessionNotFound(session_id));
         }
 
         return iter->second.get();

@@ -14,16 +14,16 @@
 
 module;
 
+module less;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module less;
 
 namespace infinity {
 
@@ -36,7 +36,7 @@ struct LessFunction {
 
 template <>
 inline void LessFunction::Run(VarcharT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: varchar < varchar");
+    RecoverableError(Status::NotSupport("Not implement: varchar < varchar"));
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {
 //            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) < 0);

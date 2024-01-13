@@ -210,7 +210,7 @@ void PhysicalShow::Init() {
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented show type");
+            RecoverableError(Status::NotSupport("Not implemented show type"));
         }
     }
 }
@@ -1405,7 +1405,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                         Error<ExecutorException>("Invalid index method type");
                     }
                     default: {
-                        Error<NotImplementException>("Not implemented");
+                        RecoverableError(Status::NotSupport("Not implemented"));
                         break;
                     }
                 }

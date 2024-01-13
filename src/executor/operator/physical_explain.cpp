@@ -14,6 +14,8 @@
 
 module;
 
+module physical_explain;
+
 import stl;
 import txn;
 import query_context;
@@ -26,10 +28,8 @@ import column_vector;
 import data_block;
 import default_values;
 import value;
-
+import status;
 import infinity_exception;
-
-module physical_explain;
 
 namespace infinity {
 
@@ -53,7 +53,7 @@ void PhysicalExplain::Init() {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
-            Error<NotImplementException>("Not implement: Query analyze");
+            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -99,7 +99,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             title = "Query Analyze";
-            Error<NotImplementException>("Not implement: Query analyze");
+            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";

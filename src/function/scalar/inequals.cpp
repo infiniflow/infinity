@@ -16,16 +16,16 @@ module;
 
 #include <type_traits>
 
+module inequals;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module inequals;
 
 namespace infinity {
 
@@ -58,7 +58,7 @@ inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
                 return;
             }
         } else {
-            Error<NotImplementException>("Column vector varchar can't be compared");
+            RecoverableError(Status::NotSupport("Column vector varchar can't be compared"));
         }
     }
     result = true;
@@ -66,7 +66,7 @@ inline void InEqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <> bigint");
+    RecoverableError(Status::NotSupport("Not implement: mixed <> bigint"));
 }
 
 template <>
@@ -76,7 +76,7 @@ inline void InEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <> double");
+    RecoverableError(Status::NotSupport("Not implement: mixed <> double"));
 }
 
 template <>
@@ -86,7 +86,7 @@ inline void InEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void InEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <> varchar");
+    RecoverableError(Status::NotSupport("Not implement: mixed <> varchar"));
 }
 
 template <>

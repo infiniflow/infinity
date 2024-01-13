@@ -98,17 +98,17 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
 //    explicit NetworkException(Args... params) : Exception(BuildMessage(String("Network Error:"), params...)) {}
 //};
 
-export class PlannerException : public Exception {
-public:
-    template <typename... Args>
-    explicit PlannerException(Args... params) : Exception(BuildMessage(String("Planner Error:"), params...)) {}
-};
+//export class PlannerException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit PlannerException(Args... params) : Exception(BuildMessage(String("Planner Error:"), params...)) {}
+//};
 
-export class OptimizerException : public Exception {
-public:
-    template <typename... Args>
-    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
-};
+//export class OptimizerException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
+//};
 
 export class ExecutorException : public Exception {
 public:
@@ -158,11 +158,11 @@ public:
     explicit ProfilerException(Args... params) : Exception(BuildMessage(String("Profiler Error:"), params...)) {}
 };
 
-export class QueryException : public Exception {
-public:
-    template <typename... Args>
-    explicit QueryException(Args... params) : Exception(BuildMessage(String("Query failed due to: "), params...)) {}
-};
+//export class QueryException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit QueryException(Args... params) : Exception(BuildMessage(String("Query failed due to: "), params...)) {}
+//};
 
 #ifdef INFINITY_DEBUG
 

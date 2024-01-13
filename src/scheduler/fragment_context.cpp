@@ -1037,7 +1037,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
     }
 
     if (tasks_[0]->sink_state_->Error()) {
-        throw QueryException(*tasks_[0]->sink_state_->error_message_);
+        Error<SchedulerException>(*tasks_[0]->sink_state_->error_message_);
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {

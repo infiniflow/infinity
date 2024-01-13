@@ -14,11 +14,11 @@
 
 module;
 
-import stl;
-
-import infinity_exception;
-
 module physical_operator_type;
+
+import stl;
+import status;
+import infinity_exception;
 
 namespace infinity {
 String PhysicalOperatorToString(PhysicalOperatorType type) {
@@ -140,6 +140,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateIndexFinish";
     }
 
-    Error<NotImplementException>("Unknown physical operator type");
+    RecoverableError(Status::NotSupport("Unknown physical operator type"));
 }
 } // namespace infinity

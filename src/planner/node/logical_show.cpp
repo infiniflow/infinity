@@ -49,7 +49,7 @@ String ToString(ShowType type) {
         case ShowType::kShowGlobalStatus:
             return "Show global status";
         case ShowType::kInvalid: {
-            Error<PlannerException>("Invalid chunk scan type");
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return {};

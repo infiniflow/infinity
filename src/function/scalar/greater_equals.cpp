@@ -14,16 +14,16 @@
 
 module;
 
+module greater_equals;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module greater_equals;
 
 namespace infinity {
 
@@ -36,7 +36,7 @@ struct GreaterEqualsFunction {
 
 template <>
 inline void GreaterEqualsFunction::Run(VarcharT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: varchar >= varchar");
+    RecoverableError(Status::NotSupport("Not implement: varchar >= varchar"));
 
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {

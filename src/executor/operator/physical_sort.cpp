@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module physical_sort;
+
 import stl;
 import txn;
 import query_context;
@@ -33,8 +35,7 @@ import operator_state;
 import data_block;
 import infinity_exception;
 import third_party;
-
-module physical_sort;
+import status;
 
 namespace infinity {
 
@@ -130,7 +131,7 @@ public:
                     COMPARE(DoubleT)
                 }
                 default: {
-                    Error<NotImplementException>(fmt::format("{} not implemented.", type.type()));
+                    RecoverableError(Status::NotSupport(fmt::format("{} not implemented.", type.type())));
                 }
             }
         }

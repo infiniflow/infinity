@@ -25,6 +25,8 @@ module;
 
 #include <vector>
 
+module physical_import;
+
 import stl;
 import txn;
 import query_context;
@@ -48,8 +50,7 @@ import buffer_handle;
 import catalog;
 import infinity_exception;
 import zsv;
-
-module physical_import;
+import status;
 
 namespace infinity {
 
@@ -112,7 +113,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         Error<ExecutorException>(fmt::format("Read dimension which length isn't {}.", nbytes));
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Error<ExecutorException>(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
@@ -287,7 +289,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) { Error<NotImplementException>("Import JSON is not implemented yet."); }
+void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {
+    RecoverableError(Status::NotSupport("Import JSON is not implemented yet."));
+}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
     ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);

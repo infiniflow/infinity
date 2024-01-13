@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module physical_knn_scan;
+
 import stl;
 import query_context;
 import parser;
@@ -52,7 +54,7 @@ import column_vector;
 import expression_evaluator;
 import expression_state;
 import index_hnsw;
-
+import status;
 import hnsw_alg;
 import plain_store;
 import lvq_store;
@@ -60,8 +62,6 @@ import dist_func_l2;
 import dist_func_ip;
 import knn_expression;
 import value;
-
-module physical_knn_scan;
 
 namespace infinity {
 
@@ -521,7 +521,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         output_block_ptr->AppendValueByPtr(i, ptr);
                     } else {
                         if (column_type->type() != LogicalType::kVarchar) {
-                            Error<NotImplementException>("Not implement complex type reading from column buffer.");
+                            RecoverableError(Status::NotSupport("Not implement complex type reading from column buffer."));
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
                         Value value = Value::MakeVarchar(varchar_ptr, data_size);

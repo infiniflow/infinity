@@ -14,16 +14,16 @@
 
 module;
 
+module greater;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module greater;
 
 namespace infinity {
 
@@ -36,7 +36,7 @@ struct GreaterFunction {
 
 template <>
 inline void GreaterFunction::Run(VarcharT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: varchar > varchar");
+    RecoverableError(Status::NotSupport("Not implement: varchar > varchar"));
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {
 //            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) > 0);
@@ -57,7 +57,7 @@ inline void GreaterFunction::Run(VarcharT, VarcharT, bool &) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed > bigint");
+    RecoverableError(Status::NotSupport("Not implement: mixed > bigint"));
 }
 
 template <>
@@ -67,7 +67,7 @@ inline void GreaterFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed > double");
+    RecoverableError(Status::NotSupport("Not implement: mixed > double"));
 }
 
 template <>
@@ -77,7 +77,7 @@ inline void GreaterFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void GreaterFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed > varchar");
+    RecoverableError(Status::NotSupport("Not implement: mixed > varchar"));
 }
 
 template <>
