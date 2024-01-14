@@ -91,7 +91,7 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
             default:
                 break;
@@ -161,7 +161,7 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
             default:
                 break;

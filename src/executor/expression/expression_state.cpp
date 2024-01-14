@@ -58,10 +58,10 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
         case ExpressionType::kIn:
             return CreateState(static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
-            Error<ExecutorException>("Unexpected expression type: KNN");
+            UnrecoverableError("Unexpected expression type: KNN");
         }
         default: {
-            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expression->Name()));
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expression->Name()));
         }
     }
     return nullptr;

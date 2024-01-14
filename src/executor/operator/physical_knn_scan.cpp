@@ -155,13 +155,13 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Not implemented");
+                    UnrecoverableError("Not implemented");
                 }
             }
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
     return true;
@@ -359,7 +359,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         break;
                     }
                     default: {
-                        Error<ExecutorException>("Not implemented");
+                        UnrecoverableError("Not implemented");
                     }
                 }
                 break;
@@ -390,7 +390,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                         switch (knn_scan_shared_data->knn_distance_type_) {
                             case KnnDistanceType::kInvalid: {
-                                throw ExecutorException("Invalid distance type");
+                                UnrecoverableError("Invalid distance type");
                             }
                             case KnnDistanceType::kL2:
                             case KnnDistanceType::kHamming: {
@@ -427,7 +427,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                Error<ExecutorException>("Not implemented");
+                                UnrecoverableError("Not implemented");
                             }
                         }
                         break;
@@ -445,19 +445,19 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 break;
                             }
                             default: {
-                                Error<ExecutorException>("Not implemented");
+                                UnrecoverableError("Not implemented");
                             }
                         }
                         break;
                     }
                     default: {
-                        Error<ExecutorException>("Not implemented");
+                        UnrecoverableError("Not implemented");
                     }
                 }
                 break;
             }
             default: {
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
         }
     }

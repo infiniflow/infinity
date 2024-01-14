@@ -59,7 +59,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expr->Name()));
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
         }
     }
 }
@@ -119,11 +119,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("Case execution");
+    UnrecoverableError("Case execution");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("Column expression");
+    UnrecoverableError("Column expression");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
@@ -163,10 +163,10 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        Error<ExecutorException>("Input data block is NULL");
+        UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        Error<ExecutorException>("Invalid column index");
+        UnrecoverableError("Invalid column index");
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];

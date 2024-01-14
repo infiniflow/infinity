@@ -41,7 +41,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
             break;
         }
         default: {
-            Error<ExecutorException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
 }

@@ -1294,7 +1294,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             break;
         }
         case ShowType::kInvalid: {
-            Error<ExecutorException>("Invalid show type");
+            UnrecoverableError("Invalid show type");
         }
     }
 }

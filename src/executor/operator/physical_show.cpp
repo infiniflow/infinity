@@ -261,7 +261,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         case ShowType::kInvalid: {
-            Error<ExecutorException>("Invalid chunk scan type");
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return true;
@@ -399,7 +399,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }
@@ -422,7 +422,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }
@@ -445,7 +445,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }

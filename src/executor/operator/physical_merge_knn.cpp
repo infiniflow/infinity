@@ -56,12 +56,12 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid elem type");
+            UnrecoverableError("Invalid elem type");
         }
         case kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
-                    Error<ExecutorException>("Invalid heap type");
+                    UnrecoverableError("Invalid heap type");
                 }
                 case MergeKnnHeapType::kMaxHeap: {
                     ExecuteInner<f32, CompareMax>(query_context, merge_knn_op_state);

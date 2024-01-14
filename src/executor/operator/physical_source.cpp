@@ -38,7 +38,7 @@ bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
-            Error<ExecutorException>("Unsupported source state type.");
+            UnrecoverableError("Unsupported source state type.");
             break;
         }
         case SourceStateType::kKnnScan:

@@ -223,10 +223,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kNull: {
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
             case kMissing: {
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
             case kInvalid: {
                 Error<ExecutorException>("Invalid data type");
@@ -488,13 +488,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
 #endif
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
             case kNull: {
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
             case kMissing: {
-                Error<ExecutorException>("Not implemented");
+                UnrecoverableError("Not implemented");
             }
             case kInvalid: {
                 Error<ExecutorException>("Invalid data type");
@@ -645,13 +645,13 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kNull: {
-            Error<ExecutorException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case kMissing: {
-            Error<ExecutorException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case kInvalid: {
-            Error<ExecutorException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
 }

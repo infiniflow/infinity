@@ -40,7 +40,7 @@ bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, SinkState *sink_state) {
     switch (sink_state->state_type_) {
         case SinkStateType::kInvalid: {
-            Error<ExecutorException>("Invalid sinker type");
+            UnrecoverableError("Invalid sinker type");
             break;
         }
         case SinkStateType::kMaterialize: {
@@ -79,7 +79,7 @@ bool PhysicalSink::Execute(QueryContext *, FragmentContext *fragment_context, Si
 void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *materialize_sink_state, OperatorState *task_op_state) {
     switch (task_op_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            Error<ExecutorException>("Invalid operator");
+            UnrecoverableError("Invalid operator");
         }
         case PhysicalOperatorType::kShow: {
             ShowOperatorState *show_output_state = static_cast<ShowOperatorState *>(task_op_state);
@@ -170,7 +170,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
 void PhysicalSink::FillSinkStateFromLastOperatorState(SummarySinkState *summary_sink_state, OperatorState *task_operator_state) {
     switch (task_operator_state->operator_type_) {
         case PhysicalOperatorType::kInvalid: {
-            Error<ExecutorException>("Invalid operator");
+            UnrecoverableError("Invalid operator");
             break;
         }
         case PhysicalOperatorType::kDelete: {
@@ -195,7 +195,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
     switch (task_operator_state->operator_type_) {
 
         case PhysicalOperatorType::kInvalid: {
-            Error<ExecutorException>("Invalid operator");
+            UnrecoverableError("Invalid operator");
         }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);

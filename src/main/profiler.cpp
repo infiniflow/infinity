@@ -156,7 +156,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Rollback";
         }
         default: {
-            Error<ExecutorException>("Invalid query phase in query profiler");
+            UnrecoverableError("Invalid query phase in query profiler");
         }
     }
     return {};

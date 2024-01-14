@@ -34,7 +34,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
             num_tasks_.erase(it);
         }
     } else {
-        Error<ExecutorException>("Get unexpected data from child fragment");
+        UnrecoverableError("Get unexpected data from child fragment");
     }
 }
 
@@ -75,7 +75,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            Error<ExecutorException>("Not support fragment data type");
+            UnrecoverableError("Not support fragment data type");
             break;
         }
     }
@@ -149,7 +149,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            Error<ExecutorException>("Not support operator type");
+            UnrecoverableError("Not support operator type");
             break;
         }
     }

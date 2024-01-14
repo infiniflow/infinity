@@ -1171,7 +1171,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             break;
         }
         case ShowType::kInvalid: {
-            Error<ExecutorException>("Invalid show type");
+            UnrecoverableError("Invalid show type");
         }
     }
 }

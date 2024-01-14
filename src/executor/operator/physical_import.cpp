@@ -119,7 +119,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        Error<ExecutorException>("Weird file size.");
+        UnrecoverableError("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 
