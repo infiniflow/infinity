@@ -197,6 +197,14 @@ Status Status::SessionNotFound(i64 session_id) {
     return Status(ErrorCode::kSessionNotFound, MakeUnique<String>(fmt::format("Session id: {} isn't found", session_id)));
 }
 
+Status Status::RecursiveAggregate(const String& expr_name) {
+    return Status(ErrorCode::kRecursiveAgg, MakeUnique<String>(fmt::format("{} is in another aggregate expression", expr_name)));
+}
+
+Status Status::FunctionArgsError(const String& func_name) {
+    return Status(ErrorCode::kFunctionArgsError, MakeUnique<String>(fmt::format("{} arguments have errors", func_name)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

@@ -172,7 +172,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        Error<ExecutorException>(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
+        UnrecoverableError(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
     BaseProfiler& phase_profiler = profilers_[phase_idx];
@@ -187,7 +187,7 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        Error<ExecutorException>("Query phase isn't started, yet");
+        UnrecoverableError("Query phase isn't started, yet");
     }
 
     current_phase_ = QueryPhase::kInvalid;

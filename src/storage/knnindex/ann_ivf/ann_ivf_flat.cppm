@@ -42,7 +42,7 @@ class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
         } else if constexpr (metric == MetricType::kMerticInnerProduct) {
             return IPDistance<DistType>(x, y, dimension);
         } else {
-            Error<ExecutorException>("Metric type is invalid");
+            UnrecoverableError("Metric type is invalid");
         }
     }
 

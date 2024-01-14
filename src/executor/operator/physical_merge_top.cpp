@@ -60,7 +60,7 @@ void PhysicalMergeTop::Init() {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        Error<ExecutorException>("order_by_types_.size() != sort_expressions_.size()");
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     // copy sort functions from PhysicalTop
     sort_functions_ = (reinterpret_cast<PhysicalTop *>(left()))->GetInnerSortFunctions();
@@ -69,12 +69,12 @@ void PhysicalMergeTop::Init() {
 bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
-        Error<ExecutorException>("output data_block_array_ is not empty");
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto merge_top_op_state = static_cast<MergeTopOperatorState *>(operator_state);
     auto &input_data_block_array = merge_top_op_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
-        Error<ExecutorException>("MergeTop: empty input");
+        UnrecoverableError("MergeTop: empty input");
         return false;
     }
     auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;

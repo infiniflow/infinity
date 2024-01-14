@@ -154,7 +154,7 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
                     break;
                 }
                 default: {
-                    ExecutorException("Create IVF Flat index: unsupported element type.");
+                    UnrecoverableError("Create IVF Flat index: Unsupported element type.");
                 }
             }
             break;

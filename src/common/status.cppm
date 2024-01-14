@@ -77,6 +77,8 @@ export enum class ErrorCode : long {
     kNotSupported = 3032,
     kDroppingUsingDb = 3033,
     kSessionNotFound = 3034,
+    kRecursiveAgg = 3035,
+    kFunctionArgsError = 3036,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -147,6 +149,8 @@ public:
     static Status NotSupport(const String& detailed);
     static Status DroppingUsingDb(const String& db_name);
     static Status SessionNotFound(i64 session_id);
+    static Status RecursiveAggregate(const String& expr_name);
+    static Status FunctionArgsError(const String& func_name);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

@@ -87,14 +87,14 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
-        Error<ExecutorException>("Input data block is not finalized");
+        UnrecoverableError("Input data block is not finalized");
     }
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
-        Error<ExecutorException>("Input data block is invalid");
+        UnrecoverableError("Input data block is invalid");
     }
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
@@ -124,7 +124,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    UnrecoverableError(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();

@@ -51,10 +51,10 @@ public:
 
     inline void Set(SizeT selection_idx, SizeT row_idx) {
         if (selection_vector == nullptr) {
-            Error<ExecutorException>("Selection container isn't initialized");
+            UnrecoverableError("Selection container isn't initialized");
         }
         if (selection_idx >= storage_->capacity_) {
-            Error<ExecutorException>("Exceed the selection vector capacity.");
+            UnrecoverableError("Exceed the selection vector capacity.");
         }
         selection_vector[selection_idx] = row_idx;
     }
@@ -69,28 +69,28 @@ public:
             return idx;
         }
         if (idx >= latest_selection_idx_) {
-            Error<ExecutorException>("Exceed the last row of the selection vector.");
+            UnrecoverableError("Exceed the last row of the selection vector.");
         }
         return selection_vector[idx];
     }
 
     inline u16 &operator[](SizeT idx) const {
         if (idx >= latest_selection_idx_) {
-            Error<ExecutorException>("Exceed the last row of the selection vector.");
+            UnrecoverableError("Exceed the last row of the selection vector.");
         }
         return selection_vector[idx];
     }
 
     inline SizeT Capacity() const {
         if (selection_vector == nullptr) {
-            Error<ExecutorException>("Selection container isn't initialized");
+            UnrecoverableError("Selection container isn't initialized");
         }
         return storage_->capacity_;
     }
 
     inline SizeT Size() const {
         if (selection_vector == nullptr) {
-            Error<ExecutorException>("Selection container isn't initialized");
+            UnrecoverableError("Selection container isn't initialized");
         }
         return latest_selection_idx_;
     }

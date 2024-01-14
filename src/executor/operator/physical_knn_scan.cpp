@@ -195,7 +195,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             Error<StorageException>("Cannot find index entry.");
         }
 
-        auto& index_map = table_index_entry->column_index_map();
+        auto &index_map = table_index_entry->column_index_map();
         auto column_index_iter = index_map.find(knn_column_id);
         if (column_index_iter == index_map.end()) {
             // knn_column_id isn't in this table index
@@ -204,7 +204,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         // Fill the segment with index
         ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
-        const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>& index_by_segment = column_index_entry->index_by_segment();
+        const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
         index_entry_map.reserve(index_by_segment.size());
         for (auto &[segment_id, segment_column_index] : index_by_segment) {
             index_entry_map[segment_id].emplace_back(segment_column_index.get());
@@ -217,7 +217,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         if (auto iter = index_entry_map.find(segment_entry->segment_id()); iter != index_entry_map.end()) {
             index_entries_->emplace_back(iter->second[0]);
         } else {
-            const auto& block_entries = segment_entry->block_entries();
+            const auto &block_entries = segment_entry->block_entries();
             for (auto &block_entry : block_entries) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                 block_column_entries_->emplace_back(block_column_entry);
@@ -289,7 +289,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         SegmentEntry *segment_entry = nullptr;
         auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            Error<ExecutorException>(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
         } else {
             segment_entry = iter->second;
         }
@@ -303,7 +303,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             auto &bool_column = knn_scan_function_data->bool_column_;
             // filter and build bitmask, if filter_expression_ != nullptr
             ExpressionEvaluator expr_evaluator;
-            const auto& block_entries = segment_entry->block_entries();
+            const auto &block_entries = segment_entry->block_entries();
             for (auto &block_entry : block_entries) {
                 auto row_count = block_entry->row_count();
                 db_for_filter->Reset(row_count);
@@ -318,10 +318,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 bool_column->Reset();
             }
             if (segment_row_count_real != segment_row_count) {
-                Error<ExecutorException>(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                                segment_id,
-                                                segment_row_count_real,
-                                                segment_row_count));
+                UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                                               segment_id,
+                                               segment_row_count_real,
+                                               segment_row_count));
             }
         }
         // bool use_bitmask = !bitmask.IsAllTrue();
@@ -385,7 +385,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         if (result_n < 0) {
                             result_n = result_n1;
                         } else if (result_n != (i64)result_n1) {
-                            throw ExecutorException("KnnScan: result_n mismatch");
+                            UnrecoverableError("KnnScan: result_n mismatch");
                         }
 
                         switch (knn_scan_shared_data->knn_distance_type_) {
@@ -470,7 +470,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
         if (!operator_state->data_block_array_.empty()) {
-            Error<ExecutorException>("In physical_knn_scan : operator_state->data_block_array_ is not empty.");
+            UnrecoverableError("In physical_knn_scan : operator_state->data_block_array_ is not empty.");
         }
         {
             SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
@@ -514,7 +514,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = base_table_ref_->column_ids_[i];
                     ColumnBuffer column_buffer =
-                                     block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
+                        block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
                     auto &column_type = block_entry->GetColumnBlockEntry(column_id)->column_type();
                     if (column_type->Plain()) {
                         const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column_type);

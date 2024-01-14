@@ -1402,7 +1402,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                         break;
                     }
                     case IndexType::kInvalid: {
-                        Error<ExecutorException>("Invalid index method type");
+                        UnrecoverableError("Invalid index method type");
                     }
                     default: {
                         RecoverableError(Status::NotSupport("Not implemented"));

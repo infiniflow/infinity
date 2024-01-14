@@ -181,7 +181,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     // parser_context -> parser
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
-        Error<ExecutorException>(strerror(errno));
+        UnrecoverableError(strerror(errno));
     }
     Txn *txn = query_context->GetTxn();
     u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
@@ -217,10 +217,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 
     if (csv_parser_status != zsv_status_no_more_input) {
         if (parser_context->err_msg_.get() != nullptr) {
-            Error<ExecutorException>(*parser_context->err_msg_);
+            UnrecoverableError(*parser_context->err_msg_);
         } else {
             String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
-            Error<ExecutorException>(err_msg);
+            UnrecoverableError(err_msg);
         }
     }
     NewCatalog::IncreaseTableRowCount(table_entry_, parser_context->row_count_);
@@ -238,7 +238,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        Error<ExecutorException>(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
 
     Txn *txn = query_context->GetTxn();
@@ -453,7 +453,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                     break;
                 }
                 case kElemInvalid: {
-                    Error<ExecutorException>("Embedding element type is invalid.");
+                    UnrecoverableError("Embedding element type is invalid.");
                 }
             }
         } else {
@@ -488,10 +488,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 }
                 case kMissing:
                 case kInvalid: {
-                    Error<ExecutorException>("Invalid data type");
+                    UnrecoverableError("Invalid data type");
                 }
                 default: {
-                    Error<ExecutorException>("Not supported now in append data in column");
+                    UnrecoverableError("Not supported now in append data in column");
                 }
             }
         }

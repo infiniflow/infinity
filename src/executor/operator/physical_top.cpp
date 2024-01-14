@@ -294,7 +294,7 @@ void PhysicalTop::Init() {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        Error<ExecutorException>("order_by_types_.size() != sort_expressions_.size()");
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     sort_functions_.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
@@ -320,7 +320,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
         return true;
     }
     if (!output_data_block_array.empty()) {
-        Error<ExecutorException>("output data_block_array_ is not empty");
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto eval_columns = GetEvalColumns(sort_expressions_, (static_cast<TopOperatorState *>(operator_state))->expr_states_, input_data_block_array);
     TopSolver solve_top(limit_, sort_expr_count_, sort_functions_);

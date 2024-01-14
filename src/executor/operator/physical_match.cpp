@@ -87,7 +87,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     driver.analyze_func_ = AnalyzeFunc;
     int rc = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (rc != 0) {
-        Error<ExecutorException>("QueryDriver::ParseSingleWithFields failed");
+        UnrecoverableError("QueryDriver::ParseSingleWithFields failed");
     }
     UniquePtr<irs::filter> flt = std::move(driver.result);
 
@@ -95,12 +95,11 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     ScoredIds result;
     UniquePtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
     if (dataStore == nullptr) {
-        throw ExecutorException(
-            fmt::format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));
+        UnrecoverableError(fmt::format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));
     }
     rc = dataStore->Search(flt.get(), search_ops.options_, result);
     if (rc != 0) {
-        Error<ExecutorException>("IRSDataStore::Search failed");
+        UnrecoverableError("IRSDataStore::Search failed");
     }
 
     // 3 populate result datablock
@@ -119,12 +118,11 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-
-        const BlockEntry* block_entry = base_table_ref_->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
+        const BlockEntry *block_entry = base_table_ref_->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
 
         SizeT column_id = 0;
         for (; column_id < column_n; ++column_id) {
-            BlockColumnEntry* block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
+            BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
             ColumnBuffer column_buffer = block_column_ptr->GetColumnData(query_context->storage()->buffer_manager());
             output_data_block->column_vectors[column_id]->AppendWith(column_buffer, block_offset, 1);
         }

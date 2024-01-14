@@ -14,9 +14,12 @@
 
 module;
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
+
+module physical_aggregate;
+
 import stl;
 import txn;
 import query_context;
@@ -35,7 +38,8 @@ import parser;
 import expression_state;
 import expression_evaluator;
 import aggregate_expression;
-module physical_aggregate;
+import status;
+
 namespace infinity {
 
 void PhysicalAggregate::Init() {}
@@ -207,7 +211,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = grouped_input_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            Error<ExecutorException>("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
+            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
         }
         types.emplace_back(input_type);
     }
@@ -326,8 +330,8 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
         }
 
         if (output_row_idx != datablock_size) {
-            Error<ExecutorException>("Expected block size: " + std::to_string(datablock_size) +
-                                     ", but only copied data size: " + std::to_string(output_row_idx));
+            UnrecoverableError("Expected block size: " + std::to_string(datablock_size) +
+                               ", but only copied data size: " + std::to_string(output_row_idx));
         }
 
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
@@ -348,7 +352,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
         SharedPtr<DataType> input_type = input_table->GetColumnTypeById(column_id);
         SharedPtr<DataType> output_type = output_table->GetColumnTypeById(column_id);
         if (*input_type != *output_type) {
-            Error<ExecutorException>("Column type doesn't matched: " + input_type->ToString() + " and " + output_type->ToString());
+            RecoverableError(Status::DataTypeMismatch(input_type->ToString(), output_type->ToString()));
         }
         types.emplace_back(input_type);
     }
@@ -574,7 +578,7 @@ bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>
                                                Vector<UniquePtr<char[]>> &states) {
     SizeT aggregates_count = aggregates_.size();
     if (aggregates_count <= 0) {
-        Error<ExecutorException>("Simple Aggregate without aggregate expression.");
+        UnrecoverableError("Simple Aggregate without aggregate expression.");
     }
 
     SizeT input_block_count = input_blocks.size();

@@ -29,7 +29,7 @@ import in_expression;
 import data_block;
 import column_vector;
 import expression_state;
-
+import status;
 import third_party;
 import infinity_exception;
 import expression_type;
@@ -68,7 +68,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
-        Error<ExecutorException>("Recursive execute aggregate function!");
+        RecoverableError(Status::RecursiveAggregate(expr->ToString()));
     }
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
@@ -80,10 +80,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     this->Execute(child_expr, child_state, child_output_col);
 
     if (expr->aggregate_function_.argument_type_ != *child_output_col->data_type()) {
-        Error<ExecutorException>("Argument type isn't matched with the child expression output");
+        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.argument_type_.ToString(), child_output_col->data_type()->ToString()));
     }
+
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
-        Error<ExecutorException>("Return type isn't matched with the output column vector");
+        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString()));
     }
 
     auto data_state = state->agg_state_;
@@ -173,7 +174,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("IN execution isn't implemented yet.");
+    RecoverableError(Status::NotSupport("IN execution isn't implemented yet."));
 }
 
 } // namespace infinity

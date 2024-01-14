@@ -210,10 +210,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors[0],
                                                                                        output,
@@ -226,10 +226,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
                                                                                     output,

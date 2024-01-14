@@ -44,7 +44,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
-        Error<ExecutorException>("This task should not be scheduled if the source queue is empty");
+        UnrecoverableError("This task should not be scheduled if the source queue is empty");
     }
 
     switch (fragment_data_base->type_) {

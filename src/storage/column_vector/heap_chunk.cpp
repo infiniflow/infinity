@@ -25,7 +25,7 @@ namespace infinity {
 
 ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        Error<ExecutorException>("Attempt to allocate zero size memory.");
+        UnrecoverableError("Attempt to allocate zero size memory.");
     }
     if (current_chunk_idx_ == std::numeric_limits<u64>::max()) {
         // First chunk
