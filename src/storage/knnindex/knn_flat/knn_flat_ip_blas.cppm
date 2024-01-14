@@ -56,7 +56,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPBlas isn't begin");
+            UnrecoverableError("KnnFlatIPBlas isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -99,7 +99,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPBlas isn't begin");
+            UnrecoverableError("KnnFlatIPBlas isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -150,7 +150,7 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }

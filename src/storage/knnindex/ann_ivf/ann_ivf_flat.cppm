@@ -82,17 +82,17 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *, u16, u32, u16) final { Error<ExecutorException>("Unsupported search function"); }
+    void Search(const DistType *, u16, u32, u16) final { UnrecoverableError("Unsupported search function"); }
 
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final { Error<ExecutorException>("Unsupported search function"); }
+    void Search(const DistType *, u16, u32, u16, Bitmask &) final { UnrecoverableError("Unsupported search function"); }
 
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != metric) {
-            Error<ExecutorException>("Metric type is invalid");
+            UnrecoverableError("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlat isn't begin");
+            UnrecoverableError("IVFFlat isn't begin");
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -151,10 +151,10 @@ public:
         }
         // check metric type
         if (base_ivf->metric_ != metric) {
-            Error<ExecutorException>("Metric type is invalid");
+            UnrecoverableError("Metric type is invalid");
         }
         if (!begin_) {
-            Error<ExecutorException>("IVFFlat isn't begin");
+            UnrecoverableError("IVFFlat isn't begin");
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -234,14 +234,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }

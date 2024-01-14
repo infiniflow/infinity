@@ -26,7 +26,7 @@ namespace infinity {
 struct SelectionData {
     explicit SelectionData(SizeT count) : capacity_(count) {
         if (count > std::numeric_limits<u16>::max()) {
-            Error<ExecutorException>("Too large size for selection data.");
+            UnrecoverableError("Too large size for selection data.");
         }
         data_ = MakeUnique<u16[]>(count);
         GlobalResourceUsage::IncrObjectCount();

@@ -52,7 +52,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPReservoir isn't begin");
+            UnrecoverableError("KnnFlatIPReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;

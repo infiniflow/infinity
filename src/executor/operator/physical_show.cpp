@@ -321,7 +321,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     Vector<TableDetail> table_collections_detail;
     Status status = txn->GetTables(db_name_, table_collections_detail);
     if (!status.ok()) {
-        Error<ExecutorException>(status.message());
+        RecoverableError(status);
     }
 
     // Prepare the output data block
@@ -475,7 +475,7 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     Vector<ViewDetail> views_detail;
     Status status = txn->GetViews(db_name_, views_detail);
     if (!status.ok()) {
-        Error<ExecutorException>(status.message());
+        RecoverableError(status);
     }
 
     // Prepare the output data block

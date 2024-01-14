@@ -44,7 +44,7 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
             ++current_chunk_idx_;
         }
         if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
-            Error<ExecutorException>("Unexpected string chunk error");
+            UnrecoverableError("Unexpected string chunk error");
         }
     }
 

@@ -119,7 +119,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             }
 
             {
-                Error<ExecutorException>(fmt::format("Unknown command: {}", set_command->var_name()));
+                UnrecoverableError(fmt::format("Unknown command: {}", set_command->var_name()));
             }
             break;
         }
@@ -138,11 +138,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCheckTable: {
-
             break;
         }
         case CommandType::kInvalid: {
-            Error<ExecutorException>("Invalid command type.");
+            UnrecoverableError("Invalid command type.");
         }
     }
     return true;

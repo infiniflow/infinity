@@ -83,16 +83,16 @@ void k_means_partition_only_centroids(MetricType metric,
         return;
     }
     if (dimension <= 0 || vector_count <= 0) {
-        Error<ExecutorException>("dimension and vector_count must be positive");
+        UnrecoverableError("dimension and vector_count must be positive");
     }
     if (vectors_ptr == nullptr) {
-        Error<ExecutorException>("vectors_ptr cannot be nullptr");
+        UnrecoverableError("vectors_ptr cannot be nullptr");
     }
     if (centroids_output == nullptr) {
-        Error<ExecutorException>("centroids_output cannot be nullptr");
+        UnrecoverableError("centroids_output cannot be nullptr");
     }
     if (partition_num > vector_count) {
-        Error<ExecutorException>("partition_num cannot be greater than vector_count");
+        UnrecoverableError("partition_num cannot be greater than vector_count");
     }
     if (partition_num <= 0) {
         partition_num = (int)sqrt(vector_count);

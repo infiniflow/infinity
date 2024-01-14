@@ -92,7 +92,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         case PhysicalOperatorType::kExplain: {
             ExplainOperatorState *explain_output_state = static_cast<ExplainOperatorState *>(task_op_state);
             if (explain_output_state->data_block_array_.empty()) {
-                Error<ExecutorException>("Empty explain output");
+                UnrecoverableError("Empty explain output");
             }
 
             for (auto &data_block : explain_output_state->data_block_array_) {
@@ -119,7 +119,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    Error<ExecutorException>("Empty sort output");
+                    UnrecoverableError("Empty sort output");
                 }
             } else {
                 for (auto &data_block : top_output_state->data_block_array_) {
@@ -135,7 +135,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    Error<ExecutorException>("Empty sort output");
+                    UnrecoverableError("Empty sort output");
                 }
             } else {
                 for (auto &data_block : sort_output_state->data_block_array_) {
@@ -151,7 +151,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
                 if (materialize_sink_state->Error()) {
                     materialize_sink_state->empty_result_ = true;
                 } else {
-                    Error<ExecutorException>("Empty agg output");
+                    UnrecoverableError("Empty agg output");
                 }
             } else {
                 for (auto &data_block : agg_output_state->data_block_array_) {
