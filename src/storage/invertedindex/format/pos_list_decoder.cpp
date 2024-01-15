@@ -1,5 +1,7 @@
 module;
 
+#include "common/utility/builtin.h"
+
 import stl;
 import byte_slice;
 import byte_slice_reader;
@@ -13,8 +15,6 @@ import index_defines;
 import position_bitmap_reader;
 import index_defines;
 module pos_list_decoder;
-
-#include "common/utility/builtin.h"
 
 namespace infinity {
 
