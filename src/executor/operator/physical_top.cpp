@@ -118,7 +118,7 @@ private:
         // compare_id_for_heap: for heap sort
         // example: x = heap_top, y = candidate, return true if y should be put into heap
         auto compare_id_for_heap = [&](Pair<u32, u32> x, Pair<u32, u32> y) -> bool {
-            return !prefer_left_function_((*input_data_)[x.first], x.second, (*input_data_)[y.first], y.second);
+            return !prefer_left_function_.Compare((*input_data_)[x.first], x.second, (*input_data_)[y.first], y.second);
         };
         const u32 input_block_cnt = input_data_->size();
         for (u32 block_id = 0; block_id < input_block_cnt; ++block_id) {
@@ -180,11 +180,11 @@ InvalidPhysicalTopCompareType(const DataType &type_) {
     };
 }
 
-// general template for types without three-way comparison but with operator< and operator==
+// general template for POD types without three-way comparison but with operator< and operator==
 template <OrderType compare_order, BinaryGenerateBoolean T>
 struct PhysicalTopCompareSingleValue {
     static std::strong_ordering
-    compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
         auto compare_prefer_left = [](const T &x, const T &y) -> bool {
             if constexpr (compare_order == OrderType::kAsc) {
                 return x < y;
@@ -192,8 +192,8 @@ struct PhysicalTopCompareSingleValue {
                 return y < x;
             }
         };
-        auto &left = (reinterpret_cast<T *>(left_col->data()))[left_id];
-        auto &right = (reinterpret_cast<T *>(right_col->data()))[right_id];
+        auto left = (reinterpret_cast<T *>(left_col->data()))[left_id];
+        auto right = (reinterpret_cast<T *>(right_col->data()))[right_id];
         if (compare_prefer_left(left, right)) {
             return std::strong_ordering::less;
         } else if (left == right) {
@@ -205,28 +205,38 @@ struct PhysicalTopCompareSingleValue {
 };
 
 template <typename T>
-concept ThreeWayCompareRaw = requires(T a, T b) {
+concept ThreeWayComparePOD = PODValueType<T> and requires(T a, T b) {
     { a <=> b } -> std::convertible_to<std::strong_ordering>;
 };
 
-template <typename T>
-concept ThreeWayCompareReader = requires(ColumnValueReader<T> a, ColumnValueReader<T> b) {
-    { a <=> b } -> std::convertible_to<std::strong_ordering>;
-};
-
-// template for types with three-way comparison method
+// template for POD types with three-way comparison method
 template <OrderType compare_order, BinaryGenerateBoolean T>
-    requires ThreeWayCompareRaw<T> or ThreeWayCompareReader<T>
+    requires ThreeWayComparePOD<T>
 struct PhysicalTopCompareSingleValue<compare_order, T> {
     static std::strong_ordering
-    compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
-        // Use ColumnValueReader (alias of ColumnVectorPtrAndIdx)
+    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
+        auto left = (reinterpret_cast<T *>(left_col->data()))[left_id];
+        auto right = (reinterpret_cast<T *>(right_col->data()))[right_id];
+        if constexpr (compare_order == OrderType::kAsc) {
+            return left <=> right;
+        } else {
+            return right <=> left;
+        }
+    }
+};
+
+// template for VarcharT and BooleanT types with three-way comparison method
+template <OrderType compare_order, BinaryGenerateBoolean T>
+    requires IsAnyOf<T, VarcharT, BooleanT>
+struct PhysicalTopCompareSingleValue<compare_order, T> {
+    static std::strong_ordering
+    Compare(const SharedPtr<ColumnVector> &left_col, u32 left_id, const SharedPtr<ColumnVector> &right_col, u32 right_id) {
         ColumnValueReader<T> left(left_col);
         ColumnValueReader<T> right(right_col);
         if constexpr (compare_order == OrderType::kAsc) {
-            return left[left_id] <=> right[right_id];
+            return ThreeWayCompareReaderValue(left.SetIndex(left_id), right.SetIndex(right_id));
         } else {
-            return right[right_id] <=> left[left_id];
+            return ThreeWayCompareReaderValue(right.SetIndex(right_id), left.SetIndex(left_id));
         }
     }
 };
@@ -236,46 +246,46 @@ inline StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, co
 GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     switch (auto switch_type = sort_expression->Type().type(); switch_type) {
         case LogicalType::kBoolean: {
-            return PhysicalTopCompareSingleValue<compare_order, BooleanT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, BooleanT>::Compare;
         }
         case LogicalType::kTinyInt: {
-            return PhysicalTopCompareSingleValue<compare_order, TinyIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TinyIntT>::Compare;
         }
         case LogicalType::kSmallInt: {
-            return PhysicalTopCompareSingleValue<compare_order, SmallIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, SmallIntT>::Compare;
         }
         case LogicalType::kInteger: {
-            return PhysicalTopCompareSingleValue<compare_order, IntegerT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, IntegerT>::Compare;
         }
         case LogicalType::kBigInt: {
-            return PhysicalTopCompareSingleValue<compare_order, BigIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, BigIntT>::Compare;
         }
         case LogicalType::kHugeInt: {
-            return PhysicalTopCompareSingleValue<compare_order, HugeIntT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, HugeIntT>::Compare;
         }
         case LogicalType::kFloat: {
-            return PhysicalTopCompareSingleValue<compare_order, FloatT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, FloatT>::Compare;
         }
         case LogicalType::kDouble: {
-            return PhysicalTopCompareSingleValue<compare_order, DoubleT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DoubleT>::Compare;
         }
         case LogicalType::kVarchar: {
-            return PhysicalTopCompareSingleValue<compare_order, VarcharT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, VarcharT>::Compare;
         }
         case LogicalType::kDate: {
-            return PhysicalTopCompareSingleValue<compare_order, DateT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DateT>::Compare;
         }
         case LogicalType::kTime: {
-            return PhysicalTopCompareSingleValue<compare_order, TimeT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TimeT>::Compare;
         }
         case LogicalType::kDateTime: {
-            return PhysicalTopCompareSingleValue<compare_order, DateTimeT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, DateTimeT>::Compare;
         }
         case LogicalType::kTimestamp: {
-            return PhysicalTopCompareSingleValue<compare_order, TimestampT>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, TimestampT>::Compare;
         }
         case LogicalType::kRowID: {
-            return PhysicalTopCompareSingleValue<compare_order, RowID>::compare;
+            return PhysicalTopCompareSingleValue<compare_order, RowID>::Compare;
         }
         default: {
             return InvalidPhysicalTopCompareType(sort_expression->Type());

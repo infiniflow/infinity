@@ -54,14 +54,10 @@ public:
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
         if (left_vector_type == ColumnVectorType::kConstant && right_vector_type == ColumnVectorType::kConstant) {
             if (!nullable || (left_null->IsAllTrue() && right_null->IsAllTrue())) {
-                bool answer;
-                Operator::template Execute(ColumnValueReader<LeftType>(left)[0],
-                                           ColumnValueReader<RightType>(right)[0],
-                                           answer,
-                                           result_null.get(),
-                                           0,
-                                           state_ptr);
-                result->buffer_->SetCompactBit(0, answer);
+                auto left_ptr = ColumnValueReader<LeftType>(left);
+                auto right_ptr = ColumnValueReader<RightType>(right);
+                BooleanColumnWriter result_ptr(result);
+                Operator::template Execute(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                 result_null->SetAllTrue();
             } else {
                 result_null->SetAllFalse();
@@ -74,9 +70,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    bool answer;
-                    Operator::template Execute(left_ptr[i], right_ptr[i], answer, result_null.get(), 0, state_ptr);
-                    result_ptr[i] = answer;
+                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right, result, count, state_ptr);
@@ -91,9 +85,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    bool answer;
-                    Operator::template Execute(left_c, right_ptr[i], answer, result_null.get(), 0, state_ptr);
-                    result_ptr[i] = answer;
+                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left_c, right, result, count, state_ptr);
@@ -108,9 +100,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    bool answer;
-                    Operator::template Execute(left_ptr[i], right_c, answer, result_null.get(), 0, state_ptr);
-                    result_ptr[i] = answer;
+                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right_c, result, count, state_ptr);
@@ -149,20 +139,22 @@ private:
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {
-                    bool answer;
-                    Operator::template Execute(left_ptr[b], right_ptr[b], answer, result_null.get(), 0, state_ptr);
-                    result_ptr[b] = answer;
+                    Operator::template Execute(left_ptr[b], right_ptr[b], result_ptr[b], result_null.get(), 0, state_ptr);
                 }
                 start_index = end_index;
             } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                 // all data of 64 rows are null
                 start_index = end_index;
             } else {
-                for (bool answer; start_index < end_index; ++start_index) {
+                for (; start_index < end_index; ++start_index) {
                     if (result_null->IsTrue(start_index)) {
                         // This row isn't null
-                        Operator::template Execute(left_ptr[start_index], right_ptr[start_index], answer, result_null.get(), start_index, state_ptr);
-                        result_ptr[start_index] = answer;
+                        Operator::template Execute(left_ptr[start_index],
+                                                   right_ptr[start_index],
+                                                   result_ptr[start_index],
+                                                   result_null.get(),
+                                                   start_index,
+                                                   state_ptr);
                     }
                 }
             }
@@ -189,20 +181,22 @@ private:
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {
-                    bool answer;
-                    Operator::template Execute(left_constant, right_ptr[b], answer, result_null.get(), 0, state_ptr);
-                    result_ptr[b] = answer;
+                    Operator::template Execute(left_constant, right_ptr[b], result_ptr[b], result_null.get(), 0, state_ptr);
                 }
                 start_index = end_index;
             } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                 // all data of 64 rows are null
                 start_index = end_index;
             } else {
-                for (bool answer; start_index < end_index; ++start_index) {
+                for (; start_index < end_index; ++start_index) {
                     if (result_null->IsTrue(start_index)) {
                         // This row isn't null
-                        Operator::template Execute(left_constant, right_ptr[start_index], answer, result_null.get(), start_index, state_ptr);
-                        result_ptr[start_index] = answer;
+                        Operator::template Execute(left_constant,
+                                                   right_ptr[start_index],
+                                                   result_ptr[start_index],
+                                                   result_null.get(),
+                                                   start_index,
+                                                   state_ptr);
                     }
                 }
             }
@@ -229,20 +223,22 @@ private:
             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
                 // all data of 64 rows are not null
                 for (SizeT b = start_index; b < end_index; ++b) {
-                    bool answer;
-                    Operator::template Execute(left_ptr[b], right_constant, answer, result_null.get(), 0, state_ptr);
-                    result_ptr[b] = answer;
+                    Operator::template Execute(left_ptr[b], right_constant, result_ptr[b], result_null.get(), 0, state_ptr);
                 }
                 start_index = end_index;
             } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
                 // all data of 64 rows are null
                 start_index = end_index;
             } else {
-                for (bool answer; start_index < end_index; ++start_index) {
+                for (; start_index < end_index; ++start_index) {
                     if (result_null->IsTrue(start_index)) {
                         // This row isn't null
-                        Operator::template Execute(left_ptr[start_index], right_constant, answer, result_null.get(), start_index, state_ptr);
-                        result_ptr[start_index] = answer;
+                        Operator::template Execute(left_ptr[start_index],
+                                                   right_constant,
+                                                   result_ptr[start_index],
+                                                   result_null.get(),
+                                                   start_index,
+                                                   state_ptr);
                     }
                 }
             }
@@ -547,7 +543,7 @@ public:
     }
 
     // case for type which can be accessed by type_ptr[i]
-    template <PointerFriendly LeftType, PointerFriendly RightType, PointerFriendly ResultType, typename Operator>
+    template <PODValueType LeftType, PODValueType RightType, PODValueType ResultType, typename Operator>
     static void inline Execute(const SharedPtr<ColumnVector> &left,
                                const SharedPtr<ColumnVector> &right,
                                SharedPtr<ColumnVector> &result,

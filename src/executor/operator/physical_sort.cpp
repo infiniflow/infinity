@@ -62,7 +62,7 @@ public:
     bool operator()(BlockRawIndex left_index, BlockRawIndex right_index) {
         auto &left = eval_results_[left_index.block_idx];
         auto &right = eval_results_[right_index.block_idx];
-        return prefer_left_function_(left, left_index.offset, right, right_index.offset);
+        return prefer_left_function_.Compare(left, left_index.offset, right, right_index.offset);
     }
 
 private:

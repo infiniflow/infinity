@@ -110,7 +110,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
             } else {
                 auto &middle_data = eval_columns_middle[middle.block_id_];
                 auto &input_data = eval_columns_input[input.block_id_ - middle_block_cnt];
-                return prefer_left_function_(middle_data, middle.block_offset_, input_data, input.block_offset_);
+                return prefer_left_function_.Compare(middle_data, middle.block_offset_, input_data, input.block_offset_);
             }
         };
         // 1. get merged top ids

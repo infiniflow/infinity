@@ -24,7 +24,7 @@ export module fix_heap;
 
 namespace infinity {
 
-class VarcharNextCharAccessor;
+class VarcharNextCharIterator;
 
 export struct FixHeapManager {
     // Use to store string.
@@ -65,8 +65,8 @@ public:
 public:
     // Used when comparing two VarcharT variables.
     // Only get next char, without copying it to buffer.
-    friend VarcharNextCharAccessor;
-    [[nodiscard]] VarcharNextCharAccessor GetNextCharAccessor(const VarcharT &varchar) const;
+    friend VarcharNextCharIterator;
+    [[nodiscard]] VarcharNextCharIterator GetNextCharIterator(const VarcharT &varchar) const;
 
 private:
     // Allocate new chunk if current chunk is not enough.
@@ -80,9 +80,10 @@ private:
     u64 current_chunk_offset_{0};
 };
 
-class VarcharNextCharAccessor {
+// can only move forward
+class VarcharNextCharIterator {
 public:
-    explicit VarcharNextCharAccessor(const FixHeapManager *heap_mgr, const VarcharT &varchar) {
+    explicit VarcharNextCharIterator(const FixHeapManager *heap_mgr, const VarcharT &varchar) {
         if (varchar.IsInlined()) {
             data_ptr_ = varchar.short_.data_;
             remain_size_ = varchar.length_;
@@ -94,7 +95,7 @@ public:
         }
     }
 
-    [[nodiscard]] inline char operator()() {
+    [[nodiscard]] inline char GetNextChar() {
         if (remain_size_ == 0) {
             data_ptr_ = heap_mgr_->chunks_[++chunk_id_]->ptr_;
             remain_size_ = heap_mgr_->current_chunk_size();
@@ -110,6 +111,6 @@ private:
     u64 chunk_id_{0};
 };
 
-VarcharNextCharAccessor FixHeapManager::GetNextCharAccessor(const VarcharT &varchar) const { return VarcharNextCharAccessor(this, varchar); }
+VarcharNextCharIterator FixHeapManager::GetNextCharIterator(const VarcharT &varchar) const { return VarcharNextCharIterator(this, varchar); }
 
 } // namespace infinity

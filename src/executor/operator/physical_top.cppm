@@ -44,7 +44,7 @@ public:
         sort_expr_count_ = sort_functions_.size();
     }
     ~CompareTwoRowAndPreferLeft() = default;
-    bool operator()(const Vector<SharedPtr<ColumnVector>> &left, u32 left_id, const Vector<SharedPtr<ColumnVector>> &right, u32 right_id) const {
+    bool Compare(const Vector<SharedPtr<ColumnVector>> &left, u32 left_id, const Vector<SharedPtr<ColumnVector>> &right, u32 right_id) const {
         for (u32 i = 0; i < sort_expr_count_; ++i) {
             auto compare_result = sort_functions_[i](left[i], left_id, right[i], right_id);
             if (compare_result != std::strong_ordering::equal) {
