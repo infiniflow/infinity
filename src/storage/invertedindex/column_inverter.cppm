@@ -12,11 +12,16 @@ namespace infinity {
 export class ColumnInverter : public TaskExecutor::Task {
 public:
     ColumnInverter(Analyzer *analyzer, bool jieba_specialize, SharedPtr<MemoryPool> byte_slice_pool);
+    ColumnInverter(const ColumnInverter &) = delete;
+    ColumnInverter(const ColumnInverter &&) = delete;
+    ColumnInverter &operator=(const ColumnInverter &) = delete;
+    ColumnInverter &operator=(const ColumnInverter &&) = delete;
     ~ColumnInverter();
 
     void InvertColumn(u32 doc_id, const String &val);
 
-private:
+    void Commit();
+
     struct PosInfo {
         u32 term_num_{0};
         u32 doc_id_{0};
@@ -33,6 +38,7 @@ private:
         }
     };
 
+private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;
     using PosInfoVec = Vector<PosInfo, PoolAllocator<PosInfo>>;
     using U32Vec = Vector<u32, PoolAllocator<u32>>;

@@ -93,4 +93,34 @@ void ColumnInverter::SortTerms() {
         p.term_num_ = GetTermNum(p.term_num_);
     }
 }
+
+struct FullRadix {
+    u64 operator()(const ColumnInverter::PosInfo &p) const { return (static_cast<u64>(p.term_num_) << 32) | p.doc_id_; }
+};
+
+void ColumnInverter::Commit() {
+    SortTerms();
+    ShiftBasedRadixSorter<PosInfo, FullRadix, std::less<PosInfo>, 56, true>::RadixSort(FullRadix(),
+                                                                                       std::less<PosInfo>(),
+                                                                                       &positions_[0],
+                                                                                       positions_.size(),
+                                                                                       16);
+    u32 last_term_num = 0;
+    u32 last_term_pos = 0;
+    u32 last_doc_id = 0;
+    StringRef term;
+    for (auto &i : positions_) {
+        if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
+            if (last_term_num != i.term_num_) {
+                last_term_num = i.term_num_;
+                term = GetTermFromNum(last_term_num);
+            }
+            last_doc_id = i.doc_id_;
+        }
+        if (i.term_pos_ != last_term_pos) {
+            last_term_pos = i.term_pos_;
+        }
+    }
+}
+
 } // namespace infinity
