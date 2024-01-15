@@ -62,8 +62,8 @@ void PhysicalMergeTop::Init() {
     if (sort_expr_count_ != sort_expressions_.size()) {
         Error<ExecutorException>("order_by_types_.size() != sort_expressions_.size()");
     }
-    // copy sort functions from PhysicalTop
-    sort_functions_ = (reinterpret_cast<PhysicalTop *>(left()))->GetInnerSortFunctions();
+    // copy compare function from PhysicalTop
+    prefer_left_function_ = (reinterpret_cast<PhysicalTop *>(left()))->GetInnerCompareFunction();
 }
 
 bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
@@ -110,19 +110,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
             } else {
                 auto &middle_data = eval_columns_middle[middle.block_id_];
                 auto &input_data = eval_columns_input[input.block_id_ - middle_block_cnt];
-                for (u32 i = 0; i < sort_expr_count_; ++i) {
-                    auto compare_result =
-                        sort_functions_[i](middle_data[i]->data(), middle.block_offset_, input_data[i]->data(), input.block_offset_);
-                    switch (compare_result) {
-                        case OrderBySingleResult::kPreferLeft:
-                            return true;
-                        case OrderBySingleResult::kPreferRight:
-                            return false;
-                        default:
-                            continue;
-                    }
-                }
-                return true;
+                return prefer_left_function_.Compare(middle_data, middle.block_offset_, input_data, input.block_offset_);
             }
         };
         // 1. get merged top ids
