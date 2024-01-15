@@ -18,6 +18,7 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -26,6 +27,7 @@ module;
 #include <experimental/source_location>
 #include <filesystem>
 #include <forward_list>
+#include <functional>
 #include <iostream>
 #include <list>
 #include <map>
@@ -115,7 +117,32 @@ using std::ranges::equal;
 
 }
 
+using std::function;
 using std::numeric_limits;
+
+namespace chrono {
+using std::chrono::duration;
+using std::chrono::microseconds;
+using std::chrono::milliseconds;
+using std::chrono::nanoseconds;
+using std::chrono::seconds;
+
+using std::chrono::operator>;
+using std::chrono::operator>=;
+using std::chrono::operator<;
+using std::chrono::operator<=;
+using std::chrono::operator==;
+
+using std::chrono::operator+;
+using std::chrono::operator-;
+
+using std::chrono::minutes;
+using std::chrono::weeks;
+using std::chrono::years;
+
+using std::chrono::steady_clock;
+using std::chrono::time_point;
+} // namespace chrono
 
 using std::cout;
 using std::cerr;
@@ -127,6 +154,8 @@ using std::ifstream;
 using std::ios;
 
 using std::align;
+
+using std::ptrdiff_t;
 
 using std::static_pointer_cast;
 using std::dynamic_pointer_cast;
@@ -155,8 +184,8 @@ export {
     template <typename T, std::size_t N>
     using Array = std::array<T, N>;
 
-    template <typename T>
-    using Vector = std::vector<T>;
+    template <typename T, typename Allocator = std::allocator<T>>
+    using Vector = std::vector<T, Allocator>;
 
     template <typename T>
     using Deque = std::deque<T>;

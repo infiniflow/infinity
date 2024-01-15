@@ -1,13 +1,13 @@
 module;
 
+#include "common/utility/builtin.h"
+
 import stl;
 import posting_iterator;
 import index_defines;
 import term_meta;
 
 module multi_posting_iterator;
-
-#include "common/utility/builtin.h"
 
 namespace infinity {
 

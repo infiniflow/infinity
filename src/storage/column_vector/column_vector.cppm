@@ -14,6 +14,8 @@
 
 module;
 
+#include <compare>
+#include <concepts>
 #include <sstream>
 
 import stl;
@@ -27,6 +29,7 @@ import value;
 import column_buffer;
 import third_party;
 import infinity_exception;
+import fix_heap;
 
 export module column_vector;
 
@@ -191,23 +194,6 @@ private:
         }
     }
 
-    template <>
-    static void CopyValue<BooleanT>(const ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
-        auto dst_tail = dst.tail_index_;
-        const VectorBuffer *src_buffer = src.buffer_.get();
-        auto dst_buffer = dst.buffer_.get();
-        if (dst_tail % 8 == 0 && from % 8 == 0) {
-            SizeT dst_byte_offset = dst_tail / 8;
-            SizeT src_byte_offset = from / 8;
-            SizeT byte_count = (count + 7) / 8; // copy to tail
-            std::memcpy(dst_buffer->GetData() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
-        } else {
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_buffer->SetCompactBit(dst_tail + idx, src_buffer->GetCompactBit(from + idx));
-            }
-        }
-    }
-
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
@@ -237,6 +223,23 @@ public:
 
     [[nodiscard]] inline SizeT Size() const { return tail_index_; }
 };
+
+template <>
+void ColumnVector::CopyValue<BooleanT>(const ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+    auto dst_tail = dst.tail_index_;
+    const VectorBuffer *src_buffer = src.buffer_.get();
+    auto dst_buffer = dst.buffer_.get();
+    if (dst_tail % 8 == 0 && from % 8 == 0) {
+        SizeT dst_byte_offset = dst_tail / 8;
+        SizeT src_byte_offset = from / 8;
+        SizeT byte_count = (count + 7) / 8; // copy to tail
+        std::memcpy(dst_buffer->GetData() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
+    } else {
+        for (SizeT idx = 0; idx < count; ++idx) {
+            dst_buffer->SetCompactBit(dst_tail + idx, src_buffer->GetCompactBit(from + idx));
+        }
+    }
+}
 
 template <typename DataT>
 inline void
@@ -697,5 +700,145 @@ ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, Si
     ptr_t dst_ptr = dst + dst_idx * data_type_size_;
     std::memcpy(dst_ptr, src_ptr, data_type_size_);
 }
+
+export template <typename T, typename... U>
+concept IsAnyOf = (std::same_as<T, U> || ...);
+
+export template <typename ValueType>
+concept PODValueType = IsAnyOf<ValueType,
+                               TinyIntT,
+                               SmallIntT,
+                               IntegerT,
+                               BigIntT,
+                               HugeIntT,
+                               FloatT,
+                               DoubleT,
+                               DecimalT,
+                               DateT,
+                               TimeT,
+                               DateTimeT,
+                               TimestampT,
+                               IntervalT,
+                               RowID,
+                               UuidT>;
+
+export template <typename ValueType>
+concept BinaryGenerateBoolean = PODValueType<ValueType> or IsAnyOf<ValueType, BooleanT, VarcharT>;
+
+template <typename Unsupported>
+class ColumnVectorPtrAndIdx {
+    static_assert(false, "Unsupported type");
+};
+
+// Return Iterator for POD ColumnVector
+// Now only support reading values from ColumnVector
+// used in cases like "where x > y" ( (int > int) -> bool )
+template <PODValueType FlatType>
+class ColumnVectorPtrAndIdx<FlatType> {
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const FlatType *>(col->data())) {}
+    // Don't return reference
+    // keep compatibility with "Run(TA left, TB right, TC &result)"
+    FlatType operator[](u32 index) { return data_ptr_[index]; }
+
+private:
+    const FlatType *data_ptr_ = nullptr;
+};
+
+// Return Iterator for BooleanT ColumnVector
+// Now support writing BooleanT results to ColumnVector and comparing BooleanT values
+// used in cases like "where x > y" ( (int > int) -> bool )
+template <>
+class ColumnVectorPtrAndIdx<BooleanT> {
+    using IteratorType = ColumnVectorPtrAndIdx<BooleanT>;
+
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : buffer_(col->buffer_.get()) {}
+    auto &SetIndex(u32 index) {
+        idx_ = index;
+        return *this;
+    }
+    auto &operator[](u32 index) { return SetIndex(index); }
+    void SetValue(bool value) { buffer_->SetCompactBit(idx_, value); }
+    inline bool GetValue() const { return buffer_->GetCompactBit(idx_); }
+    // Does not check type.
+    friend std::strong_ordering ThreeWayCompareReaderValue(const IteratorType &left, const IteratorType &right) {
+        bool left_value = left.GetValue();
+        bool right_value = right.GetValue();
+        return left_value <=> right_value;
+    }
+
+private:
+    VectorBuffer *buffer_ = nullptr;
+    u32 idx_ = {};
+};
+
+// Return Iterator for VarcharT ColumnVector
+// Now only support reading Varchar from ColumnVector
+// used in cases like "where c1 > c2" ( (varchar > varchar) -> bool )
+template <>
+class ColumnVectorPtrAndIdx<VarcharT> {
+    using IteratorType = ColumnVectorPtrAndIdx<VarcharT>;
+
+public:
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), fix_heap_mgr_(col->buffer_->fix_heap_mgr_.get()) {}
+    auto &SetIndex(u32 index) {
+        idx_ = index;
+        return *this;
+    }
+    auto &operator[](u32 index) { return SetIndex(index); }
+    // Does not check type.
+    friend std::strong_ordering ThreeWayCompareReaderValue(const IteratorType &left, const IteratorType &right) {
+        const VarcharT &left_value = left.data_ptr_[left.idx_];
+        const VarcharT &right_value = right.data_ptr_[right.idx_];
+        auto left_length = static_cast<u32>(left_value.length_);
+        auto right_length = static_cast<u32>(right_value.length_);
+        auto left_char_iterator = left.fix_heap_mgr_->GetNextCharIterator(left_value);
+        auto right_char_iterator = right.fix_heap_mgr_->GetNextCharIterator(right_value);
+        return CompareCharArray(left_char_iterator, left_length, right_char_iterator, right_length);
+    }
+    friend bool CheckReaderValueEquality(const IteratorType &left, const IteratorType &right) {
+        const VarcharT &left_value = left.data_ptr_[left.idx_];
+        const VarcharT &right_value = right.data_ptr_[right.idx_];
+        auto left_length = static_cast<u32>(left_value.length_);
+        auto right_length = static_cast<u32>(right_value.length_);
+        if (left_length != right_length) {
+            return false;
+        }
+        auto left_char_iterator = left.fix_heap_mgr_->GetNextCharIterator(left_value);
+        auto right_char_iterator = right.fix_heap_mgr_->GetNextCharIterator(right_value);
+        for (u32 i = 0; i < left_length; ++i) {
+            if (left_char_iterator.GetNextChar() != right_char_iterator.GetNextChar()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+private:
+    const VarcharT *data_ptr_ = nullptr;
+    FixHeapManager *fix_heap_mgr_ = nullptr;
+    u32 idx_ = {};
+    static std::strong_ordering CompareCharArray(auto &left_char_iterator, u32 left_len, auto &right_char_iterator, u32 right_len) {
+        for (u32 i = 0, com_len = std::min(left_len, right_len); i < com_len; ++i) {
+            char left_char = left_char_iterator.GetNextChar();
+            char right_char = right_char_iterator.GetNextChar();
+            if (left_char < right_char) {
+                return std::strong_ordering::less;
+            } else if (left_char > right_char) {
+                return std::strong_ordering::greater;
+            }
+        }
+        return left_len <=> right_len;
+    }
+};
+
+// BooleanColumnWriter does not check null, range and type.
+export using BooleanColumnWriter = ColumnVectorPtrAndIdx<BooleanT>;
+
+// ColumnValueReader does not check null, range and type.
+export template <BinaryGenerateBoolean ColumnValueType>
+using ColumnValueReader = ColumnVectorPtrAndIdx<ColumnValueType>;
 
 } // namespace infinity
