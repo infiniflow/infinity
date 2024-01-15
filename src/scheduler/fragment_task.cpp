@@ -16,6 +16,8 @@ module;
 
 #include <sstream>
 
+module fragment_task;
+
 import profiler;
 import plan_fragment;
 import stl;
@@ -31,8 +33,6 @@ import query_context;
 import base_table_ref;
 import defer_op;
 import fragment_context;
-
-module fragment_task;
 
 namespace infinity {
 
@@ -150,7 +150,7 @@ void FragmentTask::CompleteTask() {
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
     } else {
-        Error<SchedulerException>("Status should be error");
+        UnrecoverableError("Status should be error");
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
