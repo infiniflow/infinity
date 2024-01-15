@@ -200,7 +200,11 @@ public:
 
         ImportOptions import_options;
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
-        import_options.delimiter_ = request.import_option.delimiter[0];
+        auto &delimiter_string = request.import_option.delimiter;
+        if (delimiter_string.size() != 1) {
+            Error<NetworkException>("Delimiter size must be 1");
+        }
+        import_options.delimiter_ = delimiter_string[0];
 
         const QueryResult result = table->Import(path.c_str(), import_options);
         ProcessCommonResult(response, result);
