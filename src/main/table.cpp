@@ -105,7 +105,7 @@ QueryResult Table::Import(const String &path, ImportOptions import_options) {
 
     import_statement->header_ = false;
     import_statement->copy_file_type_ = import_options.copy_file_type_;
-    import_statement->delimiter_ = ',';
+    import_statement->delimiter_ = import_options.delimiter_;
 
     QueryResult result = query_context_ptr->QueryStatement(import_statement.get());
     return result;
