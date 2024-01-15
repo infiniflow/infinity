@@ -16,6 +16,9 @@ module;
 
 //#include <fstream>
 #include <string>
+
+module physical_command;
+
 import stl;
 import query_context;
 import operator_state;
@@ -29,11 +32,8 @@ import options;
 import third_party;
 import defer_op;
 import config;
-
+import status;
 import infinity_exception;
-#include "statement/command_statement.h"
-
-module physical_command;
 
 namespace infinity {
 
@@ -51,7 +51,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SetCmd *set_command = (SetCmd *)(command_info_.get());
             if(set_command->var_name() == enable_profiling_name) {
                 if(set_command->value_type() != SetVarType::kBool) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+                    RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
                 }
                 query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
                 return true;
@@ -59,7 +59,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             if(set_command->var_name() == profile_history_capacity_name) {
                 if(set_command->value_type() != SetVarType::kInteger) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+                    RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
                 }
                 query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
                 return true;
@@ -67,7 +67,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             if(set_command->var_name() == log_level) {
                 if(set_command->value_type() != SetVarType::kString) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+                    RecoverableError(Status::DataTypeMismatch("String", set_command->value_type_str()));
                 }
 
                 if(set_command->scope() != SetScope::kGlobal) {

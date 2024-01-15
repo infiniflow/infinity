@@ -63,10 +63,10 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
         return; // All data are false;
     }
     if (output_true_select.get() == nullptr && output_false_select.get() == nullptr) {
-        Error<ExecutorException>("No output select column vector is given");
+        UnrecoverableError("No output select column vector is given");
     }
     if (expr->Type().type() != LogicalType::kBoolean) {
-        Error<ExecutorException>("Attempting to select non-boolean expression");
+        UnrecoverableError("Attempting to select non-boolean expression");
     }
     Select(expr, state, count, output_true_select);
 }
@@ -87,7 +87,7 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
 
 void ExpressionSelector::Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable) {
     if (bool_column->vector_type() != ColumnVectorType::kCompactBit || bool_column->data_type()->type() != LogicalType::kBoolean) {
-        Error<ExecutorException>("Attempting to select non-boolean expression");
+        UnrecoverableError("Attempting to select non-boolean expression");
     }
     const auto &boolean_buffer = *(bool_column->buffer_);
     const auto &null_mask = bool_column->nulls_ptr_;
