@@ -18,10 +18,13 @@ import global_resource_usage;
 import stl;
 import vector_heap_chunk;
 import default_values;
+import parser;
 
 export module fix_heap;
 
 namespace infinity {
+
+class VarcharNextCharAccessor;
 
 export struct FixHeapManager {
     // Use to store string.
@@ -59,6 +62,12 @@ public:
 
     [[nodiscard]] inline u64 total_mem() const { return current_chunk_size_ * (current_chunk_idx_ + 1); }
 
+public:
+    // Used when comparing two VarcharT variables.
+    // Only get next char, without copying it to buffer.
+    friend VarcharNextCharAccessor;
+    [[nodiscard]] VarcharNextCharAccessor GetNextCharAccessor(const VarcharT &varchar) const;
+
 private:
     // Allocate new chunk if current chunk is not enough.
     // return value: start chunk id and start offset of the chunk id
@@ -70,5 +79,37 @@ private:
     u64 current_chunk_idx_{0};
     u64 current_chunk_offset_{0};
 };
+
+class VarcharNextCharAccessor {
+public:
+    explicit VarcharNextCharAccessor(const FixHeapManager *heap_mgr, const VarcharT &varchar) {
+        if (varchar.IsInlined()) {
+            data_ptr_ = varchar.short_.data_;
+            remain_size_ = varchar.length_;
+        } else {
+            heap_mgr_ = heap_mgr;
+            chunk_id_ = varchar.vector_.chunk_id_;
+            data_ptr_ = heap_mgr_->chunks_[chunk_id_]->ptr_ + varchar.vector_.chunk_offset_;
+            remain_size_ = heap_mgr_->current_chunk_size() - varchar.vector_.chunk_offset_;
+        }
+    }
+
+    [[nodiscard]] inline char operator()() {
+        if (remain_size_ == 0) {
+            data_ptr_ = heap_mgr_->chunks_[++chunk_id_]->ptr_;
+            remain_size_ = heap_mgr_->current_chunk_size();
+        }
+        --remain_size_;
+        return *(data_ptr_++);
+    }
+
+private:
+    const char *data_ptr_{nullptr};
+    u64 remain_size_{0};
+    const FixHeapManager *heap_mgr_{nullptr};
+    u64 chunk_id_{0};
+};
+
+VarcharNextCharAccessor FixHeapManager::GetNextCharAccessor(const VarcharT &varchar) const { return VarcharNextCharAccessor(this, varchar); }
 
 } // namespace infinity
