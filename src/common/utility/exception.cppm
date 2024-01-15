@@ -110,11 +110,11 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
 //    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
 //};
 
-export class ExecutorException : public Exception {
-public:
-    template <typename... Args>
-    explicit ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
-};
+//export class ExecutorException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
+//};
 
 export class SchedulerException : public Exception {
 public:

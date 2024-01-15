@@ -1103,7 +1103,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
         if (task->sink_state_->error_message_.get() != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_);
+            UnrecoverableError(*task->sink_state_->error_message_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
@@ -1150,7 +1150,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
         if (task->sink_state_->error_message_.get() != nullptr) {
-            Error<ExecutorException>(*task->sink_state_->error_message_);
+            UnrecoverableError(*task->sink_state_->error_message_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
