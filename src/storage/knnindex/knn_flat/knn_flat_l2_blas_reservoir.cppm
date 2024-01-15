@@ -64,7 +64,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2BlasReservoir isn't begin");
+            UnrecoverableError("KnnFlatL2BlasReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -126,7 +126,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2BlasReservoir isn't begin");
+            UnrecoverableError("KnnFlatL2BlasReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;

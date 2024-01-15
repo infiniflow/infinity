@@ -229,7 +229,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 UnrecoverableError("Not implemented");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
         }
     }
@@ -497,7 +497,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 UnrecoverableError("Not implemented");
             }
             case kInvalid: {
-                Error<ExecutorException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
         }
     }

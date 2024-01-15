@@ -99,7 +99,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPBlasReservoir isn't begin");
+            UnrecoverableError("KnnFlatIPBlasReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
