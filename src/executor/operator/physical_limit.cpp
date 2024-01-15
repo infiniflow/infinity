@@ -29,7 +29,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import data_block;
-
+import status;
 import infinity_exception;
 import expression_type;
 import value_expression;
@@ -84,7 +84,7 @@ SizeT AtomicCounter::Limit(SizeT row_count) {
 
 bool AtomicCounter::IsLimitOver() {
     if (limit_ < 0) {
-        Error<ExecutorException>("limit is not allowed to be smaller than 0");
+        RecoverableError(Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0"));
     }
     return limit_ == 0;
 }
@@ -129,7 +129,7 @@ SizeT UnSyncCounter::Limit(SizeT row_count) {
 
 bool UnSyncCounter::IsLimitOver() {
     if (limit_ < 0) {
-        Error<ExecutorException>("limit is not allowed to be smaller than 0");
+        RecoverableError(Status::InvalidParameterValue("Limit", std::to_string(limit_), "larger than 0"));
     }
     return limit_ == 0;
 }
