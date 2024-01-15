@@ -90,15 +90,15 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
     if (table_entry_->ColumnCount() != 1) {
-        Error<ExecutorException>("FVECS file must have only one column.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one column."));
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
     if (column_type->type() != kEmbedding) {
-        Error<ExecutorException>("FVECS file must have only one embedding column.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column."));
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     if (embedding_info->Type() != kElemFloat) {
-        Error<ExecutorException>("FVECS file must have only one embedding column with float element.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column with float element."));
     }
 
     LocalFileSystem fs;
@@ -110,11 +110,11 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
-        Error<ExecutorException>(fmt::format("Read dimension which length isn't {}.", nbytes));
+        RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(
-            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        RecoverableError(Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension())));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
@@ -136,7 +136,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Error<ExecutorException>(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            RecoverableError(Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension)));
         }
         ptr_t dst_ptr = buf_ptr + last_block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -421,12 +421,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                Error<ExecutorException>("Embedding data size exceeds dimension.");
+                RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
             }
 
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    Error<ExecutorException>("Embedding bit type is not implemented.");
+                    UnrecoverableError("Embedding bit type is not implemented.");
                 }
                 case kElemInt8: {
                     AppendEmbeddingData<TinyIntT>(block_column_entry, ele_str_views, dst_offset);
@@ -504,7 +504,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
 template <typename T>
 void AppendEmbeddingJsonl(BlockColumnEntry *block_column_entry, const Vector<T> &embedding, SizeT dst_offset, SizeT dim) {
     if (embedding.size() != dim) {
-        Error<ExecutorException>("Embedding data size neq dimension.");
+        RecoverableError(Status::ImportFileFormatError("Embedding data size isn't same as dimension."));
     }
     block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(embedding.data()), embedding.size() * sizeof(T), nullptr);
 }

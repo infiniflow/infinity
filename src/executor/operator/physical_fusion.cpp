@@ -88,9 +88,9 @@ bool PhysicalFusion::Execute(QueryContext *query_context, OperatorState *operato
         SizeT base_rank = 1;
         for (UniquePtr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                Error<ExecutorException>(fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                                     input_data_block->column_count(),
-                                                     GetOutputTypes()->size()));
+                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                                               input_data_block->column_count(),
+                                               GetOutputTypes()->size()));
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());

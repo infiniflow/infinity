@@ -262,7 +262,6 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
-            Error<ExecutorException>(*err_msg);
             return Status(ErrorCode::kNotFound, std::move(err_msg));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
@@ -298,7 +297,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableEntry::GetSegmentByID(this, segment_id);
         if (segment == nullptr) {
-            Error<ExecutorException>(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
+            UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
@@ -315,7 +314,6 @@ Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
-        Error<ExecutorException>(*err_msg);
         return Status(ErrorCode::kNotFound, std::move(err_msg));
     }
 
@@ -349,12 +347,12 @@ SegmentEntry *TableEntry::GetSegmentByID(const TableEntry *table_entry, u32 segm
 const BlockEntry *TableEntry::GetBlockEntryByID(u32 seg_id, u16 block_id) const {
     SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, seg_id);
     if (segment_entry == nullptr) {
-        throw ExecutorException(fmt::format("Cannot find segment, segment id: {}", seg_id));
+        UnrecoverableError(fmt::format("Cannot find segment, segment id: {}", seg_id));
     }
 
     BlockEntry *block_entry = segment_entry->GetBlockEntryByID(block_id);
     if (block_entry == nullptr) {
-        throw ExecutorException(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
+        UnrecoverableError(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
     }
     return block_entry;
 }

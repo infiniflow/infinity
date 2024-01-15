@@ -62,6 +62,7 @@ import dist_func_l2;
 import dist_func_ip;
 import knn_expression;
 import value;
+import status;
 
 namespace infinity {
 
@@ -500,7 +501,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    UnrecoverableError(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {

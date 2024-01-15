@@ -14,20 +14,20 @@
 
 module;
 
+module column_buffer;
+
 import stl;
 import buffer_handle;
 import buffer_manager;
 import infinity_exception;
-
+import status;
 import varchar_layout;
 import parser;
 import buffer_obj;
 import data_file_worker;
 import default_values;
-import column_buffer;
 import catalog;
 
-module column_buffer;
 namespace infinity {
 
 const_ptr_t ColumnBuffer::GetAll() {
@@ -60,7 +60,7 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     return {ptr, varchar_layout->length_};
 }
 
-Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {\
+Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefix(SizeT row_idx) {
     if (outline_buffer_.get() == nullptr) {
         Error<StorageException>("Cannot get one element of an inline column");
     }
@@ -79,14 +79,14 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
     } else {
         switch (data_type.type()) {
             case LogicalType::kBoolean: {
-                Error<ExecutorException>("Can't return a pointer for compact Boolean type");
+                RecoverableError(Status::NotSupport("Can't return a pointer for compact Boolean type"));
             }
             case LogicalType::kVarchar:
             case LogicalType::kArray:
             case LogicalType::kTuple:
-//            case LogicalType::kPath:
-//            case LogicalType::kPolygon:
-//            case LogicalType::kBlob:
+                //            case LogicalType::kPath:
+                //            case LogicalType::kPolygon:
+                //            case LogicalType::kBlob:
             case LogicalType::kMixed: {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }
@@ -149,14 +149,14 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
     } else {
         switch (data_type.type()) {
             case LogicalType::kBoolean: {
-                Error<ExecutorException>("Can't return a pointer for compact Boolean type");
+                RecoverableError(Status::NotSupport("Can't return a pointer for compact Boolean type"));
             }
             case kVarchar:
             case kArray:
             case kTuple:
-//            case kPath:
-//            case kPolygon:
-//            case kBlob:
+                //            case kPath:
+                //            case kPolygon:
+                //            case kBlob:
             case kMixed: {
                 Error<NotImplementException>("Not implement complex type GetValueAt function");
             }

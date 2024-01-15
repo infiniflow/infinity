@@ -15,6 +15,9 @@
 module;
 
 #include <string>
+
+module physical_insert;
+
 import stl;
 import txn;
 import query_context;
@@ -32,8 +35,6 @@ import base_expression;
 import infinity_exception;
 import catalog;
 
-module physical_insert;
-
 namespace infinity {
 
 void PhysicalInsert::Init() {}
@@ -43,9 +44,8 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
-        Error<ExecutorException>(
+        UnrecoverableError(
             fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
-        ;
     }
 
     // Prepare the output block

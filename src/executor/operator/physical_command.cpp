@@ -123,7 +123,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
             if (profiler_record == nullptr) {
-                Error<ExecutorException>(fmt::format("The record does not exist: {}", export_command->file_no()));
+                RecoverableError(Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no())));
             }
             LocalFileSystem fs;
             FileWriter file_writer(fs, export_command->file_name(), 128);

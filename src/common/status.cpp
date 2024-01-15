@@ -205,6 +205,14 @@ Status Status::FunctionArgsError(const String& func_name) {
     return Status(ErrorCode::kFunctionArgsError, MakeUnique<String>(fmt::format("{} arguments have errors", func_name)));
 }
 
+Status Status::ImportFileFormatError(const infinity::String &detailed_info) {
+    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Import file format error: ", detailed_info)));
+}
+
+Status Status::DataNotExist(const infinity::String &detailed_info) {
+    return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Data not exist: ", detailed_info)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

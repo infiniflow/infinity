@@ -79,6 +79,8 @@ export enum class ErrorCode : long {
     kSessionNotFound = 3034,
     kRecursiveAgg = 3035,
     kFunctionArgsError = 3036,
+    kImportFileFormatError = 3037,
+    kDataNotExist = 3038,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -151,6 +153,8 @@ public:
     static Status SessionNotFound(i64 session_id);
     static Status RecursiveAggregate(const String& expr_name);
     static Status FunctionArgsError(const String& func_name);
+    static Status ImportFileFormatError(const String& detailed_info);
+    static Status DataNotExist(const String& detailed_info);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

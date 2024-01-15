@@ -306,7 +306,7 @@ void PhysicalTop::Init() {
 bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto prev_op_state = operator_state->prev_op_state_;
     if ((offset_ != 0) and !(prev_op_state->Complete())) {
-        Error<ExecutorException>("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
+        UnrecoverableError("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = operator_state->data_block_array_;
