@@ -67,7 +67,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
                                                          String replay_table_index_dir) {
     if (index_def->index_name_->empty()) {
         // Index name shouldn't be empty
-        Error<StorageException>("Attempt to create no name index.");
+        UnrecoverableError("Attempt to create no name index.");
     }
 
     TableIndexMeta *table_index_meta{nullptr};
@@ -120,10 +120,10 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 
                 return {nullptr, Status(ErrorCode::kNotFound, error_message.c_str())};
             }
             default: {
-                Error<StorageException>("Invalid conflict type.");
+                UnrecoverableError("Invalid conflict type.");
             }
         }
-        Error<StorageException>("Should not reach here.");
+        UnrecoverableError("Should not reach here.");
     }
     LOG_TRACE(fmt::format("Drop index entry {}", index_name));
     return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
@@ -178,7 +178,7 @@ void TableEntry::GetFullTextAnalyzers(u64 txn_id,
 
 void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) {
     if (this->deleted_) {
-        Error<StorageException>("table is deleted");
+        UnrecoverableError("table is deleted");
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
@@ -237,7 +237,7 @@ void TableEntry::CreateIndexFile(void *txn_store,
         } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
             continue;
         } else {
-            Error<StorageException>("Invalid entry type");
+            UnrecoverableError("Invalid entry type");
         }
     }
 }
@@ -503,10 +503,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
-            Error<StorageException>("deleted table should have no segment");
+            UnrecoverableError("deleted table should have no segment");
         }
     } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
-        Error<StorageException>("table segment 0 should be valid");
+        UnrecoverableError("table segment 0 should be valid");
     }
 
     if (table_entry_json.contains("table_indexes")) {
@@ -532,17 +532,17 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
 void TableEntry::MergeFrom(BaseEntry &other) {
     auto table_entry2 = dynamic_cast<TableEntry *>(&other);
     if (table_entry2 == nullptr) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
     }
     // // No locking here since only the load stage needs MergeFrom.
     if (*this->table_name_ != *table_entry2->table_name_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_name_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_name_ match");
     }
     if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
     }
     if (this->table_entry_type_ != table_entry2->table_entry_type_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
     }
 
     this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
@@ -564,7 +564,7 @@ void TableEntry::MergeFrom(BaseEntry &other) {
     if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
         auto seg_it = this->segment_map_.find(max_segment_id);
         if (seg_it == this->segment_map_.end()) {
-            Error<StorageException>(fmt::format("max_segment_id {} is invalid", max_segment_id));
+            UnrecoverableError(fmt::format("max_segment_id {} is invalid", max_segment_id));
         }
         this->unsealed_segment_ = seg_it->second.get();
     }

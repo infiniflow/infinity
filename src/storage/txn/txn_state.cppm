@@ -56,7 +56,7 @@ export inline String ToString(TxnState txn_state) {
             break;
         }
     }
-    Error<StorageException>("Invalid transaction state.");
+    UnrecoverableError("Invalid transaction state.");
     return String();
 }
 

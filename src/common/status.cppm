@@ -108,6 +108,7 @@ export enum class ErrorCode : long {
     kIndexCorrupted = 7007,
     kFileNotFound = 7008,
     kDirNotFound = 7009,
+    kDataIOError = 7010,
 };
 
 export class Status {
@@ -182,6 +183,7 @@ public:
     static Status IndexCorrupted(const String &path);
     static Status FileNotFound(const String &path);
     static Status DirNotFound(const String &path);
+    static Status DataIOError(const String &detailed_info);
 
 public:
     Status() = default;

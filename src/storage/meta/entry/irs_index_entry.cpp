@@ -59,7 +59,7 @@ SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const nlohmann::json &index_
 }
 
 SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String &) {
-    Error<StorageException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return nullptr;
 }
 

@@ -57,7 +57,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
             }
         }
         default: {
-            Error<StorageException>("Invalid conflict type.");
+            UnrecoverableError("Invalid conflict type.");
             return {table_index_entry, status};
         }
     }
@@ -195,7 +195,7 @@ TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnT
             }
         }
         default: {
-            Error<StorageException>("Invalid conflict type.");
+            UnrecoverableError("Invalid conflict type.");
             return {table_index_entry, status};
         }
     }
@@ -258,7 +258,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
     }
 }
 
-SharedPtr<String> TableIndexMeta::ToString() { throw StorageException("Not implemented"); }
+SharedPtr<String> TableIndexMeta::ToString() { UnrecoverableError("Not implemented"); }
 
 nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
@@ -274,7 +274,7 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
                 continue;
             }
             if (base_entry->entry_type_ != EntryType::kTableIndex) {
-                Error<StorageException>("Unexpected entry type during serialize table index meta");
+                UnrecoverableError("Unexpected entry type during serialize table index meta");
             }
             if (base_entry->commit_ts_ <= max_commit_ts) {
                 // Put it to candidate list
@@ -358,7 +358,7 @@ void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
 
 void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
     if (!IsEqual(*this->index_name_, *other.index_name_)) {
-        Error<StorageException>("TableIndexMeta::MergeFrom requires index_name_ match");
+        UnrecoverableError("TableIndexMeta::MergeFrom requires index_name_ match");
     }
     MergeLists(this->entry_list_, other.entry_list_);
 }

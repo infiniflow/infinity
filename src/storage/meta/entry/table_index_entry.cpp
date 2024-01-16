@@ -52,7 +52,7 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
 
         // Get column info
         if (index_base->column_names_.size() != 1) {
-            Error<StorageException>("Currently, composite index doesn't supported.");
+            UnrecoverableError("Currently, composite index doesn't supported.");
         }
         u64 column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
         if (index_base->index_type_ == IndexType::kIRSFullText) {

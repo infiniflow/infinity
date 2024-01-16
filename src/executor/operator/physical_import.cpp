@@ -136,7 +136,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            RecoverableError(Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension)));
+            RecoverableError(
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension)));
         }
         ptr_t dst_ptr = buf_ptr + last_block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -399,7 +400,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         UniquePtr<String> err_msg =
             MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
         LOG_ERROR(*err_msg);
-        Error<StorageException>(*err_msg);
+        RecoverableError(Status::ImportFileFormatError(*err_msg));
     }
     // append data to segment entry
     SizeT write_row = last_block_entry->row_count();

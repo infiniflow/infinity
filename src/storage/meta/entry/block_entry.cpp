@@ -79,7 +79,7 @@ void BlockVersion::LoadFromFile(const String &version_path) {
     std::memcpy(deleted_.data(), ptr, deleted_size * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != buf_len) {
-        Error<StorageException>(fmt::format("Failed to load block_version file: {}", version_path));
+        UnrecoverableError(fmt::format("Failed to load block_version file: {}", version_path));
     }
 }
 
@@ -95,11 +95,11 @@ void BlockVersion::SaveToFile(const String &version_path) {
     std::memcpy(ptr, deleted_.data(), deleted_.size() * sizeof(TxnTimeStamp));
     ptr += deleted_.size() * sizeof(TxnTimeStamp);
     if (ptr - buf.data() != exp_size) {
-        Error<StorageException>(fmt::format("Failed to save block_version file: {}", version_path));
+        UnrecoverableError(fmt::format("Failed to save block_version file: {}", version_path));
     }
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
-        Error<StorageException>(fmt::format("Failed to open block_version file: {}", version_path));
+        UnrecoverableError(fmt::format("Failed to open block_version file: {}", version_path));
     }
     ofs.write(buf.data(), ptr - buf.data());
     ofs.flush();
@@ -160,7 +160,7 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
 u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
@@ -192,7 +192,7 @@ u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_bl
 void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
@@ -214,7 +214,7 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
 void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != txn_id) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
     this->using_txn_id_ = 0;
@@ -230,7 +230,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
 void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
 
@@ -262,7 +262,7 @@ void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_ver
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     LOG_TRACE(fmt::format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("BlockEntry checkpoint_ts skew! checkpoint_ts: {}, this->checkpoint_ts_: {}", checkpoint_ts, this->checkpoint_ts_));
     }
     int checkpoint_row_count = 0;
@@ -276,7 +276,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
         checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
-            Error<StorageException>("BlockEntry is empty at checkpoint_ts!");
+            UnrecoverableError("BlockEntry is empty at checkpoint_ts!");
         }
         const Vector<TxnTimeStamp> &deleted = this->block_version_->deleted_;
         if (checkpoint_row_count <= this->checkpoint_row_count_) {
@@ -369,34 +369,34 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, u64 block_i
 void BlockEntry::MergeFrom(BaseEntry &other) {
     auto block_entry2 = dynamic_cast<BlockEntry *>(&other);
     if (block_entry2 == nullptr) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
     }
     // // No locking here since only the load stage needs MergeFrom.
     if (*this->base_dir_ != *block_entry2->base_dir_) {
-        Error<StorageException>("BlockEntry::MergeFrom requires base_dir_ match");
+        UnrecoverableError("BlockEntry::MergeFrom requires base_dir_ match");
     }
     if (this->block_id_ != block_entry2->block_id_) {
-        Error<StorageException>("BlockEntry::MergeFrom requires block_id_ match");
+        UnrecoverableError("BlockEntry::MergeFrom requires block_id_ match");
     }
     if (this->row_capacity_ != block_entry2->row_capacity_) {
-        Error<StorageException>("BlockEntry::MergeFrom requires row_capacity_ match");
+        UnrecoverableError("BlockEntry::MergeFrom requires row_capacity_ match");
     }
     if (this->min_row_ts_ != block_entry2->min_row_ts_) {
-        Error<StorageException>("BlockEntry::MergeFrom requires min_row_ts_ match");
+        UnrecoverableError("BlockEntry::MergeFrom requires min_row_ts_ match");
     }
     if (this->row_count_ > block_entry2->row_count_) {
-        Error<StorageException>("BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
+        UnrecoverableError("BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
     }
     if (this->checkpoint_ts_ > block_entry2->checkpoint_ts_) {
-        Error<StorageException>(
+        UnrecoverableError(
             "BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
     }
     if (this->checkpoint_row_count_ > block_entry2->checkpoint_row_count_) {
-        Error<StorageException>(
+        UnrecoverableError(
             "BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
     }
     if (columns_.size() > block_entry2->columns_.size()) {
-        Error<StorageException>("BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
+        UnrecoverableError("BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
     }
 
     if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)

@@ -122,11 +122,11 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
 //    explicit SchedulerException(Args... params) : Exception(BuildMessage(String("Scheduler Error:"), params...)) {}
 //};
 
-export class StorageException : public Exception {
-public:
-    template <typename... Args>
-    explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
-};
+//export class StorageException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
+//};
 
 //export class TypeException : public Exception {
 //public:

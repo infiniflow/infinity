@@ -60,7 +60,7 @@ void BGTaskProcessor::Process() {
                 break;
             }
             case BGTaskType::kInvalid: {
-                Error<StorageException>("Invalid background task");
+                UnrecoverableError("Invalid background task");
                 break;
             }
         }

@@ -82,7 +82,7 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
             };
             auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
-                Error<StorageException>("HNSW supports embedding type.");
+                UnrecoverableError("HNSW supports embedding type.");
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
@@ -107,7 +107,7 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    Error<StorageException>("Not implemented");
+                                    UnrecoverableError("Not implemented");
                                 }
                             }
                             break;
@@ -129,19 +129,19 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    Error<StorageException>("Not implemented");
+                                    UnrecoverableError("Not implemented");
                                 }
                             }
                             break;
                         }
                         default: {
-                            Error<StorageException>("Not implemented");
+                            UnrecoverableError("Not implemented");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Not implemented");
+                    UnrecoverableError("Not implemented");
                 }
             }
             break;
@@ -182,7 +182,7 @@ void SegmentColumnIndexEntry::SaveIndexFile() {
 
 nlohmann::json SegmentColumnIndexEntry::Serialize() {
     if (this->deleted_) {
-        Error<StorageException>("Segment Column index entry can't be deleted.");
+        UnrecoverableError("Segment Column index entry can't be deleted.");
     }
 
     nlohmann::json index_entry_json;
@@ -205,7 +205,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
-        Error<StorageException>(status.message());
+        UnrecoverableError(status.message());
         return nullptr;
     }
     u64 column_id = column_index_entry->column_id();
@@ -215,7 +215,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());
     if (segment_column_index_entry.get() == nullptr) {
-        Error<StorageException>("Failed to load index entry");
+        UnrecoverableError("Failed to load index entry");
     }
     segment_column_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_column_index_entry->max_ts_ = index_entry_json["max_ts"];

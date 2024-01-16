@@ -76,14 +76,14 @@ AnnIVFFlatIndexFileWorker<DataType>::~AnnIVFFlatIndexFileWorker() {
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
-        Error<StorageException>("Data is already allocated.");
+        UnrecoverableError("Data is already allocated.");
     }
     if (index_base_->index_type_ != IndexType::kIVFFlat) {
-        Error<StorageException>("Bug.");
+        UnrecoverableError("Index type is mismatched");
     }
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
-        StorageException("Index should be created on embedding column now.");
+        UnrecoverableError("Index should be created on embedding column now.");
     }
     SizeT dimension = GetDimension();
 
@@ -98,7 +98,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
             break;
         }
         default: {
-            Error<StorageException>("Index should be created on float embedding column now.");
+            UnrecoverableError("Index should be created on float embedding column now.");
         }
     }
 }
@@ -106,7 +106,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
 template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("Data is not allocated.");
+        UnrecoverableError("Data is not allocated.");
     }
     auto index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     delete index;

@@ -30,7 +30,9 @@ import status;
 
 namespace infinity {
 BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const {
-    Assert<StorageException>(!entry_list_.empty(), "entry list should at least has a dummy head.");
+    if(entry_list_.empty()) {
+        UnrecoverableError("entry list should at least has a dummy head.");
+    }
     // BaseEntry *header_base_entry = entry_list_.front().get();
 
     auto iter = entry_list_.begin();
@@ -77,7 +79,7 @@ BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_
                 break;
             }
             default: {
-                throw StorageException("Invalid entry txn state.");
+                UnrecoverableError("Invalid entry txn state.");
             }
         }
     }

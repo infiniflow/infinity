@@ -69,11 +69,11 @@ SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_nam
         } else if (para->param_name_ == "encode") {
             encode_type = StringToHnswEncodeType(para->param_value_);
         } else {
-            Error<StorageException>("Invalid index parameter");
+            UnrecoverableError("Invalid index parameter");
         }
     }
     if (metric_type == MetricType::kInvalid || encode_type == HnswEncodeType::kInvalid) {
-        Error<StorageException>("Lack index parameters");
+        UnrecoverableError("Lack index parameters");
     }
     return MakeShared<IndexHnsw>(file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
 }

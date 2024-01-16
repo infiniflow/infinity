@@ -40,7 +40,7 @@ public:
                 }
             }
             default: {
-                Error<StorageException>("Invalid conflict type.");
+                UnrecoverableError("Invalid conflict type.");
                 return result;
             }
         }

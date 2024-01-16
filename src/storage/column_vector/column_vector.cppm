@@ -100,16 +100,16 @@ public:
 
     void AppendValue(const Value &value) {
         if (!initialized) {
-            Error<StorageException>("Column vector isn't initialized.");
+            UnrecoverableError("Column vector isn't initialized.");
         }
         if (vector_type_ == ColumnVectorType::kConstant) {
             if (tail_index_ >= 1) {
-                Error<StorageException>("Constant column vector will only have 1 value.");
+                UnrecoverableError("Constant column vector will only have 1 value.");
             }
         }
 
         if (tail_index_ >= capacity_) {
-            Error<StorageException>(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
+            UnrecoverableError(fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_));
         }
         SetValue(tail_index_++, value);
     }

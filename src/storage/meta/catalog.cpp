@@ -455,7 +455,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, Buffe
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        Error<StorageException>(fmt::format("Catalog file {}, read error.", catalog_path));
+        RecoverableError(Status::CatalogCorrupted(catalog_path));
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
@@ -506,7 +506,8 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (nbytes != catalog_str.size()) {
-        Error<StorageException>(fmt::format("Catalog file {}, saving error.", file_path));
+        LOG_ERROR(fmt::format("Saving catalog file failed: {}", file_path));
+        RecoverableError(Status::CatalogCorrupted(file_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();

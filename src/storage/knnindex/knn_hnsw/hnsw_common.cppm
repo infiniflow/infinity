@@ -109,7 +109,7 @@ public:
         file_handler.Read(&max_vec_num, sizeof(SizeT));
         if (new_vec_n != 0) {
             if (new_vec_n < cur_vec_num) {
-                Error<StorageException>("input vec num is smaller than the stored vec num");
+                UnrecoverableError("input vec num is smaller than the stored vec num");
             }
             max_vec_num = new_vec_n;
         }

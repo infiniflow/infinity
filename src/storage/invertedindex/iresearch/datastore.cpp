@@ -300,7 +300,7 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
         if (index_base->analyzer_ == JIEBA) {
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
             if (!stream.get()) {
-                throw StorageException("Dict path of Jieba analyzer is not valid");
+                UnrecoverableError("Dict path of Jieba analyzer is not valid");
             }
             analyzers.push_back(std::move(stream));
         } else if (index_base->analyzer_ == SEGMENT) {
@@ -311,7 +311,7 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
             UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
             analyzers.push_back(std::move(stream));
         } else {
-            throw StorageException("Non existing analyzer");
+            UnrecoverableError("Non existing analyzer");
         }
     }
 

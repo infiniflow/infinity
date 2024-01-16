@@ -75,7 +75,7 @@ void IndexDef::WriteAdv(char *&ptr) const {
 SharedPtr<IndexDef> IndexDef::ReadAdv(char *&ptr, int32_t maxbytes) {
 //    char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
-        Error<StorageException>("maxbytes < 0");
+        UnrecoverableError("maxbytes < 0");
     }
     SharedPtr<String> index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
     SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(index_name);

@@ -367,7 +367,7 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
 void TableMeta::MergeFrom(TableMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
     if (!IsEqual(*this->table_name_, *other.table_name_) || !IsEqual(*this->db_entry_dir_, *other.db_entry_dir_)) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_name_ and db_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_name_ and db_entry_dir_ match");
     }
     MergeLists(this->entry_list_, other.entry_list_);
 }
