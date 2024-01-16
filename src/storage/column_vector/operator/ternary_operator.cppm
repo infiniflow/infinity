@@ -87,13 +87,13 @@ public:
         // 2. Flat Flat Constant
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            Error<TypeException>("Not support Flat Flat Constant");
+            UnrecoverableError("Not support Flat Flat Constant");
         }
 
         // 3. Flat Constant Flat
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Flat Constant Flat");
+            UnrecoverableError("Not support Flat Constant Flat");
         }
 
         // 4. Flat Constant Constant
@@ -125,19 +125,19 @@ public:
         // 5. Constant Flat Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Constant Flat Flat");
+            UnrecoverableError("Not support Constant Flat Flat");
         }
 
         // 6. Constant Flat Constant
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            Error<TypeException>("Not support Constant Flat Constant");
+            UnrecoverableError("Not support Constant Flat Constant");
         }
 
         // 7. Constant Constant Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            Error<TypeException>("Not support Constant Constant Flat");
+            UnrecoverableError("Not support Constant Constant Flat");
         }
 
         // 8. Constant Constant Constant

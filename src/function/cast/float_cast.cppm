@@ -34,7 +34,7 @@ export struct FloatTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
     if (source.type() == target.type()) {
-        Error<FunctionException>("Can't cast from the same type");
+        UnrecoverableError("Can't cast from the same type");
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
@@ -65,7 +65,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -74,7 +74,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -83,7 +83,7 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -161,7 +161,7 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, const Sha
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
@@ -244,7 +244,7 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, const Sh
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;

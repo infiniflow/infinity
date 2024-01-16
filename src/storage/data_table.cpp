@@ -32,7 +32,7 @@ namespace infinity {
 static String TableTypeToString(TableType type) {
     switch (type) {
         case TableType::kInvalid:
-            Error<TypeException>("Unexpected table type: Invalid");
+            UnrecoverableError("Unexpected table type: Invalid");
         case TableType::kDataTable:
             return "DataTable";
         case TableType::kIntermediate:
@@ -48,7 +48,7 @@ static String TableTypeToString(TableType type) {
         case TableType::kCrossProduct:
             return "CrossProduct";
     }
-    Error<TypeException>("Unexpected error.");
+    UnrecoverableError("Unexpected error.");
 }
 
 String DataTable::ToString() const {

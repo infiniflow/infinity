@@ -116,10 +116,10 @@ public:
 
     void SetVectorType(ColumnVectorType vector_type) {
         if (initialized) {
-            Error<TypeException>("Column vector is initialized");
+            UnrecoverableError("Column vector is initialized");
         }
         if (vector_type == ColumnVectorType::kInvalid) {
-            Error<TypeException>("Invalid column vector type.");
+            UnrecoverableError("Invalid column vector type.");
         }
         if (vector_type_ == vector_type) {
             return;

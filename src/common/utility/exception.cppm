@@ -128,17 +128,17 @@ public:
     explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
 };
 
-export class TypeException : public Exception {
-public:
-    template <typename... Args>
-    explicit TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
-};
+//export class TypeException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
+//};
 
-export class FunctionException : public Exception {
-public:
-    template <typename... Args>
-    explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
-};
+//export class FunctionException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
+//};
 
 //export class NotImplementException : public Exception {
 //public:

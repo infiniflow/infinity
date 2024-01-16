@@ -33,14 +33,14 @@ export struct GeographyTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target) {
     if (source.type() == target.type()) {
-        Error<FunctionException>("Can't cast from the same type");
+        UnrecoverableError("Can't cast from the same type");
     }
     switch (target.type()) {
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, GeographyTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from geography type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from geography type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -49,7 +49,7 @@ inline BoundCastFunc BindGeographyCast(const DataType &source, DataType &target)
 struct GeographyTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
                 fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }

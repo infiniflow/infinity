@@ -36,7 +36,7 @@ struct NotFunction {
         } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT>) {
             result = !input;
         } else {
-            Error<TypeException>("NOT function accepts only u8 and BooleanT.");
+            UnrecoverableError("NOT function accepts only u8 and BooleanT.");
         }
     }
 };

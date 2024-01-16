@@ -60,7 +60,7 @@ static BoundCastFunc NumericCast(const DataType &target) {
 
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     if (source == target) {
-        Error<TypeException>(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+        UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
     }
 
     switch (source.type()) {

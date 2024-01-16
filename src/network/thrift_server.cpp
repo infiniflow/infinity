@@ -723,7 +723,7 @@ private:
             case infinity_thrift_rpc::LogicType::Varchar:
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
             default:
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
         }
         return nullptr;
     }
@@ -739,7 +739,7 @@ private:
             case infinity_thrift_rpc::Constraint::Unique:
                 return ConstraintType::kUnique;
             default:
-                Error<TypeException>("Invalid constraint type");
+                UnrecoverableError("Invalid constraint type");
         }
     }
 
@@ -760,7 +760,7 @@ private:
             case infinity_thrift_rpc::ElementType::ElementFloat64:
                 return EmbeddingDataType::kElemDouble;
             default:
-                Error<TypeException>("Invalid embedding data type");
+                UnrecoverableError("Invalid embedding data type");
         }
     }
 
@@ -773,7 +773,7 @@ private:
             case infinity_thrift_rpc::IndexType::IRSFullText:
                 return IndexType::kIRSFullText;
             default:
-                Error<TypeException>("Invalid index type");
+                UnrecoverableError("Invalid index type");
         }
         return IndexType::kInvalid;
     }
@@ -821,7 +821,7 @@ private:
                 return parsed_expr;
             }
             default: {
-                Error<TypeException>("Invalid constant type");
+                UnrecoverableError("Invalid constant type");
             }
         }
     }
@@ -904,7 +904,7 @@ private:
             auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
             return parsed_expr;
         } else {
-            Error<TypeException>("Invalid parsed expression type");
+            UnrecoverableError("Invalid parsed expression type");
         }
         return nullptr;
     }
@@ -920,7 +920,7 @@ private:
             case infinity_thrift_rpc::KnnDistanceType::Hamming:
                 return KnnDistanceType::kHamming;
             default:
-                Error<TypeException>("Invalid distance type");
+                UnrecoverableError("Invalid distance type");
         }
     }
 
@@ -943,7 +943,7 @@ private:
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
-            Error<TypeException>("Invalid embedding data type");
+            UnrecoverableError("Invalid embedding data type");
         }
         return std::make_pair(nullptr, 0);
     }
@@ -978,7 +978,7 @@ private:
             case LogicalType::kRowID:
                 return infinity_thrift_rpc::ColumnType::ColumnRowID;
             default:
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
         }
         return infinity_thrift_rpc::ColumnType::ColumnInvalid;
     }
@@ -1043,7 +1043,7 @@ private:
             }
             case LogicalType::kInvalid:
             default: {
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
         }
         return nullptr;
@@ -1066,7 +1066,7 @@ private:
             case EmbeddingDataType::kElemDouble:
                 return infinity_thrift_rpc::ElementType::ElementFloat64;
             case EmbeddingDataType::kElemInvalid: {
-                Error<TypeException>("Invalid embedding element data type");
+                UnrecoverableError("Invalid embedding element data type");
             }
         }
         return infinity_thrift_rpc::ElementType::ElementFloat32;

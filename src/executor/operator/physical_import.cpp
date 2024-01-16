@@ -326,7 +326,7 @@ namespace {
 Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Error<TypeException>("Embedding data must be surrounded by [ and ]");
+        RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
     }
     Vector<StringView> ret;
     SizeT i = 1, j = 1;

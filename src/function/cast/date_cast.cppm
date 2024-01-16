@@ -43,7 +43,7 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<DateT, VarcharT, DateTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Date type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Date type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -52,7 +52,7 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
 struct DateTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -61,7 +61,7 @@ struct DateTryCastToFixlen {
 struct DateTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -69,19 +69,19 @@ struct DateTryCastToVarlen {
 
 template <>
 inline bool DateTryCastToFixlen::Run(DateT , DateTimeT &) {
-    Error<FunctionException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTryCastToFixlen::Run(DateT , TimestampT &) {
-    Error<FunctionException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 template <>
 inline bool DateTryCastToVarlen::Run(DateT , VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<FunctionException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 

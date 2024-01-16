@@ -249,7 +249,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    Error<TypeException>("Not embedding type");
+                    UnrecoverableError("Not embedding type");
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -291,13 +291,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        Error<TypeException>("Invalid embedding data type");
+                        UnrecoverableError("Invalid embedding data type");
                     }
                 }
                 break;
             }
             default: {
-                Error<TypeException>("Unexpected type");
+                UnrecoverableError("Unexpected type");
             }
         }
 

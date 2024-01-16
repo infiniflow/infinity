@@ -45,7 +45,7 @@ public:
         switch (input_column_vector->vector_type()) {
             case ColumnVectorType::kCompactBit: {
                 if constexpr (!std::is_same_v<InputType, BooleanT>) {
-                    Error<TypeException>("kCompactBit column vector only support Boolean type");
+                    UnrecoverableError("kCompactBit column vector only support Boolean type");
                 } else {
                     // only for count, min, max
                     SizeT row_count = input_column_vector->Size();
@@ -69,7 +69,7 @@ public:
             case ColumnVectorType::kConstant: {
                 if (input_column_vector->data_type()->type() == LogicalType::kBoolean) {
                     if constexpr (!std::is_same_v<InputType, BooleanT>) {
-                        Error<TypeException>("types do not match");
+                        UnrecoverableError("types do not match");
                     } else {
                         BooleanT value = input_column_vector->buffer_->GetCompactBit(0);
                         ((AggregateState *)state)->Update(&value, 0);
