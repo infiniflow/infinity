@@ -132,7 +132,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -153,7 +153,7 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -182,7 +182,7 @@ Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -208,7 +208,7 @@ Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_a
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -220,7 +220,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -246,7 +246,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -271,7 +271,7 @@ Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &inde
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction is not started");
+        UnrecoverableError("Transaction is not started");
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -334,7 +334,7 @@ Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, c
 Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction is not started");
+        UnrecoverableError("Transaction is not started");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -362,7 +362,7 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -371,32 +371,32 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::DropViewByName(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 
 Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
-    Error<TransactionException>("Not Implemented");
+    UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotImplemented, "Not Implemented"};
 }
 

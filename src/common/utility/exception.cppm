@@ -146,11 +146,11 @@ public:
 //    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
 //};
 
-export class TransactionException : public Exception {
-public:
-    template <typename... Args>
-    explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
-};
+//export class TransactionException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
+//};
 
 //export class ProfilerException : public Exception {
 //public:
