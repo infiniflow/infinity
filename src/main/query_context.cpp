@@ -17,6 +17,9 @@ module;
 #include <sstream>
 //#include "gperftools/profiler.h"
 
+module query_context;
+
+
 import stl;
 import session;
 import config;
@@ -43,8 +46,6 @@ import logger;
 import query_result;
 import status;
 import session_manager;
-
-module query_context;
 
 namespace infinity {
 
@@ -155,14 +156,18 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
-    } catch (const Exception &e) {
+    } catch (RecoverableException &e) {
         StopProfile();
         StartProfile(QueryPhase::kRollback);
         this->RollbackTxn();
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
         query_result.status_.Init(ErrorCode::kError, e.what());
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(e.what());
+        throw e;
     }
+
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
     return query_result;

@@ -242,8 +242,11 @@ void WalManager::Flush() {
             if (file_size > wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts);
             }
-        } catch (Exception &e) {
+        } catch (RecoverableException& e) {
             LOG_ERROR(e.what());
+        } catch (UnrecoverableException &e) {
+            LOG_CRITICAL(e.what());
+            throw e;
         }
         SetWalState(max_commit_ts, wal_size);
     }
@@ -299,8 +302,11 @@ void WalManager::Checkpoint() {
             RecycleWalFile(full_ckp_commit_ts_);
         }
         LOG_INFO(fmt::format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
-    } catch (Exception &e) {
+    } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
     }
 }
 

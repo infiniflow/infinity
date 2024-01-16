@@ -82,9 +82,14 @@ void FragmentTask::OnExecute(i64) {
                     break;
                 }
             }
-        } catch (const Exception &e) {
+        } catch (RecoverableException &e) {
+            LOG_ERROR(e.what());
             err_msg = MakeUnique<String>(e.what());
+        } catch (UnrecoverableException &e) {
+            LOG_CRITICAL(e.what());
+            throw e;
         }
+
         profiler.End();
         fragment_context->FlushProfiler(profiler);
 

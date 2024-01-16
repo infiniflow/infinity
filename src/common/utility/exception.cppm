@@ -43,48 +43,48 @@ public:
 private:
     String message_;
 };
-
-export class Exception : public std::exception {
-public:
-    explicit Exception(String message) : message_(std::move(message)) {}
-    [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
-
-protected:
-    template <typename... Args>
-    static String BuildMessage(Args... params);
-
-private:
-    template <typename T, typename... Args>
-    static String BuildMessageInternal(Vector<String> &values, T param, Args... params);
-
-    static String BuildMessageInternal(Vector<String> &values);
-
-    String message_;
-};
-
-String Exception::BuildMessageInternal(Vector<String> &values) {
-    auto values_count = values.size();
-    if (values_count > 0) {
-        String msg(values[0]);
-        for (SizeT idx = 1; idx < values_count; ++idx) {
-            msg.append(" ").append(values[idx]);
-        }
-        return msg;
-    }
-    return String();
-}
-
-template <typename... Args>
-String Exception::BuildMessage(Args... params) {
-    Vector<String> values;
-    return BuildMessageInternal(values, params...);
-}
-
-template <typename T, typename... Args>
-String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... params) {
-    values.push_back(std::move(param));
-    return BuildMessageInternal(values, params...);
-}
+//
+//export class Exception : public std::exception {
+//public:
+//    explicit Exception(String message) : message_(std::move(message)) {}
+//    [[nodiscard]] inline const char *what() const noexcept override { return message_.c_str(); }
+//
+//protected:
+//    template <typename... Args>
+//    static String BuildMessage(Args... params);
+//
+//private:
+//    template <typename T, typename... Args>
+//    static String BuildMessageInternal(Vector<String> &values, T param, Args... params);
+//
+//    static String BuildMessageInternal(Vector<String> &values);
+//
+//    String message_;
+//};
+//
+//String Exception::BuildMessageInternal(Vector<String> &values) {
+//    auto values_count = values.size();
+//    if (values_count > 0) {
+//        String msg(values[0]);
+//        for (SizeT idx = 1; idx < values_count; ++idx) {
+//            msg.append(" ").append(values[idx]);
+//        }
+//        return msg;
+//    }
+//    return String();
+//}
+//
+//template <typename... Args>
+//String Exception::BuildMessage(Args... params) {
+//    Vector<String> values;
+//    return BuildMessageInternal(values, params...);
+//}
+//
+//template <typename T, typename... Args>
+//String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... params) {
+//    values.push_back(std::move(param));
+//    return BuildMessageInternal(values, params...);
+//}
 
 //export class CatalogException : public Exception {
 //public:
@@ -166,13 +166,13 @@ String Exception::BuildMessageInternal(Vector<String> &values, T param, Args... 
 
 #ifdef INFINITY_DEBUG
 
-export template <typename ExceptionType>
-inline void
-Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line()) {
-    String err_msg = message;
-    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
-    throw ExceptionType(err_msg);
-}
+//export template <typename ExceptionType>
+//inline void
+//Error(const String &message, const char *file_name = std::source_location::current().file_name(), u32 line = std::source_location::current().line()) {
+//    String err_msg = message;
+//    err_msg.append(" @").append(infinity::TrimPath(file_name)).append(":").append(std::to_string(line));
+//    throw ExceptionType(err_msg);
+//}
 
 export void RecoverableError(Status status,
                              const char *file_name = std::source_location::current().file_name(),
