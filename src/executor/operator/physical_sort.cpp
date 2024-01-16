@@ -40,8 +40,10 @@ import physical_top;
 namespace infinity {
 
 struct BlockRawIndex {
-    SizeT block_idx;
-    SizeT offset;
+    BlockRawIndex(u32 block_idx, u32 offset) : block_idx_(block_idx), offset_(offset) {}
+    ~BlockRawIndex() = default;
+    u32 block_idx_;
+    u32 offset_;
 };
 
 class Comparator {
@@ -59,10 +61,10 @@ public:
         eval_results_ = PhysicalTop::GetEvalColumns(expressions_, expr_states_, order_by_blocks_);
     }
 
-    bool operator()(BlockRawIndex left_index, BlockRawIndex right_index) {
-        auto &left = eval_results_[left_index.block_idx];
-        auto &right = eval_results_[right_index.block_idx];
-        return prefer_left_function_.Compare(left, left_index.offset, right, right_index.offset);
+    bool Compare(BlockRawIndex left_index, BlockRawIndex right_index) {
+        auto &left = eval_results_[left_index.block_idx_];
+        auto &right = eval_results_[right_index.block_idx_];
+        return prefer_left_function_.Compare(left, left_index.offset_, right, right_index.offset_);
     }
 
 private:
@@ -86,7 +88,7 @@ Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &&indexes_a, Vector<
     auto ptr_b = indexes_b.begin();
 
     while (ptr_a != indexes_a.end() && ptr_b != indexes_b.end()) {
-        if (comparator(*ptr_a, *ptr_b)) {
+        if (comparator.Compare(*ptr_a, *ptr_b)) {
             merged_indexes.push_back(*ptr_a);
             ++ptr_a;
         } else {
@@ -138,8 +140,8 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
             output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors;
 
         for (SizeT column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
-            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx]->column_vectors[column_id].get(),
-                                                         block_index.offset,
+            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx_]->column_vectors[column_id].get(),
+                                                         block_index.offset_,
                                                          1);
         }
     }
@@ -171,11 +173,9 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
 
     block_indexes.reserve(pre_op_state->data_block_array_.size() * DEFAULT_BLOCK_CAPACITY);
     // filling block_indexes
-    for (SizeT block_id = 0; block_id < pre_op_state->data_block_array_.size(); block_id++) {
-        for (SizeT offset = 0; offset < pre_op_state->data_block_array_[block_id]->row_count(); offset++) {
-            BlockRawIndex block_index(block_id, offset);
-
-            block_indexes.push_back(block_index);
+    for (u32 block_id = 0; block_id < pre_op_state->data_block_array_.size(); block_id++) {
+        for (u32 offset = 0; offset < pre_op_state->data_block_array_[block_id]->row_count(); offset++) {
+            block_indexes.emplace_back(block_id, offset);
         }
     }
     auto &expr_states = (static_cast<SortOperatorState *>(operator_state))->expr_states_;
@@ -183,7 +183,10 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
 
     block_comparator.Init();
     // sort block_indexes
-    std::sort(block_indexes.begin(), block_indexes.end(), block_comparator);
+    std::sort(block_indexes.begin(), block_indexes.end(), [&block_comparator](BlockRawIndex x, BlockRawIndex y) -> bool {
+        // Be careful! std::sort needs a strict ordering comparator. ("<" instead of "<=")
+        return !block_comparator.Compare(y, x);
+    });
 
     CopyWithIndexes(pre_op_state->data_block_array_, sort_operator_state->unmerge_sorted_blocks_, block_indexes);
     prev_op_state->data_block_array_.clear();
@@ -198,15 +201,14 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     merge_comparator.Init();
     indexes_group.reserve(unmerge_sorted_blocks.size());
 
-    for (SizeT block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
+    for (u32 block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
         Vector<BlockRawIndex> indexes;
         indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
 
-        for (SizeT offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
-            BlockRawIndex block_index(block_id, offset);
-            indexes.push_back(block_index);
+        for (u32 offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
+            indexes.emplace_back(block_id, offset);
         }
-        indexes_group.push_back(indexes);
+        indexes_group.push_back(std::move(indexes));
     }
     auto merge_indexes = MergeIndexes(indexes_group, 0, indexes_group.size() - 1, merge_comparator);
     indexes_group.clear();
