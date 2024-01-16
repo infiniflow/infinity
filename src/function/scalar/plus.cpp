@@ -30,7 +30,7 @@ namespace infinity {
 struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
-        Error<NotImplementException>("Not implement");
+        UnrecoverableError("Not implement: PlusFunction::Run");
         return false;
     }
 };

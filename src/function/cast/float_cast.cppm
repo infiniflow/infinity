@@ -59,7 +59,7 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, FloatTryCastToFixlen>);
         }
         case LogicalType::kDecimal: {
-            Error<NotImplementException>(fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString()));
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
@@ -132,7 +132,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 // TODO: Cast from float to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, HugeIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -145,7 +145,7 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -214,7 +214,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 // TODO: Cast from double to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, HugeIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 
@@ -227,7 +227,7 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
     return false;
 }
 

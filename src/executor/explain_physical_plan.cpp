@@ -1181,27 +1181,27 @@ void ExplainPhysicalPlan::Explain(const PhysicalUnionAll *, SharedPtr<Vector<Sha
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalIndexScan *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: Explain Physical Index Scan");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalDummyScan *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: PhysicalDummyScan");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalHashJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: PhysicalHashJoin");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: PhysicalSortMergeJoin");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: PhysicalIndexJoin");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalTop *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: PhysicalTop");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

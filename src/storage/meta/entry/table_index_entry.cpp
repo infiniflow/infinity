@@ -203,7 +203,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes) {
     if (column_index_map_.size() != 1) {
         // TODO
-        Error<NotImplementException>("Not implemented");
+        UnrecoverableError("Not implemented");
     }
     const auto &[column_id, column_index_entry] = *column_index_map_.begin();
 

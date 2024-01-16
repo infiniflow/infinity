@@ -34,7 +34,7 @@ const_ptr_t ColumnBuffer::GetAll() {
     if (outline_buffer_.get() == nullptr) {
         return static_cast<const_ptr_t>(inline_col_.GetData());
     }
-    Error<NotImplementException>("Cannot get all data of an outline column");
+    UnrecoverableError("Not implement: Cannot get all data of an outline column");
     return nullptr;
 }
 
@@ -88,7 +88,7 @@ const_ptr_t ColumnBuffer::GetValueAt(SizeT row_idx, const DataType &data_type) {
                 //            case LogicalType::kPolygon:
                 //            case LogicalType::kBlob:
             case LogicalType::kMixed: {
-                Error<NotImplementException>("Not implement complex type GetValueAt function");
+                UnrecoverableError("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -104,7 +104,7 @@ ptr_t ColumnBuffer::GetAllMut() {
     if (outline_buffer_.get() == nullptr) {
         return static_cast<ptr_t>(inline_col_.GetDataMut());
     }
-    Error<NotImplementException>("Cannot get all data of an outline column");
+    UnrecoverableError("Not implement: Cannot get all data of an outline column");
     return nullptr;
 }
 
@@ -158,7 +158,7 @@ ptr_t ColumnBuffer::GetValueAtMut(SizeT row_idx, const DataType &data_type) {
                 //            case kPolygon:
                 //            case kBlob:
             case kMixed: {
-                Error<NotImplementException>("Not implement complex type GetValueAt function");
+                UnrecoverableError("Not implement complex type GetValueAt function");
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");

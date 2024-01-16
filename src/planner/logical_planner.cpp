@@ -448,7 +448,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         RecoverableError(Status::InvalidIndexName("No index name."));
     }
     //    if (create_index_info->column_names_->size() != 1) {
-    //        Error<NotImplementException>("Creating index only support single column now.");
+    //        UnrecoverableError("Creating index only support single column now.");
     //    }
 
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));

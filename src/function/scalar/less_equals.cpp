@@ -36,7 +36,7 @@ struct LessEqualsFunction {
 
 template <>
 inline void LessEqualsFunction::Run(VarcharT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: varchar <= varchar");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 //    if (left.IsInlined()) {
 //        if (right.IsInlined()) {
 //            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) <= 0);
@@ -57,7 +57,7 @@ inline void LessEqualsFunction::Run(VarcharT, VarcharT, bool &) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= bigint");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>
@@ -67,7 +67,7 @@ inline void LessEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= double");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>
@@ -77,7 +77,7 @@ inline void LessEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= varchar");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>

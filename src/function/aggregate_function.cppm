@@ -81,10 +81,10 @@ public:
                 break;
             }
             case ColumnVectorType::kHeterogeneous: {
-                Error<NotImplementException>("Heterogeneous type isn't implemented");
+                UnrecoverableError("Not implement: Heterogeneous type");
             }
             default: {
-                Error<NotImplementException>("Other type of column vector isn't implemented");
+                UnrecoverableError("Not implement: Other type");
             }
         }
     }
@@ -160,7 +160,7 @@ public:
                 break;
             }
             default: {
-                Error<NotImplementException>("Other type of column vector isn't implemented");
+                UnrecoverableError("Other type of column vector isn't implemented");
             }
         }
     }

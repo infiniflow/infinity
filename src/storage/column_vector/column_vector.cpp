@@ -1342,7 +1342,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             break;
         }
         case kArray: {
-            Error<NotImplementException>("Array copy");
+            UnrecoverableError("Array copy");
             break;
         }
         case kTuple: {
@@ -1489,7 +1489,7 @@ SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, Siz
          case kMixed:
          case kNull: {
              LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
-             Error<NotImplementException>("Not supported now in append data in column");
+             UnrecoverableError("Not supported now in append data in column");
          }
          case kMissing:
          case kInvalid: {
@@ -1650,7 +1650,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         Error<StorageException>("Column vector isn't initialized.");
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        Error<NotImplementException>(fmt::format("Not supported vector_type {}", int(vector_type_)));
+        UnrecoverableError(fmt::format("Not supported vector_type {}", int(vector_type_)));
     }
     this->data_type_->WriteAdv(ptr);
     WriteBufAdv<ColumnVectorType>(ptr, this->vector_type_);

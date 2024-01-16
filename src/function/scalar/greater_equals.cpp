@@ -58,7 +58,7 @@ inline void GreaterEqualsFunction::Run(VarcharT, VarcharT, bool &) {
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= bigint");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>
@@ -68,7 +68,7 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= double");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>
@@ -78,7 +78,7 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= varchar");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>

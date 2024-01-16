@@ -71,25 +71,25 @@ struct TimestampTryCastToVarlen {
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 

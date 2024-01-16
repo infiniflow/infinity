@@ -62,7 +62,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
         case kDecimal: {
-            Error<NotImplementException>(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case kVarchar: {
             Error<TypeException>("Attempt to cast from varchar to varchar");

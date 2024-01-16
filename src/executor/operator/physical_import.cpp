@@ -552,7 +552,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, BlockEntry
                         break;
                     }
                     default: {
-                        Error<NotImplementException>("Embedding type not implemented.");
+                        UnrecoverableError("Not implement: Embedding type.");
                     }
                 }
                 break;
@@ -593,7 +593,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, BlockEntry
                 break;
             }
             default: {
-                Error<NotImplementException>("Type not implemented.");
+                UnrecoverableError("Not implement: Invalid data type.");
             }
         }
     }

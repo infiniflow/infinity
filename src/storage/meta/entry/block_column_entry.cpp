@@ -187,7 +187,7 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
             Error<StorageException>("AppendRaw: Error type.");
         }
         default: {
-            Error<NotImplementException>("AppendRaw: Not implement the type.");
+            UnrecoverableError("AppendRaw: Not implement the type.");
         }
     }
 }
@@ -249,7 +249,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT) {
         case kMixed:
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
-            Error<NotImplementException>("Invalid data type.");
+            UnrecoverableError("Not implement: Invalid data type.");
         }
         case kMissing:
         case kInvalid: {

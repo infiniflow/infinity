@@ -513,7 +513,7 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            Error<NotImplementException>("Any");
+            UnrecoverableError("Not implement: Any");
         }
     }
 

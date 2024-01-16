@@ -88,7 +88,7 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
         return;
     }
     if (active_operator_ != nullptr) {
-        Error<ProfilerException>("Attempting to call StartOperator while another operator is active.", __FILE_NAME__, __LINE__);
+        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
     }
     active_operator_ = op;
     profiler_.Begin();
@@ -98,7 +98,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         return;
     }
     if (active_operator_ == nullptr) {
-        Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
+        UnrecoverableError("Attempting to call StopOperator while another operator is active.");
     }
     profiler_.End();
 

@@ -53,7 +53,7 @@ struct TimeTryCastToVarlen {
 
 template <>
 inline bool TimeTryCastToVarlen::Run(TimeT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 

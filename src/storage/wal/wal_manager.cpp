@@ -582,7 +582,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::ALTER_INFO:
-                Error<NotImplementException>("WalCmdAlterInfo Replay Not implemented");
+                UnrecoverableError("WalCmdAlterInfo Replay Not implemented");
                 break;
             case WalCommandType::CREATE_INDEX:
                 WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);

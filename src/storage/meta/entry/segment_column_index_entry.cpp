@@ -153,7 +153,7 @@ Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const Colum
     return Status::OK();
 }
 
-void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { Error<NotImplementException>("Not implemented"); }
+void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
 
 bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     String &index_name = *this->column_index_entry_->col_index_dir();

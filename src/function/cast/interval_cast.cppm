@@ -54,7 +54,7 @@ struct IntervalTryCastToVarlen {
 
 template <>
 inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 

@@ -266,7 +266,7 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kHugeInt: {
-                            Error<NotImplementException>("HugeInt data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: HugeInt data shuffle.");
                         }
                         case kFloat: {
                             ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
@@ -279,10 +279,10 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kDecimal: {
-                            Error<NotImplementException>("Decimal data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Decimal data shuffle.");
                         }
                         case kVarchar: {
-                            Error<NotImplementException>("Varchar data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Varchar data shuffle.");
                             //                            VarcharT &dst_ref = ((VarcharT
                             //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
                             //                            = ((VarcharT
@@ -305,22 +305,22 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                             break;
                         }
                         case kTime: {
-                            Error<NotImplementException>("Time data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Time data shuffle.");
                         }
                         case kDateTime: {
-                            Error<NotImplementException>("Datetime data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Datetime data shuffle.");
                         }
                         case kTimestamp: {
-                            Error<NotImplementException>("Timestamp data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Timestamp data shuffle.");
                         }
                         case kInterval: {
-                            Error<NotImplementException>("Interval data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Interval data shuffle.");
                         }
                         case kMixed: {
-                            Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.");
+                            UnrecoverableError("Not implement: Heterogeneous data shuffle.");
                         }
                         default: {
-                            Error<NotImplementException>("Unexpected data type");
+                            UnrecoverableError("Not implement: Unexpected data type");
                         }
                     }
                 }
@@ -399,7 +399,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kHugeInt: {
-                    Error<NotImplementException>("HugeInt data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: HugeInt data shuffle.");
                 }
                 case kFloat: {
                     ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
@@ -412,10 +412,10 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kDecimal: {
-                    Error<NotImplementException>("Decimal data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Decimal data shuffle.");
                 }
                 case kVarchar: {
-                    Error<NotImplementException>("Varchar data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Varchar data shuffle.");
                     //                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
                     //                    VarcharT &src_ref = ((VarcharT
                     //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
@@ -437,22 +437,22 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     break;
                 }
                 case kTime: {
-                    Error<NotImplementException>("Time data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Time data shuffle.");
                 }
                 case kDateTime: {
-                    Error<NotImplementException>("Datetime data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Datetime data shuffle.");
                 }
                 case kTimestamp: {
-                    Error<NotImplementException>("Timestamp data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Timestamp data shuffle.");
                 }
                 case kInterval: {
-                    Error<NotImplementException>("Interval data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Interval data shuffle.");
                 }
                 case kMixed: {
-                    Error<NotImplementException>("Heterogeneous data shuffle isn't implemented.");
+                    UnrecoverableError("Not implement: Heterogeneous data shuffle.");
                 }
                 default: {
-                    Error<NotImplementException>("Unexpected data type");
+                    UnrecoverableError("Not implement: Unexpected data type");
                 }
             }
 

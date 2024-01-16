@@ -99,7 +99,7 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                     break;
                 }
                 default:
-                    Error<NotImplementException>("Input value type not Implement");
+                    UnrecoverableError("Input value type not Implement");
             }
         }
     }
@@ -120,7 +120,7 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
     } else if (function_name == "COUNT_STAR") {
         // no action for "COUNT_STAR"
     } else {
-        Error<NotImplementException>(fmt::format("Function type {} not Implement.", function_name));
+        UnrecoverableError(fmt::format("Function type {} not Implement.", function_name));
     }
 }
 

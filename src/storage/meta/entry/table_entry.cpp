@@ -288,7 +288,7 @@ void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendSt
 void TableEntry::RollbackAppend(u64 txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    Error<NotImplementException>("TableEntry::RollbackAppend");
+    UnrecoverableError("TableEntry::RollbackAppend");
 }
 
 void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &delete_state) {
@@ -307,7 +307,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
 }
 
 Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
-    Error<NotImplementException>("TableEntry::RollbackDelete");
+    UnrecoverableError("TableEntry::RollbackDelete");
     return Status::OK();
 }
 
@@ -524,7 +524,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        Error<NotImplementException>(fmt::format("No column name: {}", column_name));
+        UnrecoverableError(fmt::format("No column name: {}", column_name));
     }
     return it->second;
 }

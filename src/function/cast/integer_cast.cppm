@@ -130,7 +130,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
-    Error<NotImplementException>(fmt::format("Not implemented"));
+    UnrecoverableError(fmt::format("Not implemented"));
     return false;
 }
 
@@ -197,7 +197,7 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -267,7 +267,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -340,7 +340,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -374,51 +374,51 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
 // TODO: Cast HugeInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, TinyIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, SmallIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, IntegerT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, BigIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, FloatT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DoubleT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(HugeIntT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 

@@ -30,7 +30,7 @@ namespace infinity {
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        Error<NotImplementException>("Not implement");
+        UnrecoverableError("Not implement: SubFunction::Run");
     }
 };
 
@@ -69,7 +69,7 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -96,7 +96,7 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal - Decimal = Decimal
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
@@ -127,35 +127,35 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubFunction::Run");
     return false;
 }
 

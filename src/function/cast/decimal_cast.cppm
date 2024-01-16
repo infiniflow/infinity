@@ -92,49 +92,49 @@ struct DecimalTryCastToVarlen {
 // Cast DecimalT to TinyIntT
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, TinyIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, SmallIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, IntegerT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, BigIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, HugeIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, FloatT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, DoubleT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToVarlen::Run(DecimalT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 

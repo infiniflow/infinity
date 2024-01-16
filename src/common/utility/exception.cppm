@@ -140,11 +140,11 @@ public:
     explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
 };
 
-export class NotImplementException : public Exception {
-public:
-    template <typename... Args>
-    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
-};
+//export class NotImplementException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
+//};
 
 export class TransactionException : public Exception {
 public:
@@ -152,11 +152,11 @@ public:
     explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
 };
 
-export class ProfilerException : public Exception {
-public:
-    template <typename... Args>
-    explicit ProfilerException(Args... params) : Exception(BuildMessage(String("Profiler Error:"), params...)) {}
-};
+//export class ProfilerException : public Exception {
+//public:
+//    template <typename... Args>
+//    explicit ProfilerException(Args... params) : Exception(BuildMessage(String("Profiler Error:"), params...)) {}
+//};
 
 //export class QueryException : public Exception {
 //public:
