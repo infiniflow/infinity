@@ -525,7 +525,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
                         Value value = Value::MakeVarchar(varchar_ptr, data_size);
-                        output_block_ptr->AppendValue(column_id, value);
+                        output_block_ptr->AppendValue(i, value);
                     }
                 }
                 output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
