@@ -155,6 +155,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
+        // LOG_WARN("Finish query");
     } catch (const Exception &e) {
         StopProfile();
         StartProfile(QueryPhase::kRollback);

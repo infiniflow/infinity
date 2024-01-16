@@ -130,10 +130,10 @@ bool FragmentTask::QuitFromWorkerLoop() {
     std::unique_lock lock(mutex_);
     if (queue_state->source_queue_.Empty() && status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kPending;
-        LOG_WARN(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
+        LOG_TRACE(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
-    LOG_WARN(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
+    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
     return false;
 }
 
@@ -145,7 +145,7 @@ TaskBinding FragmentTask::TaskBinding() const {
     return binding;
 }
 
-void FragmentTask::CompleteTask() {
+bool FragmentTask::CompleteTask() {
     // One thread reach here
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
@@ -154,7 +154,7 @@ void FragmentTask::CompleteTask() {
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));
-    fragment_context->TryFinishFragment();
+    return fragment_context->TryFinishFragment();
 }
 
 String FragmentTask::PhysOpsToString() {

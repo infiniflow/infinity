@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_sort;
+
 import stl;
 import parser;
 import query_context;
@@ -26,15 +28,9 @@ import data_table;
 import data_block;
 import load_meta;
 import infinity_exception;
-
-export module physical_sort;
+import physical_top;
 
 namespace infinity {
-
-struct BlockRawIndex {
-    SizeT block_idx;
-    SizeT offset;
-};
 
 export class PhysicalSort : public PhysicalOperator {
 public:
@@ -60,11 +56,15 @@ public:
         return left_->TaskletCount();
     }
 
+    // for OperatorState
+    inline auto const &GetSortExpressions() const { return expressions_; }
+
     Vector<SharedPtr<BaseExpression>> expressions_;
     Vector<OrderType> order_by_types_{};
 
 private:
     u64 input_table_index_{};
+    CompareTwoRowAndPreferLeft prefer_left_function_; // compare function
 };
 
 } // namespace infinity
