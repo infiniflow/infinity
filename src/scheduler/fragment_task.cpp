@@ -130,10 +130,10 @@ bool FragmentTask::QuitFromWorkerLoop() {
     std::unique_lock lock(mutex_);
     if (queue_state->source_queue_.Empty() && status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kPending;
-        LOG_WARN(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
+        LOG_TRACE(fmt::format("Task: {} of Fragment: {} quits from worker loop", task_id_, FragmentId()));
         return true;
     }
-    LOG_WARN(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
+    LOG_TRACE(fmt::format("Task: {} of Fragment: {} is still running", task_id_, FragmentId()));
     return false;
 }
 

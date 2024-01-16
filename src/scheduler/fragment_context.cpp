@@ -499,7 +499,7 @@ bool FragmentContext::TryFinishFragment() {
             auto *parent_plan_fragment = fragment_ptr_->GetParent();
             if (parent_plan_fragment) {
                 auto *scheduler = query_context_->scheduler();
-                LOG_WARN(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
+                LOG_TRACE(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
                 scheduler->ScheduleFragment(parent_plan_fragment);
             }
         }
@@ -1210,10 +1210,10 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
 
 void FragmentContext::DumpFragmentCtx() {
     for (auto &task : tasks_) {
-        LOG_WARN(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
+        LOG_TRACE(fmt::format("Task id: {}, status: {}", task->TaskID(), FragmentTaskStatus2String(task->status())));
     }
     for (auto iter = fragment_ptr_->GetOperators().begin(); iter != fragment_ptr_->GetOperators().end(); ++iter) {
-        LOG_WARN(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
+        LOG_TRACE(fmt::format("Operator type: {}", PhysicalOperatorToString((*iter)->operator_type())));
     }
 }
 
