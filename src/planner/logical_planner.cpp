@@ -128,14 +128,14 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             break;
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildSelect(const SelectStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     UniquePtr<BoundSelectStatement> bound_statement_ptr = query_binder_ptr->BindSelect(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildInsert(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -269,19 +269,19 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     //    this->AppendOperator(logical_insert, bind_context_ptr);
 
     this->logical_plan_ = logical_insert;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildInsertSelect(const InsertStatement *, SharedPtr<BindContext> &) {
     RecoverableError(Status::NotSupport("Not supported"));
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildUpdate(const UpdateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     UniquePtr<BoundUpdateStatement> bound_statement_ptr = query_binder_ptr->BindUpdate(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -289,7 +289,7 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<B
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     UniquePtr<BoundDeleteStatement> bound_statement_ptr = query_binder_ptr->BindDelete(*statement);
     this->logical_plan_ = bound_statement_ptr->BuildPlan(query_context_ptr_);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -313,7 +313,7 @@ Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<B
             UnrecoverableError("Not supported");
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -325,7 +325,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
         if (!ValidIdentifier(create_table_info->column_defs_[idx]->name())) {
-            return Status(ErrorCode::kInvalidIdentifier, "invalid column name");
+            return Status::InvalidIndexName("invalid column name");
         }
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
@@ -337,7 +337,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_table_info->schema_name_);
 
     if (!ValidIdentifier(create_table_info->table_name_)) {
-        return Status(ErrorCode::kInvalidIdentifier, "invalid table name");
+        return Status::InvalidTableName(create_table_info->table_name_);
     }
 
     SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
@@ -358,7 +358,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     this->logical_plan_ = logical_create_table_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -376,14 +376,14 @@ Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, S
     this->logical_plan_ = logical_create_collection_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_schema_info = (CreateSchemaInfo *)statement->create_info_.get();
 
     if (!ValidIdentifier(create_schema_info->schema_name_)) {
-        return Status(ErrorCode::kInvalidIdentifier, "invalid schema name");
+        return Status::InvalidDBName(create_schema_info->schema_name_);
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);
@@ -394,7 +394,7 @@ Status LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, Share
     this->logical_plan_ = logical_create_schema_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -427,7 +427,7 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     this->logical_plan_ = logical_create_view_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 // struct IndexInfo {
@@ -506,7 +506,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -530,7 +530,7 @@ Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindC
             UnrecoverableError("Invalid drop statement type.");
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -550,7 +550,7 @@ Status LogicalPlanner::BuildDropTable(const DropStatement *statement, SharedPtr<
     this->logical_plan_ = logical_drop_table;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -571,7 +571,7 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
     this->logical_plan_ = logical_drop_collection;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -588,7 +588,7 @@ Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr
     this->logical_plan_ = logical_drop_schema;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -607,7 +607,7 @@ Status LogicalPlanner::BuildDropIndex(const DropStatement *statement, SharedPtr<
     this->logical_plan_ = logical_drop_index;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -622,7 +622,7 @@ Status LogicalPlanner::BuildDropView(const DropStatement *statement, SharedPtr<B
     this->logical_plan_ = logical_drop_view;
     this->names_ptr_->emplace_back("OK");
     this->types_ptr_->emplace_back(LogicalType::kInteger);
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildPrepare(const PrepareStatement *, SharedPtr<BindContext> &) {
@@ -671,7 +671,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                                                       statement->copy_file_type_);
 
     this->logical_plan_ = logical_export;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -698,7 +698,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
                                                                       statement->copy_file_type_);
 
     this->logical_plan_ = logical_import;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildAlter(const AlterStatement *, SharedPtr<BindContext> &) {
@@ -719,7 +719,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 
                 this->logical_plan_ = logical_command;
             } else {
-                RecoverableError(status);
+                return status;
             }
             break;
         }
@@ -746,7 +746,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 
                 this->logical_plan_ = logical_command;
             } else {
-                UnrecoverableError(*status.msg_);
+                return status;
             }
             break;
         }
@@ -754,7 +754,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             UnrecoverableError("Invalid command type.");
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -794,7 +794,7 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
             UnrecoverableError("Unexpected show statement type.");
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowConfigs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -804,7 +804,7 @@ Status LogicalPlanner::BuildShowConfigs(const ShowStatement *statement, SharedPt
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -814,7 +814,7 @@ Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedP
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -824,7 +824,7 @@ Status LogicalPlanner::BuildShowIndexes(const ShowStatement *statement, SharedPt
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -835,7 +835,7 @@ Status LogicalPlanner::BuildShowColumns(const ShowStatement *statement, SharedPt
                                                                   bind_context_ptr->GenerateTableIndex());
 
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -848,7 +848,7 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
                                                                   statement->block_id_);
 
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowTables(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
@@ -862,7 +862,7 @@ Status LogicalPlanner::BuildShowTables(const ShowStatement *, SharedPtr<BindCont
     // FIXME: check if we need to append operator
     //    this->AppendOperator(logical_show, bind_context_ptr);
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowViews(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
@@ -873,7 +873,7 @@ Status LogicalPlanner::BuildShowViews(const ShowStatement *, SharedPtr<BindConte
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
@@ -884,7 +884,7 @@ Status LogicalPlanner::BuildShowDatabases(const ShowStatement *, SharedPtr<BindC
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowSessionStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -897,7 +897,7 @@ Status LogicalPlanner::BuildShowSessionStatus(const ShowStatement *statement, Sh
                                                                   statement->block_id_);
 
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -910,7 +910,7 @@ Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, Sha
                                                                   statement->block_id_);
 
     this->logical_plan_ = logical_show;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -925,25 +925,25 @@ Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<Bin
             return BuildFlushLog(statement, bind_context_ptr);
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildFlushData(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kData);
     this->logical_plan_ = logical_flush;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildFlushLog(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kLog);
     this->logical_plan_ = logical_flush;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_flush = MakeShared<LogicalFlush>(bind_context_ptr->GetNewLogicalNodeId(), FlushType::kBuffer);
     this->logical_plan_ = logical_flush;
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -955,7 +955,7 @@ Status LogicalPlanner::BuildOptimize(const OptimizeStatement *statement, SharedP
             break;
         }
     }
-    return Status();
+    return Status::OK();
 }
 
 Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -984,7 +984,7 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     }
 
     this->logical_plan_ = explain_node;
-    return Status();
+    return Status::OK();
 }
 
 } // namespace infinity

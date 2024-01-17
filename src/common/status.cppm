@@ -23,18 +23,18 @@ namespace infinity {
 export enum class ErrorCode : long {
 
     kOk = 0, // success
-    kError,
-    kNotFound,
-    kNotImplemented,
-    kReachQueryMemoryLimit,
-    kNotSupportedCast,
-    kAlreadyExist,
-    kNetworkError,
-    kServiceUnavailable,
-    kWWConflict,
-    kDuplicate,
-    kUndefined,
-    kInvalidIdentifier,
+//    kError,
+//    kNotFound,
+//    kNotImplemented,
+//    kReachQueryMemoryLimit,
+//    kNotSupportedCast,
+//    kAlreadyExist,
+//    kNetworkError,
+//    kServiceUnavailable,
+//    kWWConflict,
+//    kDuplicate,
+//    kUndefined,
+//    kInvalidIdentifier,
 
     // 1. config error,
 
@@ -81,6 +81,7 @@ export enum class ErrorCode : long {
     kFunctionArgsError = 3036,
     kImportFileFormatError = 3037,
     kDataNotExist = 3038,
+    kColumnCountMismatch = 3039,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -109,6 +110,7 @@ export enum class ErrorCode : long {
     kFileNotFound = 7008,
     kDirNotFound = 7009,
     kDataIOError = 7010,
+    kUnexpectedError = 7011,
 };
 
 export class Status {
@@ -156,6 +158,7 @@ public:
     static Status FunctionArgsError(const String& func_name);
     static Status ImportFileFormatError(const String& detailed_info);
     static Status DataNotExist(const String& detailed_info);
+    static Status ColumnCountMismatch(const String& detailed_info);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -184,6 +187,7 @@ public:
     static Status FileNotFound(const String &path);
     static Status DirNotFound(const String &path);
     static Status DataIOError(const String &detailed_info);
+    static Status UnexpectedError(const String &detailed_info);
 
 public:
     Status() = default;

@@ -110,10 +110,10 @@ private:
 //    explicit OptimizerException(Args... params) : Exception(BuildMessage(String("Optimizer Error:"), params...)) {}
 //};
 
-//export class ExecutorException : public Exception {
+//export class UnrecoverableException : public Exception {
 //public:
 //    template <typename... Args>
-//    explicit ExecutorException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
+//    explicit UnrecoverableException(Args... params) : Exception(BuildMessage(String("Executor Error:"), params...)) {}
 //};
 
 //export class SchedulerException : public Exception {
@@ -122,22 +122,22 @@ private:
 //    explicit SchedulerException(Args... params) : Exception(BuildMessage(String("Scheduler Error:"), params...)) {}
 //};
 
-//export class StorageException : public Exception {
+//export class UnrecoverableException : public Exception {
 //public:
 //    template <typename... Args>
-//    explicit StorageException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
+//    explicit UnrecoverableException(Args... params) : Exception(BuildMessage(String("Storage Error:"), params...)) {}
 //};
 
-//export class TypeException : public Exception {
+//export class UnrecoverableException : public Exception {
 //public:
 //    template <typename... Args>
-//    explicit TypeException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
+//    explicit UnrecoverableException(Args... params) : Exception(BuildMessage(String("Type Error:"), params...)) {}
 //};
 
-//export class FunctionException : public Exception {
+//export class UnrecoverableException : public Exception {
 //public:
 //    template <typename... Args>
-//    explicit FunctionException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
+//    explicit UnrecoverableException(Args... params) : Exception(BuildMessage(String("Function Error:"), params...)) {}
 //};
 
 //export class NotImplementException : public Exception {
@@ -146,10 +146,10 @@ private:
 //    explicit NotImplementException(Args... params) : Exception(BuildMessage(String("NotImplement Error:"), params...)) {}
 //};
 
-//export class TransactionException : public Exception {
+//export class UnrecoverableException : public Exception {
 //public:
 //    template <typename... Args>
-//    explicit TransactionException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
+//    explicit UnrecoverableException(Args... params) : Exception(BuildMessage(String("Transaction Error:"), params...)) {}
 //};
 
 //export class ProfilerException : public Exception {

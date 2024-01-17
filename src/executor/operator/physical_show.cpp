@@ -1291,7 +1291,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
         show_operator_state->error_message_ = std::move(table_status.msg_);
-        //        Error<ExecutorException>(table_status.message());
+        //        Error<UnrecoverableException>(table_status.message());
         return;
     }
 

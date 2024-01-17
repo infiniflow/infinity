@@ -297,4 +297,12 @@ Status Status::DataIOError(const String &detailed_info) {
     return Status(ErrorCode::kDataIOError, MakeUnique<String>(fmt::format("Data read error: {}", detailed_info)));
 }
 
+Status Status::UnexpectedError(const String &detailed_info) {
+    return Status(ErrorCode::kUnexpectedError, MakeUnique<String>(fmt::format("Unexpected error: {}", detailed_info)));
+}
+
+Status Status::ColumnCountMismatch(const String& detailed_info) {
+    return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
+}
+
 } // namespace infinity

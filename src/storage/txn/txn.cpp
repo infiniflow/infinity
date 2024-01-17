@@ -16,6 +16,9 @@ module;
 
 #include <string>
 #include <vector>
+#include <tuple>
+
+module txn;
 
 import stl;
 
@@ -32,7 +35,7 @@ import parser;
 import meta_state;
 import buffer_manager;
 import data_access_state;
-
+import status;
 import table_detail;
 import table_entry_type;
 import catalog;
@@ -40,8 +43,6 @@ import database_detail;
 import status;
 import table_def;
 import index_def;
-
-module txn;
 
 namespace infinity {
 
@@ -55,7 +56,7 @@ Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const Stri
         if (!IsEqual(db_name_, db_name)) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kInvalidDbName, std::move(err_msg))};
         }
     }
 
@@ -87,11 +88,8 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
     table_store = txn_tables_store_[table_name].get();
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
-    UniquePtr<String> err_msg = table_store->Append(input_block);
-    if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, std::move(err_msg));
-    }
-    return Status::OK();
+    auto [err_msg, append_status] = table_store->Append(input_block);
+    return append_status;
 }
 
 Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
@@ -107,11 +105,8 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     table_store = txn_tables_store_[table_name].get();
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
-    UniquePtr<String> err_msg = table_store->Delete(row_ids);
-    if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, std::move(err_msg));
-    }
-    return Status::OK();
+    auto [err_msg, delete_status] = table_store->Delete(row_ids);
+    return delete_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
@@ -231,7 +226,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         if (table_status.ok()) {
             UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kError, std::move(err_msg));
+            return Status(ErrorCode::kUnexpectedError, std::move(err_msg));
         } else {
             return table_status;
         }
@@ -372,32 +367,32 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::DropViewByName(const String &, const String &, ConflictType, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }

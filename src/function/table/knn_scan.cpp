@@ -41,7 +41,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //     Vector<GlobalBlockID> *block_ids = knn_scan_function_data_ptr->global_block_ids_.get();
     //     const Vector<SizeT> &knn_column_ids = knn_scan_function_data_ptr->knn_column_ids_;
     //     if (knn_column_ids.size() != 1) {
-    //         Error<ExecutorException>("More than one knn column");
+    //         Error<UnrecoverableException>("More than one knn column");
     //     }
 
     //     SizeT knn_column_id = knn_column_ids[0];
@@ -58,7 +58,7 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //     switch (knn_scan_function_data_ptr->knn_distance_type_) {
 
     //         case KnnDistanceType::kInvalid: {
-    //             Error<ExecutorException>("Invalid Knn distance type");
+    //             Error<UnrecoverableException>("Invalid Knn distance type");
     //         }
     //         case KnnDistanceType::kL2: {
     //             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -206,13 +206,13 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                     break;
     //                 }
     //                 case EmbeddingDataType::kElemInvalid: {
-    //                     Error<ExecutorException>("Invalid element data type");
+    //                     Error<UnrecoverableException>("Invalid element data type");
     //                 }
     //             }
     //             break;
     //         }
     //         case KnnDistanceType::kCosine: {
-    //             Error<ExecutorException>("Not implemented Cosine");
+    //             Error<UnrecoverableException>("Not implemented Cosine");
     //         }
     //         case KnnDistanceType::kInnerProduct: {
     //             switch (knn_scan_function_data_ptr->elem_type_) {
@@ -360,13 +360,13 @@ void KnnScanFunc(QueryContext *, TableFunctionData *, DataBlock &) {
     //                     break;
     //                 }
     //                 case EmbeddingDataType::kElemInvalid: {
-    //                     Error<ExecutorException>("Invalid element data type");
+    //                     Error<UnrecoverableException>("Invalid element data type");
     //                 }
     //             }
     //             break;
     //         }
     //         case KnnDistanceType::kHamming: {
-    //             Error<ExecutorException>("Not implemented Hamming");
+    //             Error<UnrecoverableException>("Not implemented Hamming");
     //         }
     //     }
 

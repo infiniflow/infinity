@@ -35,7 +35,8 @@ namespace infinity {
 
 struct SegmentEntry;
 
-TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) : index_name_(std::move(index_name)), table_entry_(table_entry) {}
+TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
+    : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                                                        ConflictType conflict_type,
@@ -50,7 +51,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
             return {table_index_entry, status};
         }
         case ConflictType::kIgnore: {
-            if (status.code() == ErrorCode::kDuplicate or status.code() == ErrorCode::kNotFound) {
+            if (status.code() == ErrorCode::kDuplicateIndexName or status.code() == ErrorCode::kIndexNotExist) {
                 return {table_index_entry, Status::OK()};
             } else {
                 return {table_index_entry, status};
@@ -111,14 +112,14 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                     // Duplicated index name
                     UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated index name: {}.", *this->index_name_));
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
                 }
             } else {
                 // Write-Write conflict
                 UniquePtr<String> err_msg = MakeUnique<String>(
                     fmt::format("Write-write conflict: There is a committed TableIndexEntry which is later than current transaction."));
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
             }
         } else {
 
@@ -140,12 +141,12 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                         } else {
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated index name: {}.", *this->index_name_));
                             LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
+                            return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
                         }
                     } else {
                         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
-                        return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                        return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
                     }
                 }
                 case TxnState::kCommitting:
@@ -154,7 +155,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                     UniquePtr<String> err_msg = MakeUnique<String>(
                         fmt::format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -172,7 +173,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Invalid db entry txn state");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kUndefined, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
                 }
             }
         }
@@ -188,7 +189,7 @@ TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnT
             return {table_index_entry, status};
         }
         case ConflictType::kIgnore: {
-            if (status.code() == ErrorCode::kDuplicate or status.code() == ErrorCode::kNotFound) {
+            if (status.code() == ErrorCode::kDuplicateIndexName or status.code() == ErrorCode::kIndexNotExist) {
                 return {table_index_entry, Status::OK()};
             } else {
                 return {table_index_entry, status};
@@ -209,14 +210,14 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty index entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
     }
 
     BaseEntry *header_base_entry = this->entry_list_.front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid index entry.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
     }
 
     TableIndexEntry *header_index_entry = (TableIndexEntry *)header_base_entry;
@@ -226,7 +227,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
             if (header_index_entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
                 LOG_TRACE(*err_msg);
-                return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+                return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
             }
 
             // Append new one to drop index
@@ -240,7 +241,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
             UniquePtr<String> err_msg =
                 MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -253,7 +254,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64
             // Not same txn, issue WW conflict
             UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted table index entry.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
         }
     }
 }
@@ -289,7 +290,8 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<TableIndexMeta> TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+UniquePtr<TableIndexMeta>
+TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
     LOG_TRACE(fmt::format("load index"));
 
     SharedPtr<String> index_name = MakeShared<String>(table_index_meta_json["index_name"]);
@@ -314,7 +316,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
         }
 
         if (entry->commit_ts_ < UNCOMMIT_TS) {
@@ -323,7 +325,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
                 if (entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
                 } else {
                     table_index_entry = static_cast<TableIndexEntry *>(entry.get());
                     return {table_index_entry, Status::OK()};
@@ -338,7 +340,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
 
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
 }
 
 void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {

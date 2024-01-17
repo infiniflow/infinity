@@ -30,7 +30,6 @@ export import :column_index_entry;
 export import :segment_column_index_entry;
 export import :irs_index_entry;
 export import :base_entry;
-import :base_meta;
 
 import stl;
 import parser;

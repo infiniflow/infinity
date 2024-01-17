@@ -92,7 +92,7 @@ DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_ty
 
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
@@ -110,9 +110,9 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_coll
 
     //    LOG_TRACE("Get a table entry {}", table_name);
     if (table_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No valid db meta.");
+        UniquePtr<String> err_msg = MakeUnique<String>("No valid table meta.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
     }
     return table_meta->GetEntry(txn_id, begin_ts);
 }

@@ -117,7 +117,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 
             case ConflictType::kError: {
                 String error_message = fmt::format("Attempt to drop not existed index entry {}", index_name);
                 LOG_TRACE(error_message);
-                return {nullptr, Status(ErrorCode::kNotFound, error_message.c_str())};
+                return {nullptr, Status(ErrorCode::kIndexNotExist, error_message.c_str())};
             }
             default: {
                 UnrecoverableError("Invalid conflict type.");
@@ -135,7 +135,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
@@ -262,7 +262,7 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
-            return Status(ErrorCode::kNotFound, std::move(err_msg));
+            return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
@@ -314,7 +314,7 @@ Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
-        return Status(ErrorCode::kNotFound, std::move(err_msg));
+        return Status(ErrorCode::kTableNotExist, std::move(err_msg));
     }
 
     segment->min_row_ts_ = commit_ts;
@@ -364,7 +364,8 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
-        return {0, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        UnrecoverableError(*err_msg);
+        return {0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
     }
 }
 
@@ -561,6 +562,7 @@ void TableEntry::MergeFrom(BaseEntry &other) {
             it->second->MergeFrom(*sgement_entry2.get());
         }
     }
+
     if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
         auto seg_it = this->segment_map_.find(max_segment_id);
         if (seg_it == this->segment_map_.end()) {

@@ -56,7 +56,7 @@ inline bool UuidTryCastToVarlen::Run(const UuidT &, VarcharT &, const SharedPtr<
     UnrecoverableError("Not implemented");
 //    target.length_ = UuidT::LENGTH;
 //    std::memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
-//    Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+//    Assert<UnrecoverableException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
 //                          "Varchar column vector should use MemoryVectorBuffer.");
 //
 //    ptr_t ptr = vector_ptr->buffer_->fix_heap_mgr_->Allocate(target.length);

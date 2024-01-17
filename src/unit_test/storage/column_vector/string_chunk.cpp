@@ -46,7 +46,7 @@ TEST_F(StringChunkTest, string_chunk_a) {
 
     StringHeapMgr string_chunk_mgr;
 
-    EXPECT_THROW(string_chunk_mgr.Allocate(0), ExecutorException);
+    EXPECT_THROW(string_chunk_mgr.Allocate(0), UnrecoverableException);
 
     for (u64 i = 256; i <= 8192; i += 256) {
         string_chunk_mgr.Allocate(i);

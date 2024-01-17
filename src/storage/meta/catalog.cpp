@@ -116,7 +116,7 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
@@ -135,7 +135,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
     return db_meta->GetEntry(txn_id, begin_ts);
 }

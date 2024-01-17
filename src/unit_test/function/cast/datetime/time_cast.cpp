@@ -46,7 +46,7 @@ TEST_F(TimeCastTest, date_cast0) {
     {
         TimeT source;
         TinyIntT target;
-        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, nullptr), FunctionException);
+        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         TimeT source;
@@ -56,7 +56,7 @@ TEST_F(TimeCastTest, date_cast0) {
         SharedPtr<ColumnVector> col_varchar = MakeShared<ColumnVector>(data_type);
         col_varchar->Initialize();
 
-        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, col_varchar), NotImplementException);
+        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, col_varchar), UnrecoverableException);
     }
 }
 
@@ -66,7 +66,7 @@ TEST_F(TimeCastTest, date_cast1) {
     // Call BindDateCast with wrong type of parameters
     {
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindTimeCast(target_type), FunctionException);
+        EXPECT_THROW(BindTimeCast(target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kTime);
@@ -92,6 +92,6 @@ TEST_F(TimeCastTest, date_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 }

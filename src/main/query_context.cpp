@@ -115,10 +115,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         // Build unoptimized logical plan for each SQL statement.
         StartProfile(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
-        auto state = logical_planner_->Build(statement, bind_context);
+        auto status = logical_planner_->Build(statement, bind_context);
         // FIXME
-        if (!state.ok()) {
-            UnrecoverableError(state.message());
+        if (!status.ok()) {
+            RecoverableError(status);
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
@@ -162,7 +162,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         this->RollbackTxn();
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
-        query_result.status_.Init(ErrorCode::kError, e.what());
+        query_result.status_.Init(e.ErrorCode(), e.what());
     } catch (UnrecoverableException &e) {
         LOG_CRITICAL(e.what());
         throw e;

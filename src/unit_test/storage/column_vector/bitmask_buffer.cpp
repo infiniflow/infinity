@@ -37,7 +37,7 @@ TEST_F(BitmaskBufferTest, bitmask_buffer_a) {
         EXPECT_EQ(bitmask_buffer.count_, 0);
         EXPECT_EQ(bitmask_buffer.data_ptr_, nullptr);
 
-        EXPECT_THROW(bitmask_buffer.Initialize(7), TypeException);
+        EXPECT_THROW(bitmask_buffer.Initialize(7), UnrecoverableException);
         bitmask_buffer.Initialize(bit_count);
         EXPECT_EQ(bitmask_buffer.count_, bit_count);
         EXPECT_NE(bitmask_buffer.data_ptr_, nullptr);
