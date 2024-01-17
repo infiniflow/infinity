@@ -1,0 +1,14 @@
+croaring v1.1.5
+cxxopts v3.0.0
+googletest v1.12.1
+magic_enum v0.8.1
+spdlog v1.10.0
+simdjson v3.1.8
+tlsf v3.1.0
+tlx v0.6.1
+nlohmann 3.11.2
+zsv commit-id:5c22aae4363fdcd433079d2a9b48007a7c6fbbdf
+mlas onnxruntime:v1.14.1
+cppjieba v5.1.0
+iresearch self-maintained
+thrift v0.19.0
