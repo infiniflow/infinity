@@ -99,7 +99,7 @@ public:
                                                                    di,
                                                                    ip_block_.get());
                 }
-                for (i64 i = i0; i < i1; i++) {
+                for (SizeT i = i0; i < i1; i++) {
                     DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
                     for (SizeT j = j0; j < j1; j++) {
@@ -161,7 +161,7 @@ public:
                                                                    di,
                                                                    ip_block_.get());
                 }
-                for (i64 i = i0; i < i1; i++) {
+                for (SizeT i = i0; i < i1; i++) {
                     DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
                     for (SizeT j = j0; j < j1; j++) {

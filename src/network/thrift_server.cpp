@@ -202,6 +202,11 @@ public:
 
         ImportOptions import_options;
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
+        auto &delimiter_string = request.import_option.delimiter;
+        if (delimiter_string.size() != 1) {
+            RecoverableError(Status::SyntaxError("delimiter isn't a char."));
+        }
+        import_options.delimiter_ = delimiter_string[0];
 
         const QueryResult result = table->Import(path.c_str(), import_options);
         ProcessCommonResult(response, result);

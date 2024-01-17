@@ -76,7 +76,7 @@ public:
 
     [[nodiscard]] TaskBinding TaskBinding() const;
 
-    void CompleteTask();
+    bool CompleteTask();
 
     String PhysOpsToString();
 

@@ -195,7 +195,7 @@ export struct ProjectionOperatorState : public OperatorState {
 // Sort
 export struct SortOperatorState : public OperatorState {
     inline explicit SortOperatorState() : OperatorState(PhysicalOperatorType::kSort) {}
-
+    Vector<SharedPtr<ExpressionState>> expr_states_; // expression states
     Vector<UniquePtr<DataBlock>> unmerge_sorted_blocks_{};
 };
 

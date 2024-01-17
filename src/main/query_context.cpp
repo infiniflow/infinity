@@ -157,14 +157,18 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
+
     } catch (RecoverableException &e) {
+
         StopProfile();
         StartProfile(QueryPhase::kRollback);
         this->RollbackTxn();
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
         query_result.status_.Init(e.ErrorCode(), e.what());
+
     } catch (UnrecoverableException &e) {
+
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
 //        throw e;

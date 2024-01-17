@@ -14,6 +14,8 @@
 
 module;
 
+#include <compare>
+
 module less;
 
 import stl;
@@ -30,30 +32,23 @@ namespace infinity {
 struct LessFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = left < right;
+        static_assert(false, "Unsupported type");
     }
 };
 
-template <>
-inline void LessFunction::Run(VarcharT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: varchar < varchar"));
-//    if (left.IsInlined()) {
-//        if (right.IsInlined()) {
-//            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) < 0);
-//            return;
-//        }
-//    } else if (right.IsInlined()) {
-//        ;
-//    } else {
-//        // Both left and right are not inline
-//        u16 min_len = std::min(right.length, left.length);
-//        if (std::memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) < 0) {
-//            result = (std::memcmp(left.ptr, right.ptr, min_len) < 0);
-//            return;
-//        }
-//    }
-//    result = false;
-}
+struct PODTypeLessFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
+        result.SetValue(left < right);
+    }
+};
+
+struct ColumnValueReaderTypeLessFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA &left, TB &right, TC &result) {
+        result.SetValue(ThreeWayCompareReaderValue(left, right) == std::strong_ordering::less);
+    }
+};
 
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
@@ -85,7 +80,7 @@ inline void LessFunction::Run(VarcharT left, MixedT right, bool &result) {
     LessFunction::Run(right, left, result);
 }
 
-template <typename CompareType>
+template <typename CompareType, typename LessFunction>
 static void GenerateLessFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
     String func_name = "<";
 
@@ -101,26 +96,26 @@ void RegisterLessFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    GenerateLessFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
-    GenerateLessFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
-    GenerateLessFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
-    GenerateLessFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
-    GenerateLessFunction<HugeIntT>(function_set_ptr, DataType(LogicalType::kHugeInt));
-    GenerateLessFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
-    GenerateLessFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
+    GenerateLessFunction<TinyIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateLessFunction<SmallIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateLessFunction<IntegerT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateLessFunction<BigIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateLessFunction<HugeIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateLessFunction<DoubleT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 
     //    GenerateLessFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
     //    GenerateLessFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
     //    GenerateLessFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
     //    GenerateLessFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
 
-    GenerateLessFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
+    GenerateLessFunction<VarcharT, ColumnValueReaderTypeLessFunction>(function_set_ptr, DataType(LogicalType::kVarchar));
     //    GenerateLessFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-    GenerateLessFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    GenerateLessFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    GenerateLessFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    GenerateLessFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateLessFunction<DateT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateLessFunction<TimeT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateLessFunction<DateTimeT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateLessFunction<TimestampT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateLessFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
     //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));

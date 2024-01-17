@@ -36,112 +36,43 @@ import data_block;
 import infinity_exception;
 import third_party;
 import status;
+import physical_top;
 
 namespace infinity {
 
-#define COMPARE(type)                                                                                                                                \
-    type left_value = ((type *)(left_result_vector->data()))[left_index.offset];                                                                     \
-    type right_value = ((type *)(right_result_vector->data()))[right_index.offset];                                                                  \
-    if (left_value == right_value) {                                                                                                                 \
-        continue;                                                                                                                                    \
-    }                                                                                                                                                \
-    if (order_type == OrderType::kAsc) {                                                                                                             \
-        return left_value < right_value;                                                                                                             \
-    } else {                                                                                                                                         \
-        return left_value > right_value;                                                                                                             \
-    }
+struct BlockRawIndex {
+    BlockRawIndex(u32 block_idx, u32 offset) : block_idx_(block_idx), offset_(offset) {}
+    ~BlockRawIndex() = default;
+    u32 block_idx_;
+    u32 offset_;
+};
 
 class Comparator {
 public:
-    explicit Comparator(const Vector<UniquePtr<DataBlock>> &order_by_blocks,
-                        const Vector<OrderType> &order_by_types,
-                        Vector<SharedPtr<BaseExpression>> expressions)
-        : order_by_blocks_(order_by_blocks), order_by_types_(order_by_types), expressions_(expressions) {}
+    explicit Comparator(const CompareTwoRowAndPreferLeft &prefer_left_function,
+                        const Vector<UniquePtr<DataBlock>> &order_by_blocks,
+                        const Vector<SharedPtr<BaseExpression>> &expressions,
+                        Vector<SharedPtr<ExpressionState>> &expr_states)
+        : prefer_left_function_(prefer_left_function), order_by_blocks_(order_by_blocks), expressions_(expressions), expr_states_(expr_states) {}
 
     void Init() {
         if (order_by_blocks_.empty()) {
             return;
         }
-        eval_results_.reserve(order_by_blocks_.size());
-
-        ExpressionEvaluator expr_evaluator;
-        Vector<SharedPtr<ExpressionState>> expr_states;
-        for (SizeT expr_id = 0; expr_id < expressions_.size(); ++expr_id) {
-            expr_states.push_back(ExpressionState::CreateState(expressions_[expr_id]));
-        }
-
-        for (SizeT block_id = 0; block_id < order_by_blocks_.size(); ++block_id) {
-            Vector<SharedPtr<ColumnVector>> results;
-
-            expr_evaluator.Init(order_by_blocks_[block_id].get());
-            results.reserve(expressions_.size());
-
-            for (SizeT expr_id = 0; expr_id < expressions_.size(); ++expr_id) {
-                auto expr = expressions_[expr_id];
-                SharedPtr<ColumnVector> result_vector = MakeShared<ColumnVector>(MakeShared<DataType>(expr->Type()));
-
-                result_vector->Initialize();
-                expr_evaluator.Execute(expr, expr_states[expr_id], result_vector);
-
-                results.push_back(result_vector);
-            }
-            eval_results_.push_back(results);
-        }
+        eval_results_ = PhysicalTop::GetEvalColumns(expressions_, expr_states_, order_by_blocks_);
     }
 
-    bool operator()(BlockRawIndex left_index, BlockRawIndex right_index) {
-        SizeT exprs_count = expressions_.size();
-        for (SizeT expr_idx = 0; expr_idx < exprs_count; ++expr_idx) {
-            auto expr = expressions_[expr_idx];
-            DataType type = expr->Type();
-            OrderType order_type = order_by_types_[expr_idx];
-
-            SharedPtr<ColumnVector> &left_result_vector = eval_results_[left_index.block_idx][expr_idx];
-            SharedPtr<ColumnVector> &right_result_vector = eval_results_[right_index.block_idx][expr_idx];
-
-            switch (type.type()) {
-                case kBoolean: {
-                    auto bool_left = left_result_vector->buffer_->GetCompactBit(left_index.offset);
-                    auto bool_right = right_result_vector->buffer_->GetCompactBit(left_index.offset);
-                    if (bool_left == bool_right) {
-                        continue;
-                    }
-                    if (order_type == OrderType::kAsc) {
-                        return bool_left < bool_right;
-                    } else {
-                        return bool_left > bool_right;
-                    }
-                }
-                case kTinyInt: {
-                    COMPARE(TinyIntT)
-                }
-                case kSmallInt: {
-                    COMPARE(SmallIntT)
-                }
-                case kInteger: {
-                    COMPARE(IntegerT)
-                }
-                case kBigInt: {
-                    COMPARE(BigIntT)
-                }
-                case kFloat: {
-                    COMPARE(FloatT)
-                }
-                case kDouble: {
-                    COMPARE(DoubleT)
-                }
-                default: {
-                    RecoverableError(Status::NotSupport(fmt::format("{} not implemented.", type.type())));
-                }
-            }
-        }
-        return true;
+    bool Compare(BlockRawIndex left_index, BlockRawIndex right_index) {
+        auto &left = eval_results_[left_index.block_idx_];
+        auto &right = eval_results_[right_index.block_idx_];
+        return prefer_left_function_.Compare(left, left_index.offset_, right, right_index.offset_);
     }
 
 private:
+    const CompareTwoRowAndPreferLeft &prefer_left_function_;
     const Vector<UniquePtr<DataBlock>> &order_by_blocks_;
-    const Vector<OrderType> &order_by_types_;
-    Vector<SharedPtr<BaseExpression>> expressions_;
+    const Vector<SharedPtr<BaseExpression>> &expressions_;
+    Vector<SharedPtr<ExpressionState>> &expr_states_;
 
     // Blocks -> Expressions
     Vector<Vector<SharedPtr<ColumnVector>>> eval_results_;
@@ -158,7 +89,7 @@ Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &&indexes_a, Vector<
     auto ptr_b = indexes_b.begin();
 
     while (ptr_a != indexes_a.end() && ptr_b != indexes_b.end()) {
-        if (comparator(*ptr_a, *ptr_b)) {
+        if (comparator.Compare(*ptr_a, *ptr_b)) {
             merged_indexes.push_back(*ptr_a);
             ++ptr_a;
         } else {
@@ -182,9 +113,7 @@ Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &indexes_group,
     if (l > r)
         return Vector<BlockRawIndex>();
     SizeT mid = (l + r) >> 1;
-    return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator),
-                           MergeIndexes(indexes_group, mid + 1, r, comparator),
-                           comparator);
+    return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator), MergeIndexes(indexes_group, mid + 1, r, comparator), comparator);
 }
 
 void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
@@ -210,8 +139,8 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
             output_blocks[(index_idx / DEFAULT_BLOCK_CAPACITY) + start_block_index]->column_vectors;
 
         for (SizeT column_id = 0; column_id < output_column_vectors.size(); ++column_id) {
-            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx]->column_vectors[column_id].get(),
-                                                         block_index.offset,
+            output_column_vectors[column_id]->AppendWith(*input_blocks[block_index.block_idx_]->column_vectors[column_id].get(),
+                                                         block_index.offset_,
                                                          1);
         }
     }
@@ -220,7 +149,18 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
     }
 }
 
-void PhysicalSort::Init() {}
+void PhysicalSort::Init() {
+    auto sort_expr_count = order_by_types_.size();
+    if (sort_expr_count != expressions_.size()) {
+        UnrecoverableError("order_by_types_.size() != expressions_.size()");
+    }
+    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    sort_functions.reserve(sort_expr_count);
+    for (u32 i = 0; i < sort_expr_count; ++i) {
+        sort_functions.emplace_back(PhysicalTop::GenerateSortFunction(order_by_types_[i], expressions_[i]));
+    }
+    prefer_left_function_ = CompareTwoRowAndPreferLeft(std::move(sort_functions));
+}
 
 bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
     auto *prev_op_state = operator_state->prev_op_state_;
@@ -232,18 +172,20 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
 
     block_indexes.reserve(pre_op_state->data_block_array_.size() * DEFAULT_BLOCK_CAPACITY);
     // filling block_indexes
-    for (SizeT block_id = 0; block_id < pre_op_state->data_block_array_.size(); block_id++) {
-        for (SizeT offset = 0; offset < pre_op_state->data_block_array_[block_id]->row_count(); offset++) {
-            BlockRawIndex block_index(block_id, offset);
-
-            block_indexes.push_back(block_index);
+    for (u32 block_id = 0; block_id < pre_op_state->data_block_array_.size(); block_id++) {
+        for (u32 offset = 0; offset < pre_op_state->data_block_array_[block_id]->row_count(); offset++) {
+            block_indexes.emplace_back(block_id, offset);
         }
     }
-    auto block_comparator = Comparator(pre_op_state->data_block_array_, order_by_types_, expressions_);
+    auto &expr_states = (static_cast<SortOperatorState *>(operator_state))->expr_states_;
+    auto block_comparator = Comparator(prefer_left_function_, pre_op_state->data_block_array_, expressions_, expr_states);
 
     block_comparator.Init();
     // sort block_indexes
-    std::sort(block_indexes.begin(), block_indexes.end(), block_comparator);
+    std::sort(block_indexes.begin(), block_indexes.end(), [&block_comparator](BlockRawIndex x, BlockRawIndex y) -> bool {
+        // Be careful! std::sort needs a strict ordering comparator. ("<" instead of "<=")
+        return !block_comparator.Compare(y, x);
+    });
 
     CopyWithIndexes(pre_op_state->data_block_array_, sort_operator_state->unmerge_sorted_blocks_, block_indexes);
     prev_op_state->data_block_array_.clear();
@@ -252,21 +194,20 @@ bool PhysicalSort::Execute(QueryContext *, OperatorState *operator_state) {
         return false;
     }
     auto &unmerge_sorted_blocks = sort_operator_state->unmerge_sorted_blocks_;
-    auto merge_comparator = Comparator(unmerge_sorted_blocks, order_by_types_, expressions_);
+    auto merge_comparator = Comparator(prefer_left_function_, unmerge_sorted_blocks, expressions_, expr_states);
     Vector<Vector<BlockRawIndex>> indexes_group;
 
     merge_comparator.Init();
     indexes_group.reserve(unmerge_sorted_blocks.size());
 
-    for (SizeT block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
+    for (u32 block_id = 0; block_id < unmerge_sorted_blocks.size(); ++block_id) {
         Vector<BlockRawIndex> indexes;
         indexes.reserve(unmerge_sorted_blocks[block_id]->row_count());
 
-        for (SizeT offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
-            BlockRawIndex block_index(block_id, offset);
-            indexes.push_back(block_index);
+        for (u32 offset = 0; offset < unmerge_sorted_blocks[block_id]->row_count(); ++offset) {
+            indexes.emplace_back(block_id, offset);
         }
-        indexes_group.push_back(indexes);
+        indexes_group.push_back(std::move(indexes));
     }
     auto merge_indexes = MergeIndexes(indexes_group, 0, indexes_group.size() - 1, merge_comparator);
     indexes_group.clear();

@@ -55,35 +55,37 @@ export String FragmentType2String(FragmentType type) {
 }
 
 export class Notifier {
-    SizeT running_task_n_;
-    bool finished_;
+    SizeT all_task_n_ = 0;
+    bool error_ = false;
 
     std::mutex locker_{};
     std::condition_variable cv_{};
 
 public:
-    Notifier() : running_task_n_(0), finished_(false) {}
+    void SetTaskN(SizeT all_task_n) { all_task_n_ = all_task_n; }
 
     void Wait() {
         std::unique_lock<std::mutex> lk(locker_);
-        cv_.wait(lk, [&] { return finished_; });
+        cv_.wait(lk, [&] { return all_task_n_ == 0; });
     }
 
     bool StartTask() {
         std::unique_lock<std::mutex> lk(locker_);
-        if (finished_) {
-            return false;
+        if (!error_) {
+            return true;
         }
-        ++running_task_n_;
-        return true;
+        if (--all_task_n_ == 0) {
+            cv_.notify_one();
+        }
+        return false;
     }
 
-    void FinishTask(bool finish) {
+    void FinishTask(bool error) {
         std::unique_lock<std::mutex> lk(locker_);
-        if (finish) {
-            finished_ = true;
+        if (error) {
+            error_ = true;
         }
-        if (--running_task_n_ == 0 && finished_) {
+        if (--all_task_n_ == 0) {
             cv_.notify_one();
         }
     }
@@ -107,7 +109,7 @@ public:
         query_context_->FlushProfiler(std::move(profiler));
     }
 
-    void TryFinishFragment();
+    bool TryFinishFragment();
 
     Vector<PhysicalOperator *> &GetOperators();
 

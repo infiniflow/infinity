@@ -14,6 +14,10 @@
 
 module;
 
+#include <compare>
+
+module less_equals;
+
 import stl;
 import catalog;
 
@@ -23,37 +27,28 @@ import scalar_function_set;
 import parser;
 import third_party;
 
-module less_equals;
-
 namespace infinity {
 
 struct LessEqualsFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = left <= right;
+        static_assert(false, "Unsupported type");
     }
 };
 
-template <>
-inline void LessEqualsFunction::Run(VarcharT, VarcharT, bool &) {
-    UnrecoverableError("Not implement: LessEqualsFunction::Run");
-//    if (left.IsInlined()) {
-//        if (right.IsInlined()) {
-//            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) <= 0);
-//            return;
-//        }
-//    } else if (right.IsInlined()) {
-//        ;
-//    } else {
-//        // Both left and right are not inline
-//        u16 min_len = std::min(right.length, left.length);
-//        if (std::memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) <= 0) {
-//            result = (std::memcmp(left.ptr, right.ptr, min_len) <= 0);
-//            return;
-//        }
-//    }
-//    result = false;
-}
+struct PODTypeLessEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
+        result.SetValue(left <= right);
+    }
+};
+
+struct ColumnValueReaderTypeLessEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA &left, TB &right, TC &result) {
+        result.SetValue(ThreeWayCompareReaderValue(left, right) != std::strong_ordering::greater);
+    }
+};
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, BigIntT, bool &) {
@@ -85,7 +80,7 @@ inline void LessEqualsFunction::Run(VarcharT left, MixedT right, bool &result) {
     LessEqualsFunction::Run(right, left, result);
 }
 
-template <typename CompareType>
+template <typename CompareType, typename LessEqualsFunction>
 static void GenerateLessEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
     String func_name = "<=";
     ScalarFunction less_function(func_name,
@@ -100,26 +95,26 @@ void RegisterLessEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    GenerateLessEqualsFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
-    GenerateLessEqualsFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
-    GenerateLessEqualsFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
-    GenerateLessEqualsFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
-    GenerateLessEqualsFunction<HugeIntT>(function_set_ptr, DataType(LogicalType::kHugeInt));
-    GenerateLessEqualsFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
-    GenerateLessEqualsFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
+    GenerateLessEqualsFunction<TinyIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateLessEqualsFunction<SmallIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateLessEqualsFunction<IntegerT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateLessEqualsFunction<BigIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateLessEqualsFunction<HugeIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateLessEqualsFunction<FloatT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateLessEqualsFunction<DoubleT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 
     //    GenerateLessEqualsFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
     //    GenerateLessEqualsFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
     //    GenerateLessEqualsFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
     //    GenerateLessEqualsFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
 
-    GenerateLessEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
+    GenerateLessEqualsFunction<VarcharT, ColumnValueReaderTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kVarchar));
     //    GenerateLessEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-    GenerateLessEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    GenerateLessEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    GenerateLessEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    GenerateLessEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateLessEqualsFunction<DateT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateLessEqualsFunction<TimeT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateLessEqualsFunction<DateTimeT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateLessEqualsFunction<TimestampT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateLessEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
     //    GenerateEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));

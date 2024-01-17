@@ -14,9 +14,11 @@
 
 module;
 
+#include <compare>
 #include <type_traits>
 
 module equals;
+
 import stl;
 import catalog;
 import status;
@@ -31,37 +33,39 @@ namespace infinity {
 struct EqualsFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        if constexpr (std::is_same_v<std::remove_cv_t<TA>, u8> && std::is_same_v<std::remove_cv_t<TB>, u8> &&
-                      std::is_same_v<std::remove_cv_t<TC>, u8>) {
-            result = ~(left ^ right);
-        } else {
-            result = (left == right);
-        }
+        static_assert(false, "Unsupported type");
+    }
+};
+
+struct BooleanEqualsFunction {
+    // keep compatible with template Run call
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
+        static_assert(false, "Unsupported type");
     }
 };
 
 template <>
-inline void EqualsFunction::Run(VarcharT left, VarcharT right, bool &result) {
-    if (left.length_ != right.length_) {
-        result = false;
-        return;
-    }
-    if (left.IsInlined()) {
-        result = (std::memcmp(left.short_.data_, right.short_.data_, left.length_) == 0);
-        return;
-    } else {
-        // Both left and right are not inline
-        if(left.IsValue() && right.IsValue()) {
-            if (std::memcmp(left.value_.prefix_, right.value_.prefix_, VARCHAR_PREFIX_LEN) == 0) {
-                result = (std::memcmp(left.value_.ptr_, right.value_.ptr_, left.length_) == 0);
-                return;
-            }
-        } else {
-            RecoverableError(Status::NotSupport("Column vector varchar can't be compared"));
-        }
-    }
-    result = false;
+inline void BooleanEqualsFunction::Run<u8, u8, u8>(u8 left, u8 right, u8 &result) { result = ~(left ^ right); }
+
+template <>
+inline void BooleanEqualsFunction::Run<bool, bool, bool>(bool left, bool right, bool &result) {
+    result = (left == right);
 }
+
+struct PODTypeEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
+        result.SetValue(left == right);
+    }
+};
+
+struct ColumnValueReaderTypeEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA &left, TB &right, TC &result) {
+        result.SetValue(CheckReaderValueEquality(left, right));
+    }
+};
 
 template <>
 inline void EqualsFunction::Run(MixedT, BigIntT, bool &) {
@@ -93,7 +97,7 @@ inline void EqualsFunction::Run(VarcharT left, MixedT right, bool &result) {
     EqualsFunction::Run(right, left, result);
 }
 
-template <typename CompareType>
+template <typename CompareType, typename EqualsFunction>
 static void GenerateEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
     String func_name = "=";
     ScalarFunction equals_function(func_name,
@@ -108,27 +112,27 @@ void RegisterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    GenerateEqualsFunction<BooleanT>(function_set_ptr, DataType(LogicalType::kBoolean));
-    GenerateEqualsFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
-    GenerateEqualsFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
-    GenerateEqualsFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
-    GenerateEqualsFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
-    GenerateEqualsFunction<HugeIntT>(function_set_ptr, DataType(LogicalType::kHugeInt));
-    GenerateEqualsFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
-    GenerateEqualsFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
+    GenerateEqualsFunction<BooleanT, BooleanEqualsFunction>(function_set_ptr, DataType(LogicalType::kBoolean));
+    GenerateEqualsFunction<TinyIntT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateEqualsFunction<SmallIntT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateEqualsFunction<IntegerT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateEqualsFunction<BigIntT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateEqualsFunction<HugeIntT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateEqualsFunction<FloatT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateEqualsFunction<DoubleT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 
     //    GenerateEqualsFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
     //    GenerateEqualsFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
     //    GenerateEqualsFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
     //    GenerateEqualsFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
 
-    GenerateEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
+    GenerateEqualsFunction<VarcharT, ColumnValueReaderTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kVarchar));
     //    GenerateEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-    GenerateEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    GenerateEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    GenerateEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    GenerateEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateEqualsFunction<DateT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateEqualsFunction<TimeT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateEqualsFunction<DateTimeT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateEqualsFunction<TimestampT, PODTypeEqualsFunction>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
     //    GenerateEqualsFunction<IntervalT>(function_set_ptr, DataType(LogicalType::kInterval));
 

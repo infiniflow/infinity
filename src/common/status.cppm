@@ -23,18 +23,6 @@ namespace infinity {
 export enum class ErrorCode : long {
 
     kOk = 0, // success
-             //    kError,
-             //    kNotFound,
-             //    kNotImplemented,
-             //    kReachQueryMemoryLimit,
-             //    kNotSupportedCast,
-             //    kAlreadyExist,
-             //    kNetworkError,
-             //    kServiceUnavailable,
-             //    kWWConflict,
-             //    kDuplicate,
-             //    kUndefined,
-             //    kInvalidIdentifier,
 
     // 1. config error,
 

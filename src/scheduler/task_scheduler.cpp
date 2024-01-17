@@ -85,9 +85,11 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     return min_workload_worker_id;
 }
 
-Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
+Pair<Vector<PlanFragment *>, SizeT> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
     Vector<PlanFragment *> leaf_fragments;
+    SizeT all_fragment_n = 0;
     StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
+        all_fragment_n += root->GetContext()->Tasks().size();
         if (root->Children().empty()) {
             leaf_fragments.emplace_back(root);
             return;
@@ -99,7 +101,7 @@ Vector<PlanFragment *> TaskScheduler::GetStartFragments(PlanFragment *plan_fragm
     // Traverse the tree to get all leaf fragments
     TraversePlanFragmentTree(plan_fragment);
 
-    return leaf_fragments;
+    return {leaf_fragments, all_fragment_n};
 }
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
@@ -108,7 +110,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     }
     // DumpPlanFragment(plan_fragment);
 
-    Vector<PlanFragment *> fragments = GetStartFragments(plan_fragment);
+    auto [fragments, task_n] = GetStartFragments(plan_fragment);
+    plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
     for (auto *plan_fragment : fragments) {
         auto &tasks = plan_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
@@ -175,15 +178,16 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         fragment_task->OnExecute(worker_id);
         fragment_task->SetLastWorkID(worker_id);
 
+        bool error = false;
         bool finish = false;
 
         if (fragment_task->status() != FragmentTaskStatus::kError) {
             if (fragment_task->IsComplete()) {
                 auto *sink_op = fragment_ctx->GetSinkOperator();
-                finish = sink_op->sink_type() == SinkType::kResult;
                 --worker_workloads_[worker_id];
                 fragment_task->CompleteTask();
                 iter = task_lists.erase(iter);
+                finish = true;
             } else if (fragment_task->QuitFromWorkerLoop()) {
                 --worker_workloads_[worker_id];
                 iter = task_lists.erase(iter);
@@ -191,11 +195,14 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
                 ++iter;
             }
         } else {
+            error = true;
             finish = true;
             --worker_workloads_[worker_id];
             iter = task_lists.erase(iter);
         }
-        fragment_ctx->notifier()->FinishTask(finish);
+        if (finish) {
+            fragment_ctx->notifier()->FinishTask(error);
+        }
     }
 }
 

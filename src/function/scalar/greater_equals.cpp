@@ -14,6 +14,8 @@
 
 module;
 
+#include <compare>
+
 module greater_equals;
 
 import stl;
@@ -30,31 +32,23 @@ namespace infinity {
 struct GreaterEqualsFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA left, TB right, TC &result) {
-        result = left >= right;
+        static_assert(false, "Unsupported type");
     }
 };
 
-template <>
-inline void GreaterEqualsFunction::Run(VarcharT, VarcharT, bool &) {
-    RecoverableError(Status::NotSupport("Not implement: varchar >= varchar"));
+struct PODTypeGreaterEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA left, TB right, TC &result) {
+        result.SetValue(left >= right);
+    }
+};
 
-//    if (left.IsInlined()) {
-//        if (right.IsInlined()) {
-//            result = (std::memcmp(left.prefix, right.prefix, VarcharT::INLINE_LENGTH) >= 0);
-//            return;
-//        }
-//    } else if (right.IsInlined()) {
-//        ;
-//    } else {
-//        // Both left and right are not inline
-//        u16 min_len = std::min(right.length, left.length);
-//        if (std::memcmp(left.prefix, right.prefix, VarcharT::PREFIX_LENGTH) >= 0) {
-//            result = (std::memcmp(left.ptr, right.ptr, min_len) >= 0);
-//            return;
-//        }
-//    }
-//    result = false;
-}
+struct ColumnValueReaderTypeGreaterEqualsFunction {
+    template <typename TA, typename TB, typename TC>
+    static inline void Run(TA &left, TB &right, TC &result) {
+        result.SetValue(ThreeWayCompareReaderValue(left, right) != std::strong_ordering::less);
+    }
+};
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
@@ -86,7 +80,7 @@ inline void GreaterEqualsFunction::Run(VarcharT left, MixedT right, bool &result
     GreaterEqualsFunction::Run(right, left, result);
 }
 
-template <typename CompareType>
+template <typename CompareType, typename GreaterEqualsFunction>
 static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr, DataType data_type) {
     String func_name = ">=";
     ScalarFunction greater_equals_function(func_name,
@@ -101,26 +95,26 @@ void RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
 
-    GenerateGreaterEqualsFunction<TinyIntT>(function_set_ptr, DataType(LogicalType::kTinyInt));
-    GenerateGreaterEqualsFunction<SmallIntT>(function_set_ptr, DataType(LogicalType::kSmallInt));
-    GenerateGreaterEqualsFunction<IntegerT>(function_set_ptr, DataType(LogicalType::kInteger));
-    GenerateGreaterEqualsFunction<BigIntT>(function_set_ptr, DataType(LogicalType::kBigInt));
-    GenerateGreaterEqualsFunction<HugeIntT>(function_set_ptr, DataType(LogicalType::kHugeInt));
-    GenerateGreaterEqualsFunction<FloatT>(function_set_ptr, DataType(LogicalType::kFloat));
-    GenerateGreaterEqualsFunction<DoubleT>(function_set_ptr, DataType(LogicalType::kDouble));
+    GenerateGreaterEqualsFunction<TinyIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
+    GenerateGreaterEqualsFunction<SmallIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));
+    GenerateGreaterEqualsFunction<IntegerT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
+    GenerateGreaterEqualsFunction<BigIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
+    GenerateGreaterEqualsFunction<HugeIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateGreaterEqualsFunction<FloatT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
+    GenerateGreaterEqualsFunction<DoubleT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 
     //    GenerateGreaterEqualsFunction<Decimal16T>(function_set_ptr, DataType(LogicalType::kDecimal16));
     //    GenerateGreaterEqualsFunction<Decimal32T>(function_set_ptr, DataType(LogicalType::kDecimal32));
     //    GenerateGreaterEqualsFunction<Decimal64T>(function_set_ptr, DataType(LogicalType::kDecimal64));
     //    GenerateGreaterEqualsFunction<Decimal128T>(function_set_ptr, DataType(LogicalType::kDecimal128));
 
-    GenerateGreaterEqualsFunction<VarcharT>(function_set_ptr, DataType(LogicalType::kVarchar));
+    GenerateGreaterEqualsFunction<VarcharT, ColumnValueReaderTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kVarchar));
     //    GenerateGreaterEqualsFunction<CharT>(function_set_ptr, DataType(LogicalType::kChar));
 
-    GenerateGreaterEqualsFunction<DateT>(function_set_ptr, DataType(LogicalType::kDate));
-    GenerateGreaterEqualsFunction<TimeT>(function_set_ptr, DataType(LogicalType::kTime));
-    GenerateGreaterEqualsFunction<DateTimeT>(function_set_ptr, DataType(LogicalType::kDateTime));
-    GenerateGreaterEqualsFunction<TimestampT>(function_set_ptr, DataType(LogicalType::kTimestamp));
+    GenerateGreaterEqualsFunction<DateT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kDate));
+    GenerateGreaterEqualsFunction<TimeT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTime));
+    GenerateGreaterEqualsFunction<DateTimeT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kDateTime));
+    GenerateGreaterEqualsFunction<TimestampT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTimestamp));
     //    GenerateGreaterEqualsFunction<TimestampTZT>(function_set_ptr, DataType(LogicalType::kTimestampTZ));
 
     //    GenerateGreaterEqualsFunction<MixedT>(function_set_ptr, DataType(LogicalType::kMixed));
