@@ -48,7 +48,6 @@ public:
      * @param newSize The desired new size
      * @return true if successful.
      */
-    virtual size_t resize_inplace(PtrAndSize current, size_t newSize) const = 0;
     static size_t roundUpToHugePages(size_t sz) noexcept { return (sz + (HUGEPAGE_SIZE - 1)) & ~(HUGEPAGE_SIZE - 1); }
 };
 

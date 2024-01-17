@@ -1,18 +1,12 @@
-// Copyright Vespa.ai. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root.
-#include "alloc.h"
-#include "atomic.h"
-#include "memory_allocator.h"
-#include "round_up_to_page_size.h"
-#include "size_literals.h"
 #include <atomic>
 #include <cassert>
 #include <exception>
 #include <map>
-#include <mutex>
-#include <sys/mman.h>
-#include <unordered_map>
 
-using namespace vespalib::atomic;
+#include <vespalib/util/alloc.h>
+#include <vespalib/util/memory_allocator.h>
+
+import memory_pool;
 
 namespace vespalib {
 
@@ -48,6 +42,9 @@ void HeapAllocator::sfree(PtrAndSize alloc) noexcept {
         ::free(alloc.get());
     }
 }
+HeapAllocator _G_heapAllocatorDefault;
+
+MemoryAllocator &HeapAllocator::getDefault() { return _G_heapAllocatorDefault; }
 
 } // namespace
 
