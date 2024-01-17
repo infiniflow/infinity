@@ -226,6 +226,7 @@ target_link_libraries(infinity
         lz4.a
         atomic.a
         event.a
+        vespalib
 #        profiler
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
