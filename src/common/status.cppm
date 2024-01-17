@@ -23,18 +23,18 @@ namespace infinity {
 export enum class ErrorCode : long {
 
     kOk = 0, // success
-//    kError,
-//    kNotFound,
-//    kNotImplemented,
-//    kReachQueryMemoryLimit,
-//    kNotSupportedCast,
-//    kAlreadyExist,
-//    kNetworkError,
-//    kServiceUnavailable,
-//    kWWConflict,
-//    kDuplicate,
-//    kUndefined,
-//    kInvalidIdentifier,
+             //    kError,
+             //    kNotFound,
+             //    kNotImplemented,
+             //    kReachQueryMemoryLimit,
+             //    kNotSupportedCast,
+             //    kAlreadyExist,
+             //    kNetworkError,
+             //    kServiceUnavailable,
+             //    kWWConflict,
+             //    kDuplicate,
+             //    kUndefined,
+             //    kInvalidIdentifier,
 
     // 1. config error,
 
@@ -82,6 +82,7 @@ export enum class ErrorCode : long {
     kImportFileFormatError = 3037,
     kDataNotExist = 3038,
     kColumnCountMismatch = 3039,
+    kEmptyDBNameIsGiven = 3040,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -120,7 +121,7 @@ public:
 
     // 2. Auth error
     static Status WrongPasswd(const String &user_name);
-    static Status InsufficientPrivilege(const String& user_name, const String &detailed_error);
+    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);
@@ -151,14 +152,15 @@ public:
     static Status ReadOnlySysVar(const String &sys_var);
     static Status FunctionNotFound(const String &function_name);
     static Status SpecialFunctionNotFound();
-    static Status NotSupport(const String& detailed);
-    static Status DroppingUsingDb(const String& db_name);
+    static Status NotSupport(const String &detailed);
+    static Status DroppingUsingDb(const String &db_name);
     static Status SessionNotFound(i64 session_id);
-    static Status RecursiveAggregate(const String& expr_name);
-    static Status FunctionArgsError(const String& func_name);
-    static Status ImportFileFormatError(const String& detailed_info);
-    static Status DataNotExist(const String& detailed_info);
-    static Status ColumnCountMismatch(const String& detailed_info);
+    static Status RecursiveAggregate(const String &expr_name);
+    static Status FunctionArgsError(const String &func_name);
+    static Status ImportFileFormatError(const String &detailed_info);
+    static Status DataNotExist(const String &detailed_info);
+    static Status ColumnCountMismatch(const String &detailed_info);
+    static Status EmptyDBNameIsGiven();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -173,7 +175,7 @@ public:
 
     // 6. Operation intervention
     static Status QueryCancelled(const String &query_text);
-    static Status QueryNotSupported(const String &query_text, const String& detailed_reason);
+    static Status QueryNotSupported(const String &query_text, const String &detailed_reason);
     static Status ClientClose();
 
     // 7. System error
@@ -227,7 +229,9 @@ public:
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
 
-    void AppendMessage(const String& msg);
+    void AppendMessage(const String &msg);
+
+    inline Status clone() { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};

@@ -61,9 +61,9 @@ bool QueueSourceState::GetData() {
         }
         case FragmentDataType::kError: {
             auto *fragment_error = static_cast<FragmentError *>(fragment_data_base.get());
-            if (this->error_message_.get() == nullptr) {
+            if (this->status_.ok()) {
                 // Only record the first error of input data.
-                this->error_message_ = std::move(fragment_error->error_message_);
+                this->status_ = std::move(fragment_error->status_);
             }
             // Get an error message from predecessor fragment
             MarkCompletedTask(fragment_error->fragment_id_);

@@ -59,9 +59,8 @@ bool PhysicalCreateTable::Execute(QueryContext *query_context, OperatorState *op
     auto txn = query_context->GetTxn();
 
     Status status = txn->CreateTable(*schema_name_, table_def_ptr_, conflict_type_);
-    auto create_table_operator_state = (CreateTableOperatorState *)operator_state;
     if (!status.ok()) {
-        create_table_operator_state->error_message_ = std::move(status.msg_);
+        operator_state->status_ = status;
     }
     operator_state->SetComplete();
     return true;

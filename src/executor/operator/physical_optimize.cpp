@@ -54,16 +54,18 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     LOG_INFO(fmt::format("OptimizeIndex {} {}", db_name_, object_name_));
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
-    if (!table_status.ok()) {
-        operator_state->error_message_ = MakeUnique<String>(*table_status.msg_);
+
+    if(!table_status.ok()) {
+        operator_state->status_ = table_status;
         RecoverableError(table_status);
-        return;
+        return ;
     }
 
     SharedPtr<IrsIndexEntry> irs_index_entry;
     for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
         auto [table_index_entry, index_status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (!index_status.ok()) {
+            operator_state->status_ = index_status;
             RecoverableError(index_status);
         }
         irs_index_entry = table_index_entry->irs_index_entry();

@@ -14,6 +14,8 @@
 
 module;
 
+export module embedding_cast;
+
 import stl;
 import column_vector;
 import vector_buffer;
@@ -25,8 +27,7 @@ import integer_cast;
 import infinity_exception;
 import third_party;
 import logger;
-
-export module embedding_cast;
+import status;
 
 namespace infinity {
 
@@ -43,7 +44,8 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
-        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
+        RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
+//        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {

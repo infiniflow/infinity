@@ -1037,7 +1037,7 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
     }
 
     if (tasks_[0]->sink_state_->Error()) {
-        UnrecoverableError(*tasks_[0]->sink_state_->error_message_);
+        RecoverableError(tasks_[0]->sink_state_->status_);
     }
 
     switch (tasks_[0]->sink_state_->state_type()) {
@@ -1102,8 +1102,8 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
-        if (task->sink_state_->error_message_.get() != nullptr) {
-            UnrecoverableError(*task->sink_state_->error_message_);
+        if (!task->sink_state_->status_.ok()) {
+            RecoverableError(task->sink_state_->status_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {
@@ -1149,8 +1149,8 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
     SharedPtr<DataTable> result_table = nullptr;
     for (const auto &task : tasks_) {
-        if (task->sink_state_->error_message_.get() != nullptr) {
-            UnrecoverableError(*task->sink_state_->error_message_);
+        if (!task->sink_state_->status_.ok()) {
+            RecoverableError(task->sink_state_->status_);
         }
     }
     if (tasks_[0]->sink_state_->state_type() == SinkStateType::kSummary) {

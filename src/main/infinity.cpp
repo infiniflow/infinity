@@ -89,7 +89,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
         query_result.result_table_ = nullptr;
         UniquePtr<String> err_msg = MakeUnique<String>("Empty database name is given.");
         LOG_ERROR(*err_msg);
-        query_result.status_ = Status::InvalidDBName(db_name);
+        query_result.status_ = Status::EmptyDBNameIsGiven();
         return query_result;
     }
 

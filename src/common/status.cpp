@@ -213,6 +213,10 @@ Status Status::DataNotExist(const infinity::String &detailed_info) {
     return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Data not exist: ", detailed_info)));
 }
 
+Status Status::EmptyDBNameIsGiven() {
+    return Status(ErrorCode::kEmptyDBNameIsGiven, MakeUnique<String>("Empty database name is given."));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

@@ -199,8 +199,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateTable: {
             auto *output_state = static_cast<CreateTableOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -209,8 +209,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateIndex: {
             auto *output_state = static_cast<CreateIndexOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
@@ -220,8 +220,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateCollection: {
             auto *output_state = static_cast<CreateCollectionOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -230,8 +230,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateDatabase: {
             auto *output_state = static_cast<CreateDatabaseOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -240,8 +240,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateView: {
             auto *output_state = static_cast<CreateViewOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -250,8 +250,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kDropTable: {
             auto *output_state = static_cast<DropTableOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -260,8 +260,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kDropIndex: {
             auto *output_state = static_cast<DropIndexOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
@@ -271,8 +271,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kDropCollection: {
             auto *output_state = static_cast<DropCollectionOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -281,8 +281,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kDropDatabase: {
             auto *output_state = static_cast<DropDatabaseOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -291,8 +291,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kDropView: {
             auto *output_state = static_cast<DropViewOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -301,8 +301,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCommand: {
             auto *output_state = static_cast<CommandOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -311,8 +311,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kFlush: {
             auto *output_state = static_cast<FlushOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -321,8 +321,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kOptimize: {
             auto *output_state = static_cast<OptimizeOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
             } else {
                 result_sink_state->result_def_ = {
                     MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>())};
@@ -331,8 +331,8 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateIndexFinish: {
             auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
-            if (output_state->error_message_.get() != nullptr) {
-                result_sink_state->error_message_ = std::move(output_state->error_message_);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
                 break;
             }
             result_sink_state->result_def_ = {
@@ -381,9 +381,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
     // if (task_operator_state->operator_type_ == PhysicalOperatorType::kAggregate) {
     //     LOG_WARN(fmt::format("Sink Agg task id {}, fragment id {}", queue_sink_state->task_id_, queue_sink_state->fragment_id_));
     // }
-    if (queue_sink_state->error_message_.get() != nullptr) {
-        LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->error_message_));
-        auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, MakeUnique<String>(*queue_sink_state->error_message_));
+    if (queue_sink_state->Error()) {
+        LOG_TRACE(fmt::format("Error: {} is sent to notify next fragment", *queue_sink_state->status_.msg_));
+        auto fragment_error = MakeShared<FragmentError>(queue_sink_state->fragment_id_, queue_sink_state->status_.clone());
         for (const auto &next_fragment_queue : queue_sink_state->fragment_data_queues_) {
             next_fragment_queue->Enqueue(fragment_error);
         }

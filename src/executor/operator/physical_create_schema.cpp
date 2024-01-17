@@ -33,8 +33,9 @@ void PhysicalCreateSchema::Init() {}
 bool PhysicalCreateSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto txn = query_context->GetTxn();
     Status status = txn->CreateDatabase(*schema_name_, conflict_type_);
-    auto create_database_operator_state = (CreateDatabaseOperatorState *)(operator_state);
-    create_database_operator_state->error_message_ = std::move(status.msg_);
+    if (!status.ok()) {
+        operator_state->status_ = status;
+    }
     operator_state->SetComplete();
     return true;
 }
