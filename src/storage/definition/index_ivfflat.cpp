@@ -17,10 +17,9 @@ module;
 #include <string>
 #include <vector>
 
-import infinity_exception;
-
 module index_ivfflat;
 
+import infinity_exception;
 import stl;
 import index_def;
 import parser;
@@ -89,6 +88,18 @@ nlohmann::json IndexIVFFlat::Serialize() const {
 SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
     UnrecoverableError("Not implemented");
     return nullptr;
+}
+
+void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+    auto &column_names_vector = *(base_table_ref->column_names_);
+    auto &column_types_vector = *(base_table_ref->column_types_);
+    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    if (column_id == column_names_vector.size()) {
+        UnrecoverableError(fmt::format("Invalid parameter for IVFFlat index: column name not found: {}.", column_name));
+    } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
+        UnrecoverableError(
+            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString()));
+    }
 }
 
 } // namespace infinity

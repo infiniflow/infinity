@@ -14,13 +14,14 @@
 
 module;
 
+export module index_ivfflat;
+
 import stl;
 import index_def;
 import parser;
 import index_base;
 import third_party;
-
-export module index_ivfflat;
+import base_table_ref;
 
 namespace infinity {
 export class IndexIVFFlat final : public IndexBase {
@@ -48,6 +49,9 @@ public:
     virtual nlohmann::json Serialize() const override;
 
     static SharedPtr<IndexIVFFlat> Deserialize(const nlohmann::json &index_def_json);
+
+public:
+    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
 public:
     const SizeT centroids_count_{};
