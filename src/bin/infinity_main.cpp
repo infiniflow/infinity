@@ -60,6 +60,9 @@ void ShutdownServer() {
 
 void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
+        case SIGUSR1: {
+            fmt::print("Unrecoverable error issued, stop the server");
+        }
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
@@ -89,6 +92,7 @@ void RegisterSignal() {
     sig_action.sa_flags = SA_SIGINFO;
     sig_action.sa_sigaction = SignalHandler;
     sigemptyset(&sig_action.sa_mask);
+    sigaction(SIGUSR1, &sig_action, NULL);
     sigaction(SIGINT, &sig_action, NULL);
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);

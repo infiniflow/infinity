@@ -88,7 +88,7 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
         return;
     }
     if (active_operator_ != nullptr) {
-        Error<ProfilerException>("Attempting to call StartOperator while another operator is active.", __FILE_NAME__, __LINE__);
+        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
     }
     active_operator_ = op;
     profiler_.Begin();
@@ -98,7 +98,7 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         return;
     }
     if (active_operator_ == nullptr) {
-        Error<ProfilerException>("Attempting to call StopOperator while another operator is active.", __FILE_NAME__, __LINE__);
+        UnrecoverableError("Attempting to call StopOperator while another operator is active.");
     }
     profiler_.End();
 
@@ -156,7 +156,7 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Rollback";
         }
         default: {
-            Error<ExecutorException>("Invalid query phase in query profiler");
+            UnrecoverableError("Invalid query phase in query profiler");
         }
     }
     return {};
@@ -172,7 +172,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        Error<ExecutorException>(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
+        UnrecoverableError(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
     }
 
     BaseProfiler& phase_profiler = profilers_[phase_idx];
@@ -187,7 +187,7 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        Error<ExecutorException>("Query phase isn't started, yet");
+        UnrecoverableError("Query phase isn't started, yet");
     }
 
     current_phase_ = QueryPhase::kInvalid;

@@ -30,7 +30,6 @@ export import :column_index_entry;
 export import :segment_column_index_entry;
 export import :irs_index_entry;
 export import :base_entry;
-import :base_meta;
 
 import stl;
 import parser;
@@ -204,8 +203,6 @@ public:
 
     static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    static void DeleteFunctionSet(NewCatalog *catalog, String function_name);
-
     // Table Function related methods
     static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
 
@@ -213,9 +210,7 @@ public:
 
     static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
-    static SharedPtr<SpecialFunction> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
-
-    static void DeleteTableFunction(NewCatalog *catalog, String function_name);
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
 
 public:
     // Serialization and Deserialization

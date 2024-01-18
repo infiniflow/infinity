@@ -14,23 +14,23 @@
 
 module;
 
+module extract;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
 
-module extract;
-
 namespace infinity {
 
 struct ExtractYearFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractYear function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractYear function isn't implemented"));
     }
 };
 
@@ -52,7 +52,7 @@ inline void ExtractYearFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractMonthFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractMonth function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractMonth function isn't implemented"));
     }
 };
 
@@ -74,7 +74,7 @@ inline void ExtractMonthFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractDayFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractDay function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractDay function isn't implemented"));
     }
 };
 
@@ -96,7 +96,7 @@ inline void ExtractDayFunction::Run(TimestampT left, BigIntT &result) {
 struct ExtractHourFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractHour function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractHour function isn't implemented"));
     }
 };
 
@@ -118,7 +118,7 @@ inline void ExtractHourFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractMinuteFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractMinute function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractMinute function isn't implemented"));
     }
 };
 
@@ -140,7 +140,7 @@ inline void ExtractMinuteFunction::Run(TimeT left, BigIntT &result) {
 struct ExtractSecondFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
-        Error<NotImplementException>("ExtractSecond function isn't implemented");
+        RecoverableError(Status::NotSupport("ExtractSecond function isn't implemented"));
     }
 };
 

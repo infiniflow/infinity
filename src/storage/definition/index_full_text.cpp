@@ -65,7 +65,7 @@ void IndexFullText::WriteAdv(char *&ptr) const {
 }
 
 SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
-    Error<StorageException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return nullptr;
 }
 
@@ -85,7 +85,7 @@ nlohmann::json IndexFullText::Serialize() const {
 }
 
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
-    Error<StorageException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return nullptr;
 }
 

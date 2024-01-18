@@ -26,7 +26,7 @@ import logical_node;
 import query_context;
 import stl;
 import infinity_exception;
-
+import status;
 import base_table_ref;
 import subquery_table_ref;
 import expression_transformer;
@@ -62,7 +62,7 @@ SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_conte
 SharedPtr<LogicalNode>
 BoundDeleteStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
-        Error<PlannerException>("unsupported!");
+        UnrecoverableError("Unsupported!");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
@@ -111,7 +111,7 @@ void BoundDeleteStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            Error<PlannerException>("Nested subquery detected");
+            RecoverableError(Status::SyntaxError("Nested subquery detected"));
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

@@ -46,7 +46,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("BufferManager::Allocate: file %s already exists.", file_path.c_str()));
         LOG_ERROR(*err_msg);
-        Error<StorageException>(*err_msg);
+        UnrecoverableError(*err_msg);
     }
     buffer_map_.emplace(file_path, std::move(buffer_obj));
     return res;
@@ -80,16 +80,16 @@ void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {
         if (gc_queue_.TryDequeue(buffer_obj1)) {
             if (buffer_obj == buffer_obj1) {
                 if (buffer_obj1->status() != BufferStatus::kFreed) {
-                    Error<StorageException>("Bug.");
+                    UnrecoverableError("buffer object status isn't freed");
                 }
-                // prevent dead lock
+                // prevent deadlock
                 continue;
             }
             if (buffer_obj1->Free()) {
                 current_memory_size_ -= buffer_obj1->GetBufferSize();
             }
         } else {
-            throw StorageException("Out of memory.");
+            UnrecoverableError("Out of memory.");
         }
     }
     current_memory_size_ += need_size;

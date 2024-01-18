@@ -55,7 +55,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
         }
 
         TinyIntT target;
-        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, nullptr), FunctionException);
+        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         BitmapT source;
@@ -73,7 +73,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, col_varchar_ptr), FunctionException);
+        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, col_varchar_ptr), UnrecoverableException);
     }
 }
 
@@ -83,7 +83,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
     // Call BindBitmapCast with wrong type of parameters
     {
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindBitmapCast(target_type), TypeException);
+        EXPECT_THROW(BindBitmapCast(target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBitmap);
@@ -127,7 +127,7 @@ TEST_F(BitmapCastTest, bitmap_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), FunctionException);
+        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 }
 #endif

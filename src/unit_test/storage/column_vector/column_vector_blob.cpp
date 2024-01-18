@@ -37,12 +37,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
-    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -74,7 +74,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 
     column_vector.Reserve(DEFAULT_VECTOR_SIZE * 2);
@@ -125,7 +125,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 
     column_vector.Reset();
@@ -138,12 +138,12 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
 
     // ====
     column_vector.Initialize();
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
-    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -173,7 +173,7 @@ TEST_F(ColumnVectorBlobTest, flat_blob) {
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 
     ColumnVector column_constant(data_type);
@@ -207,12 +207,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
-    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -223,7 +223,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), UnrecoverableException);
     auto tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
@@ -241,11 +241,11 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
         Value v = Value::MakeBlob(b1);
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 
     for (i64 i = 0; i < 1; ++i) {
@@ -274,12 +274,12 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), TypeException);
+    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
     EXPECT_EQ(column_vector.Size(), 0);
 
-    EXPECT_THROW(column_vector.GetValue(0), TypeException);
+    EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.tail_index_, 0);
     EXPECT_EQ(column_vector.data_type_size_, 16);
     EXPECT_NE(column_vector.data_ptr_, nullptr);
@@ -290,7 +290,7 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), StorageException);
+    EXPECT_THROW(column_vector.Reserve(DEFAULT_VECTOR_SIZE - 1), UnrecoverableException);
     tmp_ptr = column_vector.data_ptr_;
     EXPECT_EQ(tmp_ptr, column_vector.data_ptr_);
     for (i64 i = 0; i < 1; ++i) {
@@ -306,11 +306,11 @@ TEST_F(ColumnVectorBlobTest, contant_blob) {
 
         Value v = Value::MakeBlob(b1);
         column_vector.AppendValue(v);
-        EXPECT_THROW(column_vector.AppendValue(v), StorageException);
+        EXPECT_THROW(column_vector.AppendValue(v), UnrecoverableException);
         Value vx = column_vector.GetValue(i);
         EXPECT_EQ(vx.type().type(), LogicalType::kBlob);
         EXPECT_EQ(vx.value_.blob, b1);
-        EXPECT_THROW(column_vector.GetValue(i + 1), TypeException);
+        EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 }
 

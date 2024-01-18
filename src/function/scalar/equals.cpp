@@ -21,13 +21,12 @@ module equals;
 
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
 
 namespace infinity {
 
@@ -47,9 +46,7 @@ struct BooleanEqualsFunction {
 };
 
 template <>
-inline void BooleanEqualsFunction::Run<u8, u8, u8>(u8 left, u8 right, u8 &result) {
-    result = ~(left ^ right);
-}
+inline void BooleanEqualsFunction::Run<u8, u8, u8>(u8 left, u8 right, u8 &result) { result = ~(left ^ right); }
 
 template <>
 inline void BooleanEqualsFunction::Run<bool, bool, bool>(bool left, bool right, bool &result) {
@@ -72,7 +69,7 @@ struct ColumnValueReaderTypeEqualsFunction {
 
 template <>
 inline void EqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed == bigint");
+    RecoverableError(Status::NotSupport("Not implement: mixed == bigint"));
 }
 
 template <>
@@ -82,7 +79,7 @@ inline void EqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void EqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed == double");
+    RecoverableError(Status::NotSupport("Not implement: mixed == double"));
 }
 
 template <>
@@ -92,7 +89,7 @@ inline void EqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void EqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed == varchar");
+    RecoverableError(Status::NotSupport("Not implement: mixed == varchar"));
 }
 
 template <>

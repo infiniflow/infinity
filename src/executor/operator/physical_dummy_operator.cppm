@@ -38,7 +38,7 @@ public:
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
+        UnrecoverableError("Not implement: TaskletCount not Implement");
         return 0;
     }
 

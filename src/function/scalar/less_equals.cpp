@@ -15,6 +15,7 @@
 module;
 
 #include <compare>
+
 module less_equals;
 
 import stl;
@@ -51,7 +52,7 @@ struct ColumnValueReaderTypeLessEqualsFunction {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= bigint");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>
@@ -61,7 +62,7 @@ inline void LessEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= double");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>
@@ -71,7 +72,7 @@ inline void LessEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed <= varchar");
+    UnrecoverableError("Not implement: LessEqualsFunction::Run");
 }
 
 template <>

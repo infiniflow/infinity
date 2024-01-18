@@ -189,7 +189,7 @@ RowID *MergeKnn<DataType, C>::GetIDs() const {
 template <typename DataType, template <typename, typename> typename C>
 DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
-        Error<ExecutorException>("Query index exceeds the limit");
+        UnrecoverableError("Query index exceeds the limit");
     }
     return distance_array_.get() + idx * this->topk_;
 }
@@ -197,7 +197,7 @@ DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
 template <typename DataType, template <typename, typename> typename C>
 RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
-        Error<ExecutorException>("Query index exceeds the limit");
+        UnrecoverableError("Query index exceeds the limit");
     }
     return idx_array_.get() + idx * this->topk_;
 }

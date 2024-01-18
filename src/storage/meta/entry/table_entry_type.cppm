@@ -36,7 +36,7 @@ export inline String ToString(TableEntryType type) {
             return "Collection";
         }
         default: {
-            Error<ExecutorException>("Invalid base table type");
+            UnrecoverableError("Invalid base table type");
         }
     }
 }

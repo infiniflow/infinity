@@ -16,6 +16,8 @@ module;
 
 #include <tuple>
 
+module physical_optimize;
+
 import stl;
 import txn;
 import query_context;
@@ -29,8 +31,6 @@ import logger;
 import iresearch_datastore;
 import base_table_ref;
 import catalog;
-
-module physical_optimize;
 
 namespace infinity {
 
@@ -54,17 +54,19 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     LOG_INFO(fmt::format("OptimizeIndex {} {}", db_name_, object_name_));
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
-    if (!table_status.ok()) {
-        operator_state->error_message_ = std::move(table_status.msg_);
-        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
-        return;
+
+    if(!table_status.ok()) {
+        operator_state->status_ = table_status;
+        RecoverableError(table_status);
+        return ;
     }
 
     SharedPtr<IrsIndexEntry> irs_index_entry;
     for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
         auto [table_index_entry, index_status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (!index_status.ok()) {
-            Error<StorageException>("Cannot find index entry.");
+            operator_state->status_ = index_status;
+            RecoverableError(index_status);
         }
         irs_index_entry = table_index_entry->irs_index_entry();
     }

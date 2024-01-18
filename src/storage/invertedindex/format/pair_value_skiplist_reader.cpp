@@ -49,14 +49,14 @@ void PairValueSkipListReader::Load_(u32, u32, const u32 &item_count) {
         byte_slice_reader_.Read(value_buffer_, item_count * sizeof(value_buffer_[0]));
         num_in_buffer_ = item_count;
         if (end_ != byte_slice_reader_.Tell()) {
-            Error<StorageException>("end_ != byte_slice_reader_.Tell().");
+            UnrecoverableError("end_ != byte_slice_reader_.Tell().");
         }
     }
 }
 
 bool PairValueSkipListReader::SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &value, u32 &delta) {
     if (current_key_ > query_key) {
-        Error<StorageException>("current_key_ > query_key.");
+        UnrecoverableError("current_key_ > query_key.");
     }
 
     u32 local_prev_key, local_prev_value;

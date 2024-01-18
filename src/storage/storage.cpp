@@ -19,6 +19,8 @@ module;
 #include <regex>
 #include <string>
 
+module storage;
+
 import config;
 import stl;
 import buffer_manager;
@@ -35,8 +37,7 @@ import txn;
 import infinity_exception;
 import status;
 import backgroud_process;
-
-module storage;
+import status;
 
 namespace infinity {
 
@@ -133,7 +134,7 @@ void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
         txn_mgr->CommitTxn(new_txn);
     } else {
         txn_mgr->RollBackTxn(new_txn);
-        Error<StorageException>(*status.msg_);
+        UnrecoverableError(*status.msg_);
     }
 }
 

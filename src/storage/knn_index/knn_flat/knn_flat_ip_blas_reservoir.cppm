@@ -17,29 +17,27 @@ module;
 import stl;
 import knn_result_handler;
 import knn_distance;
+import mlas_matrix_multiply;
+import bitmask;
 import parser;
 
 import infinity_exception;
 import default_values;
-import vector_distance;
-import mlas_matrix_multiply;
-import bitmask;
 
-export module knn_flat_l2_blas;
+export module knn_flat_ip_blas_reservoir;
 
 namespace infinity {
 
 export template <typename DistType>
-class KnnFlatL2Blas final : public KnnDistance<DistType> {
-    using ResultHandler = HeapResultHandler<CompareMax<DistType, RowID>>;
+class KnnFlatIPBlasReservoir final : public KnnDistance<DistType> {
+
+    using ResultHandler = ReservoirResultHandler<CompareMin<DistType, RowID>>;
 
 public:
-    explicit KnnFlatL2Blas(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Blas, elem_data_type, query_count, dimension, topk), queries_(queries) {
-
+    explicit KnnFlatIPBlasReservoir(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpBlasReservoir, elem_data_type, query_count, dimension, topk), queries_(queries) {
         id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
         distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
-
         result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
     }
 
@@ -48,15 +46,9 @@ public:
             return;
         }
 
-        // block sizes
         const SizeT bs_x = DISTANCE_COMPUTE_BLAS_QUERY_BS;
         const SizeT bs_y = DISTANCE_COMPUTE_BLAS_DATABASE_BS;
-        // const SizeT bs_x = 16, bs_y = 16;
-
         ip_block_ = MakeUniqueForOverwrite<DistType[]>(bs_x * bs_y);
-        x_norms_ = MakeUniqueForOverwrite<DistType[]>(this->query_count_);
-
-        L2NormsSquares(x_norms_.get(), queries_, this->dimension_, this->query_count_);
 
         result_handler_->Begin();
         begin_ = true;
@@ -64,7 +56,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2Blas isn't begin");
+            UnrecoverableError("KnnFlatIPBlasReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -73,10 +65,6 @@ public:
             return;
         }
 
-        y_norms_ = MakeUniqueForOverwrite<DistType[]>(base_count);
-        L2NormsSquares(y_norms_.get(), base, this->dimension_, base_count);
-
-        // block sizes
         const SizeT bs_x = DISTANCE_COMPUTE_BLAS_QUERY_BS;
         const SizeT bs_y = DISTANCE_COMPUTE_BLAS_DATABASE_BS;
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
@@ -99,22 +87,7 @@ public:
                                                                    di,
                                                                    ip_block_.get());
                 }
-                for (SizeT i = i0; i < i1; i++) {
-                    DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
-                    for (SizeT j = j0; j < j1; j++) {
-                        DistType ip = *ip_line;
-                        DistType dis = x_norms_[i] + y_norms_[j] - 2 * ip;
-
-                        // negative values can occur for identical vectors
-                        // due to roundoff errors
-                        if (dis < 0)
-                            dis = 0;
-
-                        *ip_line = dis;
-                        ip_line++;
-                    }
-                }
                 result_handler_->AddResults(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start);
             }
         }
@@ -126,7 +99,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2Blas isn't begin");
+            UnrecoverableError("KnnFlatIPBlasReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -135,10 +108,6 @@ public:
             return;
         }
 
-        y_norms_ = MakeUniqueForOverwrite<DistType[]>(base_count);
-        L2NormsSquares(y_norms_.get(), base, this->dimension_, base_count);
-
-        // block sizes
         const SizeT bs_x = DISTANCE_COMPUTE_BLAS_QUERY_BS;
         const SizeT bs_y = DISTANCE_COMPUTE_BLAS_DATABASE_BS;
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
@@ -161,27 +130,8 @@ public:
                                                                    di,
                                                                    ip_block_.get());
                 }
-                for (SizeT i = i0; i < i1; i++) {
-                    DistType *ip_line = ip_block_.get() + (i - i0) * (j1 - j0);
 
-                    for (SizeT j = j0; j < j1; j++) {
-                        if (bitmask.IsTrue(segment_offset_start + j)) {
-                            DistType ip = *ip_line;
-                            DistType dis = x_norms_[i] + y_norms_[j] - 2 * ip;
-
-                            // negative values can occur for identical vectors
-                            // due to roundoff errors
-                            if (dis < 0)
-                                dis = 0;
-
-                            *ip_line = dis;
-                        } else {
-                            *ip_line = std::numeric_limits<DistType>::max();
-                        }
-                        ip_line++;
-                    }
-                }
-                result_handler_->AddResults(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start);
+                result_handler_->AddResults(i0, i1, j0, j1, ip_block_.get(), segment_id, segment_offset_start, bitmask);
             }
         }
     }
@@ -191,7 +141,6 @@ public:
             return;
 
         result_handler_->End();
-
         begin_ = false;
     }
 
@@ -201,14 +150,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
@@ -216,16 +165,13 @@ public:
 private:
     UniquePtr<RowID[]> id_array_{};
     UniquePtr<DistType[]> distance_array_{};
+    UniquePtr<DistType[]> ip_block_{};
 
     UniquePtr<ResultHandler> result_handler_{};
     const DistType *queries_{};
     bool begin_{false};
-
-    UniquePtr<DistType[]> ip_block_{};
-    UniquePtr<DistType[]> x_norms_{};
-    UniquePtr<DistType[]> y_norms_{};
 };
 
-template class KnnFlatL2Blas<f32>;
+template class KnnFlatIPBlasReservoir<f32>;
 
 } // namespace infinity

@@ -16,6 +16,8 @@ module;
 
 #include <boost/asio/ip/tcp.hpp>
 
+module connection;
+
 import pg_protocol_handler;
 import boost;
 import stl;
@@ -33,19 +35,17 @@ import logical_node_type;
 import query_result;
 import session_manager;
 
-module connection;
-
 namespace infinity {
 
 Connection::Connection(boost::asio::io_service &io_service)
     : socket_(MakeShared<boost::asio::ip::tcp::socket>(io_service)), pg_handler_(MakeShared<PGProtocolHandler>(socket())) {}
 
 Connection::~Connection() {
-    if(session_ == nullptr) {
+    if (session_ == nullptr) {
         // To avoid null ptr access
-        return ;
+        return;
     }
-    SessionManager* session_mgr = InfinityContext::instance().session_manager();
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
@@ -53,7 +53,7 @@ void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
-    SessionManager* session_manager = InfinityContext::instance().session_manager();
+    SessionManager *session_manager = InfinityContext::instance().session_manager();
     session_ = session_manager->CreateRemoteSession();
 
     HandleConnection();
@@ -63,10 +63,16 @@ void Connection::Run() {
     while (!terminate_connection_) {
         try {
             HandleRequest();
-        } catch (const infinity::ClientException &e) {
-            LOG_TRACE("Client is closed");
-            return;
-        } catch (const Exception &e) {
+        } catch (const infinity::RecoverableException &e) {
+            LOG_TRACE("Recoverable exception");
+            return ;
+        } catch (const infinity::UnrecoverableException& e) {
+            HashMap<PGMessageType, String> error_message_map;
+            error_message_map[PGMessageType::kHumanReadableError] = e.what();
+            LOG_ERROR(e.what());
+            pg_handler_->send_error_response(error_message_map);
+            pg_handler_->send_ready_for_query();
+        } catch (const std::exception &e) {
             HashMap<PGMessageType, String> error_message_map;
             error_message_map[PGMessageType::kHumanReadableError] = e.what();
             LOG_ERROR(e.what());
@@ -130,7 +136,7 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            Error<NetworkException>("Unknown PG command type");
+            UnrecoverableError("Unknown PG command type");
         }
     }
 }
@@ -243,7 +249,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    Error<TypeException>("Not embedding type");
+                    UnrecoverableError("Not embedding type");
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -285,13 +291,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        Error<TypeException>("Invalid embedding data type");
+                        UnrecoverableError("Invalid embedding data type");
                     }
                 }
                 break;
             }
             default: {
-                Error<TypeException>("Unexpected type");
+                UnrecoverableError("Unexpected type");
             }
         }
 

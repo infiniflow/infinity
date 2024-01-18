@@ -210,10 +210,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors[0],
                                                                                        output,
@@ -226,10 +226,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
                                                                                     output,
@@ -242,10 +242,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
@@ -259,10 +259,10 @@ public:
     template <typename InputType, typename OutputType, typename Operation>
     static inline void UnaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
-            Error<ExecutorException>("Unary function: input column count isn't one.");
+            UnrecoverableError("Unary function: input column count isn't one.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
@@ -276,10 +276,10 @@ public:
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
-            Error<ExecutorException>("Binary function: input column count isn't two.");
+            UnrecoverableError("Binary function: input column count isn't two.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(input.column_vectors[0],
                                                                                                    input.column_vectors[1],
@@ -293,10 +293,10 @@ public:
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
-            Error<ExecutorException>("Binary function: input column count isn't two.");
+            UnrecoverableError("Binary function: input column count isn't two.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(input.column_vectors[0],
                                                                                                 input.column_vectors[1],
@@ -310,10 +310,10 @@ public:
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
-            Error<ExecutorException>("Binary function: input column count isn't two.");
+            UnrecoverableError("Binary function: input column count isn't two.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
@@ -328,10 +328,10 @@ public:
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
-            Error<ExecutorException>("Binary function: input column count isn't two.");
+            UnrecoverableError("Binary function: input column count isn't two.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],
@@ -346,10 +346,10 @@ public:
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
-            Error<ExecutorException>("Ternary function: input column count isn't three.");
+            UnrecoverableError("Ternary function: input column count isn't three.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWrapper<Operation>>(input.column_vectors[0],
                                                                                                                   input.column_vectors[1],
@@ -364,10 +364,10 @@ public:
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
-            Error<ExecutorException>("Ternary function: input column count isn't three.");
+            UnrecoverableError("Ternary function: input column count isn't three.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpWrapper<Operation>>(input.column_vectors[0],
                                                                                                                input.column_vectors[1],
@@ -382,10 +382,10 @@ public:
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
-            Error<ExecutorException>("Ternary function: input column count isn't three.");
+            UnrecoverableError("Ternary function: input column count isn't three.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectToVarlenWrapper<Operation>>(input.column_vectors[0],
@@ -401,10 +401,10 @@ public:
     template <typename FirstType, typename SecondType, typename ThirdType, typename ResultType, typename Operation>
     static inline void TernaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
-            Error<ExecutorException>("Ternary function: input column count isn't three.");
+            UnrecoverableError("Ternary function: input column count isn't three.");
         }
         if (!input.Finalized()) {
-            Error<ExecutorException>("Input data block is finalized");
+            UnrecoverableError("Input data block is finalized");
         }
         ScalarFunctionData function_data(output.get());
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpToVarlenWrapper<Operation>>(input.column_vectors[0],

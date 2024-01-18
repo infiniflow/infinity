@@ -32,7 +32,7 @@ public:
     inline void BeginCommit(TxnTimeStamp begin_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kNotStarted) {
-            Error<StorageException>("Transaction isn't in NOT_STARTED status.");
+            UnrecoverableError("Transaction isn't in NOT_STARTED status.");
         }
         begin_ts_ = begin_ts;
         state_ = TxnState::kStarted;
@@ -56,7 +56,7 @@ public:
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
-            Error<StorageException>("Transaction isn't in STARTED status.");
+            UnrecoverableError("Transaction isn't in STARTED status.");
         }
         state_ = TxnState::kRollbacking;
         commit_ts_ = rollback_ts;
@@ -65,7 +65,7 @@ public:
     inline void SetTxnRollbacked() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kRollbacking && state_!= TxnState::kCommitting) {
-            Error<StorageException>("Transaction isn't in ROLLBACKING status.");
+            UnrecoverableError("Transaction isn't in ROLLBACKING status.");
         }
         state_ = TxnState::kRollbacked;
     }
@@ -73,7 +73,7 @@ public:
     inline void SetTxnCommitted() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
-            Error<StorageException>("Transaction isn't in COMMITTING status.");
+            UnrecoverableError("Transaction isn't in COMMITTING status.");
         }
         state_ = TxnState::kCommitted;
     }
@@ -81,7 +81,7 @@ public:
     inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
-            Error<StorageException>("Transaction isn't in STARTED status.");
+            UnrecoverableError("Transaction isn't in STARTED status.");
         }
         state_ = TxnState::kCommitting;
         commit_ts_ = commit_ts;

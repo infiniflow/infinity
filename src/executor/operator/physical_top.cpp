@@ -34,6 +34,7 @@ import expression_evaluator;
 import default_values;
 import expression_type;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -175,7 +176,7 @@ private:
 StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
     return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
-        Error<NotImplementException>(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
+        UnrecoverableError(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
         return std::strong_ordering::equal;
     };
 }
@@ -309,7 +310,7 @@ void PhysicalTop::Init() {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
-        Error<ExecutorException>("order_by_types_.size() != sort_expressions_.size()");
+        UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
     Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count_);
@@ -323,7 +324,7 @@ void PhysicalTop::Init() {
 bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto prev_op_state = operator_state->prev_op_state_;
     if ((offset_ != 0) and !(prev_op_state->Complete())) {
-        Error<ExecutorException>("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
+        UnrecoverableError("Only 1 PhysicalTop job but !(prev_op_state->Complete())");
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
     auto &output_data_block_array = operator_state->data_block_array_;
@@ -337,7 +338,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
         return true;
     }
     if (!output_data_block_array.empty()) {
-        Error<ExecutorException>("output data_block_array_ is not empty");
+        UnrecoverableError("output data_block_array_ is not empty");
     }
     auto eval_columns = GetEvalColumns(sort_expressions_, (static_cast<TopOperatorState *>(operator_state))->expr_states_, input_data_block_array);
     TopSolver solve_top(limit_, prefer_left_function_);

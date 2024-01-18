@@ -26,7 +26,7 @@ import logical_node;
 import query_context;
 import stl;
 import infinity_exception;
-
+import status;
 import base_table_ref;
 import subquery_table_ref;
 import expression_transformer;
@@ -46,7 +46,7 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     SharedPtr<LogicalNode> current_node;
     if (where_conditions_.empty()) {
-        Error<PlannerException>("where_conditions_ shall not be empty");
+        RecoverableError(Status::SyntaxError("where_conditions_ shall not be empty"));
     }
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
     if (!where_conditions_.empty()) {
@@ -65,7 +65,7 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
 SharedPtr<LogicalNode>
 BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
-        Error<PlannerException>("unsupported!");
+        UnrecoverableError("unsupported!");
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
 }
@@ -114,7 +114,7 @@ void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            Error<PlannerException>("Nested subquery detected");
+            RecoverableError(Status::SyntaxError("Nested subquery detected"));
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

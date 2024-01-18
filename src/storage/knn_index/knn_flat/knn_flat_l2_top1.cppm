@@ -14,31 +14,33 @@
 
 module;
 
-#include <functional>
 import stl;
+import knn_result_handler;
 import knn_distance;
 import parser;
-import knn_result_handler;
+
 import infinity_exception;
 import default_values;
 import vector_distance;
 import bitmask;
 
-export module knn_flat_ip;
+export module knn_flat_l2_top1;
 
 namespace infinity {
 
 export template <typename DistType>
-class KnnFlatIP final : public KnnDistance<DistType> {
-    using ResultHandler = HeapResultHandler<CompareMin<DistType, RowID>>;
+class KnnFlatL2Top1 final : public KnnDistance<DistType> {
+
+    using ResultHandler = SingleBestResultHandler<CompareMax<DistType, RowID>>;
 
 public:
-    explicit KnnFlatIP(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, topk), queries_(queries) {
+    explicit KnnFlatL2Top1(const DistType *queries, i64 query_count, i64 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Top1, elem_data_type, query_count, dimension, 1), queries_(queries) {
 
-        id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
-        distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
-        result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
+        id_array_ = MakeUniqueForOverwrite<RowID[]>(this->query_count_);
+        distance_array_ = MakeUniqueForOverwrite<DistType[]>(this->query_count_);
+
+        result_handler_ = MakeUnique<ResultHandler>(query_count, distance_array_.get(), id_array_.get());
     }
 
     void Begin() final {
@@ -53,7 +55,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIP isn't begin");
+            UnrecoverableError("KnnFlatL2Top1 isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -63,14 +65,14 @@ public:
         }
 
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
-
         for (u64 i = 0; i < this->query_count_; ++i) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
-                auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                result_handler_->AddResult(i, ip, RowID(segment_id, segment_offset_start + j));
+            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+
+                auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                result_handler_->AddResult(i, l2_distance, RowID{segment_id, segment_offset_start + j});
             }
         }
     }
@@ -81,7 +83,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIP isn't begin");
+            UnrecoverableError("KnnFlatL2Top1 isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -91,16 +93,15 @@ public:
         }
 
         u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
-
         for (u64 i = 0; i < this->query_count_; ++i) {
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
                 auto segment_offset = segment_offset_start + j;
                 if (bitmask.IsTrue(segment_offset)) {
-                    auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                    result_handler_->AddResult(i, ip, RowID(segment_id, segment_offset_start + j));
+                    auto l2_distance = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                    result_handler_->AddResult(i, l2_distance, RowID{segment_id, segment_offset});
                 }
             }
         }
@@ -121,16 +122,16 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
-        return distance_array_.get() + idx * this->top_k_;
+        return distance_array_.get() + idx * 1;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
-        return id_array_.get() + idx * this->top_k_;
+        return id_array_.get() + idx * 1;
     }
 
 private:
@@ -143,6 +144,6 @@ private:
     bool begin_{false};
 };
 
-export template class KnnFlatIP<f32>;
+template class KnnFlatL2Top1<f32>;
 
 } // namespace infinity

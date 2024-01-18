@@ -81,7 +81,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
                                                          String replay_table_index_dir) {
     if (index_def->index_name_->empty()) {
         // Index name shouldn't be empty
-        Error<StorageException>("Attempt to create no name index.");
+        UnrecoverableError("Attempt to create no name index.");
     }
 
     TableIndexMeta *table_index_meta{nullptr};
@@ -140,13 +140,13 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
             case ConflictType::kError: {
                 String error_message = fmt::format("Attempt to drop not existed index entry {}", index_name);
                 LOG_TRACE(error_message);
-                return {nullptr, Status(ErrorCode::kNotFound, error_message.c_str())};
+                return {nullptr, Status(ErrorCode::kIndexNotExist, error_message.c_str())};
             }
             default: {
-                Error<StorageException>("Invalid conflict type.");
+                UnrecoverableError("Invalid conflict type.");
             }
         }
-        Error<StorageException>("Should not reach here.");
+        UnrecoverableError("Should not reach here.");
     }
     LOG_TRACE(fmt::format("Drop index entry {}", index_name));
     return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
@@ -158,7 +158,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr) {
@@ -201,7 +201,7 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
 
 void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
     if (this->deleted_) {
-        Error<StorageException>("table is deleted");
+        UnrecoverableError("table is deleted");
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
@@ -262,7 +262,7 @@ void TableEntry::CreateIndexFile(void *txn_store,
         } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
             continue;
         } else {
-            Error<StorageException>("Invalid entry type");
+            UnrecoverableError("Invalid entry type");
         }
     }
 }
@@ -287,8 +287,7 @@ Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteSt
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
-            Error<ExecutorException>(*err_msg);
-            return Status(ErrorCode::kNotFound, std::move(err_msg));
+            return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
@@ -314,7 +313,7 @@ void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, cons
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    Error<NotImplementException>("TableEntry::RollbackAppend");
+    UnrecoverableError("TableEntry::RollbackAppend");
 }
 
 void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &delete_state) {
@@ -323,7 +322,7 @@ void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment = TableEntry::GetSegmentByID(this, segment_id);
         if (segment == nullptr) {
-            Error<ExecutorException>(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
+            UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
         segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
@@ -333,15 +332,14 @@ void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, cons
 }
 
 Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
-    Error<NotImplementException>("TableEntry::RollbackDelete");
+    UnrecoverableError("TableEntry::RollbackDelete");
     return Status::OK();
 }
 
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
-        Error<ExecutorException>(*err_msg);
-        return Status(ErrorCode::kNotFound, std::move(err_msg));
+        return Status(ErrorCode::kTableNotExist, std::move(err_msg));
     }
 
     segment->min_row_ts_ = commit_ts;
@@ -374,12 +372,12 @@ SegmentEntry *TableEntry::GetSegmentByID(const TableEntry *table_entry, u32 segm
 const BlockEntry *TableEntry::GetBlockEntryByID(u32 seg_id, u16 block_id) const {
     SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, seg_id);
     if (segment_entry == nullptr) {
-        throw ExecutorException(fmt::format("Cannot find segment, segment id: {}", seg_id));
+        UnrecoverableError(fmt::format("Cannot find segment, segment id: {}", seg_id));
     }
 
     BlockEntry *block_entry = segment_entry->GetBlockEntryByID(block_id);
     if (block_entry == nullptr) {
-        throw ExecutorException(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
+        UnrecoverableError(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
     }
     return block_entry;
 }
@@ -391,7 +389,8 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
-        return {0, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        UnrecoverableError(*err_msg);
+        return {0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
     }
 }
 
@@ -530,10 +529,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
-            Error<StorageException>("deleted table should have no segment");
+            UnrecoverableError("deleted table should have no segment");
         }
     } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
-        Error<StorageException>("table segment 0 should be valid");
+        UnrecoverableError("table segment 0 should be valid");
     }
 
     if (table_entry_json.contains("table_indexes")) {
@@ -551,7 +550,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        Error<NotImplementException>(fmt::format("No column name: {}", column_name));
+        UnrecoverableError(fmt::format("No column name: {}", column_name));
     }
     return it->second;
 }
@@ -559,17 +558,17 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
 void TableEntry::MergeFrom(BaseEntry &other) {
     auto table_entry2 = dynamic_cast<TableEntry *>(&other);
     if (table_entry2 == nullptr) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
     }
     // // No locking here since only the load stage needs MergeFrom.
     if (*this->table_name_ != *table_entry2->table_name_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_name_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_name_ match");
     }
     if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
     }
     if (this->table_entry_type_ != table_entry2->table_entry_type_) {
-        Error<StorageException>("DBEntry::MergeFrom requires table_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
     }
 
     this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
@@ -588,10 +587,11 @@ void TableEntry::MergeFrom(BaseEntry &other) {
             it->second->MergeFrom(*sgement_entry2.get());
         }
     }
+
     if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
         auto seg_it = this->segment_map_.find(max_segment_id);
         if (seg_it == this->segment_map_.end()) {
-            Error<StorageException>(fmt::format("max_segment_id {} is invalid", max_segment_id));
+            UnrecoverableError(fmt::format("max_segment_id {} is invalid", max_segment_id));
         }
         this->unsealed_segment_ = seg_it->second.get();
     }

@@ -84,6 +84,23 @@ public:
     [[nodiscard]] inline SetScope scope() const { return scope_; }
     [[nodiscard]] inline std::string var_name() const { return var_name_; }
     [[nodiscard]] inline SetVarType value_type() const { return value_type_; }
+    [[nodiscard]] inline std::string value_type_str() const {
+        switch (value_type_) {
+            case SetVarType::kBool: {
+                return "Boolean";
+            }
+            case SetVarType::kInteger: {
+                return "Integer";
+            }
+            case SetVarType::kDouble: {
+                return "Double";
+            }
+            case SetVarType::kString: {
+                return "String";
+            }
+        };
+    }
+
     [[nodiscard]] inline std::string value_str() const { return value_str_; }
     [[nodiscard]] inline bool value_bool() const { return value_bool_; }
     [[nodiscard]] inline int64_t value_int() const { return value_int_; }

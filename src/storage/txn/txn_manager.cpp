@@ -36,7 +36,7 @@ TxnManager::TxnManager(NewCatalog *catalog, BufferManager *buffer_mgr, PutWalEnt
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot create txn");
+        UnrecoverableError("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
@@ -78,7 +78,7 @@ TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
 void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot invalidate");
+        UnrecoverableError("TxnManager is not running, cannot invalidate");
     }
     std::lock_guard<std::mutex> guard(mutex_);
     SizeT cnt = priority_que_.erase(commit_ts);
@@ -94,7 +94,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
 void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        Error<TransactionException>("TxnManager is not running, cannot put wal entry");
+        UnrecoverableError("TxnManager is not running, cannot put wal entry");
     }
     if (put_wal_entry_ == nullptr)
         return;

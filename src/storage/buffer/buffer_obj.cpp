@@ -90,7 +90,7 @@ void BufferObj::UnloadInner() {
             break;
         }
         default: {
-            Error<StorageException>("Invalid call.");
+            UnrecoverableError("Invalid call.");
         }
     }
 }
@@ -119,7 +119,7 @@ bool BufferObj::Free() {
             break;
         }
         case BufferStatus::kNew: {
-            Error<StorageException>("Invalid call.");
+            UnrecoverableError("Invalid call.");
         }
     }
     file_worker_->FreeInMemory();
@@ -145,7 +145,7 @@ bool BufferObj::Save() {
             default: {
                 UniquePtr<String> err_msg = MakeUnique<String>("Invalid buffer status.");
                 LOG_ERROR(*err_msg);
-                Error<StorageException>(*err_msg);
+                UnrecoverableError(*err_msg);
             }
         }
         type_ = BufferType::kPersistent;
@@ -167,25 +167,25 @@ void BufferObj::CheckState() const {
     switch (status_) {
         case BufferStatus::kLoaded: {
             if (rc_ == 0) {
-                Error<StorageException>("Invalid status.");
+                UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kUnloaded: {
             if (rc_ > 0) {
-                Error<StorageException>("Invalid status.");
+                UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kFreed: {
             if (rc_ > 0) {
-                Error<StorageException>("Invalid status.");
+                UnrecoverableError("Invalid status.");
             }
             break;
         }
         case BufferStatus::kNew: {
             if (type_ != BufferType::kEphemeral || rc_ > 0) {
-                Error<StorageException>("Invalid status.");
+                UnrecoverableError("Invalid status.");
             }
             break;
         }

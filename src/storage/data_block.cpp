@@ -16,9 +16,11 @@ module;
 
 #include <sstream>
 
+module data_block;
+
 import stl;
 import selection;
-
+import status;
 import infinity_exception;
 import column_vector;
 import parser;
@@ -27,20 +29,18 @@ import third_party;
 import default_values;
 import serialize;
 
-module data_block;
-
 namespace infinity {
 
 void DataBlock::Init(const DataBlock *input, const SharedPtr<Selection> &input_select) {
     if (initialized) {
-        Error<StorageException>("Data block was initialized before.");
+        UnrecoverableError("Data block was initialized before.");
     }
     if (input == nullptr || input_select.get() == nullptr) {
-        Error<StorageException>("Invalid input data block or select");
+        UnrecoverableError("Invalid input data block or select");
     }
     column_count_ = input->column_count();
     if (column_count_ == 0) {
-        Error<StorageException>("Empty column vectors.");
+        UnrecoverableError("Empty column vectors.");
     }
     column_vectors.reserve(column_count_);
     for (SizeT idx = 0; idx < column_count_; ++idx) {
@@ -56,14 +56,14 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selectio
 
 void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT end_idx) {
     if (initialized) {
-        Error<StorageException>("Data block was initialized before.");
+        UnrecoverableError("Data block was initialized before.");
     }
     if (input.get() == nullptr) {
-        Error<StorageException>("Invalid input data block");
+        UnrecoverableError("Invalid input data block");
     }
     column_count_ = input->column_count();
     if (column_count_ == 0) {
-        Error<StorageException>("Empty column vectors.");
+        UnrecoverableError("Empty column vectors.");
     }
     column_vectors.reserve(column_count_);
     for (SizeT idx = 0; idx < column_count_; ++idx) {
@@ -77,7 +77,7 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
 
 SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
     if (!input->Finalized()) {
-        Error<StorageException>("Input data block is not finalized.");
+        UnrecoverableError("Input data block is not finalized.");
     }
     auto data_block = DataBlock::Make();
     SizeT capacity = input->row_count();
@@ -96,10 +96,10 @@ SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
 
 void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
     if (initialized) {
-        Error<StorageException>("Data block was initialized before.");
+        UnrecoverableError("Data block was initialized before.");
     }
     if (types.empty()) {
-        Error<StorageException>("Empty data types collection.");
+        UnrecoverableError("Empty data types collection.");
     }
     column_count_ = types.size();
     column_vectors.reserve(column_count_);
@@ -114,7 +114,7 @@ void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
 
 void DataBlock::Init(const Vector<SharedPtr<ColumnVector>> &input_vectors) {
     if (input_vectors.empty()) {
-        Error<StorageException>("Empty column vectors.");
+        UnrecoverableError("Empty column vectors.");
     }
     column_count_ = input_vectors.size();
     column_vectors = input_vectors;
@@ -138,7 +138,7 @@ void DataBlock::UnInit() {
 
 void DataBlock::Reset() {
     if (!initialized) {
-        Error<StorageException>("Should not reset an uninitialized block.");
+        UnrecoverableError("Should not reset an uninitialized block.");
     }
 
     // Reset behavior:
@@ -155,11 +155,11 @@ void DataBlock::Reset() {
     finalized = false;
 }
 
-//TODO: May cause error when capacity is larger than the originally allocated size
-//TODO: Initialize() parameter may not be ColumnVectorType::kFlat ?
+// TODO: May cause error when capacity is larger than the originally allocated size
+// TODO: Initialize() parameter may not be ColumnVectorType::kFlat ?
 void DataBlock::Reset(SizeT capacity) {
     if (!initialized) {
-        Error<StorageException>("Should not reset an uninitialized block.");
+        UnrecoverableError("Should not reset an uninitialized block.");
     }
     // Reset behavior:
     // Reset each column into just initialized status.
@@ -178,14 +178,14 @@ Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return co
 
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
     if (column_index >= column_count_) {
-        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        UnrecoverableError(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->SetValue(row_index, val);
 }
 
 void DataBlock::AppendValue(SizeT column_index, const Value &value) {
     if (column_index >= column_count_) {
-        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        UnrecoverableError(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->AppendValue(value);
     finalized = false;
@@ -193,15 +193,15 @@ void DataBlock::AppendValue(SizeT column_index, const Value &value) {
 
 void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
     if (column_index >= column_count_) {
-        Error<StorageException>(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
+        UnrecoverableError(fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_));
     }
     column_vectors[column_index]->AppendByPtr(value_ptr);
     finalized = false;
 }
 
 void DataBlock::Finalize() {
-    if(finalized) {
-        return ;
+    if (finalized) {
+        return;
     }
     bool first_flat_column_vector = false;
     SizeT row_count = 0;
@@ -211,7 +211,7 @@ void DataBlock::Finalize() {
         } else {
             if (first_flat_column_vector) {
                 if (row_count != column_vectors[idx]->Size()) {
-                    Error<StorageException>("Column vectors in same data block have different size.");
+                    UnrecoverableError("Column vectors in same data block have different size.");
                 }
             } else {
                 first_flat_column_vector = true;
@@ -234,7 +234,7 @@ String DataBlock::ToString() const {
 
 void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const {
     if (!finalized) {
-        Error<StorageException>("DataBlock isn't finalized.");
+        UnrecoverableError("DataBlock isn't finalized.");
     }
     u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
     for (u32 offset = 0; offset < row_count_; ++offset) {
@@ -244,16 +244,16 @@ void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id)
 
 void DataBlock::UnionWith(const SharedPtr<DataBlock> &other) {
     if (this->row_count_ != other->row_count_) {
-        Error<StorageException>("Attempt to union two block with different row count");
+        UnrecoverableError("Attempt to union two block with different row count");
     }
     if (this->capacity_ != other->capacity_) {
-        Error<StorageException>("Attempt to union two block with different row count");
+        UnrecoverableError("Attempt to union two block with different row count");
     }
     if (!this->initialized || !other->initialized) {
-        Error<StorageException>("Attempt to union two block with different row count");
+        UnrecoverableError("Attempt to union two block with different row count");
     }
     if (this->finalized != other->finalized) {
-        Error<StorageException>("Attempt to union two block with different row count");
+        UnrecoverableError("Attempt to union two block with different row count");
     }
     column_count_ += other->column_count_;
     column_vectors.reserve(column_count_);
@@ -264,12 +264,11 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) { AppendWith(other
 
 void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
-        ;
     }
     if (this->row_count_ + other->row_count_ > this->capacity_) {
-        Error<StorageException>(fmt::format("Attempt append block with row count {} into block with row count {}, "
+        UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count {}, "
                                        "which exceeds the capacity {}",
                                        other->row_count(),
                                        this->row_count(),
@@ -284,12 +283,11 @@ void DataBlock::AppendWith(const DataBlock *other) {
 
 void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
     if (other->column_count() != this->column_count()) {
-        Error<StorageException>(
+        UnrecoverableError(
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
-        ;
     }
     if (this->row_count_ + count > this->capacity_) {
-        Error<StorageException>(fmt::format("Attempt append block with row count {} into block with row count{}, "
+        UnrecoverableError(fmt::format("Attempt append block with row count {} into block with row count{}, "
                                        "which exceeds the capacity {}",
                                        count,
                                        this->row_count(),
@@ -322,7 +320,7 @@ bool DataBlock::operator==(const DataBlock &other) const {
 
 i32 DataBlock::GetSizeInBytes() const {
     if (!finalized) {
-        Error<StorageException>("Data block is not finalized.");
+        UnrecoverableError("Data block is not finalized.");
     }
     i32 size = sizeof(i32);
     for (SizeT i = 0; i < column_count_; i++) {
@@ -333,7 +331,7 @@ i32 DataBlock::GetSizeInBytes() const {
 
 void DataBlock::WriteAdv(char *&ptr) const {
     if (!finalized) {
-        Error<StorageException>("Data block is not finalized.");
+        UnrecoverableError("Data block is not finalized.");
     }
     WriteBufAdv<i32>(ptr, column_count_);
     for (SizeT i = 0; i < column_count_; i++) {
@@ -348,7 +346,7 @@ SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {
     for (int i = 0; i < column_count; i++) {
         maxbytes = ptr_end - ptr;
         if (maxbytes <= 0) {
-            Error<StorageException>("ptr goes out of range when reading DataBlock");
+            UnrecoverableError("ptr goes out of range when reading DataBlock");
         }
         SharedPtr<ColumnVector> column_vector = ColumnVector::ReadAdv(ptr, maxbytes);
         column_vectors.push_back(column_vector);
@@ -358,7 +356,7 @@ SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {
     block->Finalize();
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
-        Error<StorageException>("ptr goes out of range when reading DataBlock");
+        UnrecoverableError("ptr goes out of range when reading DataBlock");
     }
     return block;
 }

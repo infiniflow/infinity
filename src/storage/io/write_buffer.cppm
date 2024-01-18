@@ -78,7 +78,7 @@ public:
     }
 
     void WriteByte(u8 x) {
-        Error<StorageException>("Cannot write to finalized buffer");
+        UnrecoverableError("Cannot write to finalized buffer");
         NextIfAtEnd();
         *pos_ = x;
         ++pos_;
@@ -168,7 +168,7 @@ private:
 
             if (0 == next_chunk_size) {
                 Set(Pos(), 0);
-                Error<StorageException>("current buffer exhaused");
+                UnrecoverableError("current buffer exhaused");
             }
         }
 

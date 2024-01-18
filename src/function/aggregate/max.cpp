@@ -14,16 +14,16 @@
 
 module;
 
+module max;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
 import parser;
 import third_party;
-
-module max;
 
 namespace infinity {
 
@@ -32,15 +32,15 @@ struct MaxState {
 public:
     ValueType value_;
 
-    void Initialize() { Error<NotImplementException>("Not implemented"); }
+    void Initialize() { UnrecoverableError("Not implement: Max::Initialize"); }
 
-    void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
+    void Update(const ValueType *__restrict, SizeT) { UnrecoverableError("Not implement: Max::Update"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { Error<NotImplementException>("Not implemented"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { UnrecoverableError("Not implement: Max::ConstantUpdate"); }
 
-    [[nodiscard]] ptr_t Finalize() const { Error<NotImplementException>("Not implemented"); }
+    [[nodiscard]] ptr_t Finalize() const { UnrecoverableError("Not implement: Max::Finalize"); }
 
-    inline static SizeT Size(const DataType &) { Error<NotImplementException>("Not implemented"); }
+    inline static SizeT Size(const DataType &) { UnrecoverableError("Not implement: Max::Size"); }
 };
 
 template <>

@@ -125,7 +125,7 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, Transac
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
@@ -144,7 +144,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, Transact
     if (db_meta == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
     return db_meta->GetEntry(txn_id, begin_ts);
 }
@@ -334,7 +334,7 @@ SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, Str
     StringToLower(function_name);
 
     if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(fmt::format("No function name: {}", function_name));
+        RecoverableError(Status::FunctionNotFound(function_name));
     }
     return catalog->function_sets_[function_name];
 }
@@ -343,25 +343,16 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        Error<CatalogException>(fmt::format("Trying to add duplicated function table_name into catalog: {}", name));
+        UnrecoverableError(fmt::format("Trying to add duplicated function table_name into catalog: {}", name));
     }
     catalog->function_sets_.emplace(name, function_set);
-}
-
-void NewCatalog::DeleteFunctionSet(NewCatalog *catalog, String function_name) {
-    // Unused now.
-    StringToLower(function_name);
-    if (!catalog->function_sets_.contains(function_name)) {
-        Error<CatalogException>(fmt::format("Delete not exist function: {}", function_name));
-    }
-    catalog->function_sets_.erase(function_name);
 }
 
 // Table Function related methods
 SharedPtr<TableFunction> NewCatalog::GetTableFunctionByName(NewCatalog *catalog, String function_name) {
     StringToLower(function_name);
     if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(fmt::format("No table function table_name: {}", function_name));
+        RecoverableError(Status::FunctionNotFound(function_name));
     }
     return catalog->table_functions_[function_name];
 }
@@ -370,7 +361,7 @@ void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunc
     String name = table_function->name();
     StringToLower(name);
     if (catalog->table_functions_.contains(name)) {
-        Error<CatalogException>(fmt::format("Trying to add duplicated table function into catalog: {}", name));
+        UnrecoverableError(fmt::format("Trying to add duplicated table function into catalog: {}", name));
     }
     catalog->table_functions_.emplace(name, table_function);
 }
@@ -379,26 +370,17 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<Special
     String name = special_function->name();
     StringToLower(name);
     if (catalog->table_functions_.contains(name)) {
-        Error<CatalogException>(fmt::format("Trying to add duplicated special function into catalog: {}", name));
+        UnrecoverableError(fmt::format("Trying to add duplicated special function into catalog: {}", name));
     }
     catalog->special_functions_.emplace(name, special_function);
 }
 
-SharedPtr<SpecialFunction> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+Tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
     StringToLower(function_name);
     if (!catalog->special_functions_.contains(function_name)) {
-        return nullptr;
+        return {nullptr, Status::SpecialFunctionNotFound()};
     }
-    return catalog->special_functions_[function_name];
-}
-
-void NewCatalog::DeleteTableFunction(NewCatalog *catalog, String function_name) {
-    // Unused now.
-    StringToLower(function_name);
-    if (!catalog->table_functions_.contains(function_name)) {
-        Error<CatalogException>(fmt::format("Delete not exist table function: {}", function_name));
-    }
-    catalog->table_functions_.erase(function_name);
+    return {catalog->special_functions_[function_name].get(), Status::OK()};
 }
 
 nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
@@ -446,7 +428,7 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog1 = MakeUnique<NewCatalog>(nullptr);
     if (catalog_paths.empty()) {
-        Error<CatalogException>("Catalog paths is empty");
+        UnrecoverableError(fmt::format("Catalog path is empty"));
     }
     // Load the latest full checkpoint.
     LOG_INFO(fmt::format("Load base catalog1 from: {}", catalog_paths[0]));
@@ -482,7 +464,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, Buffe
     String json_str(file_size, 0);
     SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
     if (file_size != nbytes) {
-        Error<StorageException>(fmt::format("Catalog file {}, read error.", catalog_path));
+        RecoverableError(Status::CatalogCorrupted(catalog_path));
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
@@ -533,7 +515,8 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT nbytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (nbytes != catalog_str.size()) {
-        Error<StorageException>(fmt::format("Catalog file {}, saving error.", file_path));
+        LOG_ERROR(fmt::format("Saving catalog file failed: {}", file_path));
+        RecoverableError(Status::CatalogCorrupted(file_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();

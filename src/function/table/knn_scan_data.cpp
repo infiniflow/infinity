@@ -55,7 +55,7 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
             break;
         }
         default: {
-            throw ExecutorException("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
 }
@@ -70,7 +70,7 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData* shared_data, u32 cur
             break;
         }
         default: {
-            throw ExecutorException("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
 }
@@ -79,7 +79,7 @@ template <typename DataType>
 void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            throw ExecutorException("Invalid Knn distance type");
+            UnrecoverableError("Invalid Knn distance type");
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

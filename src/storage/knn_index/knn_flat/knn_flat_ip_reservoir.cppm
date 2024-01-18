@@ -16,30 +16,28 @@ module;
 
 import stl;
 import knn_result_handler;
-import knn_distance;
 import bitmask;
+import knn_distance;
 import parser;
 
 import infinity_exception;
 import default_values;
 import vector_distance;
 
-export module knn_flat_l2_reservoir;
+export module knn_flat_ip_reservoir;
 
 namespace infinity {
 
 export template <typename DistType>
-class KnnFlatL2Reservoir final : public KnnDistance<DistType> {
+class KnnFlatIPReservoir final : public KnnDistance<DistType> {
 
-    using ResultHandler = ReservoirResultHandler<CompareMax<DistType, RowID>>;
+    using ResultHandler = ReservoirResultHandler<CompareMin<DistType, RowID>>;
 
 public:
-    explicit KnnFlatL2Reservoir(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2Reservoir, elem_data_type, query_count, dimension, topk), queries_(queries) {
-
+    explicit KnnFlatIPReservoir(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpReservoir, elem_data_type, query_count, dimension, topk), queries_(queries) {
         id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
         distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
-
         result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
     }
 
@@ -49,13 +47,12 @@ public:
         }
 
         result_handler_->Begin();
-
         begin_ = true;
     }
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2Reservoir isn't begin");
+            UnrecoverableError("KnnFlatIPReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -71,7 +68,7 @@ public:
             const DistType *y_j = base;
 
             for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
-                auto ip = L2Distance<DistType>(x_i, y_j, this->dimension_);
+                auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
                 result_handler_->AddResult(i, ip, RowID{segment_id, segment_offset_start + j});
             }
         }
@@ -83,7 +80,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatL2Reservoir isn't begin");
+            UnrecoverableError("KnnFlatIPReservoir isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -98,11 +95,11 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
                 auto segment_offset = segment_offset_start + j;
                 if (bitmask.IsTrue(segment_offset)) {
-                    auto l2 = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    result_handler_->AddResult(i, l2, RowID(segment_id, segment_offset_start + j));
+                    auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
+                    result_handler_->AddResult(i, ip, RowID(segment_id, segment_offset_start + j));
                 }
             }
         }
@@ -113,7 +110,6 @@ public:
             return;
 
         result_handler_->End();
-
         begin_ = false;
     }
 
@@ -123,14 +119,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
@@ -144,6 +140,6 @@ private:
     bool begin_{false};
 };
 
-template class KnnFlatL2Reservoir<f32>;
+template class KnnFlatIPReservoir<f32>;
 
 } // namespace infinity

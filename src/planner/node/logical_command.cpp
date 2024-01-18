@@ -99,7 +99,7 @@ String LogicalCommand::ToString(i64 &space) const {
             break;
         }
         case CommandType::kInvalid: {
-            Error<PlannerException>("Invalid command type.");
+            UnrecoverableError("Invalid command type.");
         }
     }
 

@@ -47,7 +47,7 @@ bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorSta
     auto *txn = query_context->GetTxn();
     auto status = txn->CreateIndexFinish(*db_name_, *table_name_, index_def_);
     if (!status.ok()) {
-        Error<ExecutorException>(fmt::format("Create index finish failed: {}", status.message()));
+        RecoverableError(status);
     }
     operator_state->SetComplete();
     return true;

@@ -35,6 +35,7 @@ import operator_state;
 import data_block;
 import infinity_exception;
 import third_party;
+import status;
 import physical_top;
 
 namespace infinity {
@@ -112,9 +113,7 @@ Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &indexes_group,
     if (l > r)
         return Vector<BlockRawIndex>();
     SizeT mid = (l + r) >> 1;
-    return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator),
-                           MergeIndexes(indexes_group, mid + 1, r, comparator),
-                           comparator);
+    return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator), MergeIndexes(indexes_group, mid + 1, r, comparator), comparator);
 }
 
 void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
@@ -153,7 +152,7 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
 void PhysicalSort::Init() {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
-        Error<ExecutorException>("order_by_types_.size() != expressions_.size()");
+        UnrecoverableError("order_by_types_.size() != expressions_.size()");
     }
     Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count);

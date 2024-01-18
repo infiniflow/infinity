@@ -183,8 +183,8 @@ TEST_F(TableEntryTest, test2) {
         input_block->Finalize();
         EXPECT_EQ(input_block->Finalized(), true);
 
-        new_txn->Append("db1", "tbl1", input_block);
-
+        Status append_status = new_txn->Append("db1", "tbl1", input_block);
+        EXPECT_TRUE(append_status.ok());
         // Txn2: Commit, OK
         txn_mgr->CommitTxn(new_txn);
     }

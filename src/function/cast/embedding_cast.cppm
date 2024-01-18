@@ -14,6 +14,8 @@
 
 module;
 
+export module embedding_cast;
+
 import stl;
 import column_vector;
 import vector_buffer;
@@ -25,8 +27,7 @@ import integer_cast;
 import infinity_exception;
 import third_party;
 import logger;
-
-export module embedding_cast;
+import status;
 
 namespace infinity {
 
@@ -38,12 +39,13 @@ BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
-        Error<TypeException>(fmt::format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
-        Error<TypeException>(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
+        RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
+//        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {
@@ -65,7 +67,7 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
             return BindEmbeddingCast<DoubleT>(target_info);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from {} to Embedding type", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to Embedding type", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -93,7 +95,7 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, DoubleT, EmbeddingTryCastToFixlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Embedding type to {}", target->ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target->ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -118,7 +120,7 @@ struct EmbeddingTryCastToFixlen {
             }
             return true;
         }
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>()));
     }
 };
@@ -126,7 +128,7 @@ struct EmbeddingTryCastToFixlen {
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -139,7 +141,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &,
                                           const SharedPtr<ColumnVector> &vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        Error<TypeException>(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
@@ -156,7 +158,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         std::memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            Error<TypeException>(fmt::format("Varchar column vector should use MemoryVectorBuffer."));
+            UnrecoverableError(fmt::format("Varchar column vector should use MemoryVectorBuffer."));
         }
 
         // Set varchar prefix

@@ -101,7 +101,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         std::filesystem::create_directories("/tmp/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableError("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -121,7 +121,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         std::filesystem::create_directories("/tmp/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableException("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -141,7 +141,7 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         std::filesystem::create_directories("/tmp/infinity/wal");
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            throw Exception("Failed to open wal file: /tmp/infinity/wal/wal.log");
+            UnrecoverableException("Failed to open wal file: /tmp/infinity/wal/wal.log");
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();

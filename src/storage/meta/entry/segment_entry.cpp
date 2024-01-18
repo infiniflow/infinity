@@ -131,7 +131,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             u16 actual_appended =
                 last_block_entry->AppendData(txn_id, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
             if (to_append_rows < actual_appended) {
-                Error<StorageException>(fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
+                UnrecoverableError(fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
             }
 
             append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_block_id, range_block_start_row, actual_appended);
@@ -156,7 +156,7 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         u16 block_id = row_hash_map.first;
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+            UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         const Vector<RowID> &rows = row_hash_map.second;
@@ -172,7 +172,7 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
-                Error<StorageException>("AnnIVFFlat supports embedding type.");
+                UnrecoverableError("AnnIVFFlat only supports embedding type.");
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
@@ -199,7 +199,7 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
                     break;
                 }
                 default: {
-                    Error<StorageException>("Not implemented");
+                    UnrecoverableError("Not implemented");
                 }
             }
             break;
@@ -207,7 +207,7 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
         case IndexType::kHnsw: {
             auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
-                Error<StorageException>("HNSW supports embedding type.");
+                UnrecoverableError("HNSW supports embedding type.");
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
@@ -254,7 +254,7 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
                                     break;
                                 }
                                 default: {
-                                    Error<StorageException>("Not implemented");
+                                    UnrecoverableError("Not implemented");
                                 }
                             }
                             break;
@@ -277,19 +277,19 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
                                     break;
                                 }
                                 default: {
-                                    Error<StorageException>("Not implemented");
+                                    UnrecoverableError("Not implemented");
                                 }
                             }
                             break;
                         }
                         default: {
-                            Error<StorageException>("Not implemented");
+                            UnrecoverableError("Not implemented");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Not implemented");
+                    UnrecoverableError("Not implemented");
                 }
             }
             break;
@@ -298,13 +298,13 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
+            UnrecoverableError(*err_msg);
         }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
+            UnrecoverableError(*err_msg);
         }
     }
 }
@@ -350,7 +350,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
-            Error<StorageException>(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+            UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
         block_entry->CommitDelete(txn_id, commit_ts);
@@ -446,25 +446,25 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
 void SegmentEntry::MergeFrom(BaseEntry &other) {
     auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
     if (segment_entry2 == nullptr) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
     }
     if (*this->segment_dir_ != *segment_entry2->segment_dir_) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires segment_dir_ match");
+        UnrecoverableError("SegmentEntry::MergeFrom requires segment_dir_ match");
     }
     if (this->segment_id_ != segment_entry2->segment_id_) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires segment_id_ match");
+        UnrecoverableError("SegmentEntry::MergeFrom requires segment_id_ match");
     }
     if (this->column_count_ != segment_entry2->column_count_) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires column_count_ match");
+        UnrecoverableError("SegmentEntry::MergeFrom requires column_count_ match");
     }
     if (this->row_capacity_ != segment_entry2->row_capacity_) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires row_capacity_ match");
+        UnrecoverableError("SegmentEntry::MergeFrom requires row_capacity_ match");
     }
     if (this->min_row_ts_ != segment_entry2->min_row_ts_) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires min_row_ts_ match");
+        UnrecoverableError("SegmentEntry::MergeFrom requires min_row_ts_ match");
     }
     if (this->block_entries_.size() > segment_entry2->block_entries_.size()) {
-        Error<StorageException>("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
+        UnrecoverableError("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
     }
 
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
@@ -513,7 +513,7 @@ UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_coun
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
+            UnrecoverableError(*err_msg);
         }
     }
     return nullptr;

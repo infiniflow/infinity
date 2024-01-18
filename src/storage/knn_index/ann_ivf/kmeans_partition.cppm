@@ -79,20 +79,20 @@ void k_means_partition_only_centroids(MetricType metric,
                                       u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
     if (metric != MetricType::kMerticL2 && metric != MetricType::kMerticInnerProduct) {
-        Error<ExecutorException>("metric type not implemented");
+        UnrecoverableError("metric type not implemented");
         return;
     }
     if (dimension <= 0 || vector_count <= 0) {
-        Error<ExecutorException>("dimension and vector_count must be positive");
+        UnrecoverableError("dimension and vector_count must be positive");
     }
     if (vectors_ptr == nullptr) {
-        Error<ExecutorException>("vectors_ptr cannot be nullptr");
+        UnrecoverableError("vectors_ptr cannot be nullptr");
     }
     if (centroids_output == nullptr) {
-        Error<ExecutorException>("centroids_output cannot be nullptr");
+        UnrecoverableError("centroids_output cannot be nullptr");
     }
     if (partition_num > vector_count) {
-        Error<ExecutorException>("partition_num cannot be greater than vector_count");
+        UnrecoverableError("partition_num cannot be greater than vector_count");
     }
     if (partition_num <= 0) {
         partition_num = (int)sqrt(vector_count);

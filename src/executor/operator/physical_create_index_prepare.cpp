@@ -60,7 +60,7 @@ bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorSt
     auto *txn = query_context->GetTxn();
     Status status = txn->CreateIndex(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_, true);
     if (!status.ok()) {
-        operator_state->error_message_ = std::move(status.msg_);
+        operator_state->status_ = status;
     }
     operator_state->SetComplete();
     return true;

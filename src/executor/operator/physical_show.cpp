@@ -210,7 +210,7 @@ void PhysicalShow::Init() {
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented show type");
+            RecoverableError(Status::NotSupport("Not implemented show type"));
         }
     }
 }
@@ -261,7 +261,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             break;
         }
         case ShowType::kInvalid: {
-            Error<ExecutorException>("Invalid chunk scan type");
+            UnrecoverableError("Invalid chunk scan type");
         }
     }
     return true;
@@ -320,8 +320,11 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
     Vector<TableDetail> table_collections_detail;
     Status status = txn->GetTables(db_name_, table_collections_detail);
-    if (!status.ok()) {
-        Error<ExecutorException>(status.message());
+
+    if(!status.ok()) {
+        show_operator_state->status_ = status;
+        RecoverableError(status);
+        return ;
     }
 
     // Prepare the output data block
@@ -399,7 +402,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }
@@ -422,7 +425,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }
@@ -445,7 +448,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
                     break;
                 }
                 default: {
-                    Error<ExecutorException>("Invalid table type");
+                    UnrecoverableError("Invalid table type");
                 }
             }
         }
@@ -475,7 +478,8 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     Vector<ViewDetail> views_detail;
     Status status = txn->GetViews(db_name_, views_detail);
     if (!status.ok()) {
-        Error<ExecutorException>(status.message());
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
     }
 
     // Prepare the output data block
@@ -593,8 +597,8 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
-        show_operator_state->error_message_ = std::move(status.msg_);
-        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
         return;
     }
 
@@ -670,8 +674,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
-        show_operator_state->error_message_ = std::move(status.msg_);
-        Error<ExecutorException>(fmt::format("{} isn't found", object_name_));
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
         return;
     }
 
@@ -1288,8 +1292,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, object_name_);
     if (!table_status.ok()) {
-        show_operator_state->error_message_ = std::move(table_status.msg_);
-        //        Error<ExecutorException>(table_status.message());
+        show_operator_state->status_ = table_status;
+        //        Error<UnrecoverableException>(table_status.message());
         return;
     }
 
@@ -1402,10 +1406,10 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                         break;
                     }
                     case IndexType::kInvalid: {
-                        Error<ExecutorException>("Invalid index method type");
+                        UnrecoverableError("Invalid index method type");
                     }
                     default: {
-                        Error<NotImplementException>("Not implemented");
+                        RecoverableError(Status::NotSupport("Not implemented"));
                         break;
                     }
                 }

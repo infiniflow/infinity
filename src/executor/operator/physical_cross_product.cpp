@@ -37,8 +37,8 @@ void PhysicalCrossProduct::Init() {}
 bool PhysicalCrossProduct::Execute(QueryContext *, OperatorState *) {
 #if 0
 
-    Assert<ExecutorException>(left_->output().get() != nullptr, "No left input.");
-    Assert<ExecutorException>(right_->output().get() != nullptr, "No right input.");
+    UnrecoverableError("No left input.");
+    UnrecoverableError("No right input.");
     left_table_ = left_->output();
     right_table_ = right_->output();
 

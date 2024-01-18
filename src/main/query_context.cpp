@@ -15,7 +15,11 @@
 module;
 
 #include <sstream>
+#include <csignal>
 //#include "gperftools/profiler.h"
+
+module query_context;
+
 
 import stl;
 import session;
@@ -43,8 +47,6 @@ import logger;
 import query_result;
 import status;
 import session_manager;
-
-module query_context;
 
 namespace infinity {
 
@@ -83,11 +85,11 @@ QueryResult QueryContext::Query(const String &query) {
 
     if (parsed_result->IsError()) {
         StopProfile(QueryPhase::kParser);
-        Error<PlannerException>(parsed_result->error_message_);
+        UnrecoverableError(parsed_result->error_message_);
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
-        Error<PlannerException>("Only support single statement.");
+        UnrecoverableError("Only support single statement.");
     }
     StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
@@ -95,7 +97,7 @@ QueryResult QueryContext::Query(const String &query) {
         return query_result;
     }
 
-    Error<NetworkException>("Not reachable");
+    UnrecoverableError("Not reachable");
     return QueryResult::UnusedResult();
 }
 
@@ -114,10 +116,10 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         // Build unoptimized logical plan for each SQL statement.
         StartProfile(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
-        auto state = logical_planner_->Build(statement, bind_context);
+        auto status = logical_planner_->Build(statement, bind_context);
         // FIXME
-        if (!state.ok()) {
-            Error<PlannerException>(state.message());
+        if (!status.ok()) {
+            RecoverableError(status);
         }
 
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
@@ -155,15 +157,23 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StartProfile(QueryPhase::kCommit);
         this->CommitTxn();
         StopProfile(QueryPhase::kCommit);
-        // LOG_WARN("Finish query");
-    } catch (const Exception &e) {
+
+    } catch (RecoverableException &e) {
+
         StopProfile();
         StartProfile(QueryPhase::kRollback);
         this->RollbackTxn();
         StopProfile(QueryPhase::kRollback);
         query_result.result_table_ = nullptr;
-        query_result.status_.Init(ErrorCode::kError, e.what());
+        query_result.status_.Init(e.ErrorCode(), e.what());
+
+    } catch (UnrecoverableException &e) {
+
+        LOG_CRITICAL(e.what());
+        raise(SIGUSR1);
+//        throw e;
     }
+
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
     return query_result;

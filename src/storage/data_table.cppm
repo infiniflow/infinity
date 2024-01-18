@@ -69,7 +69,7 @@ public:
 
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
         if (idx >= data_blocks_.size()) {
-            Error<StorageException>(fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
+            UnrecoverableError(fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount()));
         }
         return data_blocks_[idx];
     }

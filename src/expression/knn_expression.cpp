@@ -30,7 +30,7 @@ namespace infinity {
 String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
-            Error<PlannerException>("Invalid KNN distance type");
+            UnrecoverableError("Invalid KNN distance type");
         }
         case KnnDistanceType::kL2: {
             return "L2";

@@ -40,11 +40,11 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    Error<TypeException>("Target vector type isn't flat.");
+                    UnrecoverableError("Target vector type isn't flat.");
                 }
                 if (nullable) {
                     ExecuteFlatWithNull<InputElemType, OutputElemType, Operator>(input_ptr,
@@ -63,7 +63,7 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    Error<TypeException>("Attempting to execute more than one row of the constant column vector.");
+                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
                 }
                 if (nullable) {
                     result_null->SetAllTrue();
@@ -75,11 +75,11 @@ public:
                 return;
             }
             case ColumnVectorType::kHeterogeneous: {
-                Error<NotImplementException>("Heterogeneous embedding is not implemented yet.");
+                UnrecoverableError("Heterogeneous embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                Error<NotImplementException>("Compact Bit embedding is not implemented yet.");
+                UnrecoverableError("Compact Bit embedding is not implemented yet.");
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
         }
