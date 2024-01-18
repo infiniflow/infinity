@@ -41,12 +41,9 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
     : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_def_(std::move(index_def)), index_dir_(std::move(index_dir)) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
-
-    SizeT index_count = index_def->index_array_.size();
-    this->column_index_map_.reserve(index_count);
 }
 
-TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts)
+TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
@@ -63,18 +60,22 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_replay) {
         auto table_index_entry =
             MakeShared<TableIndexEntry>(index_def, table_index_meta, MakeShared<String>(replay_table_index_dir), txn_id, begin_ts);
+        SizeT index_count = index_def->index_array_.size();
+        table_index_entry->column_index_map_.reserve(index_count);
 
         return table_index_entry;
     } else {
         SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_def->index_name_);
         auto table_index_entry = MakeShared<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
         TableIndexEntry *table_index_entry_ptr = table_index_entry.get();
+
         {
-            if (txn != nullptr) {
-                auto operation = MakeUnique<AddTableIndexEntryOperation>(table_index_entry);
-                txn->AddPhysicalOperation(std::move(operation));
-            }
+            auto operation = MakeUnique<AddTableIndexEntryOperation>(table_index_entry);
+            txn->AddCatalogDeltaOperation(std::move(operation));
         }
+
+        SizeT index_count = index_def->index_array_.size();
+        table_index_entry->column_index_map_.reserve(index_count);
 
         HashMap<u64, SharedPtr<IndexFullText>> index_info_map;
         for (SizeT idx = 0; idx < index_def->index_array_.size(); ++idx) {
@@ -105,7 +106,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     }
 }
 
-SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts) {
+SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
     return MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
 }
 
@@ -168,7 +169,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
                                                         TableIndexMeta *table_index_meta,
                                                         BufferManager *buffer_mgr,
                                                         TableEntry *table_entry) {
-    u64 txn_id = index_def_entry_json["txn_id"];
+    TransactionID txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
     bool deleted = index_def_entry_json["deleted"];

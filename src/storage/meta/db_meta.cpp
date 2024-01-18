@@ -57,8 +57,8 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
         // Physical log
         {
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
 
@@ -77,8 +77,8 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
             // Physical log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
 
@@ -94,12 +94,10 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     // No conflict
 
                     SharedPtr<DBEntry> db_entry = DBEntry::DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-                    // Physical log
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                            auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
 
@@ -139,11 +137,9 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                         if (header_db_entry->deleted_) {
 
                             SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-                            // physical wal log
                             if (txn_mgr != nullptr) {
-                                auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                                txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                                auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                             }
 
                             db_entry_ptr = db_entry.get();
@@ -171,18 +167,17 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
                     // Remove the header entry
-                    // TODO Consider whether it is necessary to add physical logs
+                    //
                     this->entry_list_.erase(this->entry_list_.begin());
 
-                    // Append new one
-
+                    // Rollback Txn will not merge the txn catalog delta operations to global catalog delta operations.
+                    // So, rollback catalog operations shouldn't be recorded.
+                    // But this new Txn catalog delta operations need to be recorded.
                     SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-                    // physical wal log
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                            auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
 
@@ -233,8 +228,8 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             // Physical log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
 
@@ -254,18 +249,16 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
         // Uncommitted, check if the same txn
         if (txn_id == header_db_entry->txn_id_) {
             // Same txn, remove the header db entry
-            auto base_entry_ptr_iter = this->entry_list_.begin();
-            auto db_entry = std::dynamic_pointer_cast<DBEntry>(*base_entry_ptr_iter);
-
-            // Physical log
+            auto base_entry_ptr = this->entry_list_.front();
+            auto db_entry = std::static_pointer_cast<DBEntry>(base_entry_ptr);
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDatabaseEntryOperation>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
 
-            this->entry_list_.erase(this->entry_list_.begin());
+            this->entry_list_.pop_front();
             return {db_entry.get(), Status::OK()};
         } else {
             // Not same txn, issue WW conflict
@@ -281,8 +274,7 @@ void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry) {
     db_meta->entry_list_.emplace_front(std::move(db_entry));
 }
 
-
-void DBMeta::DeleteNewEntry(TransactionID txn_id, TxnManager * txn_mgr) {
+void DBMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr) {
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Empty db entry list.");
@@ -291,17 +283,7 @@ void DBMeta::DeleteNewEntry(TransactionID txn_id, TxnManager * txn_mgr) {
 
     auto removed_iter =
         std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](auto &entry) -> bool { return entry->txn_id_ == txn_id; });
-
-    // TODO Need to check whether or not adding physical operation log
-    // DeleteNewEntry is only called when txn is rollbacked, so no need to add physical log
-    // Physical log
-//    {
-//        if (txn_mgr != nullptr) {
-//            auto operation = MakeUnique<AddDatabaseEntryOperation>(removed_iter);
-//            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
-//        }
-//    }
-
+    // DeleteNewEntry is only called when txn is rollback, so no need to add physical log
     this->entry_list_.erase(removed_iter, this->entry_list_.end());
 }
 

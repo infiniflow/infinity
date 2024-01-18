@@ -46,7 +46,7 @@ SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_
     {
         if (txn != nullptr) {
             auto operation = MakeUnique<AddIrsIndexEntryOperation>(irs_index_entry);
-            txn->AddPhysicalOperation(std::move(operation));
+            txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
     return irs_index_entry;
@@ -63,7 +63,7 @@ nlohmann::json IrsIndexEntry::Serialize(TxnTimeStamp) {
 }
 
 SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *) {
-    u64 txn_id = index_def_entry_json["txn_id"];
+    TransactionID txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);

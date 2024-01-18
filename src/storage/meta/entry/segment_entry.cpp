@@ -58,11 +58,11 @@ namespace infinity {
 
 SegmentEntry::SegmentEntry(const TableEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
 
-SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, BufferManager *buffer_mgr, Txn *txn) {
+SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
     if (txn != nullptr) {
         auto operation = MakeUnique<AddSegmentEntryOperation>(segment_entry.get());
-        txn->AddPhysicalOperation(std::move(operation));
+        txn->AddCatalogDeltaOperation(std::move(operation));
     }
     segment_entry->row_count_ = 0;
     segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
@@ -75,8 +75,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
 
     segment_entry->segment_dir_ = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
     if (segment_entry->block_entries_.empty()) {
-        auto block_entry =
-            BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, buffer_mgr, txn);
+        auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
         segment_entry->block_entries_.emplace_back(std::move(block_entry));
     }
 
@@ -105,7 +104,7 @@ int SegmentEntry::Room() {
     return this->row_capacity_ - this->row_count_;
 }
 
-u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
+u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
         return 0;
@@ -121,8 +120,7 @@ u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferMa
             // Append to_append_rows into block
             BlockEntry *last_block_entry = this->block_entries_.back().get();
             if (last_block_entry->GetAvailableCapacity() <= 0) {
-                this->block_entries_.emplace_back(
-                    BlockEntry::NewBlockEntry(this, this->block_entries_.size(), 0, this->column_count_, buffer_mgr, txn));
+                this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, this->block_entries_.size(), 0, this->column_count_, txn));
                 last_block_entry = this->block_entries_.back().get();
             }
 
@@ -151,7 +149,7 @@ u64 SegmentEntry::AppendData(u64 txn_id, AppendState *append_state_ptr, BufferMa
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {
@@ -331,7 +329,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntr
     return segment_column_index_entry;
 }
 
-void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
+void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
     SharedPtr<BlockEntry> block_entry;
     {
         std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
@@ -344,7 +342,7 @@ void SegmentEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id
     block_entry->CommitAppend(txn_id, commit_ts);
 }
 
-void SegmentEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &row_hash_map : block_row_hashmap) {

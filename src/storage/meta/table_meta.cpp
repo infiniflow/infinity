@@ -63,7 +63,7 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
 Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry_type,
                                                       const SharedPtr<String> &table_collection_name_ptr,
                                                       const Vector<SharedPtr<ColumnDef>> &columns,
-                                                      u64 txn_id,
+                                                      TransactionID txn_id,
                                                       TxnTimeStamp begin_ts,
                                                       TxnManager *txn_mgr) {
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
@@ -85,7 +85,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
         {
             if (txn_mgr != nullptr) {
                 auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
 
@@ -106,7 +106,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
             {
                 if (txn_mgr != nullptr) {
                     auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
 
@@ -128,7 +128,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     {
                         if (txn_mgr != nullptr) {
                             auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
 
@@ -170,7 +170,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                             {
                                 if (txn_mgr != nullptr) {
                                     auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                                 }
                             }
 
@@ -198,7 +198,6 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
-                    // TODO Consider whether it is necessary to add physical logs
                     // Remove the header entry
                     this->entry_list_.erase(this->entry_list_.begin());
 
@@ -210,7 +209,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     {
                         if (txn_mgr != nullptr) {
                             auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
 
@@ -270,7 +269,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
             {
                 if (txn_mgr != nullptr) {
                     auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
 
@@ -292,18 +291,17 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
             // Same txn, remove the header table entry
             table_entry_ptr = header_table_entry;
 
-            auto base_entry_ptr_iter = this->entry_list_.begin();
-            auto table_entry_ptr = std::dynamic_pointer_cast<TableEntry>(*base_entry_ptr_iter);
+            auto base_entry_ptr = this->entry_list_.front();
+            auto table_entry_ptr = std::static_pointer_cast<TableEntry>(base_entry_ptr);
 
             // Physical log
             {
                 if (txn_mgr != nullptr) {
                     auto operation = MakeUnique<AddTableEntryOperation>(table_entry_ptr);
-                    txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
-            this->entry_list_.erase(this->entry_list_.begin());
-
+            this->entry_list_.pop_front();
             return {table_entry_ptr.get(), Status::OK()};
         } else {
             // Not same txn, issue WW conflict
@@ -314,7 +312,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
     }
 }
 
-void TableMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
+void TableMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Empty table entry list.");
@@ -340,7 +338,7 @@ void TableMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
  * @param begin_ts
  * @return Status
  */
-Tuple<TableEntry *, Status> TableMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");

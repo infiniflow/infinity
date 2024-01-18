@@ -537,7 +537,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, buffer_manager,txn4);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4);
             EXPECT_EQ(segment_entry->segment_id(), 0);
             auto last_block_entry = segment_entry->GetLastEntry();
 

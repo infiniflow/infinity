@@ -41,7 +41,7 @@ ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                    TableIndexEntry *table_index_entry,
                                    u64 column_id,
                                    SharedPtr<String> col_index_dir,
-                                   u64 txn_id,
+                                   TransactionID txn_id,
                                    TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), column_id_(column_id), col_index_dir_(col_index_dir),
       index_base_(index_base) {
@@ -53,14 +53,14 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
                                                                   ColumnID column_id,
                                                                   TableIndexEntry *table_index_entry,
                                                                   Txn *txn,
-                                                                  u64 txn_id,
+                                                                  TransactionID txn_id,
                                                                   SharedPtr<String> col_index_dir,
                                                                   TxnTimeStamp begin_ts) {
     auto column_index_entry = MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
     {
         if (txn != nullptr) {
             UniquePtr<AddColumnIndexEntryOperation> operation = MakeUnique<AddColumnIndexEntryOperation>(column_index_entry);
-            txn->AddPhysicalOperation(std::move(operation));
+            txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
     return column_index_entry;
@@ -111,7 +111,7 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
         Error<StorageException>("Column index entry can't be deleted.");
     }
 
-    u64 txn_id = column_index_entry_json["txn_id"];
+    TransactionID txn_id = column_index_entry_json["txn_id"];
     TxnTimeStamp begin_ts = column_index_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = column_index_entry_json["commit_ts"];
     u64 column_id = column_index_entry_json["column_id"];

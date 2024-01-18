@@ -47,7 +47,16 @@ namespace infinity {
 
 Txn::Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
-      local_physical_wal_entry_(MakeShared<PhysicalWalEntry>()) {}
+      local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
+
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
+      local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
+
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
+    return txn;
+}
 
 Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const String &table_name) {
     if (db_name_.empty()) {
@@ -467,7 +476,7 @@ void Txn::CommitBottom() {
     }
 
     // Snapshot the physical operations in one txn
-    local_physical_wal_entry_->Snapshot(txn_id_, commit_ts);
+    local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
 
     LOG_INFO(fmt::format("Txn: {} is committed.", txn_id_));
 
@@ -521,11 +530,9 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::AddPhysicalOperation(UniquePtr<PhysicalWalOperation> operation) {
-    local_physical_wal_entry_->operations().emplace_back(std::move(operation));
+void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
+    local_catalog_delta_ops_entry_->operations().emplace_back(std::move(operation));
 }
-
-void Txn::SubPhysicalOperation() { local_physical_wal_entry_->operations().pop_back(); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";

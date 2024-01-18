@@ -29,7 +29,7 @@ import status;
 #if 0
 
 namespace infinity {
-BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const {
+BaseMeta::EntryStatus BaseMeta::AddEntryInternal(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, BaseEntry *&last_entry) const {
     Assert<StorageException>(!entry_list_.empty(), "entry list should at least has a dummy head.");
     // BaseEntry *header_base_entry = entry_list_.front().get();
 
@@ -83,7 +83,7 @@ BaseMeta::EntryStatus BaseMeta::AddEntryInternal(u64 txn_id, TxnTimeStamp begin_
     }
 }
 
-void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
+void BaseMeta::DeleteNewEntry(BaseMeta *meta, TransactionID txn_id, TxnManager *txn_mgr) {
     std::unique_lock<std::shared_mutex> w_locker(meta->rw_locker_);
     if (meta->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
@@ -98,7 +98,7 @@ void BaseMeta::DeleteNewEntry(BaseMeta *meta, u64 txn_id, TxnManager *txn_mgr) {
     meta->entry_list_.erase(removed_iter, meta->entry_list_.end());
 }
 
-Status BaseMeta::GetEntry(BaseMeta *meta, u64 txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
+Status BaseMeta::GetEntry(BaseMeta *meta, TransactionID txn_id, TxnTimeStamp begin_ts, BaseEntry*& base_entry) {
     std::shared_lock<std::shared_mutex> r_locker(meta->rw_locker_);
     for (const auto &entry : meta->entry_list_) {
         if (entry->entry_type_ == EntryType::kDummy) {

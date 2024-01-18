@@ -62,9 +62,9 @@ public:
 
     bool Stopped();
 
-    TxnTimeStamp CommitTxn(Txn* txn);
+    TxnTimeStamp CommitTxn(Txn *txn);
 
-    void RollBackTxn(Txn* txn);
+    void RollBackTxn(Txn *txn);
 
 private:
     u64 GetNewTxnID();

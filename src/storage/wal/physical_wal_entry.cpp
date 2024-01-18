@@ -32,30 +32,30 @@ import logger;
 
 namespace infinity {
 
-UniquePtr<PhysicalWalOperation> PhysicalWalOperation::ReadAdv(char *&ptr, i32 max_bytes) {
+UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
-    UniquePtr<PhysicalWalOperation> operation = nullptr;
-    auto operation_type = ReadBufAdv<PhysicalWalOperationType>(ptr);
+    UniquePtr<CatalogDeltaOperation> operation = nullptr;
+    auto operation_type = ReadBufAdv<CatalogDeltaOperationType>(ptr);
     switch (operation_type) {
-        case PhysicalWalOperationType::ADD_DATABASE_META: {
+        case CatalogDeltaOperationType::ADD_DATABASE_META: {
             String db_name = ReadBufAdv<String>(ptr);
             String data_dir = ReadBufAdv<String>(ptr);
             TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             bool is_delete = ReadBufAdv<bool>(ptr);
-            operation = MakeUnique<AddDatabaseMetaOperation>(begin_ts, is_delete, db_name, data_dir);
+            operation = MakeUnique<AddDBMetaOperation>(begin_ts, is_delete, db_name, data_dir);
             break;
         }
-        case PhysicalWalOperationType::ADD_DATABASE_ENTRY: {
+        case CatalogDeltaOperationType::ADD_DATABASE_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
             TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             bool is_delete = ReadBufAdv<bool>(ptr);
-            operation = MakeUnique<AddDatabaseEntryOperation>(begin_ts, is_delete, db_name, db_entry_dir);
+            operation = MakeUnique<AddDBEntryOperation>(begin_ts, is_delete, db_name, db_entry_dir);
             operation->begin_ts_ = begin_ts;
             operation->is_delete_ = is_delete;
             break;
         }
-        case PhysicalWalOperationType::ADD_TABLE_ENTRY: {
+        case CatalogDeltaOperationType::ADD_TABLE_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_entry_dir = ReadBufAdv<String>(ptr);
@@ -66,7 +66,7 @@ UniquePtr<PhysicalWalOperation> PhysicalWalOperation::ReadAdv(char *&ptr, i32 ma
             operation->is_delete_ = is_delete;
             break;
         }
-        case PhysicalWalOperationType::ADD_SEGMENT_ENTRY: {
+        case CatalogDeltaOperationType::ADD_SEGMENT_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -79,7 +79,7 @@ UniquePtr<PhysicalWalOperation> PhysicalWalOperation::ReadAdv(char *&ptr, i32 ma
             operation->is_delete_ = is_delete;
             break;
         }
-        case PhysicalWalOperationType::ADD_BLOCK_ENTRY: {
+        case CatalogDeltaOperationType::ADD_BLOCK_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -101,7 +101,7 @@ UniquePtr<PhysicalWalOperation> PhysicalWalOperation::ReadAdv(char *&ptr, i32 ma
                                                            row_capacity);
             break;
         }
-        case PhysicalWalOperationType::ADD_COLUMN_ENTRY: {
+        case CatalogDeltaOperationType::ADD_COLUMN_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -117,18 +117,18 @@ UniquePtr<PhysicalWalOperation> PhysicalWalOperation::ReadAdv(char *&ptr, i32 ma
             break;
         }
         default:
-            Error<StorageException>(fmt::format("UNIMPLEMENTED ReadAdv for PhysicalWalOperation type {}", int(operation_type)));
+            Error<StorageException>(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
     }
 
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        Error<StorageException>("ptr goes out of range when reading PhysicalWalOperation");
+        Error<StorageException>("ptr goes out of range when reading CatalogDeltaOperation");
     }
     return operation;
 }
 
-void AddDatabaseMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_DATABASE_META);
+void AddDBMetaOperation::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->data_dir_);
     WriteBufAdv(buf, this->begin_ts_);
@@ -136,15 +136,15 @@ void AddDatabaseMetaOperation::WriteAdv(char *&buf) const {
 }
 
 void AddTableMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_DATABASE_META);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
     WriteBufAdv(buf, this->begin_ts_);
     WriteBufAdv(buf, this->is_delete_);
 }
 
-void AddDatabaseEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_DATABASE_ENTRY);
+void AddDBEntryOperation::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
 
@@ -153,7 +153,7 @@ void AddDatabaseEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddTableEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_TABLE_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_entry_dir_);
@@ -163,7 +163,7 @@ void AddTableEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_SEGMENT_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
@@ -174,7 +174,7 @@ void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddBlockEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_BLOCK_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_BLOCK_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
@@ -188,7 +188,7 @@ void AddBlockEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddColumnEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_COLUMN_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
@@ -201,7 +201,7 @@ void AddColumnEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddIndexMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_INDEX_META);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_INDEX_META);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
@@ -210,7 +210,7 @@ void AddIndexMetaOperation::WriteAdv(char *&buf) const {
 }
 
 void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_TABLE_INDEX_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
     WriteBufAdv(buf, this->begin_ts_);
@@ -218,7 +218,7 @@ void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_IRS_INDEX_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
     WriteBufAdv(buf, this->begin_ts_);
@@ -226,7 +226,7 @@ void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_COLUMN_INDEX_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
@@ -236,7 +236,7 @@ void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, PhysicalWalOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY);
+    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
@@ -248,7 +248,7 @@ void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->is_delete_);
 }
 
-void AddDatabaseMetaOperation::Snapshot() {
+void AddDBMetaOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -257,7 +257,7 @@ void AddDatabaseMetaOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddTableMetaOperation::Snapshot() {
+void AddTableMetaOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -266,7 +266,7 @@ void AddTableMetaOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddDatabaseEntryOperation::Snapshot() {
+void AddDBEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -277,7 +277,7 @@ void AddDatabaseEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddTableEntryOperation::Snapshot() {
+void AddTableEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -287,7 +287,7 @@ void AddTableEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddSegmentEntryOperation::Snapshot() {
+void AddSegmentEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -298,7 +298,7 @@ void AddSegmentEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddBlockEntryOperation::Snapshot() {
+void AddBlockEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -312,7 +312,7 @@ void AddBlockEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddColumnEntryOperation::Snapshot() {
+void AddColumnEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -328,7 +328,7 @@ void AddColumnEntryOperation::Snapshot() {
 }
 
 /// Related to index
-void AddIndexMetaOperation::Snapshot() {
+void AddIndexMetaOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -338,7 +338,7 @@ void AddIndexMetaOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddTableIndexEntryOperation::Snapshot() {
+void AddTableIndexEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -350,7 +350,7 @@ void AddTableIndexEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddIrsIndexEntryOperation::Snapshot() {
+void AddIrsIndexEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -361,7 +361,7 @@ void AddIrsIndexEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddColumnIndexEntryOperation::Snapshot() {
+void AddColumnIndexEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -373,7 +373,7 @@ void AddColumnIndexEntryOperation::Snapshot() {
     is_snapshotted_ = true;
 }
 
-void AddSegmentColumnIndexEntryOperation::Snapshot() {
+void AddSegmentColumnIndexEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
@@ -383,28 +383,15 @@ void AddSegmentColumnIndexEntryOperation::Snapshot() {
     this->index_name_ = this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->index_name();
     this->column_id_ = this->segment_column_index_entry_->column_index_entry()->column_id();
     this->segment_id_ = this->segment_column_index_entry_->segment_id();
-    this->min_ts_=this->segment_column_index_entry_->min_ts();
-    this->max_ts_= this->segment_column_index_entry_->max_ts();
+    this->min_ts_ = this->segment_column_index_entry_->min_ts();
+    this->max_ts_ = this->segment_column_index_entry_->max_ts();
     is_snapshotted_ = true;
 }
 
-/// class PhysicalWalEntry
-bool PhysicalWalEntry::operator==(const PhysicalWalEntry &other) const {
-    if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->operations_.size() != other.operations_.size()) {
-        return false;
-    }
-    for (u32 i = 0; i < this->operations_.size(); i++) {
-        const UniquePtr<PhysicalWalOperation> &operation1 = this->operations_[i];
-        const UniquePtr<PhysicalWalOperation> &operation2 = other.operations_[i];
-        if (operation1.get() == nullptr || operation2.get() == nullptr || (*operation1).operator!=(*operation2)) {
-            return false;
-        }
-    }
-    return true;
-}
+/// class CatalogDeltaEntry
 
-i32 PhysicalWalEntry::GetSizeInBytes() const {
-    i32 size = sizeof(PhysicalWalEntryHeader) + sizeof(i32);
+i32 CatalogDeltaEntry::GetSizeInBytes() const {
+    i32 size = sizeof(CatalogDeltaEntryHeader) + sizeof(i32);
     SizeT operations_size = operations_.size();
     for (SizeT idx = 0; idx < operations_size; ++idx) {
         const auto &operation = operations_[idx];
@@ -414,13 +401,13 @@ i32 PhysicalWalEntry::GetSizeInBytes() const {
     return size;
 }
 
-SharedPtr<PhysicalWalEntry> PhysicalWalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
+SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         Error<StorageException>("ptr goes out of range when reading WalEntry");
     }
-    auto entry = MakeShared<PhysicalWalEntry>();
-    auto *header = (PhysicalWalEntryHeader *)ptr;
+    auto entry = MakeShared<CatalogDeltaEntry>();
+    auto *header = (CatalogDeltaEntryHeader *)ptr;
     entry->size_ = header->size_;
     entry->checksum_ = header->checksum_;
     entry->txn_id_ = header->txn_id_;
@@ -434,14 +421,14 @@ SharedPtr<PhysicalWalEntry> PhysicalWalEntry::ReadAdv(char *&ptr, i32 max_bytes)
     if (entry->checksum_ != checksum2) {
         return nullptr;
     }
-    ptr += sizeof(PhysicalWalEntryHeader);
+    ptr += sizeof(CatalogDeltaEntryHeader);
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
             Error<StorageException>("ptr goes out of range when reading WalEntry");
         }
-        UniquePtr<PhysicalWalOperation> operation = PhysicalWalOperation::ReadAdv(ptr, max_bytes);
+        UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes);
         entry->operations_.emplace_back(std::move(operation));
     }
     ptr += sizeof(i32);
@@ -454,7 +441,7 @@ SharedPtr<PhysicalWalEntry> PhysicalWalEntry::ReadAdv(char *&ptr, i32 max_bytes)
 
 /**
  * An entry is serialized as follows:
- * - PhysicalWalEntryHeader
+ * - CatalogDeltaEntryHeader
  *   - size
  *   - checksum
  *   - txn_id
@@ -465,10 +452,10 @@ SharedPtr<PhysicalWalEntry> PhysicalWalEntry::ReadAdv(char *&ptr, i32 max_bytes)
  * @param ptr
  * @return void
  */
-void PhysicalWalEntry::WriteAdv(char *&ptr) const {
+void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
-    std::memcpy(ptr, this, sizeof(PhysicalWalEntryHeader));
-    ptr += sizeof(PhysicalWalEntryHeader);
+    std::memcpy(ptr, this, sizeof(CatalogDeltaEntryHeader));
+    ptr += sizeof(CatalogDeltaEntryHeader);
 
     WriteBufAdv(ptr, static_cast<i32>(operations_.size()));
     SizeT operation_count = operations_.size();
@@ -478,7 +465,7 @@ void PhysicalWalEntry::WriteAdv(char *&ptr) const {
     }
     i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
-    auto *header = (PhysicalWalEntryHeader *)saved_ptr;
+    auto *header = (CatalogDeltaEntryHeader *)saved_ptr;
     header->size_ = size;
     header->checksum_ = 0;
     // CRC32IEEE is equivalent to boost::crc_32_type on
@@ -486,14 +473,14 @@ void PhysicalWalEntry::WriteAdv(char *&ptr) const {
     header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
-void PhysicalWalEntry::Snapshot(TransactionID txn_id, TxnTimeStamp commit_ts) {
+void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
     LOG_INFO(fmt::format("Snapshot txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("Snapshot operation {}", operation->ToString()));
-        operation->Snapshot();
+        operation->SaveSate();
     }
 }
 

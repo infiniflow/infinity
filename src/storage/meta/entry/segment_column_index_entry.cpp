@@ -56,7 +56,7 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
     {
         if (txn != nullptr) {
             auto operation = MakeUnique<AddSegmentColumnIndexEntryOperation>(segment_column_index_entry);
-            txn->AddPhysicalOperation(std::move(operation));
+            txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
     return segment_column_index_entry;

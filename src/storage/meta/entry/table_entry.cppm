@@ -129,9 +129,9 @@ public:
 
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
-    SharedPtr<BlockIndex> GetBlockIndex(u64 txn_id, TxnTimeStamp begin_ts);
+    SharedPtr<BlockIndex> GetBlockIndex(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void GetFullTextAnalyzers(u64 txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
+    void GetFullTextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);

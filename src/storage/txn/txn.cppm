@@ -52,12 +52,16 @@ struct BaseEntry;
 struct TableIndexEntry;
 struct WalEntry;
 struct WalCmd;
-class PhysicalWalEntry;
-class PhysicalWalOperation;
+class CatalogDeltaEntry;
+class CatalogDeltaOperation;
 
 export class Txn {
 public:
     explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
 
     // Txn OPs
     void Begin();
@@ -125,6 +129,8 @@ public:
     // Getter
     BufferManager *GetBufferMgr() const;
 
+    BufferManager *buffer_manager() const { return buffer_mgr_; }
+
     NewCatalog *GetCatalog() { return catalog_; }
 
     inline TransactionID TxnID() const { return txn_id_; }
@@ -145,15 +151,15 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    void AddPhysicalOperation(UniquePtr<PhysicalWalOperation> operation);
-
-    void SubPhysicalOperation();
+    void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 private:
     // Txn Manager
     TxnManager *txn_mgr_{};
+    // This BufferManager ptr Only for replaying wal
+    BufferManager *buffer_mgr_{};
     NewCatalog *catalog_{};
     TransactionID txn_id_{};
 
@@ -179,7 +185,7 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
     // Physical log entry
-    SharedPtr<PhysicalWalEntry> local_physical_wal_entry_{};
+    SharedPtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done
     std::mutex lock_{};

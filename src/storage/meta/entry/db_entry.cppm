@@ -59,20 +59,20 @@ private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
                                             const SharedPtr<String> &table_collection_name,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
-                                            u64 txn_id,
+                                            TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status>
-    DropTable(const String &table_collection_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveTableEntry(const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
+    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr);
 
-    Vector<TableEntry *> TableCollections(u64 txn_id, TxnTimeStamp begin_ts);
+    Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Status GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+    Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
     std::shared_mutex rw_locker_{};

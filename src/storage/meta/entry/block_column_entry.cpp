@@ -41,30 +41,42 @@ namespace infinity {
 BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
     : BaseEntry(EntryType::kBlockColumn), block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
-UniquePtr<BlockColumnEntry>
-BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager, Txn *txn, bool is_replay) {
+UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
-
     if (txn != nullptr) {
         auto operation = MakeUnique<AddColumnEntryOperation>(block_column_entry.get());
-        txn->AddPhysicalOperation(std::move(operation));
+        txn->AddCatalogDeltaOperation(std::move(operation));
     }
 
     block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
-
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
-    DataType *column_type = block_column_entry->column_type_.get();
 
+    DataType *column_type = block_column_entry->column_type_.get();
     SizeT row_capacity = block_entry->row_capacity();
     SizeT total_data_size = row_capacity * column_type->Size();
-
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
-    if (!is_replay) {
-        block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
-    } else {
-        block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+
+    auto buffer_manager = txn->buffer_manager();
+    block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
+    if (block_column_entry->column_type_->type() == kVarchar) {
+        block_column_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_manager);
     }
 
+    return block_column_entry;
+}
+
+UniquePtr<BlockColumnEntry>
+BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager) {
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+    block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
+
+    DataType *column_type = block_column_entry->column_type_.get();
+    SizeT row_capacity = block_entry->row_capacity();
+    SizeT total_data_size = row_capacity * column_type->Size();
+    auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+
+    block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
     if (block_column_entry->column_type_->type() == kVarchar) {
         block_column_entry->outline_info_ = MakeUnique<OutlineInfo>(buffer_manager);
     }
@@ -282,7 +294,7 @@ nlohmann::json BlockColumnEntry::Serialize() {
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     ColumnID column_id = column_data_json["column_id"];
-    UniquePtr<BlockColumnEntry> block_column_entry = NewBlockColumnEntry(block_entry, column_id, buffer_mgr, nullptr, true);
+    UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr);
     if (block_column_entry->outline_info_.get() != nullptr) {
         auto outline_info = block_column_entry->outline_info_.get();
         outline_info->next_file_idx = column_data_json["next_outline_idx"];

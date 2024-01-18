@@ -112,24 +112,19 @@ BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnT
     : BaseEntry(EntryType::kBlock), segment_entry_(segment_entry), block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE),
       checkpoint_ts_(checkpoint_ts) {}
 
-UniquePtr<BlockEntry> BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry,
-                                                BlockID block_id,
-                                                TxnTimeStamp checkpoint_ts,
-                                                u64 column_count,
-                                                BufferManager *buffer_mgr,
-                                                Txn *txn) {
-
+UniquePtr<BlockEntry>
+BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
     if (txn != nullptr) {
         auto operation = MakeUnique<AddBlockEntryOperation>(block_entry.get());
-        txn->AddPhysicalOperation(std::move(operation));
+        txn->AddCatalogDeltaOperation(std::move(operation));
     }
 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, txn, false);
+        auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, txn);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
@@ -153,7 +148,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        block_entry->columns_.emplace_back(BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, nullptr, true));
+        block_entry->columns_.emplace_back(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr));
     }
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
@@ -176,7 +171,7 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
     return {block_offset_begin, row_idx};
 }
 
-u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *) {
+u16 BlockEntry::AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset input_block_offset, u16 append_rows, BufferManager *) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
@@ -208,7 +203,7 @@ u16 BlockEntry::AppendData(u64 txn_id, DataBlock *input_data_block, u16 input_bl
     return actual_copied;
 }
 
-void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
+void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
@@ -230,7 +225,7 @@ void BlockEntry::DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const Vector<Row
 }
 
 // A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
-void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
+void BlockEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != txn_id) {
         Error<StorageException>(
@@ -246,7 +241,7 @@ void BlockEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts) {
     block_version->created_.push_back({commit_ts, i32(this->row_count_)});
 }
 
-void BlockEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts) {
+void BlockEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         Error<StorageException>(
@@ -349,7 +344,7 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
 UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
     TxnTimeStamp checkpoint_ts = block_entry_json["checkpoint_ts"];
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry, block_id, checkpoint_ts, 0, buffer_mgr, nullptr);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry, block_id, checkpoint_ts, 0, nullptr);
 
     *block_entry->block_dir_ = block_entry_json["block_dir"];
     block_entry->row_capacity_ = block_entry_json["row_capacity"];

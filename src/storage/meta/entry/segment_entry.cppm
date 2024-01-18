@@ -42,7 +42,7 @@ struct SegmentEntry : public BaseEntry {
 public:
     explicit SegmentEntry(const TableEntry *table_entry);
 
-    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, BufferManager *buffer_mgr, Txn *txn);
+    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);

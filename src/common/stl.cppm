@@ -281,14 +281,17 @@ export {
 
     using StreamSize = std::streamsize;
 
-    // TXN
+    // Transactions
     using TxnTimeStamp = uint64_t;
     using TransactionID = uint64_t;
 
-    // ENTRY
+    // Entry
     using SegmentID = uint32_t;
     using BlockID = uint16_t;
     using ColumnID = uint64_t;
+
+    // Related to entry
+    using BlockOffset = uint16_t;
 
     // Concurrency
     using ThreadPool = ctpl::thread_pool;

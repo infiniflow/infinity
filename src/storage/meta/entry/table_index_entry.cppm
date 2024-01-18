@@ -56,7 +56,7 @@ public:
                                                          bool is_replay = false,
                                                          String replay_table_index_dir = "");
 
-    static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, u64 txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 

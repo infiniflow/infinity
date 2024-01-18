@@ -80,7 +80,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
 
         if (txn_mgr != nullptr) {
             auto operation = MakeUnique<AddTableMetaOperation>(table_meta);
-            txn_mgr->GetTxn(txn_id)->AddPhysicalOperation(std::move(operation));
+            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
         }
 
         this->rw_locker_.lock();
@@ -235,7 +235,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
 
     SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
-    u64 txn_id = db_entry_json["txn_id"];
+    TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
     UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_entry_dir, db_name, txn_id, begin_ts);
 

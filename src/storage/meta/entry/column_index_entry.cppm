@@ -44,14 +44,14 @@ public:
                      TableIndexEntry *table_index_entry,
                      ColumnID column_id,
                      SharedPtr<String> index_dir,
-                     u64 txn_id,
+                     TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
     static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                                            u64 column_id,
                                                            TableIndexEntry *table_index_entry,
                                                            Txn* txn,
-                                                           u64 txn_id,
+                                                           TransactionID txn_id,
                                                            SharedPtr<String> col_index_dir,
                                                            TxnTimeStamp begin_ts);
 

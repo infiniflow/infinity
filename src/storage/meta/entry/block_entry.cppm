@@ -76,7 +76,6 @@ public:
                                                BlockID block_id,
                                                TxnTimeStamp checkpoint_ts,
                                                u64 column_count,
-                                               BufferManager *buffer_mgr,
                                                Txn *txn);
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
@@ -102,7 +101,7 @@ public:
     void MergeFrom(BaseEntry &other) override;
 
 protected:
-    u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, u16 input_block_offset, u16 append_rows, BufferManager *buffer_mgr);
+    u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
 

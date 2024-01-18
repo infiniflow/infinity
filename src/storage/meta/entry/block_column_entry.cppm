@@ -42,8 +42,9 @@ export struct BlockColumnEntry : public BaseEntry {
 public:
     explicit BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref);
 
-    static UniquePtr<BlockColumnEntry>
-    NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager, Txn *txn, bool is_replay = false);
+    static UniquePtr<BlockColumnEntry> NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn);
+
+    static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager);
 
     nlohmann::json Serialize();
 
@@ -51,9 +52,7 @@ public:
 
 public:
     // Getter
-    inline OutlineInfo* outline_info_ptr() const {
-        return outline_info_ ? outline_info_.get() : nullptr;
-    }
+    inline OutlineInfo *outline_info_ptr() const { return outline_info_ ? outline_info_.get() : nullptr; }
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }

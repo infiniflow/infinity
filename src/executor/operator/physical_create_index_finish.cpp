@@ -45,12 +45,11 @@ void PhysicalCreateIndexFinish::Init() {}
 
 bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    auto *create_index_finish_op_state = static_cast<CreateIndexFinishOperatorState *>(operator_state);
     auto status = txn->CreateIndexFinish(*db_name_, *table_name_, index_def_);
     if (!status.ok()) {
         Error<ExecutorException>(fmt::format("Create index finish failed: {}", status.message()));
     }
-    create_index_finish_op_state->SetComplete();
+    operator_state->SetComplete();
     return true;
 }
 
