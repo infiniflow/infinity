@@ -40,7 +40,6 @@ import catalog;
 import function_set;
 import scalar_function;
 import scalar_function_set;
-import table_scan;
 import corrlated_expr_detector;
 import rewrite_correlated_expression;
 

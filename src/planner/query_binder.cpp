@@ -47,7 +47,6 @@ import project_binder;
 import limit_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
-import table_scan;
 import catalog;
 import table_entry_type;
 import block_index;

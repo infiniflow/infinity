@@ -61,7 +61,6 @@ import subquery_unnest;
 import infinity_exception;
 import expression_transformer;
 import expression_type;
-import knn_scan;
 
 import parser;
 import base_table_ref;
