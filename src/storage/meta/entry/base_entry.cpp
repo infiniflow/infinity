@@ -23,7 +23,7 @@ import infinity_exception;
 namespace infinity {
 
 // Merge two reverse-ordered list inplace.
-void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &list2) {
+void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2) {
     auto it1 = list1.begin();
     auto it2 = list2.begin();
 

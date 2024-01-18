@@ -52,10 +52,16 @@ struct BaseEntry;
 struct TableIndexEntry;
 struct WalEntry;
 struct WalCmd;
+class CatalogDeltaEntry;
+class CatalogDeltaOperation;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, u32 txn_id);
+    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
 
     // Txn OPs
     void Begin();
@@ -123,9 +129,11 @@ public:
     // Getter
     BufferManager *GetBufferMgr() const;
 
+    BufferManager *buffer_manager() const { return buffer_mgr_; }
+
     NewCatalog *GetCatalog() { return catalog_; }
 
-    inline u64 TxnID() const { return txn_id_; }
+    inline TransactionID TxnID() const { return txn_id_; }
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
@@ -143,13 +151,17 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
+    void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
+
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 private:
     // Txn Manager
     TxnManager *txn_mgr_{};
+    // This BufferManager ptr Only for replaying wal
+    BufferManager *buffer_mgr_{};
     NewCatalog *catalog_{};
-    u64 txn_id_{};
+    TransactionID txn_id_{};
 
     TxnContext txn_context_{};
 
@@ -169,8 +181,11 @@ private:
     // Handled database
     String db_name_{};
 
+    /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
+    // Physical log entry
+    SharedPtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done
     std::mutex lock_{};

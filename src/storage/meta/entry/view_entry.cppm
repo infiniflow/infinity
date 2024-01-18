@@ -37,7 +37,7 @@ public:
                        SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                        SharedPtr<Vector<String>> column_names,
                        ViewMeta *view_meta,
-                       u64 txn_id,
+                       TransactionID txn_id,
                        TxnTimeStamp begin_ts)
         : BaseEntry(EntryType::kView), create_view_info_(create_view_info), base_dir_(base_dir), view_name_(std::move(view_name)),
           column_types_(std::move(column_types)), column_names_(std::move(column_names)), view_meta_(view_meta) {

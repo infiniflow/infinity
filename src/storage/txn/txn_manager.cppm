@@ -33,16 +33,16 @@ public:
     explicit TxnManager(NewCatalog *catalog,
                         BufferManager *buffer_mgr,
                         PutWalEntryFn put_wal_entry_fn,
-                        u64 start_txn_id = 0,
+                        TransactionID start_txn_id = 0,
                         TxnTimeStamp start_ts = 1);
 
     ~TxnManager() { Stop(); }
 
     Txn *CreateTxn();
 
-    Txn *GetTxn(u64 txn_id);
+    Txn *GetTxn(TransactionID txn_id);
 
-    TxnState GetTxnState(u64 txn_id);
+    TxnState GetTxnState(TransactionID txn_id);
 
     inline void Lock() { rw_locker_.lock(); }
 
@@ -62,9 +62,9 @@ public:
 
     bool Stopped();
 
-    TxnTimeStamp CommitTxn(Txn* txn);
+    TxnTimeStamp CommitTxn(Txn *txn);
 
-    void RollBackTxn(Txn* txn);
+    void RollBackTxn(Txn *txn);
 
 private:
     u64 GetNewTxnID();
@@ -72,9 +72,9 @@ private:
 private:
     NewCatalog *catalog_{};
     std::shared_mutex rw_locker_{};
-    u64 txn_id_{};
+    TransactionID txn_id_{};
     BufferManager *buffer_mgr_{};
-    HashMap<u64, UniquePtr<Txn>> txn_map_{};
+    HashMap<TransactionID, UniquePtr<Txn>> txn_map_{};
     // PutWalEntry function
     PutWalEntryFn put_wal_entry_{};
 

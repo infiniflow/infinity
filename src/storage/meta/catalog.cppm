@@ -102,27 +102,31 @@ public:
     }
 };
 
+class CatalogDeltaOperation;
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
     // Database related functions
-    Tuple<DBEntry *, Status>
-    CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<DBEntry *, Status> DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    Tuple<DBEntry *, Status> GetDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveDBEntry(const String &db_name, u64 txn_id, TxnManager *txn_mgr);
+    void RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr);
 
     // List databases
-    Vector<DBEntry *> Databases(u64 txn_id, TxnTimeStamp begin_ts);
+    Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Table related functions
     Tuple<TableEntry *, Status> CreateTable(const String &db_name,
-                                            u64 txn_id,
+                                            TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             const SharedPtr<TableDef> &table_def,
                                             ConflictType conflict_type,
@@ -131,23 +135,23 @@ public:
     Tuple<TableEntry *, Status> DropTableByName(const String &db_name,
                                                 const String &table_name,
                                                 ConflictType conflict_type,
-                                                u64 txn_id,
+                                                TransactionID txn_id,
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr);
 
-    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, u64 txn_id, TxnTimeStamp begin_ts);
+    Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static Status RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnManager *txn_mgr);
+    static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr);
 
     // Index Related methods
     Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
-                                                               const SharedPtr<IndexDef> &index_def,
-                                                               ConflictType conflict_type,
-                                                               u64 txn_id,
-                                                               TxnTimeStamp begin_ts,
-                                                               TxnManager *txn_mgr,
+                                                 const SharedPtr<IndexDef> &index_def,
+                                                 ConflictType conflict_type,
+                                                 TransactionID txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 TxnManager *txn_mgr,
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
@@ -155,7 +159,7 @@ public:
                                                const String &table_name,
                                                const String &index_name,
                                                ConflictType conflict_type,
-                                               u64 txn_id,
+                                               TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr);
 
@@ -167,22 +171,22 @@ public:
                                 bool prepare,
                                 bool is_replay = false);
 
-    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr);
+    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr);
 
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay = false);
 
     // Append related functions
-    static void Append(TableEntry *table_entry, u64 txn_id, void *txn_store, BufferManager *buffer_mgr);
+    static void Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
 
-    static void CommitAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
+    static void CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
 
-    static void RollbackAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, void *txn_store);
+    static void RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    static Status Delete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    static Status Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
-    static void CommitDelete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
+    static void CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
-    static Status RollbackDelete(TableEntry *table_entry, u64 txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
+    static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
     static Status ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
@@ -249,6 +253,9 @@ public:
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
+
+    // Global physical wal log
+    SharedPtr<Vector<SharedPtr<CatalogDeltaOperation>>> global_catalog_delta_ops_{};
 };
 
 } // namespace infinity
