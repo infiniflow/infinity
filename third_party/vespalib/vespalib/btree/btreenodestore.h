@@ -5,6 +5,7 @@
 #include "btreenode.h"
 #include "btreetraits.h"
 #include <vespalib/datastore/datastore.h>
+#include <vespalib/util/memory_allocator.h>
 
 namespace vespalib::btree {
 
@@ -56,7 +57,7 @@ private:
     BTreeNodeBufferType<LeafNodeType> _leafNodeType;
 
 public:
-    BTreeNodeStore();
+    BTreeNodeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
 
     ~BTreeNodeStore();
 

@@ -12,8 +12,9 @@
 namespace vespalib::btree {
 
 template <typename KeyT, typename DataT, typename AggrT, size_t INTERNAL_SLOTS, size_t LEAF_SLOTS>
-BTreeNodeAllocator<KeyT, DataT, AggrT, INTERNAL_SLOTS, LEAF_SLOTS>::BTreeNodeAllocator()
-    : _nodeStore(), _internalToFreeze(), _leafToFreeze(), _treeToFreeze(), _internalHoldUntilFreeze(), _leafHoldUntilFreeze() {}
+BTreeNodeAllocator<KeyT, DataT, AggrT, INTERNAL_SLOTS, LEAF_SLOTS>::BTreeNodeAllocator(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator)
+    : _nodeStore(allocator), _internalToFreeze(allocator.get()), _leafToFreeze(allocator.get()), _treeToFreeze(allocator.get()),
+      _internalHoldUntilFreeze(allocator.get()), _leafHoldUntilFreeze(allocator.get()) {}
 
 template <typename KeyT, typename DataT, typename AggrT, size_t INTERNAL_SLOTS, size_t LEAF_SLOTS>
 BTreeNodeAllocator<KeyT, DataT, AggrT, INTERNAL_SLOTS, LEAF_SLOTS>::~BTreeNodeAllocator() {

@@ -42,14 +42,15 @@ public:
     }
     Alloc create(size_t sz) const noexcept { return (sz == 0) ? Alloc(_allocator) : Alloc(_allocator, sz); }
 
+    Alloc(const MemoryAllocator *allocator) noexcept : _alloc(), _allocator(allocator) {}
+    Alloc(const MemoryAllocator *allocator, size_t sz) noexcept : _alloc(allocator->alloc(sz)), _allocator(allocator) {}
     static Alloc alloc(size_t sz) noexcept;
     static Alloc alloc(size_t sz, size_t mmapLimit, size_t alignment = 0) noexcept;
     static Alloc alloc() noexcept;
     static Alloc alloc_with_allocator(const MemoryAllocator *allocator) noexcept;
+    static Alloc alloc_with_allocator(const MemoryAllocator *allocator, size_t sz) noexcept;
 
 private:
-    Alloc(const MemoryAllocator *allocator, size_t sz) noexcept : _alloc(allocator->alloc(sz)), _allocator(allocator) {}
-    Alloc(const MemoryAllocator *allocator) noexcept : _alloc(), _allocator(allocator) {}
     void clear() noexcept {
         _alloc.reset();
         _allocator = nullptr;

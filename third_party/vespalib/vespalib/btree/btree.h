@@ -38,7 +38,7 @@ public:
 
     BTree(const BTree &rhs) = delete;
     BTree &operator=(BTree &rhs) = delete;
-    BTree();
+    BTree(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
     ~BTree();
 
     const NodeAllocatorType &getAllocator() const { return _alloc; }

@@ -27,12 +27,13 @@ void BTreeNodeBufferType<EntryType>::clean_hold(void *buffer, size_t offset, Ent
 }
 
 template <typename KeyT, typename DataT, typename AggrT, size_t INTERNAL_SLOTS, size_t LEAF_SLOTS>
-BTreeNodeStore<KeyT, DataT, AggrT, INTERNAL_SLOTS, LEAF_SLOTS>::BTreeNodeStore()
+BTreeNodeStore<KeyT, DataT, AggrT, INTERNAL_SLOTS, LEAF_SLOTS>::BTreeNodeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator)
     : _store(), _internalNodeType(MIN_BUFFER_ARRAYS, RefType::offsetSize()), _leafNodeType(MIN_BUFFER_ARRAYS, RefType::offsetSize()) {
     _store.addType(&_internalNodeType);
     _store.addType(&_leafNodeType);
     _store.init_primary_buffers();
     _store.enableFreeLists();
+    _store.set_memory_allocator(allocator);
 }
 
 template <typename KeyT, typename DataT, typename AggrT, size_t INTERNAL_SLOTS, size_t LEAF_SLOTS>

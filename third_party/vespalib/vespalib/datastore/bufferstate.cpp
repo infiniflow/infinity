@@ -10,9 +10,10 @@ using vespalib::alloc::MemoryAllocator;
 
 namespace vespalib::datastore {
 
-BufferState::BufferState()
-    : _stats(), _free_list(_stats.dead_entries_ref()), _typeHandler(nullptr), _buffer(Alloc::alloc(0, MemoryAllocator::HUGEPAGE_SIZE)), _arraySize(0),
-      _typeId(0), _state(State::FREE), _disable_entry_hold_list(false), _compacting(false) {}
+BufferState::BufferState(const MemoryAllocator *allocator)
+    : _stats(), _free_list(_stats.dead_entries_ref()), _typeHandler(nullptr), _memory_allocator(allocator),
+      _buffer(Alloc::alloc_with_allocator(allocator)), _arraySize(0), _typeId(0), _state(State::FREE), _disable_entry_hold_list(false),
+      _compacting(false) {}
 
 BufferState::~BufferState() {
     assert(getState() == State::FREE);
@@ -81,8 +82,7 @@ void BufferState::on_active(uint32_t bufferId,
     (void)reserved_entries;
     AllocResult alloc = calc_allocation(bufferId, *typeHandler, free_entries_needed, false);
     assert(alloc.entries >= reserved_entries + free_entries_needed);
-    auto allocator = typeHandler->get_memory_allocator();
-    _buffer = (allocator != nullptr) ? Alloc::alloc_with_allocator(allocator) : Alloc::alloc(0, MemoryAllocator::HUGEPAGE_SIZE);
+    _buffer = Alloc::alloc_with_allocator(_memory_allocator);
     _buffer.create(alloc.bytes).swap(_buffer);
     assert(_buffer.get() != nullptr || alloc.entries == 0u);
     auto buffer_underflow_size = typeHandler->buffer_underflow_size();

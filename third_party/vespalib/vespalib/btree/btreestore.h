@@ -9,6 +9,7 @@
 #include "noaggrcalc.h"
 #include <vespalib/datastore/datastore.h>
 #include <vespalib/datastore/handle.h>
+#include <vespalib/util/memory_allocator.h>
 
 namespace vespalib::btree {
 
@@ -79,8 +80,7 @@ protected:
     BTreeType *getWTreeEntry(RefType ref) { return _store.getEntry<BTreeType>(ref); }
 
 public:
-    BTreeStore();
-    BTreeStore(bool init);
+    BTreeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
     ~BTreeStore();
 
     const NodeAllocatorType &getAllocator() const { return _allocator; }

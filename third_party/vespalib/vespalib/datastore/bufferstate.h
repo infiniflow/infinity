@@ -36,6 +36,7 @@ private:
     InternalBufferStats _stats;
     BufferFreeList _free_list;
     std::atomic<BufferTypeBase *> _typeHandler;
+    const vespalib::alloc::MemoryAllocator *_memory_allocator;
     Alloc _buffer;
     uint32_t _arraySize;
     uint16_t _typeId;
@@ -54,7 +55,7 @@ public:
      * compaction should always be used to free up whole buffers.
      */
 
-    BufferState();
+    BufferState(const vespalib::alloc::MemoryAllocator *allocator);
     BufferState(const BufferState &) = delete;
     BufferState &operator=(const BufferState &) = delete;
     ~BufferState();

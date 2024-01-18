@@ -84,12 +84,13 @@ public:
     using value_type = T;
     using size_type = size_t;
 
-    Array(const Alloc &initial = Alloc::alloc());
-    Array(size_t sz, const Alloc &initial = Alloc::alloc());
+    Array(const Alloc &initial);
+    Array(vespalib::alloc::MemoryAllocator *allocator = nullptr);
+    Array(size_t sz, vespalib::alloc::MemoryAllocator *allocator = nullptr);
     Array(Alloc &&buf, size_t sz) noexcept;
     Array(Array &&rhs) noexcept;
-    Array(size_t sz, T value, const Alloc &initial = Alloc::alloc());
-    Array(const_iterator begin, const_iterator end, const Alloc &initial = Alloc::alloc());
+    Array(size_t sz, T value, vespalib::alloc::MemoryAllocator *allocator = nullptr);
+    Array(const_iterator begin, const_iterator end, vespalib::alloc::MemoryAllocator *allocator = nullptr);
     Array(const Array &rhs);
     Array &operator=(const Array &rhs);
     Array &operator=(Array &&rhs) noexcept;
@@ -158,6 +159,7 @@ private:
     }
     Alloc _array;
     size_t _sz;
+    vespalib::alloc::MemoryAllocator *_allocator{nullptr};
 };
 
 } // namespace vespalib

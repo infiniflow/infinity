@@ -6,10 +6,12 @@
 #include "free_list.h"
 #include "memory_stats.h"
 #include <atomic>
+#include <memory>
 #include <vector>
 #include <vespalib/util/address_space.h>
 #include <vespalib/util/generation_hold_list.h>
 #include <vespalib/util/generationholder.h>
+#include <vespalib/util/memory_allocator.h>
 #include <vespalib/util/stash.h>
 
 namespace vespalib::datastore {
@@ -28,6 +30,8 @@ public:
 
     DataStoreBase(const DataStoreBase &) = delete;
     DataStoreBase &operator=(const DataStoreBase &) = delete;
+
+    void set_memory_allocator(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator) { _memory_allocator = allocator; }
 
     uint32_t addType(BufferTypeBase *typeHandler);
     void init_primary_buffers();
@@ -255,6 +259,7 @@ private:
     std::vector<uint32_t> _primary_buffer_ids;
 
     Stash _stash;
+    std::shared_ptr<vespalib::alloc::MemoryAllocator> _memory_allocator;
     std::vector<BufferTypeBase *> _typeHandlers; // TypeId -> handler
     std::vector<FreeList> _free_lists;
     mutable std::atomic<uint64_t> _compaction_count;

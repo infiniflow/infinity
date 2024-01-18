@@ -7,7 +7,8 @@
 namespace vespalib::btree {
 
 template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, class AggrCalcT>
-BTree<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTree() : _alloc(), _tree() {}
+BTree<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTree(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator)
+    : _alloc(allocator), _tree() {}
 
 template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, class AggrCalcT>
 BTree<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::~BTree() {

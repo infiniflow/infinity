@@ -3,8 +3,7 @@
 #include <exception>
 #include <map>
 
-#include <vespalib/util/alloc.h>
-#include <vespalib/util/memory_allocator.h>
+#include "vespa_alloc.h"
 
 import memory_pool;
 
@@ -12,6 +11,20 @@ namespace vespalib {
 
 namespace alloc {
 namespace {
+
+PtrAndSize MemoryPoolAllocator::alloc(size_t sz) const {
+    void *ptr = pool_->Allocate(sz);
+    if (ptr == nullptr) {
+        throw std::runtime_error("alloc failed with error");
+    }
+    return PtrAndSize(ptr, sz);
+}
+
+void MemoryPoolAllocator::free(PtrAndSize alloc) const noexcept {
+    if (pool_) {
+        pool_->Deallocate(alloc.get(), alloc.size());
+    }
+}
 
 class HeapAllocator : public MemoryAllocator {
 public:
@@ -30,7 +43,7 @@ PtrAndSize HeapAllocator::salloc(size_t sz) {
     }
     void *ptr = malloc(sz);
     if (ptr == nullptr) {
-        throw std::runtime_error("malloc failed with error");
+        throw std::runtime_error("alloc failed with error");
     }
     return PtrAndSize(ptr, sz);
 }
@@ -42,7 +55,8 @@ void HeapAllocator::sfree(PtrAndSize alloc) noexcept {
         ::free(alloc.get());
     }
 }
-HeapAllocator _G_heapAllocatorDefault;
+
+alloc::HeapAllocator _G_heapAllocatorDefault;
 
 MemoryAllocator &HeapAllocator::getDefault() { return _G_heapAllocatorDefault; }
 
@@ -56,11 +70,9 @@ Alloc Alloc::alloc(size_t sz, size_t mmapLimit, size_t alignment) noexcept { ret
 
 Alloc Alloc::alloc_with_allocator(const MemoryAllocator *allocator) noexcept { return Alloc(allocator); }
 
-PtrAndSize::PtrAndSize(void *ptr, size_t sz) noexcept : _ptr(ptr), _sz(sz) {
-    constexpr uint8_t MAX_PTR_BITS = 57;
-    constexpr uint64_t MAX_PTR = 1ul << MAX_PTR_BITS;
-    assert((uint64_t(ptr) + sz) < MAX_PTR);
-}
+Alloc Alloc::alloc_with_allocator(const MemoryAllocator *allocator, size_t sz) noexcept { return Alloc(allocator, sz); }
+
+PtrAndSize::PtrAndSize(void *ptr, size_t sz) noexcept : _ptr(ptr), _sz(sz) {}
 
 } // namespace alloc
 

@@ -11,15 +11,12 @@
 namespace vespalib::btree {
 
 template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, typename AggrCalcT>
-BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore() : BTreeStore(true) {}
-
-template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, typename AggrCalcT>
-BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore(bool init)
+BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator)
     : _store(), _treeType(1, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small1Type(1, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
       _small2Type(2, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small3Type(3, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
       _small4Type(4, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small5Type(5, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
       _small6Type(6, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small7Type(7, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
-      _small8Type(8, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _allocator(), _aggrCalc(), _builder(_allocator, _aggrCalc) {
+      _small8Type(8, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _allocator(allocator), _aggrCalc(), _builder(_allocator, _aggrCalc) {
     // XXX: order here makes typeId + 1 == clusterSize for small arrays,
     // code elsewhere depends on it.
     _store.addType(&_small1Type);
@@ -31,10 +28,9 @@ BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore(bool in
     _store.addType(&_small7Type);
     _store.addType(&_small8Type);
     _store.addType(&_treeType);
-    if (init) {
-        _store.init_primary_buffers();
-        _store.enableFreeLists();
-    }
+    _store.set_memory_allocator(allocator);
+    _store.init_primary_buffers();
+    _store.enableFreeLists();
 }
 
 template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, typename AggrCalcT>
