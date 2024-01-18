@@ -36,7 +36,7 @@ public:
     static Status CreateNewEntry(ViewMeta *table_meta,
                                       const SharedPtr<String> &view_name,
                                       const Vector<SharedPtr<ColumnDef>> &columns,
-                                      u64 txn_id,
+                                      TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
                                       TxnManager *txn_mgr);
 
@@ -45,11 +45,11 @@ public:
 
 
 private:
-    Status DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
+    Status DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
 
-    void DeleteNewEntry(u64 txn_id, TxnManager *txn_mgr);
+    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
 
-    Status GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    Status GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void *GetDBEntry() { return this->db_entry_; }
     

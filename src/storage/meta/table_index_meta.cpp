@@ -38,9 +38,14 @@ struct SegmentEntry;
 TableIndexMeta::TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name)
     : index_name_(std::move(index_name)), table_entry_(table_entry) {}
 
+UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name) {
+    auto table_index_meta = MakeUnique<TableIndexMeta>(table_entry, index_name);
+    return table_index_meta;
+}
+
 Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                                                        ConflictType conflict_type,
-                                                                       u64 txn_id,
+                                                                       TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts,
                                                                        TxnManager *txn_mgr,
                                                                        bool is_replay,
@@ -65,12 +70,17 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
 }
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def,
-                                                                               u64 txn_id,
+                                                                               TransactionID txn_id,
                                                                                TxnTimeStamp begin_ts,
                                                                                TxnManager *txn_mgr,
                                                                                bool is_replay,
                                                                                String replay_table_index_dir) {
     TableIndexEntry *table_index_entry_ptr{nullptr};
+
+    Txn* txn{nullptr};
+    if (txn_mgr!= nullptr){
+        txn = txn_mgr->GetTxn(txn_id);
+    }
 
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
 
@@ -81,7 +91,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
         // Create a new table index entry
-        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
+        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
         table_index_entry_ptr = table_index_entry.get();
         this->entry_list_.emplace_front(std::move(table_index_entry));
         LOG_TRACE("New table index entry is added.");
@@ -90,7 +100,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry *header_base_entry = this->entry_list_.front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
+            auto table_index_entry =
+                TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
             table_index_entry_ptr = table_index_entry.get();
             this->entry_list_.emplace_front(std::move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
@@ -103,7 +114,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                 if (header_entry->deleted_) {
                     // No conflict
                     auto table_index_entry =
-                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->entry_list_.emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
@@ -133,7 +144,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                         if (header_entry->deleted_) {
                             // No conflict
                             auto table_index_entry =
-                                TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                                TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                             table_index_entry_ptr = table_index_entry.get();
                             this->entry_list_.emplace_front(std::move(table_index_entry));
                             LOG_TRACE("New table index entry is added.");
@@ -164,7 +175,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
 
                     // Append new one
                     auto table_index_entry =
-                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->entry_list_.emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
@@ -181,7 +192,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
 }
 
 Tuple<TableIndexEntry *, Status>
-TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
 
     auto [table_index_entry, status] = DropTableIndexEntryInternal(txn_id, begin_ts, txn_mgr);
     switch (conflict_type) {
@@ -202,7 +213,7 @@ TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, u64 txn_id, TxnT
     }
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *) {
+Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *) {
 
     TableIndexEntry *table_index_entry_ptr{nullptr};
     std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
@@ -307,7 +318,7 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
     return res;
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
 
     TableIndexEntry *table_index_entry{nullptr};
 
@@ -343,7 +354,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(u64 txn_id, TxnTimeSta
     return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
 }
 
-void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
+void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
     std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
@@ -353,7 +364,7 @@ void TableIndexMeta::DeleteNewEntry(u64 txn_id, TxnManager *) {
     // `std::remove_if` move all elements that satisfy the predicate and move all the last element to the front of list. return value is the end of
     // the moved elements.
     auto removed_iter =
-        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](UniquePtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
+        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
     // erase the all "moved" elements in the end of list
     this->entry_list_.erase(removed_iter, this->entry_list_.end());
 }

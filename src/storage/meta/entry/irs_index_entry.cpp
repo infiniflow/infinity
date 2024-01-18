@@ -24,13 +24,32 @@ import iresearch_datastore;
 import index_base;
 import index_full_text;
 import logger;
+import wal;
 
 namespace infinity {
 
-IrsIndexEntry::IrsIndexEntry(TableIndexEntry *, SharedPtr<String> index_dir, u64 txn_id, TxnTimeStamp begin_ts)
+IrsIndexEntry::IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, TransactionID txn_id, TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kIRSIndex), index_dir_(std::move(index_dir)) {
+    table_index_entry_ = table_index_entry;
     txn_id_ = txn_id;
     begin_ts_ = begin_ts;
+}
+
+SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry,
+                                                         Txn *txn,
+                                                         TransactionID txn_id,
+                                                         SharedPtr<String> index_dir,
+                                                         TxnTimeStamp begin_ts) {
+    auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
+    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+
+    {
+        if (txn != nullptr) {
+            auto operation = MakeUnique<AddIrsIndexEntryOperation>(irs_index_entry);
+            txn->AddCatalogDeltaOperation(std::move(operation));
+        }
+    }
+    return irs_index_entry;
 }
 
 nlohmann::json IrsIndexEntry::Serialize(TxnTimeStamp) {
@@ -44,12 +63,12 @@ nlohmann::json IrsIndexEntry::Serialize(TxnTimeStamp) {
 }
 
 SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *) {
-    u64 txn_id = index_def_entry_json["txn_id"];
+    TransactionID txn_id = index_def_entry_json["txn_id"];
     TxnTimeStamp begin_ts = index_def_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
 
-    auto irs_index_entry = NewIrsIndexEntry(table_index_entry, txn_id, index_dir, begin_ts);
+    auto irs_index_entry = NewIrsIndexEntry(table_index_entry, nullptr, txn_id, index_dir, begin_ts);
     irs_index_entry->commit_ts_.store(commit_ts);
     irs_index_entry->txn_id_.store(txn_id);
     irs_index_entry->begin_ts_ = begin_ts;
@@ -61,13 +80,6 @@ SharedPtr<IrsIndexEntry> IrsIndexEntry::Deserialize(const nlohmann::json &index_
 SharedPtr<String> IrsIndexEntry::DetermineIndexDir(const String &, const String &) {
     UnrecoverableError("Not implemented");
     return nullptr;
-}
-
-SharedPtr<IrsIndexEntry>
-IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry, u64 txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts) {
-    auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
-    return irs_index_entry;
 }
 
 } // namespace infinity

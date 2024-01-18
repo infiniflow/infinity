@@ -40,21 +40,21 @@ Txn *TxnManager::CreateTxn() {
     }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
-    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, catalog_, new_txn_id);
+    UniquePtr<Txn> new_txn = MakeUnique<Txn>(buffer_mgr_, this, catalog_, new_txn_id);
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
     rw_locker_.unlock();
     return res;
 }
 
-Txn *TxnManager::GetTxn(u64 txn_id) {
+Txn *TxnManager::GetTxn(TransactionID txn_id) {
     rw_locker_.lock_shared();
     Txn *res = txn_map_[txn_id].get();
     rw_locker_.unlock_shared();
     return res;
 }
 
-TxnState TxnManager::GetTxnState(u64 txn_id) {
+TxnState TxnManager::GetTxnState(TransactionID txn_id) {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     Txn *txn_ptr = txn_map_[txn_id].get();
     TxnState res = txn_ptr->GetTxnState();
@@ -135,7 +135,7 @@ void TxnManager::Stop() {
 
 bool TxnManager::Stopped() { return !is_running_.load(); }
 
-TxnTimeStamp TxnManager::CommitTxn(Txn* txn) {
+TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp txn_ts = txn->Commit();
     rw_locker_.lock();
     txn_map_.erase(txn->TxnID());
@@ -143,7 +143,7 @@ TxnTimeStamp TxnManager::CommitTxn(Txn* txn) {
     return txn_ts;
 }
 
-void TxnManager::RollBackTxn(Txn* txn) {
+void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
     rw_locker_.lock();
     txn_map_.erase(txn->TxnID());

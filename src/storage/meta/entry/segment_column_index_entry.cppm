@@ -31,6 +31,7 @@ namespace infinity {
 
 export struct ColumnIndexEntry;
 
+class Txn;
 struct TableEntry;
 class FaissIndexPtr;
 class BufferManager;
@@ -42,7 +43,8 @@ export class SegmentColumnIndexEntry : public BaseEntry {
 
 public:
     static SharedPtr<SegmentColumnIndexEntry> NewIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                            u32 segment_id,
+                                                            SegmentID segment_id,
+                                                            Txn * txn,
                                                             TxnTimeStamp create_ts,
                                                             BufferManager *buffer_manager,
                                                             CreateIndexParam *create_index_param);
@@ -60,11 +62,13 @@ public:
 
 public:
     // Getter
-    inline u32 segment_id() const { return segment_id_; }
+    inline SegmentID segment_id() const { return segment_id_; }
     inline const ColumnIndexEntry *column_index_entry() const { return column_index_entry_; }
+    inline TxnTimeStamp min_ts() const { return min_ts_; }
+    inline TxnTimeStamp max_ts() const { return max_ts_; }
 
 private:
-    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferObj *buffer);
+    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer);
 
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
 
@@ -78,7 +82,7 @@ private:
 
 private:
     const ColumnIndexEntry *column_index_entry_{};
-    u32 segment_id_{};
+    SegmentID segment_id_{};
 
     BufferObj *const buffer_{};
 

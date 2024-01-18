@@ -32,13 +32,30 @@ import logger;
 import third_party;
 import infinity_exception;
 import status;
+import wal;
 
 namespace infinity {
+
+DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
+    // "data_dir": "/tmp/infinity/data"
+    // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
+    : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
+      db_name_(db_name) {
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
+}
+
+SharedPtr<DBEntry>
+DBEntry::NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+
+    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+    return db_entry;
+}
 
 Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
                                                  const SharedPtr<String> &table_collection_name,
                                                  const Vector<SharedPtr<ColumnDef>> &columns,
-                                                 u64 txn_id,
+                                                 TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr) {
     const String &table_name = *table_collection_name;
@@ -57,8 +74,14 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         this->rw_locker_.unlock_shared();
 
         LOG_TRACE(fmt::format("Create new table/collection: {}", table_name));
-        UniquePtr<TableMeta> new_table_meta = MakeUnique<TableMeta>(this->db_entry_dir_, table_collection_name, this);
+        UniquePtr<TableMeta> new_table_meta =
+            TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this, txn_mgr, txn_id, begin_ts, false);
         table_meta = new_table_meta.get();
+
+        if (txn_mgr != nullptr) {
+            auto operation = MakeUnique<AddTableMetaOperation>(table_meta);
+            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
+        }
 
         this->rw_locker_.lock();
         auto table_iter2 = this->tables_.find(table_name);
@@ -72,11 +95,16 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         LOG_TRACE(fmt::format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
     }
 
-    return table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
+    auto table_entry = table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
+
+    return table_entry;
 }
 
-Tuple<TableEntry *, Status>
-DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_name,
+                                               ConflictType conflict_type,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts,
+                                               TxnManager *txn_mgr) {
     this->rw_locker_.lock_shared();
 
     TableMeta *table_meta{nullptr};
@@ -99,7 +127,7 @@ DBEntry::DropTable(const String &table_collection_name, ConflictType conflict_ty
     return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
-Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_collection_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_collection_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     this->rw_locker_.lock_shared();
 
     TableMeta *table_meta{nullptr};
@@ -117,7 +145,7 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_coll
     return table_meta->GetEntry(txn_id, begin_ts);
 }
 
-void DBEntry::RemoveTableEntry(const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr) {
+void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr) {
     this->rw_locker_.lock_shared();
 
     TableMeta *table_meta{nullptr};
@@ -130,7 +158,7 @@ void DBEntry::RemoveTableEntry(const String &table_collection_name, u64 txn_id, 
     table_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
-Vector<TableEntry *> DBEntry::TableCollections(u64 txn_id, TxnTimeStamp begin_ts) {
+Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Vector<TableEntry *> results;
 
     this->rw_locker_.lock_shared();
@@ -150,7 +178,7 @@ Vector<TableEntry *> DBEntry::TableCollections(u64 txn_id, TxnTimeStamp begin_ts
     return results;
 }
 
-Status DBEntry::GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array) {
+Status DBEntry::GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array) {
     Vector<TableEntry *> table_collection_entries = this->TableCollections(txn_id, begin_ts);
     output_table_array.reserve(table_collection_entries.size());
     for (TableEntry *table_entry : table_collection_entries) {
@@ -207,7 +235,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
 
     SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
-    u64 txn_id = db_entry_json["txn_id"];
+    TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
     UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_entry_dir, db_name, txn_id, begin_ts);
 

@@ -39,6 +39,7 @@ import table_detail;
 import index_def;
 import txn_store;
 import data_access_state;
+import wal;
 
 namespace infinity {
 
@@ -64,7 +65,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will lose operation
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
-NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
 
     // Check if there is db_meta with the db_name
     DBMeta *db_meta{nullptr};
@@ -83,9 +84,17 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         Path catalog_path(*this->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
-        UniquePtr<DBMeta> new_db_meta = MakeUnique<DBMeta>(db_dir, MakeShared<String>(db_name));
-        db_meta = new_db_meta.get();
+        // Physical wal log
+        UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
 
+        // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
+        // In replay phase, not need to recording the catalog delta operation.
+        if (txn_mgr != nullptr) {
+            auto operation = MakeUnique<AddDBMetaOperation>(new_db_meta.get());
+            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
+        }
+
+        db_meta = new_db_meta.get();
         this->rw_locker_.lock();
         auto db_iter2 = this->databases_.find(db_name);
         if (db_iter2 == this->databases_.end()) {
@@ -96,7 +105,7 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
         this->rw_locker_.unlock();
     }
 
-    LOG_TRACE(fmt::format("Add new database entry: {}", db_name));
+    LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
     return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
@@ -104,7 +113,7 @@ NewCatalog::CreateDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::DropDatabase instead
-Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
 
     this->rw_locker_.lock_shared();
 
@@ -123,7 +132,7 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, u64 txn
     return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr);
 }
 
-Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
 
     DBMeta *db_meta{nullptr};
     this->rw_locker_.lock_shared();
@@ -140,7 +149,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, u64 txn_
     return db_meta->GetEntry(txn_id, begin_ts);
 }
 
-void NewCatalog::RemoveDBEntry(const String &db_name, u64 txn_id, TxnManager *txn_mgr) {
+void NewCatalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr) {
     this->rw_locker_.lock_shared();
 
     DBMeta *db_meta{nullptr};
@@ -153,7 +162,7 @@ void NewCatalog::RemoveDBEntry(const String &db_name, u64 txn_id, TxnManager *tx
     db_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
-Vector<DBEntry *> NewCatalog::Databases(u64 txn_id, TxnTimeStamp begin_ts) {
+Vector<DBEntry *> NewCatalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
     this->rw_locker_.lock_shared();
 
     Vector<DBEntry *> res;
@@ -170,7 +179,7 @@ Vector<DBEntry *> NewCatalog::Databases(u64 txn_id, TxnTimeStamp begin_ts) {
 }
 
 Tuple<TableEntry *, Status> NewCatalog::CreateTable(const String &db_name,
-                                                    u64 txn_id,
+                                                    TransactionID txn_id,
                                                     TxnTimeStamp begin_ts,
                                                     const SharedPtr<TableDef> &table_def,
                                                     ConflictType conflict_type,
@@ -188,7 +197,7 @@ Tuple<TableEntry *, Status> NewCatalog::CreateTable(const String &db_name,
 Tuple<TableEntry *, Status> NewCatalog::DropTableByName(const String &db_name,
                                                         const String &table_name,
                                                         ConflictType conflict_type,
-                                                        u64 txn_id,
+                                                        TransactionID txn_id,
                                                         TxnTimeStamp begin_ts,
                                                         TxnManager *txn_mgr) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
@@ -200,7 +209,7 @@ Tuple<TableEntry *, Status> NewCatalog::DropTableByName(const String &db_name,
     return db_entry->DropTable(table_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, u64 txn_id, TxnTimeStamp begin_ts) {
+Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts) {
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -211,7 +220,7 @@ Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_
     return db_entry->GetTablesDetail(txn_id, begin_ts, output_table_array);
 }
 
-Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, const String &table_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -223,7 +232,7 @@ Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, co
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnManager *txn_mgr) {
+Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
     table_meta->DeleteNewEntry(txn_id, txn_mgr);
@@ -234,7 +243,7 @@ Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, u64 txn_id, TxnMana
 Tuple<TableIndexEntry *, Status> NewCatalog::CreateIndex(TableEntry *table_entry,
                                                          const SharedPtr<IndexDef> &index_def,
                                                          ConflictType conflict_type,
-                                                         u64 txn_id,
+                                                         TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr,
                                                          bool is_replay,
@@ -247,7 +256,7 @@ Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,
                                                        const String &table_name,
                                                        const String &index_name,
                                                        ConflictType conflict_type,
-                                                       u64 txn_id,
+                                                       TransactionID txn_id,
                                                        TxnTimeStamp begin_ts,
                                                        TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
@@ -269,7 +278,7 @@ void NewCatalog::CreateIndexFile(TableEntry *table_entry,
     return table_entry->CreateIndexFile(txn_store, table_index_entry, begin_ts, buffer_mgr, prepare, is_replay);
 }
 
-Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, u64 txn_id, TxnManager *txn_mgr) {
+Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();
     table_entry->RemoveIndexEntry(index_name, txn_id, txn_mgr);
@@ -280,27 +289,27 @@ void NewCatalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
     return TableEntry::CommitCreateIndex(txn_indexes_store_, is_replay);
 }
 
-void NewCatalog::Append(TableEntry *table_entry, u64 txn_id, void *txn_store, BufferManager *buffer_mgr) {
+void NewCatalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
     return table_entry->Append(txn_id, txn_store, buffer_mgr);
 }
 
-void NewCatalog::CommitAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
+void NewCatalog::CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
     return table_entry->CommitAppend(txn_id, commit_ts, append_state_ptr);
 }
 
-void NewCatalog::RollbackAppend(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, void *txn_store) {
+void NewCatalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     return table_entry->RollbackAppend(txn_id, commit_ts, txn_store);
 }
 
-Status NewCatalog::Delete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+Status NewCatalog::Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     return table_entry->Delete(txn_id, commit_ts, delete_state);
 }
 
-void NewCatalog::CommitDelete(TableEntry *table_entry, u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
+void NewCatalog::CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
     return table_entry->CommitDelete(txn_id, commit_ts, append_state);
 }
 
-Status NewCatalog::RollbackDelete(TableEntry *table_entry, u64 txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
+Status NewCatalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 

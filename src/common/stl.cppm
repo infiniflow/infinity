@@ -283,7 +283,17 @@ export {
 
     using StreamSize = std::streamsize;
 
-    using TxnTimeStamp = u64;
+    // Transactions
+    using TxnTimeStamp = uint64_t;
+    using TransactionID = uint64_t;
+
+    // Entry
+    using SegmentID = uint32_t;
+    using BlockID = uint16_t;
+    using ColumnID = uint64_t;
+
+    // Related to entry
+    using BlockOffset = uint16_t;
 
     // Concurrency
     using ThreadPool = ctpl::thread_pool;
@@ -326,10 +336,6 @@ export {
     inline constexpr Pair<T, U> MakePair(T && first, U && second) {
         return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
-
-    // DB Type
-
-    using ColumnID = u32;
 
     // Chrono
     using Clock = std::chrono::high_resolution_clock;

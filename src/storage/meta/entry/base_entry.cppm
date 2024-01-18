@@ -67,6 +67,6 @@ public:
 };
 
 // Merge two reverse-ordered list inplace.
-export void MergeLists(List<UniquePtr<BaseEntry>> &list1, List<UniquePtr<BaseEntry>> &list2);
+export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
 } // namespace infinity

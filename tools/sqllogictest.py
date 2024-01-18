@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 from shutil import copyfile
 import subprocess
 
@@ -15,7 +16,6 @@ from generate_top_varchar import generate as generate7
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
-    os.system(f"pip install infinity_sdk")
     print("start pysdk test...")
     process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
@@ -27,8 +27,8 @@ def python_skd_test(python_test_dir: str):
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
-
-    copy_all(data_dir, copy_dir)
+    print("slt_dir path is {}".format(slt_dir))
+    print("data_dir path is {}".format(data_dir))
 
     test_cnt = 0
     for dirpath, dirnames, filenames in os.walk(slt_dir):
@@ -116,7 +116,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-jc",
         "--just_copy",
-        default=copy_all(data_dir, copy_dir),
+        type=bool,
+        default=False,
         dest="just_copy_all_data",
     )
 
@@ -131,5 +132,22 @@ if __name__ == "__main__":
     generate6(args.generate_if_exists, args.copy)
     generate7(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
-    python_skd_test(python_test_dir)
-    test_process(args.path, args.test, args.data, args.copy)
+
+    # Install py sdk
+    os.system(f"pip install infinity_sdk")
+
+    print("Start copying data...")
+    if args.just_copy_all_data is True:
+        copy_all(args.data, args.copy)
+    else:
+        copy_all(args.data, args.copy)
+        print("Start testing...")
+        start = time.time()
+        python_skd_test(python_test_dir)
+        test_process(args.path, args.test, args.data, args.copy)
+        end = time.time()
+        print("Test finished.")
+        print("Time cost: {}s".format(end - start))
+
+
+

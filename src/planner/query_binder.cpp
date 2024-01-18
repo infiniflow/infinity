@@ -403,7 +403,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
         columns.emplace_back(idx);
     }
 
-    u64 txn_id = query_context->GetTxn()->TxnID();
+    TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_id, begin_ts);

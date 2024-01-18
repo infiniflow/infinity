@@ -33,15 +33,12 @@ class DBEntry : public BaseEntry {
     friend struct NewCatalog;
 
 public:
-    inline explicit DBEntry(const SharedPtr<String> &data_dir, SharedPtr<String> db_name, u64 txn_id, TxnTimeStamp begin_ts)
-        : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
-          db_name_(std::move(db_name)) {
-        begin_ts_ = begin_ts;
-        txn_id_ = txn_id;
-    }
+    explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    static SharedPtr<DBEntry>
+    NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-
     SharedPtr<String> ToString();
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -50,28 +47,32 @@ public:
 
     virtual void MergeFrom(BaseEntry &other);
 
-    [[nodiscard]] const String& db_name() const { return *db_name_; }
+    [[nodiscard]] const String &db_name() const { return *db_name_; }
 
-    [[nodiscard]] const SharedPtr<String>& db_name_ptr() const { return db_name_; }
+    [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
+
+    [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
+
+    [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
                                             const SharedPtr<String> &table_collection_name,
                                             const Vector<SharedPtr<ColumnDef>> &columns,
-                                            u64 txn_id,
+                                            TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status>
-    DropTable(const String &table_collection_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveTableEntry(const String &table_collection_name, u64 txn_id, TxnManager *txn_mgr);
+    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr);
 
-    Vector<TableEntry *> TableCollections(u64 txn_id, TxnTimeStamp begin_ts);
+    Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Status GetTablesDetail(u64 txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+    Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
     std::shared_mutex rw_locker_{};
