@@ -29,9 +29,11 @@ import buffer_manager;
 import infinity_exception;
 import index_file_worker;
 import parser;
+import wal;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import logger;
+
 
 namespace infinity {
 
@@ -39,7 +41,7 @@ ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
                                    TableIndexEntry *table_index_entry,
                                    u64 column_id,
                                    SharedPtr<String> col_index_dir,
-                                   u64 txn_id,
+                                   TransactionID txn_id,
                                    TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kColumnIndex), table_index_entry_(table_index_entry), column_id_(column_id), col_index_dir_(col_index_dir),
       index_base_(index_base) {
@@ -47,15 +49,21 @@ ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
     txn_id_ = txn_id;
 }
 
-UniquePtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
-                                                                  u64 column_id,
+SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
+                                                                  ColumnID column_id,
                                                                   TableIndexEntry *table_index_entry,
-                                                                  u64 txn_id,
+                                                                  Txn *txn,
+                                                                  TransactionID txn_id,
                                                                   SharedPtr<String> col_index_dir,
                                                                   TxnTimeStamp begin_ts) {
-    //    SharedPtr<String> index_dir =
-    //        DetermineIndexDir(*TableIndexMeta::GetTableEntry(table_index_meta)->table_entry_dir_, index_base->file_name_);
-    return MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
+    auto column_index_entry = MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
+    {
+        if (txn != nullptr) {
+            UniquePtr<AddColumnIndexEntryOperation> operation = MakeUnique<AddColumnIndexEntryOperation>(column_index_entry);
+            txn->AddCatalogDeltaOperation(std::move(operation));
+        }
+    }
+    return column_index_entry;
 }
 
 void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry) {
@@ -94,7 +102,7 @@ nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     return json;
 }
 
-UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &column_index_entry_json,
+SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &column_index_entry_json,
                                                           TableIndexEntry *table_index_entry,
                                                           BufferManager *buffer_mgr,
                                                           TableEntry *table_entry) {
@@ -103,14 +111,14 @@ UniquePtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
         Error<StorageException>("Column index entry can't be deleted.");
     }
 
-    u64 txn_id = column_index_entry_json["txn_id"];
+    TransactionID txn_id = column_index_entry_json["txn_id"];
     TxnTimeStamp begin_ts = column_index_entry_json["begin_ts"];
     TxnTimeStamp commit_ts = column_index_entry_json["commit_ts"];
     u64 column_id = column_index_entry_json["column_id"];
     auto col_index_dir = MakeShared<String>(column_index_entry_json["col_index_dir"]);
     SharedPtr<IndexBase> index_base = IndexBase::Deserialize(column_index_entry_json["index_base"]);
 
-    auto column_index_entry = MakeUnique<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
+    auto column_index_entry = MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
     column_index_entry->commit_ts_.store(commit_ts);
     column_index_entry->deleted_ = deleted;
 

@@ -37,6 +37,7 @@ import txn_manager;
 import iresearch_datastore;
 import index_base;
 import index_full_text;
+import wal;
 
 namespace infinity {
 
@@ -45,10 +46,11 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
-                       u64 txn_id,
+                       TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
-      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type), table_meta_(table_meta) {
+    : BaseEntry(EntryType::kTable), table_meta_(table_meta),
+      table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
+      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
@@ -58,9 +60,21 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
     txn_id_ = txn_id;
 }
 
+SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
+                                                SharedPtr<String> table_collection_name,
+                                                const Vector<SharedPtr<ColumnDef>> &columns,
+                                                TableEntryType table_entry_type,
+                                                TableMeta *table_meta,
+                                                TransactionID txn_id,
+                                                TxnTimeStamp begin_ts) {
+
+    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    return table_entry;
+}
+
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
                                                          ConflictType conflict_type,
-                                                         u64 txn_id,
+                                                         TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr,
                                                          bool is_replay,
@@ -81,7 +95,16 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
     if (table_index_meta == nullptr) {
 
-        auto new_table_index_meta = MakeUnique<TableIndexMeta>(this, index_def->index_name_);
+        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
+
+        {   //
+            if (txn_mgr != nullptr) {
+                auto operation = MakeUnique<AddIndexMetaOperation>(new_table_index_meta.get());
+                LOG_TRACE(fmt::format("Add new AddDatabaseMeta Operation: {}", operation->ToString()));
+                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
+            }
+        }
+
         table_index_meta = new_table_index_meta.get();
 
         this->rw_locker_.lock();
@@ -100,7 +123,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 }
 
 Tuple<TableIndexEntry *, Status>
-TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     this->rw_locker_.lock_shared();
 
     TableIndexMeta *index_meta{nullptr};
@@ -129,7 +152,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, u64 
     return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, u64 txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
         return iter->second->GetEntry(txn_id, begin_ts);
     }
@@ -138,7 +161,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
 }
 
-void TableEntry::RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManager *txn_mgr) {
+void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr) {
     this->rw_locker_.lock_shared();
 
     TableIndexMeta *table_index_meta{nullptr};
@@ -151,7 +174,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, u64 txn_id, TxnManag
     table_index_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
-void TableEntry::GetFullTextAnalyzers(u64 txn_id,
+void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
                                       SharedPtr<IrsIndexEntry> &irs_index_entry,
                                       Map<String, String> &column2analyzer) {
@@ -176,13 +199,14 @@ void TableEntry::GetFullTextAnalyzers(u64 txn_id,
     }
 }
 
-void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) {
+void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
     if (this->deleted_) {
         Error<StorageException>("table is deleted");
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
+    Txn *txn = txn_store_ptr->txn_;
     if (append_state_ptr->Finished()) {
         LOG_TRACE("No append is done.");
         return;
@@ -193,15 +217,16 @@ void TableEntry::Append(u64 txn_id, void *txn_store, BufferManager *buffer_mgr) 
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                u32 new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::MakeNewSegmentEntry(this, new_segment_id, buffer_mgr);
+                SegmentID new_segment_id = this->next_segment_id_++;
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr);
+        u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
     }
 }
@@ -256,7 +281,7 @@ void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
     }
 }
 
-Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
@@ -271,14 +296,14 @@ Status TableEntry::Delete(u64 txn_id, TxnTimeStamp commit_ts, DeleteState &delet
     return Status::OK();
 }
 
-void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
+void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
     SizeT row_count = 0;
     for (const auto &range : append_state_ptr->append_ranges_) {
         LOG_TRACE(fmt::format("Commit, segment: {}, block: {} start offset: {}, count: {}",
-                         range.segment_id_,
-                         range.block_id_,
-                         range.start_offset_,
-                         range.row_count_));
+                              range.segment_id_,
+                              range.block_id_,
+                              range.start_offset_,
+                              range.row_count_));
         SegmentEntry *segment_ptr = this->segment_map_[range.segment_id_].get();
         segment_ptr->CommitAppend(txn_id, commit_ts, range.block_id_, range.start_offset_, range.row_count_);
         row_count += range.row_count_;
@@ -286,13 +311,13 @@ void TableEntry::CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, const AppendSt
     this->row_count_ += row_count;
 }
 
-void TableEntry::RollbackAppend(u64 txn_id, TxnTimeStamp commit_ts, void *txn_store) {
+void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     Error<NotImplementException>("TableEntry::RollbackAppend");
 }
 
-void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteState &delete_state) {
+void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &delete_state) {
     SizeT row_count = 0;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
@@ -307,7 +332,7 @@ void TableEntry::CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const DeleteSt
     this->row_count_ -= row_count;
 }
 
-Status TableEntry::RollbackDelete(u64 txn_id, DeleteState &, BufferManager *) {
+Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
     Error<NotImplementException>("TableEntry::RollbackDelete");
     return Status::OK();
 }
@@ -482,7 +507,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
         }
     }
 
-    u64 txn_id = table_entry_json["txn_id"];
+    TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
 
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);

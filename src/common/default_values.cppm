@@ -22,11 +22,11 @@ namespace infinity {
 
 export {
     // hidden columns' id
-    constexpr SizeT COLUMN_IDENTIFIER_ROW_ID = (SizeT)(-1);
-    constexpr SizeT COLUMN_IDENTIFIER_CREATE = (SizeT)(-2);
-    constexpr SizeT COLUMN_IDENTIFIER_DELETE = (SizeT)(-3);
-    constexpr SizeT COLUMN_IDENTIFIER_SCORE = (SizeT)(-4);
-    constexpr SizeT COLUMN_IDENTIFIER_DISTANCE = (SizeT)(-5);
+    constexpr ColumnID COLUMN_IDENTIFIER_ROW_ID = (ColumnID)(std::numeric_limits<u64>::max() - 1);
+    constexpr ColumnID COLUMN_IDENTIFIER_CREATE = (ColumnID)(std::numeric_limits<u64>::max() - 2);
+    constexpr ColumnID COLUMN_IDENTIFIER_DELETE = (ColumnID)(std::numeric_limits<u64>::max() - 3);
+    constexpr ColumnID COLUMN_IDENTIFIER_SCORE = (ColumnID)(std::numeric_limits<u64>::max() - 4);
+    constexpr ColumnID COLUMN_IDENTIFIER_DISTANCE = (ColumnID)(std::numeric_limits<u64>::max() - 5);
     constexpr StringView COLUMN_NAME_ROW_ID = "__rowid";
     constexpr StringView COLUMN_NAME_CREATE = "__create";
     constexpr StringView COLUMN_NAME_DELETE = "__delete";
@@ -49,10 +49,12 @@ export {
 
     // column vector related constants
     constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
-    constexpr u64 INITIAL_VECTOR_CHUNK_ID = std::numeric_limits<u64>::max();;
+    constexpr u64 INITIAL_VECTOR_CHUNK_ID = std::numeric_limits<u64>::max();
+    ;
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
-    constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();; // Each row has one chunk.
+    constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
+    ; // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
 
     // segment related constants
@@ -69,9 +71,12 @@ export {
     constexpr SizeT DEFAULT_BLOCKING_QUEUE_SIZE = 1024;
 
     // transaction related constants
-    constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();;
-    constexpr u64 MAX_TIMESTAMP = std::numeric_limits<u64>::max();;
-    constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<u64>::max();;
+    constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();
+    ;
+    constexpr u64 MAX_TIMESTAMP = std::numeric_limits<u64>::max();
+    ;
+    constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<u64>::max();
+    ;
 
     constexpr SizeT KB = 1024;
     constexpr SizeT MB = 1024 * KB;

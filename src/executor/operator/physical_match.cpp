@@ -74,7 +74,7 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
 bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
     // 1 build irs::filter
     // 1.1 populate column2analyzer
-    u64 txn_id = query_context->GetTxn()->TxnID();
+    TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SharedPtr<IrsIndexEntry> irs_index_entry;
     Map<String, String> column2analyzer;

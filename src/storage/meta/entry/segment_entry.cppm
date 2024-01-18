@@ -42,12 +42,12 @@ struct SegmentEntry : public BaseEntry {
 public:
     explicit SegmentEntry(const TableEntry *table_entry);
 
-    static SharedPtr<SegmentEntry> MakeNewSegmentEntry(const TableEntry *table_entry, u32 segment_id, BufferManager *buffer_mgr);
+    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
-    MakeReplaySegmentEntry(const TableEntry *table_entry, u32 segment_id, SharedPtr<String> segment_dir, TxnTimeStamp commit_ts);
+    NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
 
-    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const IndexBase *index_base, const ColumnDef *column_def);
+    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT segment_row_count, const IndexBase *index_base, const ColumnDef *column_def);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -57,7 +57,7 @@ public:
 
     void WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
                             bool prepare,
-                            u64 column_id,
+                            ColumnID column_id,
                             const IndexBase *index_base,
                             SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
 
@@ -68,11 +68,11 @@ public:
 
     inline TxnTimeStamp min_row_ts() const { return min_row_ts_; }
 
-    inline u32 segment_id() const { return segment_id_; }
+    inline SegmentID segment_id() const { return segment_id_; }
 
     inline const TableEntry *GetTableEntry() const { return table_entry_; }
 
-    BlockEntry *GetBlockEntryByID(u16 block_id) const;
+    BlockEntry *GetBlockEntryByID(BlockID block_id) const;
 
     inline const SharedPtr<String> &segment_dir() const { return segment_dir_; }
 
@@ -96,9 +96,9 @@ public:
     }
 
 protected:
-    u64 AppendData(u64 txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr);
+    u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
@@ -108,12 +108,12 @@ protected:
                                                        bool prepare,
                                                        bool is_replay);
 
-    void CommitAppend(u64 txn_id, TxnTimeStamp commit_ts, u16 block_id, u16 start_pos, u16 row_count);
+    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 
-    void CommitDelete(u64 txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
 
 private:
-    static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, u32 seg_id);
+    static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected:
     std::shared_mutex rw_locker_{};
@@ -121,7 +121,7 @@ protected:
     const TableEntry *table_entry_{};
 
     SharedPtr<String> segment_dir_{};
-    u32 segment_id_{};
+    SegmentID segment_id_{};
 
     SizeT row_count_{};
     SizeT row_capacity_{};

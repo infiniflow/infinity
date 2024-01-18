@@ -28,10 +28,12 @@ namespace infinity {
 
 export struct DBMeta {
 
-friend struct NewCatalog;
+    friend struct NewCatalog;
 
 public:
-    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> name) : db_name_(std::move(name)), data_dir_(data_dir) {}
+    explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> db_name) : db_name_(std::move(db_name)), data_dir_(data_dir) {}
+
+    static UniquePtr<DBMeta> NewDBMeta(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name);
 
     SharedPtr<String> ToString();
 
@@ -47,16 +49,16 @@ public:
 
 private:
     Tuple<DBEntry *, Status>
-    CreateNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropNewEntry(u64 txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<DBEntry *, Status> DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
-    void DeleteNewEntry(u64 txn_id, TxnManager *txn_mgr);
+    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
 
-    Tuple<DBEntry *, Status> GetEntry(u64 txn_id, TxnTimeStamp begin_ts);
+    Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Thread-unsafe
-    List<UniquePtr<BaseEntry>> &entry_list() { return entry_list_; }
+    List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
 
     // Used in initialization phase
     static void AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry);
@@ -67,7 +69,7 @@ private:
 
     std::shared_mutex rw_locker_{};
     // Ordered by commit_ts from latest to oldest.
-    List<UniquePtr<BaseEntry>> entry_list_{};
+    List<SharedPtr<BaseEntry>> entry_list_{};
 };
 
 } // namespace infinity
