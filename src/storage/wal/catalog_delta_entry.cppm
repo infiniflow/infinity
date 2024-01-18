@@ -17,7 +17,7 @@ module;
 #include <parallel_hashmap/phmap_utils.h>
 #include <typeinfo>
 
-export module wal:physical_wal_entry;
+export module wal:catalog_delta_entry;
 
 import table_def;
 import index_def;
