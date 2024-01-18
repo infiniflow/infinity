@@ -40,15 +40,15 @@ HnswFileWorker::~HnswFileWorker() {
 
 void HnswFileWorker::AllocateInMemory() {
     if (data_) {
-        Error<StorageException>("Data is already allocated.");
+        UnrecoverableError("Data is already allocated.");
     }
     if (index_base_->index_type_ != IndexType::kHnsw) {
-        Error<StorageException>("Bug.");
+        UnrecoverableError("Index type isn't HNSW");
     }
 
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
-        StorageException("Index should be created on embedding column now.");
+        UnrecoverableError("Index should be created on embedding column now.");
     }
 
     SizeT dimension = GetDimension();
@@ -73,7 +73,7 @@ void HnswFileWorker::AllocateInMemory() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
@@ -91,26 +91,26 @@ void HnswFileWorker::AllocateInMemory() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type.");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Bug.");
+                    UnrecoverableError("Invalid metric type");
                 }
             }
             break;
         }
         default: {
-            Error<StorageException>("Index should be created on float embedding column now.");
+            UnrecoverableError("Index should be created on float embedding column now.");
         }
     }
 }
 
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
-        Error<StorageException>("FreeInMemory: Data is not allocated.");
+        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
     auto FreeData = [&](auto *hnsw_index) { delete hnsw_index; };
@@ -131,7 +131,7 @@ void HnswFileWorker::FreeInMemory() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
@@ -149,19 +149,19 @@ void HnswFileWorker::FreeInMemory() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Bug.");
+                    UnrecoverableError("Invalid metric type");
                 }
             }
             break;
         }
         default: {
-            Error<StorageException>(fmt::format("Index should be created on float embedding column now, type: {}",
+            UnrecoverableError(fmt::format("Index should be created on float embedding column now, type: {}",
                                                 EmbeddingType::EmbeddingDataType2String(embedding_type)));
         }
     }
@@ -170,7 +170,7 @@ void HnswFileWorker::FreeInMemory() {
 
 void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
     if (!data_) {
-        Error<StorageException>("WriteToFileImpl: Data is not allocated.");
+        UnrecoverableError("WriteToFileImpl: Data is not allocated.");
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_);
     auto SaveData = [&](auto *hnsw_index) { hnsw_index->Save(*file_handler_); };
@@ -190,7 +190,7 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
@@ -208,19 +208,19 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Bug.");
+                    UnrecoverableError("Invalid metric type");
                 }
             }
             break;
         }
         default: {
-            Error<StorageException>("Index should be created on float embedding column now.");
+            UnrecoverableError("Index should be created on float embedding column now.");
         }
     }
     prepare_success = true;
@@ -246,7 +246,7 @@ void HnswFileWorker::ReadFromFileImpl() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Metric type");
                         }
                     }
                     break;
@@ -264,19 +264,19 @@ void HnswFileWorker::ReadFromFileImpl() {
                             break;
                         }
                         default: {
-                            Error<StorageException>("Bug.");
+                            UnrecoverableError("Invalid metric type");
                         }
                     }
                     break;
                 }
                 default: {
-                    Error<StorageException>("Bug.");
+                    UnrecoverableError("Invalid metric type");
                 }
             }
             break;
         }
         default: {
-            Error<StorageException>("Index should be created on float embedding column now.");
+            UnrecoverableError("Index should be created on float embedding column now.");
         }
     }
 }

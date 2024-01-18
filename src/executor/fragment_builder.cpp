@@ -14,6 +14,8 @@
 
 module;
 
+module fragment_builder;
+
 import stl;
 import plan_fragment;
 import physical_operator;
@@ -22,15 +24,13 @@ import physical_sink;
 import physical_source;
 import physical_explain;
 import physical_knn_scan;
-
+import status;
 import infinity_exception;
 import parser;
 import explain_fragment;
 import fragment_context;
 import logger;
 import third_party;
-
-module fragment_builder;
 
 namespace infinity {
 
@@ -50,7 +50,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
     switch (explain_op->explain_type()) {
 
         case ExplainType::kAnalyze: {
-            Error<NotImplementException>("Not implement: Query analyze");
+            RecoverableError(Status::NotSupport("Not implement: Query analyze"));
         }
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
@@ -84,7 +84,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
 void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr) {
     switch (phys_op->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            Error<PlannerException>("Invalid physical operator type\"");
+            UnrecoverableError("Invalid physical operator type");
         }
         case PhysicalOperatorType::kExplain: {
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
@@ -113,7 +113,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kMatch: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("{} shouldn't have child.", phys_op->GetName()));
+                UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
@@ -122,25 +122,11 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kAggregate: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() == nullptr) {
-                Error<SchedulerException>("No input node of aggregate operator");
+                UnrecoverableError("No input node of aggregate operator");
             } else {
                 current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
                 BuildFragments(phys_op->left(), current_fragment_ptr);
             }
-            return;
-            current_fragment_ptr->AddOperator(phys_op);
-            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-            if (phys_op->left() == nullptr) {
-                Error<SchedulerException>("No input node of aggregate operator");
-            }
-            current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
-            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-            next_plan_fragment->SetSinkNode(query_context_ptr_,
-                                            SinkType::kLocalQueue,
-                                            phys_op->left()->GetOutputNames(),
-                                            phys_op->left()->GetOutputTypes());
-            BuildFragments(phys_op->left(), next_plan_fragment.get());
-            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             return;
         }
         case PhysicalOperatorType::kParallelAggregate:
@@ -148,7 +134,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit: {
             if (phys_op->left() == nullptr) {
-                Error<SchedulerException>(fmt::format("No input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
             current_fragment_ptr->AddOperator(phys_op);
@@ -157,7 +143,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         }
         case PhysicalOperatorType::kTop: {
             if (phys_op->left() == nullptr) {
-                Error<SchedulerException>(fmt::format("No input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left(), current_fragment_ptr);
@@ -168,7 +154,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kDelete:
         case PhysicalOperatorType::kSort: {
             if (phys_op->left() == nullptr) {
-                Error<SchedulerException>(fmt::format("No input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
             BuildFragments(phys_op->left(), current_fragment_ptr);
@@ -185,7 +171,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kLocalQueue, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
             if (phys_op->left() == nullptr) {
-                Error<SchedulerException>(fmt::format("No input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("No input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
 
@@ -216,7 +202,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kJoinMerge:
         case PhysicalOperatorType::kJoinIndex:
         case PhysicalOperatorType::kCrossProduct: {
-            Error<SchedulerException>(fmt::format("Not support {}.", phys_op->GetName()));
+            UnrecoverableError(fmt::format("Not support {}.", phys_op->GetName()));
         }
         case PhysicalOperatorType::kKnnScan: {
             //            current_fragment_ptr->AddSourceNode(query_context_ptr_,
@@ -235,7 +221,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             //            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
             //            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("{} shouldn't have child.", phys_op->GetName()));
+                UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
             PhysicalKnnScan *knn_scan = static_cast<PhysicalKnnScan *>(phys_op);
             if (knn_scan->TaskCount() == 1) {
@@ -250,7 +236,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kTableScan:
         case PhysicalOperatorType::kIndexScan: {
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("{} shouldn't have child.", phys_op->GetName()));
+                UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
             current_fragment_ptr->AddOperator(phys_op);
@@ -272,7 +258,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         }
         case PhysicalOperatorType::kCreateIndexPrepare: {
             if (phys_op->left() != nullptr || phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("Invalid input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
@@ -281,7 +267,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         }
         case PhysicalOperatorType::kCreateIndexDo: {
             if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("Invalid input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetFragmentType(FragmentType::kParallelMaterialize);
@@ -299,7 +285,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         }
         case PhysicalOperatorType::kCreateIndexFinish: {
             if (phys_op->left() == nullptr || phys_op->right() != nullptr) {
-                Error<SchedulerException>(fmt::format("Invalid input node of {}", phys_op->GetName()));
+                UnrecoverableError(fmt::format("Invalid input node of {}", phys_op->GetName()));
             }
             current_fragment_ptr->AddOperator(phys_op);
             current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);

@@ -25,6 +25,8 @@ module;
 
 #include <vector>
 
+module physical_import;
+
 import stl;
 import txn;
 import query_context;
@@ -48,8 +50,7 @@ import buffer_handle;
 import catalog;
 import infinity_exception;
 import zsv;
-
-module physical_import;
+import status;
 
 namespace infinity {
 
@@ -89,15 +90,15 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
     if (table_entry_->ColumnCount() != 1) {
-        Error<ExecutorException>("FVECS file must have only one column.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one column."));
     }
     auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
     if (column_type->type() != kEmbedding) {
-        Error<ExecutorException>("FVECS file must have only one embedding column.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column."));
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     if (embedding_info->Type() != kElemFloat) {
-        Error<ExecutorException>("FVECS file must have only one embedding column with float element.");
+        RecoverableError(Status::ImportFileFormatError("FVECS file must have only one embedding column with float element."));
     }
 
     LocalFileSystem fs;
@@ -109,16 +110,16 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes != sizeof(dimension)) {
-        Error<ExecutorException>(fmt::format("Read dimension which length isn't {}.", nbytes));
+        RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Error<ExecutorException>(
-            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        RecoverableError(Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension())));
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        Error<ExecutorException>("Weird file size.");
+        UnrecoverableError("Weird file size.");
     }
     SizeT vector_n = file_size / row_size;
 
@@ -135,7 +136,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         int dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Error<ExecutorException>(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            RecoverableError(
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension)));
         }
         ptr_t dst_ptr = buf_ptr + last_block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
@@ -177,7 +179,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     // parser_context -> parser
     FILE *fp = fopen(file_path_.c_str(), "rb");
     if (!fp) {
-        Error<ExecutorException>(strerror(errno));
+        UnrecoverableError(strerror(errno));
     }
     Txn *txn = query_context->GetTxn();
     u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
@@ -213,10 +215,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 
     if (csv_parser_status != zsv_status_no_more_input) {
         if (parser_context->err_msg_.get() != nullptr) {
-            Error<ExecutorException>(*parser_context->err_msg_);
+            UnrecoverableError(*parser_context->err_msg_);
         } else {
             String err_msg = ZsvParser::ParseStatusDesc(csv_parser_status);
-            Error<ExecutorException>(err_msg);
+            UnrecoverableError(err_msg);
         }
     }
     NewCatalog::IncreaseTableRowCount(table_entry_, parser_context->row_count_);
@@ -234,7 +236,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        Error<ExecutorException>(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
     }
 
     Txn *txn = query_context->GetTxn();
@@ -264,11 +266,8 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         BlockEntry *block_entry = segment_entry->GetLastEntry();
         if (block_entry->GetAvailableCapacity() <= 0) {
             LOG_INFO(fmt::format("Block {} saved", block_entry->block_id()));
-            segment_entry->AppendBlockEntry(BlockEntry::NewBlockEntry(segment_entry.get(),
-                                                                      segment_entry->block_entries().size(),
-                                                                      0,
-                                                                      table_entry_->ColumnCount(),
-                                                                      txn));
+            segment_entry->AppendBlockEntry(
+                BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry_->ColumnCount(), txn));
             block_entry = segment_entry->GetLastEntry();
         }
 
@@ -285,7 +284,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
-void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) { Error<NotImplementException>("Import JSON is not implemented yet."); }
+void PhysicalImport::ImportJSON(QueryContext *, ImportOperatorState *) {
+    RecoverableError(Status::NotSupport("Import JSON is not implemented yet."));
+}
 
 void PhysicalImport::CSVHeaderHandler(void *context) {
     ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);
@@ -320,7 +321,7 @@ namespace {
 Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
-        Error<TypeException>("Embedding data must be surrounded by [ and ]");
+        RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
     }
     Vector<StringView> ret;
     SizeT i = 1, j = 1;
@@ -393,7 +394,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         UniquePtr<String> err_msg =
             MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
         LOG_ERROR(*err_msg);
-        Error<StorageException>(*err_msg);
+        RecoverableError(Status::ImportFileFormatError(*err_msg));
     }
     // append data to segment entry
     SizeT write_row = last_block_entry->row_count();
@@ -415,12 +416,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto ele_str_views = SplitArrayElement(str_view, parser_context->delimiter_);
             auto embedding_info = dynamic_cast<EmbeddingInfo *>(column_type->type_info().get());
             if (embedding_info->Dimension() < ele_str_views.size()) {
-                Error<ExecutorException>("Embedding data size exceeds dimension.");
+                RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
             }
 
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    Error<ExecutorException>("Embedding bit type is not implemented.");
+                    UnrecoverableError("Embedding bit type is not implemented.");
                 }
                 case kElemInt8: {
                     AppendEmbeddingData<TinyIntT>(block_column_entry, ele_str_views, dst_offset);
@@ -447,7 +448,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                     break;
                 }
                 case kElemInvalid: {
-                    Error<ExecutorException>("Embedding element type is invalid.");
+                    UnrecoverableError("Embedding element type is invalid.");
                 }
             }
         } else {
@@ -482,10 +483,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
                 }
                 case kMissing:
                 case kInvalid: {
-                    Error<ExecutorException>("Invalid data type");
+                    UnrecoverableError("Invalid data type");
                 }
                 default: {
-                    Error<ExecutorException>("Not supported now in append data in column");
+                    UnrecoverableError("Not supported now in append data in column");
                 }
             }
         }
@@ -498,7 +499,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
 template <typename T>
 void AppendEmbeddingJsonl(BlockColumnEntry *block_column_entry, const Vector<T> &embedding, SizeT dst_offset, SizeT dim) {
     if (embedding.size() != dim) {
-        Error<ExecutorException>("Embedding data size neq dimension.");
+        RecoverableError(Status::ImportFileFormatError("Embedding data size isn't same as dimension."));
     }
     block_column_entry->AppendRaw(dst_offset, reinterpret_cast<const_ptr_t>(embedding.data()), embedding.size() * sizeof(T), nullptr);
 }
@@ -546,7 +547,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, BlockEntry
                         break;
                     }
                     default: {
-                        Error<NotImplementException>("Embedding type not implemented.");
+                        UnrecoverableError("Not implement: Embedding type.");
                     }
                 }
                 break;
@@ -587,7 +588,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, BlockEntry
                 break;
             }
             default: {
-                Error<NotImplementException>("Type not implemented.");
+                UnrecoverableError("Not implement: Invalid data type.");
             }
         }
     }

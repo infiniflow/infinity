@@ -90,7 +90,7 @@ public:
     // Used in PhysicalImport
     inline BlockEntry *GetLastEntry() const {
         if (block_entries_.empty()) {
-            Error<StorageException>("No any block entries");
+            UnrecoverableError("No any block entries");
         }
         return block_entries_.back().get();
     }

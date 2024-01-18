@@ -32,35 +32,35 @@ template <typename SourceType>
 static BoundCastFunc NumericCast(const DataType &target) {
     switch (target.type()) {
         case kTinyInt: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kSmallInt: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kInteger: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kBigInt: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kHugeInt: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kFloat: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         case kDouble: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
         default: {
-            Error<NotImplementException>(fmt::format("Can't cast to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
         }
     }
 }
 
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     if (source == target) {
-        Error<TypeException>(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+        UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
     }
 
     switch (source.type()) {
@@ -89,76 +89,76 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
             return BindFloatCast<DoubleT>(source, target);
         }
         case kDecimal: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kVarchar: {
             return BindVarcharCast(source, target);
         }
         case kDate: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTime: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kDateTime: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTimestamp: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kInterval: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kArray: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kTuple: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kPoint: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kLine: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kLineSeg: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kBox: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
 //        case kPath: {
-//            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
 //        case kPolygon: {
-//            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kCircle: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
 //        case kBitmap: {
-//            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kUuid: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
 //        case kBlob: {
-//            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+//            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kEmbedding: {
             return BindEmbeddingCast(source, target);
         }
         case kRowID: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kMixed: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         case kNull: {
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
         }
         default:
-            Error<NotImplementException>(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
     }
     return BoundCastFunc(nullptr);
 }

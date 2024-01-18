@@ -22,28 +22,169 @@ namespace infinity {
 
 export enum class ErrorCode : long {
 
-    kOk = 0,
-    kError,
-    kNotFound,
-    kNotImplemented,
-    kReachQueryMemoryLimit,
-    kNotSupportedCast,
-    kAlreadyExist,
-    kNetworkError,
-    kServiceUnavailable,
-    kWWConflict,
-    kDuplicate,
-    kUndefined,
-    kInvalidIdentifier
+    kOk = 0, // success
+
+    // 1. config error,
+
+    // 2. Auth error
+    kWrongPasswd = 2001,
+    kInsufficientPrivilege = 2002,
+
+    // 3. syntax error or access rule violation
+    kInvalidUsername = 3001,
+    kInvalidPasswd = 3002,
+    kInvalidDbName = 3003,
+    kInvalidTableName = 3004,
+    kInvalidColumnName = 3005,
+    kInvalidIndexName = 3006,
+    kInvalidColumnDefinition = 3007,
+    kInvalidTableDefinition = 3008,
+    kInvalidIndexDefinition = 3009,
+    kInvalidDataTypeMismatch = 3010,
+    kNameTooLong = 3011,
+    kReservedName = 3012,
+    kSyntaxError = 3013,
+    kInvalidParameterValue = 3014,
+    kDuplicateUser = 3015,
+    kDuplicateDatabaseName = 3016,
+    kDuplicateTableName = 3017,
+    kDuplicateIndexName = 3018,
+    kDuplicateIndexOnColumn = 3019,
+    kNoSuchUser = 3020,
+    kDBNotExist = 3021,
+    kTableNotExist = 3022,
+    kIndexNotExist = 3023,
+    kColumnNotExist = 3024,
+    kAggNotAllowInWhereClause = 3025,
+    kColumnInSelectNotInGroupBy = 3026,
+    kNoSuchSystemVar = 3027,
+    kInvalidSystemVarValue = 3028,
+    kSystemVarReadOnly = 3029,
+    kFunctionNotFound = 3030,
+    kSpecialFunctionNotFound = 3031,
+    kNotSupported = 3032,
+    kDroppingUsingDb = 3033,
+    kSessionNotFound = 3034,
+    kRecursiveAgg = 3035,
+    kFunctionArgsError = 3036,
+    kImportFileFormatError = 3037,
+    kDataNotExist = 3038,
+    kColumnCountMismatch = 3039,
+    kEmptyDBNameIsGiven = 3040,
+
+    // 4. Txn fail
+    kTxnRollback = 4001,
+    kTxnConflict = 4002,
+
+    // 5. Insufficient resource or exceed limits
+    kDiskFull = 5001,
+    kOutOfMemory = 5002,
+    kTooManyConnections = 5003,
+    kConfigurationLimitExceed = 5004,
+    kQueryIsTooComplex = 5005,
+
+    // 6. Query intervention
+    kQueryCancelled = 6001,
+    kQueryNotSupported = 6002,
+    kClientClose = 6003,
+
+    // 7. System error
+    kIOError = 7001,
+    kDuplicatedFile = 7002,
+    kConfigFileError = 7003,
+    kLockFileExists = 7004,
+    kCatalogCorrupted = 7005,
+    kDataCorrupted = 7006,
+    kIndexCorrupted = 7007,
+    kFileNotFound = 7008,
+    kDirNotFound = 7009,
+    kDataIOError = 7010,
+    kUnexpectedError = 7011,
 };
 
 export class Status {
+public:
+    // 0. Success
+    static Status OK() { return {}; }
+
+    // 2. Auth error
+    static Status WrongPasswd(const String &user_name);
+    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
+
+    // 3. Syntax error or access rule violation
+    static Status InvalidUserName(const String &user_name);
+    static Status InvalidPasswd();
+    static Status InvalidDBName(const String &db_name);
+    static Status InvalidTableName(const String &table_name);
+    static Status InvalidColumnName(const String &column_name);
+    static Status InvalidIndexName(const String &index_name);
+    static Status DataTypeMismatch(const String &type1, const String &type2);
+    static Status NameTooLong(const String &name, const String &object_type);
+    static Status ReservedName(const String &name);
+    static Status SyntaxError(const String &detailed);
+    static Status InvalidParameterValue(const String &parameter_name, const String &parameter_value, const String &recommend_value);
+    static Status DuplicateUserName(const String &user_name);
+    static Status DuplicateDatabase(const String &db_name);
+    static Status DuplicateTable(const String &table_name);
+    static Status DuplicateIndex(const String &index_name);
+    static Status DuplicateIndexOnColumn(const String &table_name, const String &column_name);
+    static Status NoUser(const String &user_name);
+    static Status DBNotExist(const String &db_name);
+    static Status TableNotExist(const String &table_name);
+    static Status IndexNotExist(const String &index_name);
+    static Status ColumnNotExist(const String &column_name);
+    static Status AggNotAllowInWhere(const String &func_name);
+    static Status ColumnInSelectNotInGroupBy(const String &column_name);
+    static Status NoSysVar(const String &variable_name);
+    static Status SetInvalidVarValue(const String &variable_name, const String &valid_value_range);
+    static Status ReadOnlySysVar(const String &sys_var);
+    static Status FunctionNotFound(const String &function_name);
+    static Status SpecialFunctionNotFound();
+    static Status NotSupport(const String &detailed);
+    static Status DroppingUsingDb(const String &db_name);
+    static Status SessionNotFound(i64 session_id);
+    static Status RecursiveAggregate(const String &expr_name);
+    static Status FunctionArgsError(const String &func_name);
+    static Status ImportFileFormatError(const String &detailed_info);
+    static Status DataNotExist(const String &detailed_info);
+    static Status ColumnCountMismatch(const String &detailed_info);
+    static Status EmptyDBNameIsGiven();
+
+    // 4. TXN fail
+    static Status TxnRollback(u64 txn_id);
+    static Status TxnConflict(u64 txn_id, const String &conflict_reason);
+
+    // 5. Insufficient resource or exceed limits
+    static Status DiskFull(const String &detailed_info);
+    static Status OutOfMemory(const String &detailed_info);
+    static Status TooManyConnections(const String &detailed_info);
+    static Status ConfigurationLimitExceed(const String &config_name, const String &config_value, const String &valid_value_range);
+    static Status QueryTooBig(const String &query_text, u64 ast_node);
+
+    // 6. Operation intervention
+    static Status QueryCancelled(const String &query_text);
+    static Status QueryNotSupported(const String &query_text, const String &detailed_reason);
+    static Status ClientClose();
+
+    // 7. System error
+    static Status IOError(const String &detailed_info);
+    static Status DuplicatedFile(const String &filename);
+    static Status ConfigFileError(const String &path, const String &detailed_info);
+    static Status LockFileExists(const String &path);
+    static Status CatalogCorrupted(const String &path);
+    static Status DataCorrupted(const String &path);
+    static Status IndexCorrupted(const String &path);
+    static Status FileNotFound(const String &path);
+    static Status DirNotFound(const String &path);
+    static Status DataIOError(const String &detailed_info);
+    static Status UnexpectedError(const String &detailed_info);
+
 public:
     Status() = default;
 
     inline explicit Status(ErrorCode code) : code_(code) {}
 
-    inline Status(ErrorCode code, UniquePtr<String> message): code_(code), msg_(std::move(message)) {}
+    inline Status(ErrorCode code, UniquePtr<String> message) : code_(code), msg_(std::move(message)) {}
 
     Status(ErrorCode code, const char *msg);
 
@@ -59,18 +200,16 @@ public:
 
     const Status &operator=(const Status &&s) noexcept = delete;
 
-    static Status OK() { return {}; }
-
     [[nodiscard]] bool ok() const { return code_ == ErrorCode::kOk && msg_.get() == nullptr; }
 
     [[nodiscard]] ErrorCode code() const { return code_; }
 
-    void Init(ErrorCode code, const char* msg);
+    void Init(ErrorCode code, const char *msg);
 
-    [[nodiscard]] const char* message() const {
-        if(msg_.get() != nullptr) {
+    [[nodiscard]] const char *message() const {
+        if (msg_.get() != nullptr) {
             return msg_->c_str();
-        } else{
+        } else {
             return nullptr;
         }
     }
@@ -78,8 +217,12 @@ public:
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
 
+    void AppendMessage(const String &msg);
+
+    inline Status clone() { return Status{code_, MakeUnique<String>(*msg_)}; }
+
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};
 };
 
-}
+} // namespace infinity

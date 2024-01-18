@@ -177,7 +177,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kCase: {
             auto case_expression = static_pointer_cast<CaseExpression>(expression);
             if (!case_expression->arguments().empty()) {
-                Error<PlannerException>("Case expression shouldn't have arguments");
+                UnrecoverableError("Case expression shouldn't have arguments");
             }
             for (auto &case_expr : case_expression->CaseExpr()) {
                 VisitExpression(case_expr.then_expr_);
@@ -207,12 +207,12 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         case ExpressionType::kColumn: {
             auto column_expression = static_pointer_cast<ColumnExpression>(expression);
             if (!column_expression->arguments().empty()) {
-                Error<PlannerException>("Column expression shouldn't have arguments");
+                UnrecoverableError("Column expression shouldn't have arguments");
             }
 
             result = VisitReplace(column_expression);
             if (result.get() == nullptr) {
-                Error<PlannerException>("Visit column expression will always rewrite the expression");
+                UnrecoverableError("Visit column expression will always rewrite the expression");
             }
             expression = result;
             break;
@@ -233,7 +233,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             auto value_expression = static_pointer_cast<ValueExpression>(expression);
 
             if (!value_expression->arguments().empty()) {
-                Error<PlannerException>("Column expression shouldn't have arguments");
+                UnrecoverableError("Column expression shouldn't have arguments");
             }
 
             result = VisitReplace(value_expression);
@@ -261,7 +261,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
 
             result = VisitReplace(subquery_expression);
             if (result.get() != nullptr) {
-                Error<PlannerException>("Visit subquery expression will always rewrite the expression");
+                UnrecoverableError("Visit subquery expression will always rewrite the expression");
             }
             break;
         }
@@ -279,7 +279,7 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             break;
         }
         default: {
-            Error<PlannerException>(fmt::format("Unexpected expression type: {}", expression->Name()));
+            UnrecoverableError(fmt::format("Unexpected expression type: {}", expression->Name()));
         }
     }
 }

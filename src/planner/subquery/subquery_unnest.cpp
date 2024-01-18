@@ -22,7 +22,7 @@ import logical_node;
 import base_expression;
 import subquery_expression;
 import column_expression;
-
+import status;
 import parser;
 import query_context;
 import bind_context;
@@ -73,7 +73,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestSubquery(SharedPtr<BaseExpressio
                                                          QueryContext *query_context,
                                                          const SharedPtr<BindContext> &bind_context) {
     // 1. Check the subquery type: uncorrelated subquery or correlated subquery.
-    auto subquery_expr_ptr = static_cast<SubqueryExpression*>(expr_ptr.get());
+    auto subquery_expr_ptr = static_cast<SubqueryExpression *>(expr_ptr.get());
 
     auto right = subquery_expr_ptr->bound_select_statement_ptr_->BuildPlan(query_context);
     // TODO: if the correlated information of the subquery should be stored in bind context.
@@ -149,11 +149,11 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             //     |-> Aggregate( count(*) as count_start)
             //         |-> Limit (1)
             //             |-> right plan tree
-            Error<PlannerException>("Plan EXISTS uncorrelated subquery");
+            RecoverableError(Status::SyntaxError("Plan EXISTS uncorrelated subquery"));
             break;
         }
         case SubqueryType::kNotExists: {
-            Error<PlannerException>("Plan not EXISTS uncorrelated subquery");
+            RecoverableError(Status::SyntaxError("Plan not EXISTS uncorrelated subquery"));
             break;
         }
         case SubqueryType::kNotIn:
@@ -204,13 +204,13 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             return result;
         }
         case SubqueryType::kAny:
-            Error<PlannerException>("Plan ANY uncorrelated subquery");
+            RecoverableError(Status::SyntaxError("Plan ANY uncorrelated subquery"));
             break;
         default: {
-            Error<PlannerException>("Unknown subquery type.");
+            UnrecoverableError("Unknown subquery type.");
         }
     }
-    Error<PlannerException>("Not implement to unnest uncorrelated subquery.");
+    UnrecoverableError("Not implement to unnest uncorrelated subquery.");
     return nullptr;
 }
 
@@ -222,7 +222,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
     auto &correlated_columns = bind_context->correlated_column_exprs_;
 
     if (correlated_columns.empty()) {
-        Error<PlannerException>("No correlated column");
+        RecoverableError(Status::SyntaxError("No correlated column"));
     }
 
     // Valid the correlated columns are from one table.
@@ -230,7 +230,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
     SizeT table_index = correlated_columns[0]->binding().table_idx;
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (table_index != correlated_columns[idx]->binding().table_idx) {
-            Error<PlannerException>("Correlated columns can be only from one table, now.");
+            RecoverableError(Status::SyntaxError("Correlated columns can be only from one table, now."));
         }
     }
 
@@ -388,10 +388,10 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
             return result;
         }
         case SubqueryType::kAny: {
-            Error<PlannerException>("Unnest correlated any subquery.");
+            RecoverableError(Status::SyntaxError("Unnest correlated any subquery."));
         }
     }
-    Error<PlannerException>("Unreachable");
+    UnrecoverableError("Unreachable");
     return nullptr;
 }
 
@@ -408,7 +408,8 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            Error<PlannerException>(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
+            RecoverableError(
+                Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size())));
         }
 
         // Generate new correlated column expression

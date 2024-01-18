@@ -33,7 +33,7 @@ void CaseExpression::AddCaseCheck(const SharedPtr<BaseExpression> &when_expr, co
 
 void CaseExpression::AddElseExpr(const SharedPtr<BaseExpression> &else_expr) {
     if (else_expr_.get() != nullptr) {
-        Error<PlannerException>("else expression already been assigned before.");
+        UnrecoverableError("else expression already been assigned before.");
     }
     else_expr_ = else_expr;
 }

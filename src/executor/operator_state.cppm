@@ -14,6 +14,8 @@
 
 module;
 
+export module operator_state;
+
 import stl;
 import global_block_id;
 import physical_operator_type;
@@ -27,8 +29,7 @@ import merge_knn_data;
 import create_index_data;
 import blocking_queue;
 import expression_state;
-
-export module operator_state;
+import status;
 
 namespace infinity {
 
@@ -41,10 +42,13 @@ export struct OperatorState {
 
     inline void ConnectToPrevOutputOpState(OperatorState *prev_op_state) { prev_op_state_ = prev_op_state; }
 
+    inline bool Ok() const { return status_.ok(); }
+
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
+    Status status_{};
 
     bool complete_{false};
 
@@ -367,7 +371,8 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
-    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
+    Status status_{};
 };
 
 export struct QueueSourceState : public SourceState {
@@ -431,13 +436,14 @@ export struct SinkState {
 
     [[nodiscard]] inline SinkStateType state_type() const { return state_type_; }
 
-    inline bool Error() const { return error_message_.get() != nullptr; }
+    inline bool Error() const { return !status_.ok(); }
 
     u64 fragment_id_{};
     u64 task_id_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
-    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
+    Status status_{};
 };
 
 export struct QueueSinkState : public SinkState {

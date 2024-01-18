@@ -14,8 +14,11 @@
 
 module;
 
-//#include <fstream>
+// #include <fstream>
 #include <string>
+
+module physical_command;
+
 import stl;
 import query_context;
 import operator_state;
@@ -29,11 +32,8 @@ import options;
 import third_party;
 import defer_op;
 import config;
-
+import status;
 import infinity_exception;
-#include "statement/command_statement.h"
-
-module physical_command;
 
 namespace infinity {
 
@@ -49,85 +49,81 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kSet: {
             SetCmd *set_command = (SetCmd *)(command_info_.get());
-            if(set_command->var_name() == enable_profiling_name) {
-                if(set_command->value_type() != SetVarType::kBool) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+            if (set_command->var_name() == enable_profiling_name) {
+                if (set_command->value_type() != SetVarType::kBool) {
+                    RecoverableError(Status::DataTypeMismatch("Boolean", set_command->value_type_str()));
                 }
                 query_context->current_session()->options()->enable_profiling_ = set_command->value_bool();
                 return true;
             }
 
-            if(set_command->var_name() == profile_history_capacity_name) {
-                if(set_command->value_type() != SetVarType::kInteger) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+            if (set_command->var_name() == profile_history_capacity_name) {
+                if (set_command->value_type() != SetVarType::kInteger) {
+                    RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
                 }
                 query_context->current_session()->options()->profile_history_capacity_ = set_command->value_int();
                 return true;
             }
 
-            if(set_command->var_name() == log_level) {
-                if(set_command->value_type() != SetVarType::kString) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+            if (set_command->var_name() == log_level) {
+                if (set_command->value_type() != SetVarType::kString) {
+                    RecoverableError(Status::DataTypeMismatch("String", set_command->value_type_str()));
                 }
 
-                if(set_command->scope() != SetScope::kGlobal) {
-                    Error<ExecutorException>(fmt::format("log_level is a global config parameter.", set_command->var_name()));
+                if (set_command->scope() != SetScope::kGlobal) {
+                    RecoverableError(Status::SyntaxError(fmt::format("log_level is a global config parameter.", set_command->var_name())));
                 }
 
-                if(set_command->value_str() == "trace") {
+                if (set_command->value_str() == "trace") {
                     SetLogLevel(LogLevel::kTrace);
                     return true;
                 }
 
-                if(set_command->value_str() == "info") {
+                if (set_command->value_str() == "info") {
                     SetLogLevel(LogLevel::kInfo);
                     return true;
                 }
 
-                if(set_command->value_str() == "warning") {
+                if (set_command->value_str() == "warning") {
                     SetLogLevel(LogLevel::kWarning);
                     return true;
                 }
 
-                if(set_command->value_str() == "error") {
+                if (set_command->value_str() == "error") {
                     SetLogLevel(LogLevel::kError);
                     return true;
                 }
 
-                if(set_command->value_str() == "fatal") {
+                if (set_command->value_str() == "fatal") {
                     SetLogLevel(LogLevel::kFatal);
                     return true;
                 }
 
-                Error<ExecutorException>(fmt::format("Unknown log level: {}.", set_command->value_str()));
-                //                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
+                RecoverableError(Status::SetInvalidVarValue("log level", "trace, info, warning, error, fatal"));
                 return true;
             }
 
-            if(set_command->var_name() == worker_cpu_limit) {
-                if(set_command->value_type() != SetVarType::kInteger) {
-                    Error<ExecutorException>(fmt::format("Wrong value type: {}", set_command->var_name()));
+            if (set_command->var_name() == worker_cpu_limit) {
+                if (set_command->value_type() != SetVarType::kInteger) {
+                    RecoverableError(Status::DataTypeMismatch("Integer", set_command->value_type_str()));
                 }
 
-                if(set_command->scope() != SetScope::kGlobal) {
-                    Error<ExecutorException>(fmt::format("cpu_count is a global config parameter.", set_command->var_name()));
+                if (set_command->scope() != SetScope::kGlobal) {
+                    RecoverableError(Status::SyntaxError(fmt::format("cpu_count is a global config parameter.", set_command->var_name())));
                 }
 
-                Error<ExecutorException>(fmt::format("You need to change the CPU limit before start the system.", set_command->var_name()));
-//                query_context->global_config()->set_worker_cpu_number(set_command->value_int());
+                RecoverableError(Status::ReadOnlySysVar(set_command->var_name()));
                 return true;
             }
 
-            {
-                Error<ExecutorException>(fmt::format("Unknown command: {}", set_command->var_name()));
-            }
+            { UnrecoverableError(fmt::format("Unknown command: {}", set_command->var_name())); }
             break;
         }
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
             auto profiler_record = query_context->current_session()->GetProfilerRecord(export_command->file_no());
             if (profiler_record == nullptr) {
-                Error<ExecutorException>(fmt::format("The record does not exist: {}", export_command->file_no()));
+                RecoverableError(Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no())));
             }
             LocalFileSystem fs;
             FileWriter file_writer(fs, export_command->file_name(), 128);
@@ -138,11 +134,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             break;
         }
         case CommandType::kCheckTable: {
-
             break;
         }
         case CommandType::kInvalid: {
-            Error<ExecutorException>("Invalid command type.");
+            UnrecoverableError("Invalid command type.");
         }
     }
     return true;

@@ -87,7 +87,7 @@ void IndexBase::WriteAdv(char *&ptr) const {
 SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
 //    char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
-        Error<StorageException>("ptr goes out of range when reading IndexBase");
+        UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
@@ -119,14 +119,14 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             break;
         }
         case IndexType::kInvalid: {
-            Error<StorageException>("Error index method while reading");
+            UnrecoverableError("Error index method while reading");
         }
         default: {
-            Error<StorageException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
     if (maxbytes < 0) {
-        Error<StorageException>("ptr goes out of range when reading IndexBase");
+        UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
     return res;
 }
@@ -183,10 +183,10 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             break;
         }
         case IndexType::kInvalid: {
-            Error<StorageException>("Error index method while deserializing");
+            UnrecoverableError("Error index method while deserializing");
         }
         default: {
-            Error<StorageException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
     }
     return res;

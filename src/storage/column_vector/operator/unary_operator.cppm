@@ -38,14 +38,14 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
                 if (result->vector_type() != ColumnVectorType::kCompactBit) {
-                    Error<TypeException>("Target vector type isn't kCompactBit.");
+                    UnrecoverableError("Target vector type isn't kCompactBit.");
                 }
                 if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    Error<TypeException>("kCompactBit should match with BooleanT.");
+                    UnrecoverableError("kCompactBit should match with BooleanT.");
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     ExecuteBooleanWithNull<Operator>(input, result, count, state_ptr);
@@ -58,10 +58,10 @@ public:
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    Error<TypeException>("Target vector type isn't flat.");
+                    UnrecoverableError("Target vector type isn't flat.");
                 }
                 if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    Error<TypeException>("BooleanT type should not be kFlat.");
+                    UnrecoverableError("BooleanT type should not be kFlat.");
                 }
                 if (nullable) {
                     ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr);
@@ -75,7 +75,7 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    Error<TypeException>("Attempting to execute more than one row of the constant column vector.");
+                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     result_null->SetFalse(0);
@@ -84,7 +84,7 @@ public:
                     if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
                         if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> ||
                                       !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                            Error<TypeException>("Unary operator input and output type error.");
+                            UnrecoverableError("Unary operator input and output type error.");
                         }
                         BooleanT result_value;
                         Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr);
@@ -101,7 +101,7 @@ public:
             }
         }
 
-        Error<TypeException>("Unexpected error.");
+        UnrecoverableError("Unexpected error.");
     }
 
 private:

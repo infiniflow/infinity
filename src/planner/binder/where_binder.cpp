@@ -52,14 +52,14 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
     }
 
     if (result.get() == nullptr) {
-        Error<PlannerException>(fmt::format("Can't bind the expr: {}", expr.GetName()));
+        UnrecoverableError(fmt::format("Can't bind the expr: {}", expr.GetName()));
     }
     return result;
 }
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        Error<PlannerException>("Only scalar function are allowed in where clause");
+        UnrecoverableError("Only scalar function are allowed in where clause");
     }
 
 }

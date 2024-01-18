@@ -46,13 +46,9 @@ import pow;
 import substring;
 import substract;
 
-import table_scan;
-import knn_scan;
-
 import special_function;
 
 import parser;
-
 
 module builtin_functions;
 
@@ -115,11 +111,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterSubstringFunction(catalog_ptr_);
 }
 
-void BuiltinFunctions::RegisterTableFunction() {
-
-    RegisterTableScanFunction(catalog_ptr_);
-    RegisterKnnScanFunction(catalog_ptr_);
-}
+void BuiltinFunctions::RegisterTableFunction() {}
 
 void BuiltinFunctions::RegisterSpecialFunction() {
 
@@ -131,7 +123,6 @@ void BuiltinFunctions::RegisterSpecialFunction() {
 
     SharedPtr<SpecialFunction> delete_ts_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 3, SpecialType::kScore);
     NewCatalog::AddSpecialFunction(catalog_ptr_.get(), delete_ts_function);
-
 }
 
 } // namespace infinity

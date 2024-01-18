@@ -47,13 +47,13 @@ struct AnnIVFFlatIndexData {
                          u32 min_points_per_centroid = 32,
                          u32 max_points_per_centroid = 256) {
         if (dimension != dimension_) {
-            Error<StorageException>("Dimension not match");
+            UnrecoverableError("Dimension not match");
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                Error<StorageException>("Metric type not implemented");
+                UnrecoverableError("Metric type not implemented");
             } else {
-                Error<StorageException>("Metric type not supported");
+                UnrecoverableError("Metric type not supported");
             }
             return;
         }
@@ -70,13 +70,13 @@ struct AnnIVFFlatIndexData {
 
     void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
         if (dimension != i32(dimension_)) {
-            Error<StorageException>("Dimension not match");
+            UnrecoverableError("Dimension not match");
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                Error<StorageException>("Metric type not implemented");
+                UnrecoverableError("Metric type not implemented");
             } else {
-                Error<StorageException>("Metric type not supported");
+                UnrecoverableError("Metric type not supported");
             }
             return;
         }
@@ -146,11 +146,11 @@ void add_data_to_partition(u32 dimension,
                            AnnIVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data,
                            u32 id_begin = 0) {
     if (vector_count <= 0 || index_data == nullptr) {
-        Error<StorageException>("vector_count <= 0 || index_data == nullptr");
+        UnrecoverableError("vector_count <= 0 || index_data == nullptr");
         return;
     }
     if (index_data->dimension_ != dimension) {
-        Error<StorageException>("index_data->dimension_ != dimension");
+        UnrecoverableError("index_data->dimension_ != dimension");
         return;
     }
     if (id_begin == 0)

@@ -14,6 +14,8 @@
 
 module;
 
+module physical_merge_knn;
+
 import stl;
 import txn;
 import query_context;
@@ -21,7 +23,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import logger;
-
+import status;
 import infinity_exception;
 import merge_knn_data;
 import knn_result_handler;
@@ -35,8 +37,6 @@ import default_values;
 import data_block;
 import knn_expression;
 import value;
-
-module physical_merge_knn;
 
 namespace infinity {
 
@@ -56,12 +56,12 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
-            Error<ExecutorException>("Invalid elem type");
+            UnrecoverableError("Invalid elem type");
         }
         case kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
-                    Error<ExecutorException>("Invalid heap type");
+                    UnrecoverableError("Invalid heap type");
                 }
                 case MergeKnnHeapType::kMaxHeap: {
                     ExecuteInner<f32, CompareMax>(query_context, merge_knn_op_state);
@@ -75,7 +75,7 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             break;
         }
         default: {
-            Error<NotImplementException>("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     return true;
@@ -87,14 +87,14 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
-        Error<ExecutorException>("Input data block is not finalized");
+        UnrecoverableError("Input data block is not finalized");
     }
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
-        Error<ExecutorException>("Input data block is invalid");
+        UnrecoverableError("Input data block is invalid");
     }
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
@@ -124,7 +124,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    Error<ExecutorException>(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
+                    UnrecoverableError(fmt::format("Cannot find block segment id: {}, block id: {}", segment_id, block_id));
                 }
 
                 DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();
@@ -147,7 +147,7 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                         output_data_block->AppendValueByPtr(i, ptr);
                     } else {
                         if (column_type->type() != LogicalType::kVarchar) {
-                            Error<NotImplementException>("Not implement complex type reading from column buffer.");
+                            RecoverableError(Status::NotSupport("Not implement complex type reading from column buffer."));
                         }
                         auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
                         Value value = Value::MakeVarchar(varchar_ptr, data_size);

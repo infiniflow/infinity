@@ -34,7 +34,6 @@ import data_block;
 import base_expression;
 import column_vector;
 import value_expression;
-import table_scan;
 import config;
 import session;
 import storage;
@@ -63,8 +62,6 @@ class TableScanTest : public BaseTest {
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
     auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
-    //    RegisterSeqScanFunction(catalog);
-    RegisterTableScanFunction(catalog);
 
     Config config;
     config.Init(nullptr);

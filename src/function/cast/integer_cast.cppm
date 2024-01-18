@@ -34,7 +34,7 @@ export struct IntegerTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &target) {
     if (source.type() == target.type()) {
-        Error<FunctionException>("Can't cast from the same type");
+        UnrecoverableError("Can't cast from the same type");
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
@@ -65,7 +65,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -74,7 +74,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
 struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -83,7 +83,7 @@ struct IntegerTryCastToFixlen {
 struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -130,7 +130,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
-    Error<NotImplementException>(fmt::format("Not implemented"));
+    UnrecoverableError(fmt::format("Not implemented"));
     return false;
 }
 
@@ -147,7 +147,7 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, const
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        Error<TypeException>("Integer digits number should less than 14.");
+        UnrecoverableError("Integer digits number should less than 14.");
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
@@ -197,7 +197,7 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -214,7 +214,7 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, cons
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        Error<TypeException>("Integer digits number should less than 14.");
+        UnrecoverableError("Integer digits number should less than 14.");
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
@@ -267,7 +267,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -284,7 +284,7 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, const
     String tmp_str = std::to_string(source);
     target.length_ = static_cast<u32>(tmp_str.size());
     if (target.length_ > VARCHAR_INLINE_LEN) {
-        Error<TypeException>("Integer digits number should less than 14.");
+        UnrecoverableError("Integer digits number should less than 14.");
     }
     std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     return true;
@@ -340,7 +340,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
@@ -361,7 +361,7 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            Error<TypeException>("Varchar column vector should use MemoryVectorBuffer. ");
+            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
@@ -374,51 +374,51 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, const 
 // TODO: Cast HugeInt to other numeric type
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, TinyIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, SmallIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, IntegerT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, BigIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, FloatT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DoubleT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DecimalT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 
 // Cast integer to varlen type
 template <>
 inline bool IntegerTryCastToVarlen::Run(HugeIntT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implemented");
     return false;
 }
 

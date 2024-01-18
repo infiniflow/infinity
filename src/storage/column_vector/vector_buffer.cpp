@@ -41,7 +41,7 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity,
 
 void VectorBuffer::InitializeCompactBit(SizeT capacity) {
     if (initialized_) {
-        Error<TypeException>("Vector buffer is already initialized.");
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = (capacity + 7) / 8;
     if (data_size > 0) {
@@ -55,7 +55,7 @@ void VectorBuffer::InitializeCompactBit(SizeT capacity) {
 
 void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     if (initialized_) {
-        Error<TypeException>("Vector buffer is already initialized.");
+        UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
@@ -78,7 +78,7 @@ void VectorBuffer::ResetToInit() {
 
 void VectorBuffer::Copy(ptr_t input, SizeT size) {
     if (data_size_ < size) {
-        Error<TypeException>("Attempt to copy an amount of data that cannot currently be accommodated");
+        UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
     // std::memcpy(data_.get(), input, size);
     std::memcpy(data_, input, size);
@@ -92,7 +92,7 @@ bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx) {
 
 bool VectorBuffer::GetCompactBit(SizeT idx) const {
     if (idx >= capacity_) {
-        Error<TypeException>("Index out of range.");
+        UnrecoverableError("Index out of range.");
     }
     return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(data_), idx);
 }
@@ -109,7 +109,7 @@ void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val) 
 
 void VectorBuffer::SetCompactBit(SizeT idx, bool val) {
     if (idx >= capacity_) {
-        Error<TypeException>("Index out of range.");
+        UnrecoverableError("Index out of range.");
     }
     VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(data_), idx, val);
 }

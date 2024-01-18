@@ -203,7 +203,7 @@ private:
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
                 if(!(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min())) {
-                    Error<StorageException>("CompressVec error");
+                    UnrecoverableError("CompressVec error");
                 }
                 compress[j] = c;
             }
@@ -283,7 +283,7 @@ public:
 
     StoreType GetVec(SizeT vec_i) const {
         if(vec_i >= meta_.cur_vec_num()) {
-            Error<StorageException>("Get Vec error");
+            UnrecoverableError("Get Vec error");
         }
         return GetLVQData(vec_i);
     }
@@ -307,7 +307,7 @@ public:
         DenseVectorIter<DataType> empty_iter(nullptr, dim(), 0);
         SizeT ret = MergeCompress(empty_iter, 0);
         if(ret == DataStoreMeta::ERR_IDX) {
-            Error<StorageException>("Compress error");
+            UnrecoverableError("Compress error");
         }
     }
 };

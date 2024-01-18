@@ -35,10 +35,9 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
     auto txn = query_context->GetTxn();
 
     Status status = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
-    auto drop_table_operator_state = (DropTableOperatorState *)(operator_state);
 
     if(!status.ok()) {
-        drop_table_operator_state->error_message_ = std::move(status.msg_);
+        operator_state->status_ = status;
     }
 
     // Generate the result

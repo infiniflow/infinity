@@ -31,21 +31,21 @@ namespace infinity {
 struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA, TB, TC, TD &, ColumnVector *) {
-        Error<NotImplementException>("Not implement");
+        UnrecoverableError("Not implement: SubstrFunction::Run");
     }
 };
 
 template <>
 inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVector *) {
     // Validate the input before slice the string
-    Error<NotImplementException>("Not implement");
+    UnrecoverableError("Not implement: SubstrFunction::Run");
 
 //    if (second < 0) {
-//        Error<ExecutorException>(fmt::format("substring start offset should >= 0, currently it is {}", second));
+//        Error<UnrecoverableException>(fmt::format("substring start offset should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third < 0) {
-//        Error<ExecutorException>(fmt::format("substring length should >= 0, currently it is {}", second));
+//        Error<UnrecoverableException>(fmt::format("substring length should >= 0, currently it is {}", second));
 //    }
 //
 //    if (third == 0) {

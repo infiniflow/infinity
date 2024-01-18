@@ -15,11 +15,12 @@
 module;
 
 #include <compare>
+
 module greater_equals;
 
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -51,7 +52,7 @@ struct ColumnValueReaderTypeGreaterEqualsFunction {
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= bigint");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>
@@ -61,7 +62,7 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= double");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>
@@ -71,7 +72,7 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed >= varchar");
+    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
 }
 
 template <>

@@ -14,28 +14,28 @@
 
 module;
 
+#include <functional>
 import stl;
-import knn_result_handler;
-import bitmask;
 import knn_distance;
 import parser;
-
+import knn_result_handler;
 import infinity_exception;
 import default_values;
 import vector_distance;
+import bitmask;
 
-export module knn_flat_ip_reservoir;
+export module knn_flat_ip;
 
 namespace infinity {
 
 export template <typename DistType>
-class KnnFlatIPReservoir final : public KnnDistance<DistType> {
-
-    using ResultHandler = ReservoirResultHandler<CompareMin<DistType, RowID>>;
+class KnnFlatIP final : public KnnDistance<DistType> {
+    using ResultHandler = HeapResultHandler<CompareMin<DistType, RowID>>;
 
 public:
-    explicit KnnFlatIPReservoir(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIpReservoir, elem_data_type, query_count, dimension, topk), queries_(queries) {
+    explicit KnnFlatIP(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatIp, elem_data_type, query_count, dimension, topk), queries_(queries) {
+
         id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
         distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
         result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
@@ -47,12 +47,13 @@ public:
         }
 
         result_handler_->Begin();
+
         begin_ = true;
     }
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPReservoir isn't begin");
+            UnrecoverableError("KnnFlatIP isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -67,9 +68,9 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
                 auto ip = IPDistance<DistType>(x_i, y_j, this->dimension_);
-                result_handler_->AddResult(i, ip, RowID{segment_id, segment_offset_start + j});
+                result_handler_->AddResult(i, ip, RowID(segment_id, segment_offset_start + j));
             }
         }
     }
@@ -80,7 +81,7 @@ public:
             return;
         }
         if (!begin_) {
-            Error<ExecutorException>("KnnFlatIPReservoir isn't begin");
+            UnrecoverableError("KnnFlatIP isn't begin");
         }
 
         this->total_base_count_ += base_count;
@@ -110,6 +111,7 @@ public:
             return;
 
         result_handler_->End();
+
         begin_ = false;
     }
 
@@ -119,14 +121,14 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            Error<ExecutorException>("Query index exceeds the limit");
+            UnrecoverableError("Query index exceeds the limit");
         }
         return id_array_.get() + idx * this->top_k_;
     }
@@ -136,10 +138,11 @@ private:
     UniquePtr<DistType[]> distance_array_{};
 
     UniquePtr<ResultHandler> result_handler_{};
+
     const DistType *queries_{};
     bool begin_{false};
 };
 
-template class KnnFlatIPReservoir<f32>;
+export template class KnnFlatIP<f32>;
 
 } // namespace infinity

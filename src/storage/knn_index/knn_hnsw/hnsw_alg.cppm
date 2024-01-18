@@ -307,7 +307,7 @@ public:
     VertexType StoreData(Iterator iter, const LabelType *labels, SizeT insert_n) {
         auto ret = data_store_.AddVec(iter, insert_n);
         if (ret == DataStore::ERR_IDX) {
-            Error<StorageException>("Data index is not enough.");
+            UnrecoverableError("Data index is not enough.");
         }
         Copy(labels, labels + insert_n, labels_.get() + ret);
         return ret;

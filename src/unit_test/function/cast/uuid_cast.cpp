@@ -48,7 +48,7 @@ TEST_F(UuidCastTest, uuid_cast0) {
         source.Set(uuid_str);
 
         TinyIntT target;
-        EXPECT_THROW(UuidTryCastToVarlen::Run(source, target, nullptr), FunctionException);
+        EXPECT_THROW(UuidTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         char uuid_str[17] = "aabbccddeeffgghh";
@@ -72,7 +72,7 @@ TEST_F(UuidCastTest, uuid_cast1) {
     // Call BindUuidCast with wrong type of parameters
     {
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindUuidCast(target_type), TypeException);
+        EXPECT_THROW(BindUuidCast(target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kUuid);

@@ -20,7 +20,7 @@ module less;
 
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -52,7 +52,7 @@ struct ColumnValueReaderTypeLessFunction {
 
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
-    Error<NotImplementException>("Not implement: mixed < bigint");
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>
@@ -62,7 +62,7 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, DoubleT, bool &) {
-    Error<NotImplementException>("Not implement: mixed < double");
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>
@@ -72,7 +72,7 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessFunction::Run(MixedT, VarcharT, bool &) {
-    Error<NotImplementException>("Not implement: mixed < varchar");
+    UnrecoverableError("Not implement: LessFunction::Run");
 }
 
 template <>

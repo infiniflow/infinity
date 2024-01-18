@@ -40,6 +40,7 @@ public:
                                SizeT count,
                                void *state_ptr,
                                bool nullable) {
+
         auto left_vector_type = left->vector_type();
         auto right_vector_type = right->vector_type();
         auto check_vector_type_valid = [](ColumnVectorType vector_type) {
@@ -47,7 +48,7 @@ public:
             return vector_type == ColumnVectorType::kFlat || vector_type == ColumnVectorType::kConstant;
         };
         if (!check_vector_type_valid(left_vector_type) || !check_vector_type_valid(right_vector_type)) {
-            Error<TypeException>("Invalid input ColumnVectorType. Support only kFlat and kConstant.");
+            UnrecoverableError("Invalid input ColumnVectorType. Support only kFlat and kConstant.");
         }
         const SharedPtr<Bitmask> &left_null = left->nulls_ptr_;
         const SharedPtr<Bitmask> &right_null = right->nulls_ptr_;
@@ -350,7 +351,7 @@ public:
             }
             result->Finalize(count);
         } else {
-            Error<TypeException>("Wrong boolean operation.");
+            UnrecoverableError("Wrong boolean operation.");
         }
     }
 
@@ -528,7 +529,7 @@ public:
                                SizeT count,
                                void *state_ptr,
                                bool nullable) {
-        Error<TypeException>("MixedType needs to be specialized.");
+        UnrecoverableError("MixedType needs to be specialized.");
     }
 
     // case for BinaryOperator which returns BooleanT result
@@ -552,10 +553,10 @@ public:
                                bool nullable) {
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             }
             case ColumnVectorType::kCompactBit: {
-                Error<TypeException>("kCompactBit should not be in this branch.");
+                UnrecoverableError("kCompactBit should not be in this branch.");
             }
             case ColumnVectorType::kFlat: {
                 return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
@@ -581,7 +582,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -592,7 +593,7 @@ private:
                 return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                Error<TypeException>("CompactBit isn't implemented.");
+                UnrecoverableError("CompactBit isn't implemented.");
             }
         }
     }
@@ -607,7 +608,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -618,7 +619,7 @@ private:
                 return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                Error<TypeException>("CompactBit isn't implemented.");
+                UnrecoverableError("CompactBit isn't implemented.");
             }
         }
     }
@@ -633,7 +634,7 @@ private:
 
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:
-                Error<TypeException>("Invalid column vector type.");
+                UnrecoverableError("Invalid column vector type.");
             case ColumnVectorType::kFlat: {
                 return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
@@ -644,7 +645,7 @@ private:
                 return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
-                Error<TypeException>("CompactBit isn't implemented.");
+                UnrecoverableError("CompactBit isn't implemented.");
             }
         }
     }
@@ -885,7 +886,7 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        Error<TypeException>("Not implemented.");
+        UnrecoverableError("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1043,7 +1044,7 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        Error<TypeException>("Not implemented.");
+        UnrecoverableError("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1053,7 +1054,7 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        Error<TypeException>("Not implemented.");
+        UnrecoverableError("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1063,7 +1064,7 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        Error<TypeException>("Not implemented.");
+        UnrecoverableError("Not implemented.");
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1073,7 +1074,7 @@ private:
                                                          SizeT,
                                                          void *,
                                                          bool) {
-        Error<TypeException>("Not implemented.");
+        UnrecoverableError("Not implemented.");
     }
 };
 

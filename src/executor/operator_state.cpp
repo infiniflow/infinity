@@ -34,7 +34,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
             num_tasks_.erase(it);
         }
     } else {
-        Error<ExecutorException>("Get unexpected data from child fragment");
+        UnrecoverableError("Get unexpected data from child fragment");
     }
 }
 
@@ -44,7 +44,7 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
-        Error<ExecutorException>("This task should not be scheduled if the source queue is empty");
+        UnrecoverableError("This task should not be scheduled if the source queue is empty");
     }
 
     switch (fragment_data_base->type_) {
@@ -61,9 +61,9 @@ bool QueueSourceState::GetData() {
         }
         case FragmentDataType::kError: {
             auto *fragment_error = static_cast<FragmentError *>(fragment_data_base.get());
-            if (this->error_message_.get() == nullptr) {
+            if (this->status_.ok()) {
                 // Only record the first error of input data.
-                this->error_message_ = std::move(fragment_error->error_message_);
+                this->status_ = std::move(fragment_error->status_);
             }
             // Get an error message from predecessor fragment
             MarkCompletedTask(fragment_error->fragment_id_);
@@ -75,7 +75,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            Error<ExecutorException>("Not support fragment data type");
+            UnrecoverableError("Not support fragment data type");
             break;
         }
     }
@@ -149,7 +149,7 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            Error<ExecutorException>("Not support operator type");
+            UnrecoverableError("Not support operator type");
             break;
         }
     }

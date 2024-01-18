@@ -220,7 +220,7 @@ SequencedTaskExecutor::SequencedTaskExecutor(Vector<UniquePtr<TaskExecutor>> exe
 void SequencedTaskExecutor::Execute(u32 id, UniquePtr<TaskExecutor::Task> task) {
     auto rejected_task = executors_[id]->Execute(std::move(task));
     if (!rejected_task) {
-        Error<StorageException>("SequencedTaskExecutor exeute error ");
+        UnrecoverableError("SequencedTaskExecutor execute error ");
     }
 }
 

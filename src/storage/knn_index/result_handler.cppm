@@ -381,14 +381,14 @@ class ReservoirResultHandler : public ResultHandlerBase {
             }
         }
         if (n_eq != 0) {
-            Error<ExecutorException>("compress_array error: n_eq != 0");
+            UnrecoverableError("compress_array error: n_eq != 0");
         }
         return wp;
     }
 
     static DistType partition_median3(DistType *vals, ID *ids, SizeT n, SizeT q_min, SizeT q_max, SizeT &q_out) {
         if (n < 3) {
-            Error<ExecutorException>("partition_median3 error: n < 3");
+            UnrecoverableError("partition_median3 error: n < 3");
         }
         DistType thresh_inf = Compare::CompareReverse::InitialValue();
         DistType thresh_sup = Compare::InitialValue();
@@ -412,17 +412,17 @@ class ReservoirResultHandler : public ResultHandlerBase {
             }
             DistType new_thresh = sample_threshold_median3(vals, n, thresh_inf, thresh_sup);
             if (new_thresh == thresh_inf) {
-                Error<ExecutorException>("partition_median3 error: new_thresh == thresh_inf");
+                UnrecoverableError("partition_median3 error: new_thresh == thresh_inf");
             }
             thresh = new_thresh;
         }
         if (q < n_lt) {
-            Error<ExecutorException>("partition_median3 error: q < n_lt");
+            UnrecoverableError("partition_median3 error: q < n_lt");
         }
         SizeT n_eq_extra = q - n_lt;
         auto wp = compress_array(vals, ids, n, thresh, n_eq_extra);
         if (wp != q) {
-            Error<ExecutorException>("partition_median3 error: wp != q");
+            UnrecoverableError("partition_median3 error: wp != q");
         }
         q_out = q;
         return thresh;

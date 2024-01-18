@@ -15,6 +15,8 @@
 module;
 
 #include <type_traits>
+
+module or_func;
 import stl;
 import catalog;
 
@@ -23,8 +25,7 @@ import scalar_function;
 import scalar_function_set;
 import parser;
 // import third_party;
-
-module or_func;
+import status;
 
 namespace infinity {
 
@@ -38,7 +39,7 @@ struct OrFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left or right;
         } else {
-            Error<TypeException>("OR function accepts only u8 and BooleanT.");
+            UnrecoverableError("OR function accepts only u8 and BooleanT.");
         }
     }
 };

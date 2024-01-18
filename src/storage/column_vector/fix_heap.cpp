@@ -28,7 +28,7 @@ namespace infinity {
 
 Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        Error<ExecutorException>(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
+        UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
     }
 
     SizeT rest_nbytes = nbytes;

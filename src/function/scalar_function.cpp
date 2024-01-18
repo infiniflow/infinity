@@ -14,17 +14,18 @@
 module;
 
 #include <sstream>
+
+module scalar_function;
+
 import stl;
 import function;
 import parser;
-
+import status;
 import infinity_exception;
 import data_block;
 import base_expression;
 import column_vector;
 import third_party;
-
-module scalar_function;
 
 namespace infinity {
 
@@ -36,11 +37,11 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
-        Error<PlannerException>(fmt::format("Function: {} arguments number isn't matched.", name_));
+        UnrecoverableError(fmt::format("Function: {} arguments number isn't matched.", name_));
     }
     for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
-            Error<PlannerException>("Not implemented: need to cast the argument types");
+            RecoverableError(Status::NotSupport("Not implemented: need to cast the argument types"));
         }
     }
 }

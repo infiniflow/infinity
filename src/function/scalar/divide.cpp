@@ -14,6 +14,8 @@
 
 module;
 
+module divide;
+
 import stl;
 import catalog;
 
@@ -22,8 +24,7 @@ import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module divide;
+import status;
 
 namespace infinity {
 
@@ -59,13 +60,13 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    Error<NotImplementException>("Not implement huge int divide operator.");
+    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
     return false;
 }
 
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
-    Error<NotImplementException>("Not implement huge int divide operator.");
+    RecoverableError(Status::NotSupport("Not implement huge int divide operator."));
     return false;
 }
 

@@ -167,6 +167,8 @@ namespace filesystem {
 using std::mt19937;
 using std::uniform_real_distribution;
 using std::iota;
+
+using std::exception;
 } // namespace std
 
 namespace infinity {
@@ -334,12 +336,6 @@ export {
     inline constexpr Pair<T, U> MakePair(T && first, U && second) {
         return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
-
-    // DB Type
-
-    // Exception
-
-    using StdException = std::exception;
 
     // Chrono
     using Clock = std::chrono::high_resolution_clock;
