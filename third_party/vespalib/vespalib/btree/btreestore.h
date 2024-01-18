@@ -80,7 +80,7 @@ protected:
     BTreeType *getWTreeEntry(RefType ref) { return _store.getEntry<BTreeType>(ref); }
 
 public:
-    BTreeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
+    BTreeStore(vespalib::alloc::MemoryAllocator *allocator);
     ~BTreeStore();
 
     const NodeAllocatorType &getAllocator() const { return _allocator; }

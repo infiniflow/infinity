@@ -5,9 +5,7 @@
 
 import memory_pool;
 
-namespace vespalib {
-namespace alloc {
-namespace {
+namespace vespalib::alloc {
 
 class MemoryPoolAllocator : public MemoryAllocator {
     infinity::MemoryPool *pool_{nullptr};
@@ -18,6 +16,4 @@ public:
     void free(PtrAndSize alloc) const noexcept override;
 };
 
-} // namespace
-} // namespace alloc
-} // namespace vespalib
+} // namespace vespalib::alloc

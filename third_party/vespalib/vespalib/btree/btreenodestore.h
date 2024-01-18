@@ -57,7 +57,7 @@ private:
     BTreeNodeBufferType<LeafNodeType> _leafNodeType;
 
 public:
-    BTreeNodeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
+    BTreeNodeStore(vespalib::alloc::MemoryAllocator *allocator);
 
     ~BTreeNodeStore();
 

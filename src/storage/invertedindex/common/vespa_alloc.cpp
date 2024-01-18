@@ -10,7 +10,6 @@ import memory_pool;
 namespace vespalib {
 
 namespace alloc {
-namespace {
 
 PtrAndSize MemoryPoolAllocator::alloc(size_t sz) const {
     void *ptr = pool_->Allocate(sz);
@@ -59,8 +58,6 @@ void HeapAllocator::sfree(PtrAndSize alloc) noexcept {
 alloc::HeapAllocator _G_heapAllocatorDefault;
 
 MemoryAllocator &HeapAllocator::getDefault() { return _G_heapAllocatorDefault; }
-
-} // namespace
 
 Alloc Alloc::alloc() noexcept { return Alloc(&HeapAllocator::getDefault()); }
 

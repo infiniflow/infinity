@@ -327,7 +327,7 @@ void DataStoreBase::on_active(uint32_t bufferId, uint32_t typeId, size_t entries
     BufferAndMeta &bufferMeta = _buffers[bufferId];
     BufferState *state = bufferMeta.get_state_relaxed();
     if (state == nullptr) {
-        auto &newState = _stash.create<BufferState>(_memory_allocator.get());
+        auto &newState = _stash.create<BufferState>(_memory_allocator);
         if (_disable_entry_hold_list) {
             newState.disable_entry_hold_list();
         }

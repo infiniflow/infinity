@@ -47,7 +47,7 @@ private:
 public:
     BTreeNodeAllocator(const BTreeNodeAllocator &rhs) = delete;
     BTreeNodeAllocator &operator=(const BTreeNodeAllocator &rhs) = delete;
-    BTreeNodeAllocator(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator);
+    BTreeNodeAllocator(vespalib::alloc::MemoryAllocator *allocator);
     ~BTreeNodeAllocator();
 
     void disableFreeLists() { _nodeStore.disableFreeLists(); }

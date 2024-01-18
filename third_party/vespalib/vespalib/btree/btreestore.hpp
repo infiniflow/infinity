@@ -11,7 +11,7 @@
 namespace vespalib::btree {
 
 template <typename KeyT, typename DataT, typename AggrT, typename CompareT, typename TraitsT, typename AggrCalcT>
-BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator)
+BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>::BTreeStore(vespalib::alloc::MemoryAllocator *allocator)
     : _store(), _treeType(1, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small1Type(1, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
       _small2Type(2, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small3Type(3, MIN_BUFFER_ARRAYS, RefType::offsetSize()),
       _small4Type(4, MIN_BUFFER_ARRAYS, RefType::offsetSize()), _small5Type(5, MIN_BUFFER_ARRAYS, RefType::offsetSize()),

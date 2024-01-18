@@ -31,7 +31,7 @@ public:
     DataStoreBase(const DataStoreBase &) = delete;
     DataStoreBase &operator=(const DataStoreBase &) = delete;
 
-    void set_memory_allocator(std::shared_ptr<vespalib::alloc::MemoryAllocator> &allocator) { _memory_allocator = allocator; }
+    void set_memory_allocator(vespalib::alloc::MemoryAllocator *allocator) { _memory_allocator = allocator; }
 
     uint32_t addType(BufferTypeBase *typeHandler);
     void init_primary_buffers();
@@ -259,7 +259,7 @@ private:
     std::vector<uint32_t> _primary_buffer_ids;
 
     Stash _stash;
-    std::shared_ptr<vespalib::alloc::MemoryAllocator> _memory_allocator;
+    vespalib::alloc::MemoryAllocator *_memory_allocator{nullptr};
     std::vector<BufferTypeBase *> _typeHandlers; // TypeId -> handler
     std::vector<FreeList> _free_lists;
     mutable std::atomic<uint64_t> _compaction_count;

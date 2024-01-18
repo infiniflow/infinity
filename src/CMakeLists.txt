@@ -347,6 +347,7 @@ target_link_libraries(unit_test
         atomic.a
 #        profiler
         thrift.a
+        vespalib
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
