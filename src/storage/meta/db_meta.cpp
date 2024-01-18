@@ -310,7 +310,8 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
                     return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
                 } else {
                     // check the tables meta
-                    return {(DBEntry *)(db_entry.get()), Status::OK()};
+                    DBEntry* db_entry_ptr = (DBEntry *)(db_entry.get());
+                    return {db_entry_ptr, Status::OK()};
                 }
             }
         } else {
