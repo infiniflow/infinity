@@ -28,7 +28,7 @@ import index_base;
 import parser;
 import infinity_exception;
 import index_full_text;
-import wal;
+import catalog_delta_entry;
 
 namespace infinity {
 

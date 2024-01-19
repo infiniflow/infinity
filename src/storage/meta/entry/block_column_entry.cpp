@@ -34,7 +34,7 @@ import infinity_exception;
 import varchar_layout;
 import logger;
 import data_file_worker;
-import wal;
+import catalog_delta_entry;
 
 namespace infinity {
 

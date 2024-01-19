@@ -24,7 +24,7 @@ import iresearch_datastore;
 import index_base;
 import index_full_text;
 import logger;
-import wal;
+import catalog_delta_entry;
 
 namespace infinity {
 

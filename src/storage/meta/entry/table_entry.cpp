@@ -37,7 +37,7 @@ import txn_manager;
 import iresearch_datastore;
 import index_base;
 import index_full_text;
-import wal;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -100,7 +100,6 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
         {   //
             if (txn_mgr != nullptr) {
                 auto operation = MakeUnique<AddIndexMetaOperation>(new_table_index_meta.get());
-                LOG_TRACE(fmt::format("Add new AddDatabaseMeta Operation: {}", operation->ToString()));
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }

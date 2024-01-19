@@ -17,7 +17,7 @@ module;
 #include <parallel_hashmap/phmap_utils.h>
 #include <typeinfo>
 
-export module wal:catalog_delta_entry;
+export module catalog_delta_entry;
 
 import table_def;
 import index_def;
@@ -74,7 +74,10 @@ public:
 
 public:
     TxnTimeStamp begin_ts_{0};
+    TransactionID txn_id_{0};
+    TxnTimeStamp commit_ts_{0};
     bool is_delete_{false};
+
     bool is_flushed_{false};
     bool is_snapshotted_{false};
     CatalogDeltaOperationType type_{};
@@ -94,7 +97,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return String("AddDBMetaOperation"); }
+    const String ToString() const final { return String("AddDBMeta"); }
+    String GetKey() const { return db_name_; }
 
 public:
     DBMeta *db_meta_{};
@@ -119,12 +123,14 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddTableMetaOperation"; }
+    const String ToString() const final { return "AddTableMeta"; }
+    Tuple<String, String> GetKey() const { return std::make_tuple(this->db_name_, this->table_name_); }
 
 public:
     TableMeta *table_meta_{};
 
 private:
+    String db_name_{};
     String table_name_{};
     String db_entry_dir_{};
 };
@@ -144,7 +150,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddDBEntryOperation"; }
+    const String ToString() const final { return "AddDBEntry"; };
+    Tuple<bool, String> GetKey() const { return std::make_tuple(db_entry_->deleted_, db_name_); }
 
 public:
     SharedPtr<DBEntry> db_entry_{};
@@ -170,7 +177,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddTableEntryOperation"; }
+    const String ToString() const final { return "AddTableEntry"; }
+    Tuple<bool, String, String> GetKey() const { return std::make_tuple(table_entry_->deleted_, db_name_, table_name_); }
 
 public:
     SharedPtr<TableEntry> table_entry_{};
@@ -202,7 +210,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddSegmentEntryOperation"; }
+    const String ToString() const final { return "AddSegmentEntry"; }
+    Tuple<String, String, SegmentID> GetKey() { return make_tuple(this->db_name_, this->table_name_, this->segment_id_); }
 
 public:
     SegmentEntry *segment_entry_{};
@@ -249,7 +258,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddBlockEntryOperation"; }
+    const String ToString() const final { return "AddBlockEntry"; }
+    Tuple<String, String, SegmentID, BlockID> GetKey() { return make_tuple(this->db_name_, this->table_name_, this->segment_id_, this->block_id_); }
 
 public:
     BlockEntry *block_entry_{};
@@ -302,7 +312,10 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddColumnEntryOperation"; }
+    const String ToString() const final { return "AddColumnEntry"; }
+    Tuple<String, String, SegmentID, BlockID, ColumnID> GetKey() {
+        return make_tuple(this->db_name_, this->table_name_, this->segment_id_, this->block_id_, this->column_id_);
+    }
 
 public:
     BlockColumnEntry *column_entry_{};
@@ -333,7 +346,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddIndexMetaOperation"; }
+    const String ToString() const final { return "AddIndexMeta"; }
+    Tuple<String, String, String> GetKey() { return std::make_tuple(this->db_name_, this->table_name_, this->index_name_); }
 
 public:
     TableIndexMeta *index_meta_{};
@@ -360,7 +374,10 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddTableIndexEntryOperation"; }
+    const String ToString() const final { return "AddTableIndexEntry"; }
+    Tuple<bool, String, String, String> GetKey() {
+        return std::make_tuple(this->table_index_entry_->deleted_, this->db_name_, this->table_name_, this->index_name_);
+    }
 
 public:
     SharedPtr<TableIndexEntry> table_index_entry_{};
@@ -389,7 +406,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddIrsIndexEntryOperation"; }
+    const String ToString() const final { return "AddIrsIndexEntry"; }
+    Tuple<String, String, String> GetKey() { return std::make_tuple(this->db_name_, this->table_name_, this->index_name_); }
 
 public:
     SharedPtr<IrsIndexEntry> irs_index_entry_{};
@@ -417,7 +435,10 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddColumnIndexEntryOperation"; }
+    const String ToString() const final { return "AddColumnIndexEntry"; }
+    Tuple<String, String, String, ColumnID> GetKey() {
+        return std::make_tuple(this->db_name_, this->table_name_, this->index_name_, this->column_id_);
+    }
 
 public:
     SharedPtr<ColumnIndexEntry> column_index_entry_{};
@@ -452,7 +473,10 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddSegmentColumnEntryOperation"; }
+    const String ToString() const final { return "AddSegmentColumnEntry"; }
+    Tuple<String, String, String, ColumnID, SegmentID> GetKey() {
+        return std::make_tuple(this->db_name_, this->table_name_, this->index_name_, this->column_id_, this->segment_id_);
+    }
 
 public:
     SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry_{};
@@ -465,6 +489,43 @@ private:
     SegmentID segment_id_{};
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
+};
+
+struct TupleHash {
+    template <class T>
+    static std::size_t hash_combine(std::size_t seed, T const &v) {
+        return seed ^ std::hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+
+    template <class Tuple, std::size_t Index = std::tuple_size<Tuple>::value - 1>
+    struct HashValueImpl {
+        static void apply(size_t &seed, Tuple const &tuple) {
+            HashValueImpl<Tuple, Index - 1>::apply(seed, tuple);
+            seed = hash_combine(seed, std::get<Index>(tuple));
+        }
+    };
+
+    template <class Tuple>
+    struct HashValueImpl<Tuple, 0> {
+        static void apply(size_t &seed, Tuple const &tuple) { seed = hash_combine(seed, std::get<0>(tuple)); }
+    };
+
+    template <typename... TT>
+    std::size_t operator()(std::tuple<TT...> const &tt) const {
+        size_t seed = 0;
+        HashValueImpl<std::tuple<TT...>>::apply(seed, tt);
+        return seed;
+    }
+};
+
+struct PairHash {
+    template <class T1, class T2>
+    std::size_t operator()(const std::pair<T1, T2> &p) const {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+
+        return h1 ^ h2;
+    }
 };
 
 /// class CatalogDeltaEntryHeader
@@ -483,6 +544,10 @@ public:
 /// class CatalogDeltaEntry
 export class CatalogDeltaEntry : CatalogDeltaEntryHeader {
 public:
+    CatalogDeltaEntry() = default;
+    explicit CatalogDeltaEntry(bool global)
+        : global_(global), operations_(), db_meta_map_(), table_meta_map_(), db_entry_map_(), table_entry_map_(), segment_entry_map_(),
+          block_entry_map_(), column_entry_map_() {}
     [[nodiscard]] i32 GetSizeInBytes() const;
     void WriteAdv(char *&ptr) const;
     static SharedPtr<CatalogDeltaEntry> ReadAdv(char *&ptr, i32 max_bytes);
@@ -491,8 +556,26 @@ public:
 
     Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
+    void Merge(SharedPtr<CatalogDeltaEntry> other);
+
+    bool global_{false}; // when global state is true constructor initializes various maps
+
 private:
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
+
+    HashMap<String, UniquePtr<AddDBMetaOperation>> db_meta_map_{};
+    HashMap<Tuple<String, String>, UniquePtr<AddTableMetaOperation>, TupleHash> table_meta_map_{};
+    HashMap<Tuple<String, String, String>, UniquePtr<AddIndexMetaOperation>, TupleHash> index_meta_map_{};
+
+    HashMap<Tuple<bool, String>, UniquePtr<AddDBEntryOperation>, TupleHash> db_entry_map_{};
+    HashMap<Tuple<bool, String, String>, UniquePtr<AddTableEntryOperation>, TupleHash> table_entry_map_{};
+    HashMap<Tuple<String, String, SegmentID>, UniquePtr<AddSegmentEntryOperation>, TupleHash> segment_entry_map_{};
+    HashMap<Tuple<String, String, SegmentID, BlockID>, UniquePtr<AddBlockEntryOperation>, TupleHash> block_entry_map_{};
+    HashMap<Tuple<String, String, SegmentID, BlockID, ColumnID>, UniquePtr<AddColumnEntryOperation>, TupleHash> column_entry_map_{};
+    HashMap<Tuple<bool, String, String, String>, UniquePtr<AddTableIndexEntryOperation>, TupleHash> table_index_entry_map_{};
+    HashMap<Tuple<String, String, String>, UniquePtr<AddIrsIndexEntryOperation>, TupleHash> irs_index_entry_map_{};
+    HashMap<Tuple<String, String, String, ColumnID>, UniquePtr<AddColumnIndexEntryOperation>, TupleHash> column_index_entry_map_{};
+    HashMap<Tuple<String, String, String, ColumnID, SegmentID>, UniquePtr<AddSegmentColumnIndexEntryOperation>, TupleHash> segment_index_entry_map_{};
 };
 
 } // namespace infinity

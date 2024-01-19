@@ -16,6 +16,8 @@ module;
 
 import stl;
 import txn;
+import catalog;
+import catalog_delta_entry;
 
 export module bg_task;
 
@@ -25,6 +27,7 @@ export enum class BGTaskType {
     kTryCheckpoint,   // Periodically triggered by timer
     kForceCheckpoint, // Manually triggered by PhysicalImport
     kStopProcessor,
+    kCatalogDeltaOpsMerge, // Merge
     kInvalid
 };
 
@@ -82,6 +85,19 @@ export struct ForceCheckpointTask final : public BGTask {
     String ToString() const final { return "Force Checkpoint Task"; }
 
     Txn *txn_{};
+};
+
+export struct CatalogDeltaOpsMergeTask final : public BGTask {
+
+    explicit CatalogDeltaOpsMergeTask(SharedPtr<CatalogDeltaEntry> local_catalog_delta_entry, NewCatalog *catalog)
+        : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(local_catalog_delta_entry), catalog_(catalog) {}
+
+    ~CatalogDeltaOpsMergeTask() = default;
+
+    String ToString() const final { return "Catalog Delta Ops Merge Task"; }
+
+    SharedPtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
+    NewCatalog *catalog_{};
 };
 
 } // namespace infinity

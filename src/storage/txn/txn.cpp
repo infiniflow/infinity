@@ -20,8 +20,8 @@ module;
 import stl;
 
 import infinity_exception;
-
 import txn_manager;
+import buffer_manager;
 import wal;
 import third_party;
 import logger;
@@ -30,9 +30,7 @@ import txn_store;
 import txn_state;
 import parser;
 import meta_state;
-import buffer_manager;
 import data_access_state;
-
 import table_detail;
 import table_entry_type;
 import catalog;
@@ -40,14 +38,17 @@ import database_detail;
 import status;
 import table_def;
 import index_def;
+import catalog_delta_entry;
+import bg_task;
+import backgroud_process;
 
 module txn;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
-    : txn_mgr_(txn_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
-      local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, NewCatalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
+      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
@@ -477,6 +478,12 @@ void Txn::CommitBottom() {
 
     // Snapshot the physical operations in one txn
     local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
+
+    if (!local_catalog_delta_ops_entry_->operations().empty()) {
+        // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+        auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
+        bg_task_processor_->Submit(catalog_delta_ops_merge_task);
+    }
 
     LOG_INFO(fmt::format("Txn: {} is committed.", txn_id_));
 

@@ -101,7 +101,7 @@ public:
         return elements;
     }
 };
-
+class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 export struct NewCatalog {
 public:
@@ -255,7 +255,7 @@ public:
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     // Global physical wal log
-    SharedPtr<Vector<SharedPtr<CatalogDeltaOperation>>> global_catalog_delta_ops_{};
+    SharedPtr<CatalogDeltaEntry> global_catalog_delta_entry_{MakeShared<CatalogDeltaEntry>(true)};
 };
 
 } // namespace infinity

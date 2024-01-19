@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module wal;
+module catalog_delta_entry;
 
 import crc;
 import serialize;
@@ -261,6 +261,7 @@ void AddTableMetaOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
+    this->db_name_ = this->table_meta_->db_name();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
     is_snapshotted_ = true;
@@ -481,6 +482,93 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("Snapshot operation {}", operation->ToString()));
         operation->SaveSate();
+    }
+}
+
+String CatalogDeltaEntry::ToString() const {
+    String str;
+    for (const auto &operation : operations_) {
+        str += operation->ToString() + "\n";
+    }
+    return str;
+}
+
+void CatalogDeltaEntry::Merge(SharedPtr<CatalogDeltaEntry> global_catalog_delta_entry) {
+    auto &local_operations = this->operations_;
+    for (auto &local_operation : local_operations) {
+        LOG_TRACE(fmt::format("[Merge Task] {} merge to global catalog delta entry", local_operation->ToString()));
+
+        switch (local_operation->GetType()) {
+            case CatalogDeltaOperationType::ADD_DATABASE_META: {
+                // check for duplicate operation db name
+                auto op_raw = static_cast<AddDBMetaOperation *>(local_operation.get());
+                global_catalog_delta_entry->db_meta_map_[op_raw->GetKey()] = UniquePtr<AddDBMetaOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_TABLE_META: {
+                auto op_raw = static_cast<AddTableMetaOperation *>(local_operation.get());
+                global_catalog_delta_entry->table_meta_map_[op_raw->GetKey()] = UniquePtr<AddTableMetaOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_DATABASE_ENTRY: {
+                auto op_raw = static_cast<AddDBEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->db_entry_map_[op_raw->GetKey()] = UniquePtr<AddDBEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_TABLE_ENTRY: {
+                auto op_raw = static_cast<AddTableEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->table_entry_map_[op_raw->GetKey()] = UniquePtr<AddTableEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_SEGMENT_ENTRY: {
+                auto op_raw = static_cast<AddSegmentEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->segment_entry_map_[op_raw->GetKey()] = UniquePtr<AddSegmentEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_BLOCK_ENTRY: {
+                auto op_raw = static_cast<AddBlockEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->block_entry_map_[op_raw->GetKey()] = UniquePtr<AddBlockEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_COLUMN_ENTRY: {
+                auto op_raw = static_cast<AddColumnEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->column_entry_map_[op_raw->GetKey()] = UniquePtr<AddColumnEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_INDEX_META: {
+                auto op_raw = static_cast<AddIndexMetaOperation *>(local_operation.get());
+                global_catalog_delta_entry->index_meta_map_[op_raw->GetKey()] = UniquePtr<AddIndexMetaOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY: {
+                auto op_raw = static_cast<AddTableIndexEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->table_index_entry_map_[op_raw->GetKey()] = UniquePtr<AddTableIndexEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY: {
+                auto op_raw = static_cast<AddIrsIndexEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->irs_index_entry_map_[op_raw->GetKey()] = UniquePtr<AddIrsIndexEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY: {
+                auto op_raw = static_cast<AddColumnIndexEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->column_index_entry_map_[op_raw->GetKey()] = UniquePtr<AddColumnIndexEntryOperation>(op_raw);
+                break;
+            }
+            case CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
+                auto op_raw = static_cast<AddSegmentColumnIndexEntryOperation *>(local_operation.get());
+                global_catalog_delta_entry->segment_index_entry_map_[op_raw->GetKey()] = UniquePtr<AddSegmentColumnIndexEntryOperation>(op_raw);
+                break;
+            }
+
+            default: {
+                break;
+            }
+        }
+
+        local_operation.release();
+        global_catalog_delta_entry->txn_id_ = this->txn_id_;
+        global_catalog_delta_entry->commit_ts_ = this->commit_ts_;
     }
 }
 
