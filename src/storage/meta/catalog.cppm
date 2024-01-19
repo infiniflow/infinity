@@ -100,8 +100,8 @@ public:
         return elements;
     }
 };
-class CatalogDeltaEntry;
-class CatalogDeltaOperation;
+
+class GlobalCatalogDeltaEntry;
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
@@ -250,7 +250,7 @@ public:
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     // Global physical wal log
-    SharedPtr<CatalogDeltaEntry> global_catalog_delta_entry_{MakeShared<CatalogDeltaEntry>(true)};
+    SharedPtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeShared<GlobalCatalogDeltaEntry>()};
 };
 
 } // namespace infinity

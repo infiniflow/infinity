@@ -64,8 +64,8 @@ public:
     CatalogDeltaOperation(CatalogDeltaOperationType type) : type_(type) {}
     CatalogDeltaOperation(TxnTimeStamp begin_ts, bool is_delete) : begin_ts_(begin_ts), is_delete_(is_delete) {}
     virtual ~CatalogDeltaOperation() = default;
-    virtual auto GetType() -> CatalogDeltaOperationType = 0; // This is a pure virtual function
-    [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;  // This is a pure virtual function
+    virtual auto GetType() -> CatalogDeltaOperationType = 0;
+    [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
     SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(bool); }
@@ -80,7 +80,7 @@ public:
 
     bool is_flushed_{false};
     bool is_snapshotted_{false};
-    CatalogDeltaOperationType type_{};
+    CatalogDeltaOperationType type_{CatalogDeltaOperationType::INVALID};
 };
 
 /// class AddDBMetaOperation
@@ -115,7 +115,7 @@ public:
         : CatalogDeltaOperation(begin_ts, is_delete), table_name_(std::move(table_name)), db_entry_dir_(std::move(db_entry_dir_)) {}
     explicit AddTableMetaOperation(TableMeta *table_meta)
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_META), table_meta_(table_meta) {}
-    CatalogDeltaOperationType GetType() final { return CatalogDeltaOperationType::ADD_DATABASE_META; }
+    CatalogDeltaOperationType GetType() final { return CatalogDeltaOperationType::ADD_TABLE_META; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->table_name_.size() + sizeof(i32) + this->db_entry_dir_.size() +
                           GetBaseSizeInBytes();
@@ -151,7 +151,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "AddDBEntry"; };
-    Tuple<bool, String> GetKey() const { return std::make_tuple(db_entry_->deleted_, db_name_); }
+    Tuple<bool, String> GetKey() const { return std::make_tuple(this->is_delete_, this->db_name_); }
 
 public:
     SharedPtr<DBEntry> db_entry_{};
@@ -178,7 +178,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "AddTableEntry"; }
-    Tuple<bool, String, String> GetKey() const { return std::make_tuple(table_entry_->deleted_, db_name_, table_name_); }
+    Tuple<bool, String, String> GetKey() const { return std::make_tuple(is_delete_, db_name_, table_name_); }
 
 public:
     SharedPtr<TableEntry> table_entry_{};
@@ -375,9 +375,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "AddTableIndexEntry"; }
-    Tuple<bool, String, String, String> GetKey() {
-        return std::make_tuple(this->table_index_entry_->deleted_, this->db_name_, this->table_name_, this->index_name_);
-    }
+    Tuple<bool, String, String, String> GetKey() { return std::make_tuple(this->is_delete_, this->db_name_, this->table_name_, this->index_name_); }
 
 public:
     SharedPtr<TableIndexEntry> table_index_entry_{};
@@ -422,7 +420,12 @@ private:
 /// class AddColumnIndexEntryOperation
 export class AddColumnIndexEntryOperation : public CatalogDeltaOperation {
 public:
-    explicit AddColumnIndexEntryOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, String index_name, u64 column_id)
+    explicit AddColumnIndexEntryOperation(TxnTimeStamp begin_ts,
+                                          bool is_delete,
+                                          String db_name,
+                                          String table_name,
+                                          String index_name,
+                                          ColumnID column_id)
         : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
           index_name_(std::move(index_name)), column_id_(column_id) {}
     explicit AddColumnIndexEntryOperation(SharedPtr<ColumnIndexEntry> column_index_entry)
@@ -545,9 +548,6 @@ public:
 export class CatalogDeltaEntry : CatalogDeltaEntryHeader {
 public:
     CatalogDeltaEntry() = default;
-    explicit CatalogDeltaEntry(bool global)
-        : global_(global), operations_(), db_meta_map_(), table_meta_map_(), db_entry_map_(), table_entry_map_(), segment_entry_map_(),
-          block_entry_map_(), column_entry_map_() {}
     [[nodiscard]] i32 GetSizeInBytes() const;
     void WriteAdv(char *&ptr) const;
     static SharedPtr<CatalogDeltaEntry> ReadAdv(char *&ptr, i32 max_bytes);
@@ -558,15 +558,39 @@ public:
 
     void Merge(SharedPtr<CatalogDeltaEntry> other);
 
-    bool global_{false}; // when global state is true constructor initializes various maps
-
 private:
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
+};
 
+export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {
+public:
+    GlobalCatalogDeltaEntry() = default;
+    // get map
+    HashMap<String, UniquePtr<AddDBMetaOperation>> &db_meta_map() { return db_meta_map_; }
+    HashMap<Tuple<String, String>, UniquePtr<AddTableMetaOperation>, TupleHash> &table_meta_map() { return table_meta_map_; }
+    HashMap<Tuple<String, String, String>, UniquePtr<AddIndexMetaOperation>, TupleHash> &index_meta_map() { return index_meta_map_; }
+    HashMap<Tuple<bool, String>, UniquePtr<AddDBEntryOperation>, TupleHash> &db_entry_map() { return db_entry_map_; }
+    HashMap<Tuple<bool, String, String>, UniquePtr<AddTableEntryOperation>, TupleHash> &table_entry_map() { return table_entry_map_; }
+    HashMap<Tuple<String, String, SegmentID>, UniquePtr<AddSegmentEntryOperation>, TupleHash> &segment_entry_map() { return segment_entry_map_; }
+    HashMap<Tuple<String, String, SegmentID, BlockID>, UniquePtr<AddBlockEntryOperation>, TupleHash> &block_entry_map() { return block_entry_map_; }
+    HashMap<Tuple<String, String, SegmentID, BlockID, ColumnID>, UniquePtr<AddColumnEntryOperation>, TupleHash> &column_entry_map() {
+        return column_entry_map_;
+    }
+    HashMap<Tuple<bool, String, String, String>, UniquePtr<AddTableIndexEntryOperation>, TupleHash> &table_index_entry_map() {
+        return table_index_entry_map_;
+    }
+    HashMap<Tuple<String, String, String>, UniquePtr<AddIrsIndexEntryOperation>, TupleHash> &irs_index_entry_map() { return irs_index_entry_map_; }
+    HashMap<Tuple<String, String, String, ColumnID>, UniquePtr<AddColumnIndexEntryOperation>, TupleHash> &column_index_entry_map() {
+        return column_index_entry_map_;
+    }
+    HashMap<Tuple<String, String, String, ColumnID, SegmentID>, UniquePtr<AddSegmentColumnIndexEntryOperation>, TupleHash> &
+    segment_index_entry_map() {
+        return segment_index_entry_map_;
+    }
+private:
     HashMap<String, UniquePtr<AddDBMetaOperation>> db_meta_map_{};
     HashMap<Tuple<String, String>, UniquePtr<AddTableMetaOperation>, TupleHash> table_meta_map_{};
     HashMap<Tuple<String, String, String>, UniquePtr<AddIndexMetaOperation>, TupleHash> index_meta_map_{};
-
     HashMap<Tuple<bool, String>, UniquePtr<AddDBEntryOperation>, TupleHash> db_entry_map_{};
     HashMap<Tuple<bool, String, String>, UniquePtr<AddTableEntryOperation>, TupleHash> table_entry_map_{};
     HashMap<Tuple<String, String, SegmentID>, UniquePtr<AddSegmentEntryOperation>, TupleHash> segment_entry_map_{};
