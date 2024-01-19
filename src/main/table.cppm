@@ -41,6 +41,8 @@ public:
 
     QueryResult Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
+    QueryResult Explain(ExplainType explain_type, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
+
 private:
     String table_name_{};
     SharedPtr<BaseSession> session_{};

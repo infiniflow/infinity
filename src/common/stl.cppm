@@ -169,6 +169,7 @@ using std::uniform_real_distribution;
 using std::iota;
 
 using std::exception;
+using std::unordered_set;
 } // namespace std
 
 namespace infinity {

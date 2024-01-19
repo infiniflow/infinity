@@ -94,7 +94,7 @@ public:
     String ToString() const {
         std::stringstream ss;
         for (SizeT idx = 0; idx < tail_index_; ++idx) {
-            ss << ToString(idx) << " ";
+            ss << ToString(idx) << std::endl;
         }
         return ss.str();
     }

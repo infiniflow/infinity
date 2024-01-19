@@ -38,6 +38,7 @@ QueryResult Database::CreateTable(const String &table_name,
                             InfinityContext::instance().session_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
+    create_table_info->schema_name_ = db_name_;
     create_table_info->table_name_ = table_name;
     create_table_info->column_defs_ = std::move(column_defs);
     create_table_info->constraints_ = std::move(constraints);
