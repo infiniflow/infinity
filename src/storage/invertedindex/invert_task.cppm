@@ -22,6 +22,6 @@ private:
 
     SharedPtr<ColumnVector> column_vector_;
 
-    Vector<RowID> row_ids_;
+    Vector<RowID> &row_ids_;
 };
 } // namespace infinity
