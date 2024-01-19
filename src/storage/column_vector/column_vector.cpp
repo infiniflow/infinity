@@ -30,31 +30,36 @@ import serialize;
 import third_party;
 import logger;
 import value;
-
+import catalog;
+import buffer_manager;
 module column_vector;
 
 namespace infinity {
 
-void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
+VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
         UnrecoverableError("Column vector is already initialized.");
     }
-    if (other.vector_type_ == ColumnVectorType::kInvalid) {
-        UnrecoverableError("Other column vector is invalid.");
+    if (data_type_->type() == LogicalType::kInvalid) {
+        UnrecoverableError("Data type isn't assigned.");
+    }
+    if (vector_type == ColumnVectorType::kInvalid) {
+        UnrecoverableError("Attempt to initialize column vector to invalid type.");
     }
 
-    vector_type_ = other.vector_type_;
+    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
+    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
+    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
+        vector_type = ColumnVectorType::kCompactBit;
+    }
+
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    capacity_ = capacity;
+
+    tail_index_ = 0;
     data_type_size_ = data_type_->Size();
-
-    if (vector_type_ == ColumnVectorType::kConstant) {
-        // If the vector is constant, all elements are the same, so the select is meaningless.
-        capacity_ = other.capacity();
-    } else {
-        //        capacity_ = input_select.Size();
-        // Select size might not be the power of 2. Then, we use DEFAULT_VECTOR_SIZE;
-        capacity_ = DEFAULT_VECTOR_SIZE;
-    }
-
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch (data_type_->type()) {
             //        case LogicalType::kBlob:
@@ -78,6 +83,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             vector_buffer_type = VectorBufferType::kStandard;
         }
     }
+    return vector_buffer_type;
+}
+
+void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() == nullptr) {
         if (vector_type_ == ColumnVectorType::kConstant) {
@@ -99,6 +109,21 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     }
 
     initialized = true;
+}
+
+void ColumnVector::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, ColumnVectorType vector_type, SizeT capacity) {
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
+
+    if (buffer_.get() != nullptr) {
+        UnrecoverableError("Column vector is already initialized.");
+    }
+    
+    data_ptr_ = buffer_->GetData();
+}
+
+void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
+    ColumnVectorType vector_type = other.vector_type_;
+    Initialize(vector_type, vector_type == ColumnVectorType::kConstant ? other.capacity() : DEFAULT_VECTOR_SIZE);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
         tail_index_ = other.tail_index_;
@@ -235,136 +260,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     }
 }
 
-void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    if (initialized) {
-        UnrecoverableError("Column vector is already initialized.");
-    }
-    if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
-    }
-    if (vector_type == ColumnVectorType::kInvalid) {
-        UnrecoverableError("Attempt to initialize column vector to invalid type.");
-    }
-
-    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
-    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
-    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
-        vector_type = ColumnVectorType::kCompactBit;
-    }
-
-    // TODO: No check on capacity value.
-
-    vector_type_ = vector_type;
-    capacity_ = capacity;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
-//        case LogicalType::kBlob:
-//        case LogicalType::kBitmap:
-//        case LogicalType::kPolygon:
-//        case LogicalType::kPath:
-        case LogicalType::kBoolean: {
-            vector_buffer_type = VectorBufferType::kCompactBit;
-            break;
-        }
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            UnrecoverableError("Unexpected data type for column vector.");
-        }
-        default: {
-            vector_buffer_type = VectorBufferType::kStandard;
-        }
-    }
-    if (buffer_.get() == nullptr) {
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(8);
-        } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(capacity_);
-        }
-        data_ptr_ = buffer_->GetData();
-    } else {
-        // Initialize after reset will come to this branch
-        if (vector_buffer_type == VectorBufferType::kHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr) {
-                UnrecoverableError("Vector heap should be null.");
-            }
-            buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
-        }
-    }
-
-    initialized = true;
-}
-
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
-    if (initialized) {
-        UnrecoverableError("Column vector is already initialized.");
-    }
-    if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
-    }
     if (end_idx <= start_idx) {
         UnrecoverableError("End index should larger than start index.");
     }
-
-    vector_type_ = vector_type;
-    capacity_ = end_idx - start_idx;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
-
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
-            //        case LogicalType::kBlob:
-            //        case LogicalType::kBitmap:
-            //        case LogicalType::kPolygon:
-            //        case LogicalType::kPath:
-        case LogicalType::kBoolean: {
-            vector_buffer_type = VectorBufferType::kCompactBit;
-            break;
-        }
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            UnrecoverableError("Unexpected data type for column vector.");
-        }
-        default: {
-            vector_buffer_type = VectorBufferType::kStandard;
-        }
-    }
-
-    if (buffer_.get() == nullptr) {
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(8);
-        } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(capacity_);
-        }
-        data_ptr_ = buffer_->GetData();
-    } else {
-        // Initialize after reset will come to this branch
-        if (vector_buffer_type == VectorBufferType::kHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr) {
-                UnrecoverableError("Vector heap should be null.");
-            }
-            buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
-        }
-    }
-
-    initialized = true;
+    Initialize(vector_type, end_idx - start_idx);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
         tail_index_ = 1;

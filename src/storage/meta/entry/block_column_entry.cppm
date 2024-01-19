@@ -69,6 +69,8 @@ public:
 
     ColumnBuffer GetColumnData(BufferManager *buffer_manager);
 
+    ColumnVector GetColumnVector(BufferManager *buffer_mgr);
+
     // Append used in import and wal_replay
     void AppendRaw(SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
 

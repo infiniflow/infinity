@@ -16,7 +16,8 @@ module;
 
 import stl;
 import fix_heap;
-
+import buffer_obj;
+import buffer_manager;
 import infinity_exception;
 
 module vector_buffer;
@@ -33,6 +34,26 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity,
         }
         default: {
             buffer_ptr->Initialize(data_type_size, capacity);
+            break;
+        }
+    }
+    return buffer_ptr;
+}
+
+SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
+                                           BlockColumnEntry *block_column_entry,
+                                           SizeT data_type_size,
+                                           SizeT capacity,
+                                           VectorBufferType buffer_type) {
+    SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
+    buffer_ptr->buffer_type_ = buffer_type;
+    switch (buffer_type) {
+        case VectorBufferType::kCompactBit: {
+            buffer_ptr->InitializeCompactBit(capacity);
+            break;
+        }
+        default: {
+            buffer_ptr->Initialize(buffer_mgr, block_column_entry, data_type_size, capacity);
             break;
         }
     }
@@ -68,6 +89,14 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
+}
+
+void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
+    //
+}
+
+void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_size, SizeT capacity) {
+    //
 }
 
 void VectorBuffer::ResetToInit() {

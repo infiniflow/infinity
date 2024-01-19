@@ -84,6 +84,7 @@ BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, Colum
     return block_column_entry;
 }
 
+// to be remove
 ColumnBuffer BlockColumnEntry::GetColumnData(BufferManager *buffer_manager) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
@@ -93,6 +94,18 @@ ColumnBuffer BlockColumnEntry::GetColumnData(BufferManager *buffer_manager) {
 
     bool outline = this->column_type_->type() == kVarchar;
     return outline ? ColumnBuffer(this->column_id_, this->buffer_, buffer_manager, this->base_dir_) : ColumnBuffer(this->column_id_, this->buffer_);
+}
+
+ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
+    if (this->buffer_ == nullptr) {
+        // Get buffer handle from buffer manager
+        auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
+        this->buffer_ = buffer_mgr->Get(std::move(file_worker));
+    }
+
+    ColumnVector column_vector(column_type_);
+    column_vector.Initialize(buffer_mgr, this);
+    return column_vector;
 }
 
 void BlockColumnEntry::Append(BlockColumnEntry *column_entry,

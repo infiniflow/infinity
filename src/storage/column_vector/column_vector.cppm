@@ -35,6 +35,9 @@ export module column_vector;
 
 namespace infinity {
 
+class BufferManager;
+class BlockColumnEntry;
+
 export enum class ColumnVectorType : i8 {
     kInvalid,
     kFlat,          // Stand without any encode
@@ -89,8 +92,6 @@ public:
         GlobalResourceUsage::DecrObjectCount();
     }
 
-    void Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx) { Initialize(other.vector_type_, other, start_idx, end_idx); }
-
     String ToString() const {
         std::stringstream ss;
         for (SizeT idx = 0; idx < tail_index_; ++idx) {
@@ -131,12 +132,22 @@ public:
         this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
     }
 
-public:
-    void Initialize(const ColumnVector &other, const Selection &input_select);
+private:
+    VectorBufferType InitializeHelper(ColumnVectorType vector_type, SizeT capacity);
 
+public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
 
+    void Initialize(BufferManager *buffer_mgr,
+                    BlockColumnEntry *block_column_entry,
+                    ColumnVectorType vector_type = ColumnVectorType::kFlat,
+                    SizeT capacity = DEFAULT_VECTOR_SIZE);
+
+    void Initialize(const ColumnVector &other, const Selection &input_select);
+
     void Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx);
+
+    void Initialize(const ColumnVector &other, SizeT start_idx, SizeT end_idx) { Initialize(other.vector_type_, other, start_idx, end_idx); }
 
     String ToString(SizeT row_index) const;
 
