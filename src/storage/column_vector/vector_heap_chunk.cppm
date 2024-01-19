@@ -17,28 +17,66 @@ module;
 import stl;
 import global_resource_usage;
 import allocator;
+import buffer_obj;
+import buffer_handle;
+import infinity_exception;
+
+#include <variant>
 
 export module vector_heap_chunk;
 
 namespace infinity {
 
+export using ChunkId = u64;
+
 export struct VectorHeapChunk {
 public:
-    inline explicit VectorHeapChunk(u64 capacity) : capacity_(capacity) {
+    explicit VectorHeapChunk(BufferObj *buffer_obj, u64 capacity) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
+
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUnique<char[]>(capacity)) {
         GlobalResourceUsage::IncrObjectCount();
-        ptr_ = Allocator::allocate(capacity);
+        auto &p = std::get<UniquePtr<char[]>>(ptr_);
+        auto p1 = p.get();
+        int a = 1;
     }
 
-    inline ~VectorHeapChunk() {
-        Allocator::deallocate(ptr_);
-        ptr_ = nullptr;
-        capacity_ = 0;
-        GlobalResourceUsage::DecrObjectCount();
+    VectorHeapChunk(const VectorHeapChunk &) = delete;
+
+    VectorHeapChunk(VectorHeapChunk &&other) {
+        if (std::holds_alternative<UniquePtr<char[]>>(other.ptr_)) {
+            ptr_ = std::move(std::get<UniquePtr<char[]>>(other.ptr_));
+        } else {
+            ptr_ = std::move(std::get<BufferHandle>(other.ptr_));
+        }
     }
 
-    ptr_t ptr_{nullptr};
-    u64 capacity_{0};
+    VectorHeapChunk &operator=(const VectorHeapChunk &) = delete;
+
+    VectorHeapChunk &operator=(VectorHeapChunk &&) = delete;
+
+    ~VectorHeapChunk() { GlobalResourceUsage::DecrObjectCount(); }
+
+    const char *GetPtr() const { // Pattern Matching here
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            UnrecoverableError("Not implemented yet");
+            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
+        }
+    }
+
+    char *GetPtrMut() {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            auto &p = std::get<UniquePtr<char[]>>(ptr_);
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            UnrecoverableError("Not implemented yet");
+            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
+        }
+    }
+
+private:
+    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
 };
 
-}
-
+} // namespace infinity

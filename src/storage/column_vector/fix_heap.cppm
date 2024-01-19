@@ -33,35 +33,29 @@ export struct FixHeapManager {
     static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();
 
 public:
-    inline explicit FixHeapManager(u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE) : current_chunk_size_(chunk_size) {
-        GlobalResourceUsage::IncrObjectCount();
-    }
+    explicit FixHeapManager(u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE);
 
-    explicit FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE)
-        : current_chunk_size_(chunk_size) {
-        GlobalResourceUsage::IncrObjectCount();
-    }
+    explicit FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size = DEFAULT_FIXLEN_CHUNK_SIZE);
 
-    inline ~FixHeapManager() { GlobalResourceUsage::DecrObjectCount(); }
+    ~FixHeapManager();
 
     // return value: start chunk id & chunk offset
-    Pair<u64, u64> AppendToHeap(const char* data_ptr, SizeT nbytes);
+    Pair<ChunkId, u64> AppendToHeap(const char *data_ptr, SizeT nbytes);
 
     // return value: start chunk id & chunk offset
-    Pair<u64, u64> AppendToHeap(const FixHeapManager* src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes);
+    Pair<ChunkId, u64> AppendToHeap(FixHeapManager *src_heap_mgr, ChunkId src_chunk_id, u64 src_chunk_offset, SizeT nbytes);
 
     // Read #nbytes size of data from offset: #chunk_offset of chunk: #chunk_id to buffer: #buffer, Make sure the buffer has enough space to hold
     // the size of data.
-    void ReadFromHeap(char* buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes);
+    void ReadFromHeap(char *buffer, ChunkId chunk_id, u64 chunk_offset, SizeT nbytes);
 
     [[nodiscard]] String Stats() const;
-
 
 public:
     // Shouldn't use it except unit test
     [[nodiscard]] inline SizeT chunk_count() const { return chunks_.size(); }
 
-    [[nodiscard]] inline u64 current_chunk_idx() const { return current_chunk_idx_; }
+    [[nodiscard]] inline ChunkId current_chunk_idx() const { return current_chunk_idx_; }
 
     [[nodiscard]] inline u64 current_chunk_size() const { return current_chunk_size_; }
 
@@ -73,51 +67,41 @@ public:
     // Used when comparing two VarcharT variables.
     // Only get next char, without copying it to buffer.
     friend VarcharNextCharIterator;
-    [[nodiscard]] VarcharNextCharIterator GetNextCharIterator(const VarcharT &varchar) const;
+    [[nodiscard]] VarcharNextCharIterator GetNextCharIterator(const VarcharT &varchar);
 
 private:
+    VectorHeapChunk AllocateChunk();
+
     // Allocate new chunk if current chunk is not enough.
     // return value: start chunk id and start offset of the chunk id
-    Pair<u64, u64> Allocate(SizeT nbytes);
+    Pair<ChunkId, u64> Allocate(SizeT nbytes);
+
+    // Load chunk from disk if `buffer_mgr_ != nullptr` and that chunk not in memory
+    VectorHeapChunk &ReadChunk(ChunkId chunk_id);
 
 private:
-    Vector<UniquePtr<VectorHeapChunk>> chunks_{};
+    HashMap<ChunkId, VectorHeapChunk> chunks_{};
     u64 current_chunk_size_{DEFAULT_FIXLEN_CHUNK_SIZE};
-    u64 current_chunk_idx_{0};
+    ChunkId current_chunk_idx_{0};
     u64 current_chunk_offset_{0};
+
+    BufferManager *buffer_mgr_{nullptr};
+
+    BlockColumnEntry *block_column_entry_{nullptr};
 };
 
 // can only move forward
 class VarcharNextCharIterator {
 public:
-    explicit VarcharNextCharIterator(const FixHeapManager *heap_mgr, const VarcharT &varchar) {
-        if (varchar.IsInlined()) {
-            data_ptr_ = varchar.short_.data_;
-            remain_size_ = varchar.length_;
-        } else {
-            heap_mgr_ = heap_mgr;
-            chunk_id_ = varchar.vector_.chunk_id_;
-            data_ptr_ = heap_mgr_->chunks_[chunk_id_]->ptr_ + varchar.vector_.chunk_offset_;
-            remain_size_ = heap_mgr_->current_chunk_size() - varchar.vector_.chunk_offset_;
-        }
-    }
+    explicit VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar);
 
-    [[nodiscard]] inline char GetNextChar() {
-        if (remain_size_ == 0) {
-            data_ptr_ = heap_mgr_->chunks_[++chunk_id_]->ptr_;
-            remain_size_ = heap_mgr_->current_chunk_size();
-        }
-        --remain_size_;
-        return *(data_ptr_++);
-    }
+    [[nodiscard]] char GetNextChar();
 
 private:
     const char *data_ptr_{nullptr};
     u64 remain_size_{0};
-    const FixHeapManager *heap_mgr_{nullptr};
-    u64 chunk_id_{0};
+    FixHeapManager *heap_mgr_{nullptr};
+    ChunkId chunk_id_{0};
 };
-
-VarcharNextCharIterator FixHeapManager::GetNextCharIterator(const VarcharT &varchar) const { return VarcharNextCharIterator(this, varchar); }
 
 } // namespace infinity

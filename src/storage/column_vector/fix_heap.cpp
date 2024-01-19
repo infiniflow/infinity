@@ -21,10 +21,34 @@ import third_party;
 import infinity_exception;
 import default_values;
 import vector_heap_chunk;
+import global_resource_usage;
+import parser;
+import catalog;
+import buffer_manager;
 
 module fix_heap;
 
 namespace infinity {
+FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) { GlobalResourceUsage::IncrObjectCount(); }
+
+FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
+    : current_chunk_size_(chunk_size), buffer_mgr_(buffer_mgr), block_column_entry_(block_column_entry) {
+    GlobalResourceUsage::IncrObjectCount();
+}
+
+FixHeapManager::~FixHeapManager() {
+    GlobalResourceUsage::DecrObjectCount();
+    // std::variant in `VectorHeapChunk` will call destructor automatically
+}
+
+VectorHeapChunk FixHeapManager::AllocateChunk() {
+    if (buffer_mgr_ == nullptr) {
+        return VectorHeapChunk(current_chunk_size_);
+    } else {
+        // allocate by buffer_mgr, and store returned buffer_obj in `block_column_entry_`
+        UnrecoverableError("Not implemented yet");
+    }
+}
 
 Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
@@ -35,26 +59,37 @@ Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
     u64 start_chunk_id = current_chunk_idx_;
     u64 start_chunk_offset = current_chunk_offset_;
 
-    if (chunks_.empty())
-        chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+    if (chunks_.empty()) {
+        chunks_.emplace(current_chunk_idx_, AllocateChunk());
+    }
     if (current_chunk_offset_ + nbytes > current_chunk_size_) {
         rest_nbytes -= (current_chunk_size_ - current_chunk_offset_);
         while (rest_nbytes > current_chunk_size_) {
-            chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+            chunks_.emplace(++current_chunk_idx_, AllocateChunk());
             rest_nbytes -= current_chunk_size_;
         }
 
         if (rest_nbytes >= 0) {
-            chunks_.emplace_back(MakeUnique<VectorHeapChunk>(current_chunk_size_));
+            chunks_.emplace(++current_chunk_idx_, AllocateChunk());
         }
 
         current_chunk_offset_ = rest_nbytes;
-        current_chunk_idx_ = chunks_.size() - 1;
         return {start_chunk_id, start_chunk_offset};
     } else {
         current_chunk_offset_ += nbytes;
         return {start_chunk_id, start_chunk_offset};
     }
+}
+
+VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
+    auto iter = chunks_.find(chunk_id);
+    if (iter != chunks_.end()) {
+        return iter->second;
+    }
+    if (buffer_mgr_ == nullptr) {
+        UnrecoverableError("No such chunk in heap");
+    }
+    UnrecoverableError("Not implemented yet");
 }
 
 // return value: start chunk id & chunk offset
@@ -64,7 +99,8 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
     u64 start_chunk_id = chunk_id;
     u64 start_chunk_offset = chunk_offset;
     while (nbytes > 0) {
-        char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
+        VectorHeapChunk &chunk = ReadChunk(chunk_id);
+        char *start_ptr = chunk.GetPtrMut() + chunk_offset;
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         if (nbytes <= current_chunk_remain_size) {
             // Current chunk can hold the data
@@ -83,12 +119,13 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const char *data_ptr, SizeT nbytes) 
 }
 
 // return value: start chunk id & chunk offset
-Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager *src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
+Pair<u64, u64> FixHeapManager::AppendToHeap(FixHeapManager *src_heap_mgr, u64 src_chunk_id, u64 src_chunk_offset, SizeT nbytes) {
     auto [chunk_id, chunk_offset] = Allocate(nbytes);
     u64 start_chunk_id = chunk_id;
     u64 start_chunk_offset = chunk_offset;
     while (nbytes > 0) {
-        char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
+        VectorHeapChunk &dst_chunk = ReadChunk(chunk_id);
+        char *start_ptr = dst_chunk.GetPtrMut() + chunk_offset;
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         SizeT src_chunk_remain_size = src_heap_mgr->current_chunk_size() - src_chunk_offset;
 
@@ -100,7 +137,8 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager *src_heap_mgr, 
             copy_size = std::min(current_chunk_remain_size, nbytes);
         }
 
-        char *src_ptr = src_heap_mgr->chunks_[src_chunk_id]->ptr_ + src_chunk_offset;
+        const VectorHeapChunk &src_chunk = src_heap_mgr->ReadChunk(src_chunk_id);
+        const char *src_ptr = src_chunk.GetPtr() + src_chunk_offset;
 
         std::memcpy(start_ptr, src_ptr, copy_size);
 
@@ -130,7 +168,8 @@ Pair<u64, u64> FixHeapManager::AppendToHeap(const FixHeapManager *src_heap_mgr, 
 // the size of data.
 void FixHeapManager::ReadFromHeap(char *buffer, u64 chunk_id, u64 chunk_offset, SizeT nbytes) {
     while (nbytes > 0) {
-        char *start_ptr = chunks_[chunk_id]->ptr_ + chunk_offset;
+        const VectorHeapChunk &src_chunk = ReadChunk(chunk_id);
+        const char *start_ptr = src_chunk.GetPtr() + chunk_offset;
         SizeT current_chunk_remain_size = current_chunk_size_ - chunk_offset;
         if (nbytes <= current_chunk_remain_size) {
             std::memcpy(buffer, start_ptr, nbytes);
@@ -151,5 +190,28 @@ String FixHeapManager::Stats() const {
        << ", Total size: " << total_size() << std::endl;
     return ss.str();
 }
+
+VarcharNextCharIterator::VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar) {
+    if (varchar.IsInlined()) {
+        data_ptr_ = varchar.short_.data_;
+        remain_size_ = varchar.length_;
+    } else {
+        heap_mgr_ = heap_mgr;
+        chunk_id_ = varchar.vector_.chunk_id_;
+        data_ptr_ = heap_mgr_->ReadChunk(chunk_id_).GetPtr() + varchar.vector_.chunk_offset_;
+        remain_size_ = heap_mgr_->current_chunk_size() - varchar.vector_.chunk_offset_;
+    }
+}
+
+[[nodiscard]] char VarcharNextCharIterator::GetNextChar() {
+    if (remain_size_ == 0) {
+        data_ptr_ = heap_mgr_->ReadChunk(++chunk_id_).GetPtr();
+        remain_size_ = heap_mgr_->current_chunk_size();
+    }
+    --remain_size_;
+    return *(data_ptr_++);
+}
+
+VarcharNextCharIterator FixHeapManager::GetNextCharIterator(const VarcharT &varchar) { return VarcharNextCharIterator(this, varchar); }
 
 } // namespace infinity

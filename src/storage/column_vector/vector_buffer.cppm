@@ -51,7 +51,7 @@ public:
 
     void InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity);
 
-    void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_size, SizeT capacity);
+    void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
 
     void ResetToInit();
 

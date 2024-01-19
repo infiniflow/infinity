@@ -18,7 +18,9 @@ import stl;
 import fix_heap;
 import buffer_obj;
 import buffer_manager;
+import buffer_handle;
 import infinity_exception;
+import catalog;
 
 module vector_buffer;
 
@@ -95,8 +97,26 @@ void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEn
     //
 }
 
-void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_size, SizeT capacity) {
-    //
+void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity) {
+    if (initialized_) {
+        UnrecoverableError("Vector buffer is already initialized.");
+    }
+    SizeT data_size = type_size * capacity;
+    auto *buffer_obj = block_column_entry->buffer();
+    if (buffer_obj == nullptr) {
+        UnrecoverableError("Buffer object is nullptr.");
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        UnrecoverableError("Buffer object size is not equal to data size.");
+    }
+    auto buffer_handle = buffer_obj->Load();
+    data_ = static_cast<char *>(buffer_handle.GetDataMut());
+    if (buffer_type_ == VectorBufferType::kHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(buffer_mgr, block_column_entry);
+    }
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
 }
 
 void VectorBuffer::ResetToInit() {
