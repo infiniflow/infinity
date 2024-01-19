@@ -1,11 +1,11 @@
 module;
 
+module skiplist_reader;
+
 import stl;
 import byte_slice;
-
+import status;
 import infinity_exception;
-
-module skiplist_reader;
 
 namespace infinity {
 
@@ -16,10 +16,10 @@ SkipListReader::SkipListReader(const SkipListReader &other)
 
 void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
     if (start > byte_slice_list->GetTotalSize()) {
-        Error<StorageException>("start > byte_slice_list->GetTotalSize().");
+        UnrecoverableError("start > byte_slice_list->GetTotalSize().");
     }
     if (end > byte_slice_list->GetTotalSize()) {
-        Error<StorageException>("end > byte_slice_list->GetTotalSize().");
+        UnrecoverableError("end > byte_slice_list->GetTotalSize().");
     }
     start_ = start;
     end_ = end;
@@ -29,10 +29,10 @@ void SkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 e
 
 void SkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     if (start > byte_slice->size_) {
-        Error<StorageException>("start > byte_slice->size_.");
+        UnrecoverableError("start > byte_slice->size_.");
     }
     if (end > byte_slice->size_) {
-        Error<StorageException>("end > byte_slice->size_.");
+        UnrecoverableError("end > byte_slice->size_.");
     }
 
     start_ = start;

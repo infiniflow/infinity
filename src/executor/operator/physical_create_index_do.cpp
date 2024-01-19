@@ -65,7 +65,7 @@ bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *
 
     auto status = txn->CreateIndexDo(base_table_ref_->table_entry_ptr_, *index_name_, create_index_idxes);
     if (!status.ok()) {
-        operator_state->error_message_ = std::move(status.msg_);
+        operator_state->status_ = status;
         return false;
     }
     operator_state->SetComplete();

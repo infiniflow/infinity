@@ -45,7 +45,7 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<TimestampT, VarcharT, TimestampTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Timestamp type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Timestamp type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -54,7 +54,7 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
 struct TimestampTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
                 fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -63,7 +63,7 @@ struct TimestampTryCastToFixlen {
 struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
                 fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -71,25 +71,25 @@ struct TimestampTryCastToVarlen {
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
     return false;
 }
 

@@ -14,6 +14,8 @@
 
 module;
 
+module file_worker;
+
 import stl;
 
 import infinity_exception;
@@ -21,11 +23,9 @@ import local_file_system;
 import third_party;
 import file_system_type;
 import defer_op;
-
+import status;
 import local_file_system;
 import logger;
-
-module file_worker;
 
 namespace infinity {
 
@@ -43,7 +43,7 @@ void FileWorker::CloseFile() {
 
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
-        Error<StorageException>("No data will be written.");
+        UnrecoverableError("No data will be written.");
     }
     LocalFileSystem fs;
 
@@ -92,13 +92,13 @@ void FileWorker::MoveFile() {
     String dest_dir = ChooseFileDir(false);
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (!fs.Exists(src_path)) {
-        Error<StorageException>(fmt::format("File {} doesn't exist.", src_path));
+        RecoverableError(Status::FileNotFound(src_path));
     }
     if (!fs.Exists(dest_dir)) {
         fs.CreateDirectory(dest_dir);
     }
     // if (fs.Exists(dest_path)) {
-    //     Error<StorageException>(fmt::format("File {} was already been created before.", dest_path));
+    //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
     // }
     fs.Rename(src_path, dest_path);
 }

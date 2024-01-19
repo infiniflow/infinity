@@ -34,7 +34,7 @@ void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &l
             ++it2;
         } else {
             if (!(*it1)->Committed() || !(*it2)->Committed()) {
-                Error<StorageException>("MergeLists requires entries be committed");
+                UnrecoverableError("MergeLists requires entries be committed");
             }
             if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
                 ++it1;

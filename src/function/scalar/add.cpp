@@ -14,23 +14,23 @@
 
 module;
 
+module add;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
 
-module add;
-
 namespace infinity {
 
 struct AddFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        Error<NotImplementException>("Not implemented");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 };
 
@@ -73,7 +73,7 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT + HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool AddFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    Error<NotImplementException>("Not implemented: HugeIntT + HugeIntT = HugeIntT");
+    RecoverableError(Status::NotSupport("Not implemented: HugeIntT + HugeIntT = HugeIntT"));
     return false;
 }
 
@@ -100,7 +100,7 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal + Decimal = Decimal
 template <>
 inline bool AddFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    Error<NotImplementException>("Not implemented: Decimal + Decimal");
+    RecoverableError(Status::NotSupport("Not implemented: Decimal + Decimal"));
     return false;
 }
 
@@ -155,7 +155,7 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 // Mixed Type + i64
 template <>
 inline bool AddFunction::Run(MixedT, BigIntT, MixedT &) {
-    Error<NotImplementException>("Not implemented: MixedT + BigIntT");
+    RecoverableError(Status::NotSupport("Not implemented: MixedT + BigIntT"));
     return false;
 }
 
@@ -168,7 +168,7 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type + f64
 template <>
 inline bool AddFunction::Run(MixedT, DoubleT, MixedT &) {
-    Error<NotImplementException>("Not implemented: MixedT + DoubleT");
+    RecoverableError(Status::NotSupport("Not implemented: MixedT + DoubleT"));
     return false;
 }
 
@@ -181,7 +181,7 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type + Mixed Type
 template <>
 inline bool AddFunction::Run(MixedT, MixedT, MixedT &) {
-    Error<NotImplementException>("Not implemented: MixedT + MixedT");
+    RecoverableError(Status::NotSupport("Not implemented: MixedT + MixedT"));
     return false;
 }
 

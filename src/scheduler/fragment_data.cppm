@@ -14,10 +14,11 @@
 
 module;
 
+export module fragment_data;
+
 import stl;
 import data_block;
-
-export module fragment_data;
+import status;
 
 namespace infinity {
 
@@ -36,10 +37,11 @@ export struct FragmentDataBase {
 };
 
 export struct FragmentError : public FragmentDataBase {
-    UniquePtr<String> error_message_{};
+//    UniquePtr<String> error_message_{};
+    Status status_{};
 
-    FragmentError(u64 fragment_id, UniquePtr<String> error_message)
-        : FragmentDataBase(FragmentDataType::kError, fragment_id), error_message_(std::move(error_message)) {}
+    FragmentError(u64 fragment_id, Status status)
+        : FragmentDataBase(FragmentDataType::kError, fragment_id), status_(std::move(status)) {}
 };
 
 export struct FragmentData : public FragmentDataBase {

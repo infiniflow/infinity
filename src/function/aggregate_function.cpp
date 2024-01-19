@@ -15,18 +15,18 @@
 module;
 
 #include <sstream>
-import base_expression;
-
-import infinity_exception;
 
 module aggregate_function;
+
+import base_expression;
+import infinity_exception;
+import status;
 
 namespace infinity {
 
 void AggregateFunction::CastArgumentTypes(BaseExpression &) {
     // Check and add a cast function to cast the input arguments expression type to target type
-
-    Error<PlannerException>("Not implemented: need to cast the argument types");
+    RecoverableError(Status::NotSupport("Not implemented: need to cast the argument types"));
 }
 
 std::string AggregateFunction::ToString() const {

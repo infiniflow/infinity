@@ -29,7 +29,7 @@ import in_expression;
 import data_block;
 import column_vector;
 import expression_state;
-
+import status;
 import third_party;
 import infinity_exception;
 import expression_type;
@@ -59,7 +59,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expr->Name()));
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
         }
     }
 }
@@ -68,7 +68,7 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ExpressionState> &state,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
-        Error<ExecutorException>("Recursive execute aggregate function!");
+        RecoverableError(Status::RecursiveAggregate(expr->ToString()));
     }
     in_aggregate_ = true;
     SharedPtr<ExpressionState> &child_state = state->Children()[0];
@@ -80,10 +80,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
     this->Execute(child_expr, child_state, child_output_col);
 
     if (expr->aggregate_function_.argument_type_ != *child_output_col->data_type()) {
-        Error<ExecutorException>("Argument type isn't matched with the child expression output");
+        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.argument_type_.ToString(), child_output_col->data_type()->ToString()));
     }
+
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
-        Error<ExecutorException>("Return type isn't matched with the output column vector");
+        RecoverableError(Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString()));
     }
 
     auto data_state = state->agg_state_;
@@ -119,11 +120,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("Case execution");
+    UnrecoverableError("Case execution");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("Column expression");
+    UnrecoverableError("Column expression");
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
@@ -163,17 +164,17 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        Error<ExecutorException>("Input data block is NULL");
+        UnrecoverableError("Input data block is NULL");
     }
     if (column_index >= input_data_block_->column_count()) {
-        Error<ExecutorException>("Invalid column index");
+        UnrecoverableError("Invalid column index");
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    Error<ExecutorException>("IN execution isn't implemented yet.");
+    RecoverableError(Status::NotSupport("IN execution isn't implemented yet."));
 }
 
 } // namespace infinity

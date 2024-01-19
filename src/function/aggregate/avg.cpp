@@ -14,33 +14,33 @@
 
 module;
 
+module avg;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
 import parser;
 import third_party;
 
-module avg;
-
 namespace infinity {
 
 template <typename ValueType, typename ResultType>
 struct AvgState {
 public:
-    inline void Initialize() { Error<NotImplementException>("Initialize average state."); }
+    inline void Initialize() { RecoverableError(Status::NotSupport("Initialize average state.")); }
 
-    inline void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Update average state."); }
+    inline void Update(const ValueType *__restrict, SizeT) { RecoverableError(Status::NotSupport("Update average state.")); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
-        Error<NotImplementException>("Constant update average state.");
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { RecoverableError(Status::NotSupport("Constant update average state.")); }
+
+    inline ptr_t Finalize() { RecoverableError(Status::NotSupport("Finalize average state.")); }
+
+    inline static SizeT Size(const DataType &data_type) {
+        RecoverableError(Status::NotSupport(fmt::format("Average state type size: {}", data_type.ToString())));
     }
-
-    inline ptr_t Finalize() { Error<NotImplementException>("Finalize average state."); }
-
-    inline static SizeT Size(const DataType &data_type) { Error<NotImplementException>(fmt::format("Average state type size: {}", data_type.ToString())); }
 };
 
 template <>
@@ -57,7 +57,7 @@ public:
 
     inline void Update(const TinyIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -90,7 +90,7 @@ public:
 
     inline void Update(const SmallIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -124,7 +124,7 @@ public:
 
     inline void Update(const IntegerT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -158,7 +158,7 @@ public:
 
     inline void Update(const BigIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -192,7 +192,7 @@ public:
 
     inline void Update(const FloatT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];
@@ -226,7 +226,7 @@ public:
 
     inline void Update(const DoubleT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            Error<ExecutorException>(fmt::format("Data count exceeds: {}", count_));
+            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
         }
         this->count_++;
         value_ += input[idx];

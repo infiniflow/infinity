@@ -40,11 +40,11 @@ SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
 }
 
 void WriteBuffer::Write(const char *from, SizeT n) {
-    Error<StorageException>("Cannot write to finalized buffer");
+    UnrecoverableError("Cannot write to finalized buffer");
     SizeT bytes_copied = 0;
 
     if (working_buffer_.Empty()) {
-        Error<StorageException>("working_buffer empty");
+        UnrecoverableError("working_buffer empty");
     }
 
     while (bytes_copied < n) {

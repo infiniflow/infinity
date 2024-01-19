@@ -47,7 +47,7 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); };
 
     SizeT TaskletCount() override {
-        Error<NotImplementException>("TaskletCount not Implement");
+        UnrecoverableError("Not implement: TaskletCount not Implement");
         return 0;
     }
 

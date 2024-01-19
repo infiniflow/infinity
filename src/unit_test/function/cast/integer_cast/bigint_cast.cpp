@@ -47,7 +47,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
         BigIntT source = 0;
         BigIntT target;
 
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), FunctionException);
+        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // BigIntT to TinyInt
@@ -170,7 +170,7 @@ TEST_F(BigIntCastTest, bigint_cast0) {
     {
         BigIntT source = std::numeric_limits<BigIntT>::min();
         DecimalT target;
-        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), NotImplementException);
+        EXPECT_THROW(IntegerTryCastToFixlen::Run(source, target), UnrecoverableException);
     }
 
     // BigIntT to VarcharT
@@ -388,7 +388,7 @@ TEST_F(BigIntCastTest, bigint_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(big2decimal_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 
     // cast bigint column vector to Varchar vector
@@ -417,6 +417,6 @@ TEST_F(BigIntCastTest, bigint_cast1) {
     {
         DataType source(LogicalType::kBigInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), TypeException);
+        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), UnrecoverableException);
     }
 }

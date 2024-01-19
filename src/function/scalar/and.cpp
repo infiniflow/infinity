@@ -15,16 +15,17 @@
 module;
 
 #include <type_traits>
+
+module and_func;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module and_func;
 
 namespace infinity {
 
@@ -38,7 +39,7 @@ struct AndFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left and right;
         } else {
-            Error<TypeException>("AND function accepts only u8 and BooleanT.");
+            UnrecoverableError("AND function accepts only u8 and BooleanT.");
         }
     }
 };

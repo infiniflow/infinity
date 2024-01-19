@@ -48,7 +48,7 @@ TEST_F(CircleCastTest, circle_cast0) {
         f64 r(2);
         CircleT source(p1, r);
         TinyIntT target;
-        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, nullptr), FunctionException);
+        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         PointT p1(1, 1);
@@ -60,7 +60,7 @@ TEST_F(CircleCastTest, circle_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr), NotImplementException);
+        EXPECT_THROW(GeographyTryCastToVarlen::Run(source, target, col_varchar_ptr), UnrecoverableException);
     }
 }
 
@@ -71,7 +71,7 @@ TEST_F(CircleCastTest, circle_cast1) {
     {
         DataType source_type(LogicalType::kCircle);
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindGeographyCast<CircleT>(source_type, target_type), TypeException);
+        EXPECT_THROW(BindGeographyCast<CircleT>(source_type, target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kCircle);
@@ -101,6 +101,6 @@ TEST_F(CircleCastTest, circle_cast1) {
         col_target->Initialize();
 
         CastParameters cast_parameters;
-        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), NotImplementException);
+        EXPECT_THROW(source2target_ptr.function(col_source, col_target, DEFAULT_VECTOR_SIZE, cast_parameters), UnrecoverableException);
     }
 }

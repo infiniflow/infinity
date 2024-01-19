@@ -164,4 +164,32 @@ QueryResult Table::Search(SearchExpr *search_expr, ParsedExpr *filter, Vector<Pa
     return result;
 }
 
+QueryResult Table::Explain(ExplainType explain_type, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
+
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
+    explain_statment->type_ = explain_type;
+
+    SelectStatement* select_statement = new SelectStatement();
+
+    auto *table_ref = new TableReference();
+    table_ref->db_name_ = session_->current_database();
+    table_ref->table_name_ = table_name_;
+    select_statement->table_ref_ = table_ref;
+    select_statement->select_list_ = output_columns;
+    select_statement->where_expr_ = filter;
+    select_statement->search_expr_ = search_expr;
+
+    explain_statment->statement_ = select_statement;
+
+    QueryResult result = query_context_ptr->QueryStatement(explain_statment.get());
+    return result;
+
+}
+
 } // namespace infinity

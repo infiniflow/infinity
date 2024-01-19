@@ -15,6 +15,9 @@
 module;
 
 #include <string>
+
+module physical_insert;
+
 import stl;
 import txn;
 import query_context;
@@ -29,11 +32,9 @@ import third_party;
 import expression_evaluator;
 import base_expression;
 import default_values;
-
+import status;
 import infinity_exception;
 import catalog;
-
-module physical_insert;
 
 namespace infinity {
 
@@ -44,14 +45,15 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
-        Error<ExecutorException>(
-            fmt::format("Insert values count {} isn't matched with table column count {}.", column_count, table_collection_column_count));
-        ;
+        UnrecoverableError(
+            fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count));
     }
     if (row_count > DEFAULT_BLOCK_CAPACITY) {
-        Error<ExecutorException>(
-            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
-        ;
+        // Fixme: insert batch can larger than 8192, but currently we limit it.
+        RecoverableError(Status::UnexpectedError(
+            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY)));
+        //        UnrecoverableError(
+        //            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
     }
 
     // Prepare the output block

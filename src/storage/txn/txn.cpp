@@ -16,6 +16,9 @@ module;
 
 #include <string>
 #include <vector>
+#include <tuple>
+
+module txn;
 
 import stl;
 
@@ -31,6 +34,7 @@ import txn_state;
 import parser;
 import meta_state;
 import data_access_state;
+import status;
 import table_detail;
 import table_entry_type;
 import catalog;
@@ -41,8 +45,6 @@ import index_def;
 import catalog_delta_entry;
 import bg_task;
 import backgroud_process;
-
-module txn;
 
 namespace infinity {
 
@@ -66,7 +68,7 @@ Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const Stri
         if (!IsEqual(db_name_, db_name)) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kInvalidDbName, std::move(err_msg))};
         }
     }
 
@@ -98,11 +100,8 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
     table_store = txn_tables_store_[table_name].get();
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
-    UniquePtr<String> err_msg = table_store->Append(input_block);
-    if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, std::move(err_msg));
-    }
-    return Status::OK();
+    auto [err_msg, append_status] = table_store->Append(input_block);
+    return append_status;
 }
 
 Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
@@ -118,11 +117,8 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     table_store = txn_tables_store_[table_name].get();
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
-    UniquePtr<String> err_msg = table_store->Delete(row_ids);
-    if (err_msg.get() != nullptr) {
-        return Status(ErrorCode::kError, std::move(err_msg));
-    }
-    return Status::OK();
+    auto [err_msg, delete_status] = table_store->Delete(row_ids);
+    return delete_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
@@ -143,7 +139,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -164,7 +160,7 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -194,7 +190,7 @@ Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -220,7 +216,7 @@ Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_a
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -232,7 +228,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -243,7 +239,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         if (table_status.ok()) {
             UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
             LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kError, std::move(err_msg));
+            return Status(ErrorCode::kUnexpectedError, std::move(err_msg));
         } else {
             return table_status;
         }
@@ -259,7 +255,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -284,7 +280,7 @@ Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &inde
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction is not started");
+        UnrecoverableError("Transaction is not started");
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -347,7 +343,7 @@ Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, c
 Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction is not started");
+        UnrecoverableError("Transaction is not started");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -375,7 +371,7 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
-        Error<TransactionException>("Transaction isn't started.");
+        UnrecoverableError("Transaction isn't started.");
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -384,33 +380,33 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::DropViewByName(const String &, const String &, ConflictType, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
-    Error<TransactionException>("Not Implemented");
-    return {ErrorCode::kNotImplemented, "Not Implemented"};
+    UnrecoverableError("Not Implemented");
+    return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
 void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }

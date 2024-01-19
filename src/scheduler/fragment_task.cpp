@@ -16,6 +16,8 @@ module;
 
 #include <sstream>
 
+module fragment_task;
+
 import profiler;
 import plan_fragment;
 import stl;
@@ -31,8 +33,7 @@ import query_context;
 import base_table_ref;
 import defer_op;
 import fragment_context;
-
-module fragment_task;
+import status;
 
 namespace infinity {
 
@@ -60,7 +61,7 @@ void FragmentTask::OnExecute(i64) {
 
     bool execute_success{false};
     source_op->Execute(fragment_context->query_context(), source_state_.get());
-    if (source_state_->error_message_.get() == nullptr) {
+    if (source_state_->status_.ok()) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
@@ -68,7 +69,7 @@ void FragmentTask::OnExecute(i64) {
         TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
         HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
         profiler.Begin();
-        UniquePtr<String> err_msg = nullptr;
+        Status operator_status{};
         try {
             for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
                 profiler.StartOperator(operator_refs[op_idx]);
@@ -82,19 +83,24 @@ void FragmentTask::OnExecute(i64) {
                     break;
                 }
             }
-        } catch (const Exception &e) {
-            err_msg = MakeUnique<String>(e.what());
+        } catch (RecoverableException &e) {
+            LOG_ERROR(e.what());
+            operator_status = Status(e.ErrorCode(), e.what());
+        } catch (UnrecoverableException &e) {
+            LOG_CRITICAL(e.what());
+            throw e;
         }
+
         profiler.End();
         fragment_context->FlushProfiler(profiler);
 
-        if (err_msg.get() != nullptr) {
-            sink_state_->error_message_ = std::move(err_msg);
+        if (!operator_status.ok()) {
+            sink_state_->status_ = operator_status;
             status_ = FragmentTaskStatus::kError;
         }
     }
 
-    if (execute_success or sink_state_->error_message_.get() != nullptr) {
+    if (execute_success or !sink_state_->status_.ok()) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, fragment_context, sink_state_.get());
     }
@@ -150,7 +156,7 @@ bool FragmentTask::CompleteTask() {
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
     } else {
-        Error<SchedulerException>("Status should be error");
+        UnrecoverableError("Status should be error");
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));

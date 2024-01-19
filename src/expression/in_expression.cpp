@@ -43,7 +43,7 @@ String InExpression::ToString() const {
             break;
         }
         default: {
-            Error<PlannerException>("Unknown In operator type.");
+            UnrecoverableError("Unknown In operator type.");
         }
     }
 

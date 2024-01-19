@@ -92,7 +92,7 @@ public:
             if (row_count_ == 0) {
                 return 0;
             }
-            Error<StorageException>("Not finalized data block");
+            UnrecoverableError("Not finalized data block");
         }
         return row_count_;
     }

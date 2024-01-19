@@ -53,7 +53,7 @@ import function_set;
 import scalar_function_set;
 import scalar_function;
 import special_function;
-
+import status;
 import catalog;
 import query_context;
 import logger;
@@ -66,7 +66,7 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
-            Error<PlannerException>(fmt::format("Fail to bind the expression: {}", expr.GetName()));
+            RecoverableError(Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName())));
         }
         // Maybe the correlated expression, trying to bind it in the parent context.
         // result = Bind(expr, bind_context_ptr->parent_, depth + 1, root);
@@ -115,7 +115,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
             return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
         }
         default: {
-            Error<PlannerException>("Unexpected expression type.");
+            UnrecoverableError("Unexpected expression type.");
         }
     }
 
@@ -217,7 +217,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
-                Error<PlannerException>("Invalid time unit");
+                UnrecoverableError("Invalid time unit");
             }
             interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
@@ -241,7 +241,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
     }
 
-    Error<PlannerException>("Unreachable.");
+    UnrecoverableError("Unreachable.");
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -325,9 +325,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             return aggregate_function_ptr;
         }
         case FunctionType::kTable:
-            Error<PlannerException>("Table function shouldn't be bound here.");
+            UnrecoverableError("Table function shouldn't be bound here.");
         default: {
-            Error<PlannerException>(fmt::format("Unknown function type: {}", function_set_ptr->name()));
+            UnrecoverableError(fmt::format("Unknown function type: {}", function_set_ptr->name()));
         }
     }
     return nullptr;
@@ -340,10 +340,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     if (!expr.case_check_array_) {
-        Error<PlannerException>("No when and then expression");
+        UnrecoverableError("No when and then expression");
     }
     if (expr.case_check_array_->empty()) {
-        Error<PlannerException>("No when and then expression");
+        UnrecoverableError("No when and then expression");
     }
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
@@ -434,18 +434,18 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        Error<PlannerException>("Knn expression expect a column expression");
+        UnrecoverableError("Knn expression expect a column expression");
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
     if (type_info->type() != TypeInfoType::kEmbedding) {
-        Error<PlannerException>("Expect the column search is an embedding column");
+        RecoverableError(Status::SyntaxError("Expect the column search is an embedding column"));
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         if ((i64)embedding_info->Dimension() != parsed_knn_expr.dimension_) {
-            Error<PlannerException>(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
-                                           parsed_knn_expr.dimension_,
-                                           embedding_info->Dimension()));
+            RecoverableError(Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
+                                                             parsed_knn_expr.dimension_,
+                                                             embedding_info->Dimension())));
         }
     }
 
@@ -513,27 +513,27 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            Error<NotImplementException>("Any");
+            UnrecoverableError("Not implement: Any");
         }
     }
 
-    Error<PlannerException>("Unreachable");
+    UnrecoverableError("Unreachable");
     return nullptr;
 }
 
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
-    SharedPtr<SpecialFunction> special_function = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
-    if (special_function.get() != nullptr) {
-        switch (special_function->special_type()) {
+    auto [special_function_ptr, status] = NewCatalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
+    if (status.ok()) {
+        switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Error<PlannerException>("DISTANCE() needs to be allowed only when there is only KnnScan");
+                    RecoverableError(Status::SyntaxError("DISTANCE() needs to be allowed only when there is only KnnScan"));
                 }
                 break;
             }
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    Error<PlannerException>("SCORE() requires Fusion or MatchScan");
+                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MatchScan"));
                 }
                 break;
             }
@@ -543,16 +543,16 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         }
 
         String &table_name = bind_context_ptr->table_names_[0];
-        String column_name = special_function->name();
+        String column_name = special_function_ptr->name();
 
         TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function->data_type(),
+        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
                                                                                table_name,
                                                                                bind_context_ptr->table_name2table_index_[table_name],
                                                                                column_name,
-                                                                               table_entry->ColumnCount() + special_function->extra_idx(),
+                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
                                                                                depth,
-                                                                               special_function->special_type());
+                                                                               special_function_ptr->special_type());
         return bound_column_expr;
     } else {
         return None;

@@ -73,7 +73,7 @@ void ColumnIndexEntry::CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColum
 
 nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
-        Error<StorageException>("Column index entry can't be deleted.");
+        UnrecoverableError("Column index entry can't be deleted.");
     }
 
     nlohmann::json json;
@@ -108,7 +108,7 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
                                                           TableEntry *table_entry) {
     bool deleted = column_index_entry_json["deleted"];
     if (deleted) {
-        Error<StorageException>("Column index entry can't be deleted.");
+        UnrecoverableError("Column index entry can't be deleted.");
     }
 
     TransactionID txn_id = column_index_entry_json["txn_id"];
@@ -162,7 +162,7 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
                     break;
                 }
                 default: {
-                    ExecutorException("Create IVF Flat index: unsupported element type.");
+                    UnrecoverableError("Create IVF Flat index: Unsupported element type.");
                 }
             }
             break;
@@ -177,20 +177,20 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
+            UnrecoverableError(*err_msg);
             break;
         }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
-            Error<StorageException>(*err_msg);
+            UnrecoverableError(*err_msg);
         }
     }
     if (file_worker.get() == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
         LOG_ERROR(*err_msg);
-        Error<StorageException>(*err_msg);
+        UnrecoverableError(*err_msg);
     }
     return file_worker;
 }

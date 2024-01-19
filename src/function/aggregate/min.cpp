@@ -14,6 +14,8 @@
 
 module;
 
+module min;
+
 import stl;
 import catalog;
 
@@ -22,8 +24,7 @@ import aggregate_function;
 import aggregate_function_set;
 import parser;
 import third_party;
-
-module min;
+import status;
 
 namespace infinity {
 
@@ -32,15 +33,15 @@ struct MinState {
 public:
     ValueType value_;
 
-    void Initialize() { Error<NotImplementException>("Not implemented"); }
+    void Initialize() { UnrecoverableError("MinState::Initialize"); }
 
-    void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
+    void Update(const ValueType *__restrict, SizeT) { UnrecoverableError("Not implement: MinState::Update"); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { Error<NotImplementException>("Not implemented"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { UnrecoverableError("Not implement: MinState::ConstantUpdate"); }
 
-    [[nodiscard]] ptr_t Finalize() const { Error<NotImplementException>("Not implemented"); }
+    [[nodiscard]] ptr_t Finalize() const { UnrecoverableError("Not implement: MinState::Finalize"); }
 
-    inline static SizeT Size(const DataType &) { Error<NotImplementException>("Not implemented"); }
+    inline static SizeT Size(const DataType &) { UnrecoverableError("Not implement: MinState::Size"); }
 };
 
 template <>

@@ -36,7 +36,7 @@ export inline BoundCastFunc BindBlobCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<BlobT, VarcharT, BlobTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Blob type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Blob type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -45,7 +45,7 @@ export inline BoundCastFunc BindBlobCast(DataType &target) {
 struct BlobTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &source, TargetType &target, const SharedPtr<ColumnVector> &vector_ptr) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -63,8 +63,10 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
         std::memcpy(target.prefix, source.ptr, target.length);
         std::memset(target.prefix + target.length, 0, VarcharT::INLINE_LENGTH - target.length);
     } else {
-        Assert<FunctionException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
-                                  "Varchar column vector should use MemoryVectorBuffer. ");
+        if(vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer.");
+        }
+
         // Set varchar prefix
         std::memcpy(target.prefix, source.ptr, VarcharT::PREFIX_LENGTH);
 

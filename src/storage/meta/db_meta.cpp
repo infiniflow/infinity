@@ -114,7 +114,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                             // Duplicated database
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
                             LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
+                            return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
                         }
                     }
                 }
@@ -123,7 +123,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                 UniquePtr<String> err_msg =
                     MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
             }
         } else {
 
@@ -148,12 +148,12 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                         } else {
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
                             LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicate, std::move(err_msg))};
+                            return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
                         }
                     } else {
                         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
                         LOG_ERROR(*err_msg);
-                        return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                        return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
                     }
                 }
                 case TxnState::kCommitting:
@@ -162,7 +162,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     UniquePtr<String> err_msg = MakeUnique<String>(
                         fmt::format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
@@ -188,7 +188,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Invalid db entry txn state");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kUndefined, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
                 }
             }
         }
@@ -202,7 +202,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     BaseEntry *header_base_entry = this->entry_list_.front().get();
@@ -210,7 +210,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     DBEntry *header_db_entry = (DBEntry *)header_base_entry;
@@ -220,7 +220,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             if (header_db_entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
                 LOG_TRACE(*err_msg);
-                return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+                return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
             }
 
             SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
@@ -243,7 +243,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             UniquePtr<String> err_msg =
                 MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
         }
     } else {
         // Uncommitted, check if the same txn
@@ -264,7 +264,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             // Not same txn, issue WW conflict
             UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kWWConflict, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
         }
     }
 }
@@ -292,14 +292,14 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     for (const auto &db_entry : this->entry_list_) {
         if (db_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+            return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
         }
 
         if (db_entry->Committed()) {
@@ -307,10 +307,11 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
                 if (db_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
                 } else {
                     // check the tables meta
-                    return {(DBEntry *)(db_entry.get()), Status::OK()};
+                    DBEntry* db_entry_ptr = (DBEntry *)(db_entry.get());
+                    return {db_entry_ptr, Status::OK()};
                 }
             }
         } else {
@@ -320,7 +321,7 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
                 if (db_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
                 } else {
                     return {(DBEntry *)(db_entry.get()), Status::OK()};
                 }
@@ -329,7 +330,7 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No db entry found.");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
 }
 
 SharedPtr<String> DBMeta::ToString() {
@@ -378,10 +379,10 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
 void DBMeta::MergeFrom(DBMeta &other) {
     // No locking here since only the load stage needs MergeFrom.
     if (!IsEqual(*this->db_name_, *other.db_name_)) {
-        Error<StorageException>("DBMeta::MergeFrom requires db_name_ match");
+        UnrecoverableError("DBMeta::MergeFrom requires db_name_ match");
     }
     if (!IsEqual(*this->data_dir_, *other.data_dir_)) {
-        Error<StorageException>("DBMeta::MergeFrom requires db_dir_ match");
+        UnrecoverableError("DBMeta::MergeFrom requires db_dir_ match");
     }
     MergeLists(this->entry_list_, other.entry_list_);
 }

@@ -17,9 +17,11 @@ module;
 #include <list>
 #include <sched.h>
 
+module task_scheduler;
+
 import stl;
 import config;
-
+import status;
 import infinity_exception;
 import threadutil;
 import fragment_task;
@@ -32,8 +34,6 @@ import default_values;
 import physical_operator_type;
 import physical_operator;
 import physical_sink;
-
-module task_scheduler;
 
 namespace infinity {
 
@@ -57,7 +57,7 @@ void TaskScheduler::Init(const Config *config_ptr) {
     }
 
     if (worker_array_.empty()) {
-        Error<SchedulerException>("No cpu is used in scheduler");
+        UnrecoverableError("No cpu is used in scheduler");
     }
 
     initialized_ = true;
@@ -106,7 +106,7 @@ Pair<Vector<PlanFragment *>, SizeT> TaskScheduler::GetStartFragments(PlanFragmen
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     if (!initialized_) {
-        Error<SchedulerException>("Scheduler isn't initialized");
+        UnrecoverableError("Scheduler isn't initialized");
     }
     // DumpPlanFragment(plan_fragment);
 
@@ -117,7 +117,7 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
-                Error<SchedulerException>("Task can't be scheduled");
+                UnrecoverableError("Task can't be scheduled");
             }
             u64 worker_id = FindLeastWorkloadWorker();
             ScheduleTask(task.get(), worker_id);

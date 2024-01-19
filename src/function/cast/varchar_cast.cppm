@@ -34,7 +34,7 @@ export struct TryCastVarcharToVarchar;
 
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kVarchar) {
-        Error<TypeException>(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
+        UnrecoverableError(fmt::format("Expect Varchar type, but it is {}", source.ToString()));
     }
     switch (target.type()) {
         case kBoolean: {
@@ -62,10 +62,10 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
         }
         case kDecimal: {
-            Error<NotImplementException>(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
+            UnrecoverableError(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
         }
         case kVarchar: {
-            Error<TypeException>("Attempt to cast from varchar to varchar");
+            UnrecoverableError("Attempt to cast from varchar to varchar");
         }
         case kDate: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DateT, TryCastVarchar>);
@@ -83,52 +83,52 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntervalT, TryCastVarchar>);
         }
         case kArray: {
-            Error<TypeException>("Cast from varchar to array");
+            UnrecoverableError("Cast from varchar to array");
         }
         case kTuple: {
-            Error<TypeException>("Cast from varchar to tuple");
+            UnrecoverableError("Cast from varchar to tuple");
         }
         case kPoint: {
-            Error<TypeException>("Cast from varchar to point");
+            UnrecoverableError("Cast from varchar to point");
         }
         case kLine: {
-            Error<TypeException>("Cast from varchar to line");
+            UnrecoverableError("Cast from varchar to line");
         }
         case kLineSeg: {
-            Error<TypeException>("Cast from varchar to line segment");
+            UnrecoverableError("Cast from varchar to line segment");
         }
         case kBox: {
-            Error<TypeException>("Cast from varchar to box");
+            UnrecoverableError("Cast from varchar to box");
         }
             //        case kPath: {
-            //            Error<TypeException>("Cast from varchar to path");
+            //            UnrecoverableError("Cast from varchar to path");
             //        }
             //        case kPolygon: {
-            //            Error<TypeException>("Cast from varchar to polygon");
+            //            UnrecoverableError("Cast from varchar to polygon");
             //        }
         case kCircle: {
-            Error<TypeException>("Cast from varchar to circle");
+            UnrecoverableError("Cast from varchar to circle");
         }
             //        case kBitmap: {
-            //            Error<TypeException>("Cast from varchar to bitmap");
+            //            UnrecoverableError("Cast from varchar to bitmap");
             //        }
         case kUuid: {
-            Error<TypeException>("Cast from varchar to uuid");
+            UnrecoverableError("Cast from varchar to uuid");
         }
             //        case kBlob: {
-            //            Error<TypeException>("Cast from varchar to blob");
+            //            UnrecoverableError("Cast from varchar to blob");
             //        }
         case kEmbedding: {
-            Error<TypeException>("Cast from varchar to embedding");
+            UnrecoverableError("Cast from varchar to embedding");
         }
         case kRowID: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowID, TryCastVarchar>);
         }
         case kMixed: {
-            Error<TypeException>("Cast from varchar to mix");
+            UnrecoverableError("Cast from varchar to mix");
         }
         default: {
-            Error<TypeException>("Can't convert varchar");
+            UnrecoverableError("Can't convert varchar");
         }
     }
     return BoundCastFunc(nullptr);
@@ -137,7 +137,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
 struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -231,7 +231,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
     if (!source.IsValue()) {
-        Error<FunctionException>("No implementation to cast from column vector Varchar to big int");
+        UnrecoverableError("No implementation to cast from column vector Varchar to big int");
     }
     char *endptr{nullptr};
     SizeT len{0};
@@ -249,7 +249,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
 // Cast VarcharT to HugeIntT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, HugeIntT &) {
-    Error<TypeException>("Cast varchar to hugeint");
+    UnrecoverableError("Cast varchar to hugeint");
     return false;
 }
 
@@ -257,7 +257,7 @@ inline bool TryCastVarchar::Run(const VarcharT &, HugeIntT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, FloatT &target) {
     if (!source.IsValue()) {
-        Error<FunctionException>("No implementation to cast from column vector Varchar to big int");
+        UnrecoverableError("No implementation to cast from column vector Varchar to big int");
     }
     char *endptr{nullptr};
     SizeT len{0};
@@ -291,7 +291,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
 // Cast VarcharT to DateT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
-    Error<TypeException>("Cast from varchar to date");
+    UnrecoverableError("Cast from varchar to date");
 //    if (source.IsInlined()) {
 //        target.FromString(source.prefix, source.length);
 //    } else {
@@ -303,28 +303,28 @@ inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
 // Cast VarcharT to TimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, TimeT &) {
-    Error<TypeException>("Cast from varchar to time");
+    UnrecoverableError("Cast from varchar to time");
     return true;
 }
 
 // Cast VarcharT to DateTimeT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateTimeT &) {
-    Error<TypeException>("Cast from varchar to datetime");
+    UnrecoverableError("Cast from varchar to datetime");
     return true;
 }
 
 // Cast VarcharT to TimestampT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, TimestampT &) {
-    Error<TypeException>("Cast from varchar to timestamp");
+    UnrecoverableError("Cast from varchar to timestamp");
     return true;
 }
 
 // Cast VarcharT to IntervalT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, IntervalT &) {
-    Error<TypeException>("Cast from varchar to interval");
+    UnrecoverableError("Cast from varchar to interval");
     return true;
 }
 

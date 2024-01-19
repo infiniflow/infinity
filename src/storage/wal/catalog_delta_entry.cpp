@@ -117,12 +117,12 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         default:
-            Error<StorageException>(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
+            UnrecoverableException(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
     }
 
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        Error<StorageException>("ptr goes out of range when reading CatalogDeltaOperation");
+        UnrecoverableException("ptr goes out of range when reading CatalogDeltaOperation");
     }
     return operation;
 }
@@ -405,7 +405,7 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
 SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
-        Error<StorageException>("ptr goes out of range when reading WalEntry");
+        UnrecoverableException("ptr goes out of range when reading WalEntry");
     }
     auto entry = MakeShared<CatalogDeltaEntry>();
     auto *header = (CatalogDeltaEntryHeader *)ptr;
@@ -427,7 +427,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            Error<StorageException>("ptr goes out of range when reading WalEntry");
+            UnrecoverableException("ptr goes out of range when reading WalEntry");
         }
         UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes);
         entry->operations_.emplace_back(std::move(operation));
@@ -435,7 +435,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        Error<StorageException>("ptr goes out of range when reading WalEntry");
+        UnrecoverableException("ptr goes out of range when reading WalEntry");
     }
     return entry;
 }

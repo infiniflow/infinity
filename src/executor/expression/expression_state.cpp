@@ -16,6 +16,8 @@ module;
 
 #include <vector>
 
+module expression_state;
+
 import infinity_exception;
 
 import stl;
@@ -32,11 +34,9 @@ import function_expression;
 import in_expression;
 import reference_expression;
 import value_expression;
-
+import status;
 import parser;
 import default_values;
-
-module expression_state;
 
 namespace infinity {
 
@@ -58,10 +58,10 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
         case ExpressionType::kIn:
             return CreateState(static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
-            Error<ExecutorException>("Unexpected expression type: KNN");
+            UnrecoverableError("Unexpected expression type: KNN");
         }
         default: {
-            Error<ExecutorException>(fmt::format("Unknown expression type: {}", expression->Name()));
+            UnrecoverableError(fmt::format("Unknown expression type: {}", expression->Name()));
         }
     }
     return nullptr;
@@ -69,7 +69,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state) {
     if (agg_expr->arguments().size() != 1) {
-        Error<ExecutorException>("Aggregate function arguments error.");
+        RecoverableError(Status::FunctionArgsError(agg_expr->ToString()));
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
@@ -102,7 +102,7 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
     if (cast_expr->arguments().size() != 1) {
-        Error<ExecutorException>("Cast function arguments error.");
+        RecoverableError(Status::FunctionArgsError(cast_expr->ToString()));
     }
 
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();

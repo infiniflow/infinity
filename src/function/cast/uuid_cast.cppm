@@ -36,7 +36,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<UuidT, VarcharT, UuidTryCastToVarlen>);
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Uuid type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Uuid type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -45,7 +45,7 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
 struct UuidTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -53,10 +53,10 @@ struct UuidTryCastToVarlen {
 
 template <>
 inline bool UuidTryCastToVarlen::Run(const UuidT &, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<FunctionException>("Not implemented");
+    UnrecoverableError("Not implemented");
 //    target.length_ = UuidT::LENGTH;
 //    std::memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);
-//    Assert<TypeException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
+//    Assert<UnrecoverableException>(vector_ptr->buffer_->buffer_type_ == VectorBufferType::kHeap,
 //                          "Varchar column vector should use MemoryVectorBuffer.");
 //
 //    ptr_t ptr = vector_ptr->buffer_->fix_heap_mgr_->Allocate(target.length);

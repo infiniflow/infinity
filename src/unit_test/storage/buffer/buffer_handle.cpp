@@ -75,7 +75,7 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle2 = buf2->Load();
 
         // out of memory exception
-        EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, StorageException);
+        EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
         EXPECT_EQ(buf3->rc(), 0);
         EXPECT_EQ(buf3->status(), BufferStatus::kNew);
         EXPECT_EQ(buf3->type(), BufferType::kEphemeral);

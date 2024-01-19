@@ -83,7 +83,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
             // Get column info
             if (index_base->column_names_.size() != 1) {
-                Error<StorageException>("Currently, composite index doesn't supported.");
+                RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
             }
             ColumnID column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
             if (index_base->index_type_ == IndexType::kIRSFullText) {
@@ -218,7 +218,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes) {
     if (column_index_map_.size() != 1) {
         // TODO
-        Error<NotImplementException>("Not implemented");
+        UnrecoverableError("Not implemented");
     }
     const auto &[column_id, column_index_entry] = *column_index_map_.begin();
 

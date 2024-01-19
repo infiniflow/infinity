@@ -42,7 +42,7 @@ TEST_F(BitmaskTest, bitmask_a) {
 
     {
         Bitmask bitmask2;
-        EXPECT_THROW(bitmask2.Initialize(bit_count - 1), TypeException);
+        EXPECT_THROW(bitmask2.Initialize(bit_count - 1), UnrecoverableException);
     }
 
     // test DeepCopy()
@@ -135,8 +135,8 @@ TEST_F(BitmaskTest, bitmask_a) {
     EXPECT_NE(bitmask1.GetData(), nullptr);
 
     {
-        EXPECT_THROW(bitmask2.Resize(bit_count - 8), TypeException);
-        EXPECT_THROW(bitmask2.Resize(bit_count - 1), TypeException);
+        EXPECT_THROW(bitmask2.Resize(bit_count - 8), UnrecoverableException);
+        EXPECT_THROW(bitmask2.Resize(bit_count - 1), UnrecoverableException);
     }
 
     for (size_t i = 0; i < bit_count; ++i) {

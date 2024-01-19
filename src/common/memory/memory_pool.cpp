@@ -36,7 +36,7 @@ void *MemoryPool::AllocateUnsafe(SizeT num_bytes) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            Error<StorageException>("Allocate too large memory chunk: ");
+            UnrecoverableError("Allocate too large memory chunk: ");
             return nullptr;
         }
         mem_chunk_ = chunk;
@@ -52,7 +52,7 @@ void *MemoryPool::AllocateUnsafe(SizeT num_bytes, SizeT alignment) {
     if (!ptr) {
         MemoryChunk *chunk = chunk_allocator_->Allocate(alloc_size);
         if (!chunk) {
-            Error<StorageException>("Allocate too large memory chunk: ");
+            UnrecoverableError("Allocate too large memory chunk: ");
             return nullptr;
         }
         mem_chunk_ = chunk;

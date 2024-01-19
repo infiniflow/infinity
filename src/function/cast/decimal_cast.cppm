@@ -34,38 +34,38 @@ export struct DecimalTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
     if (source.type() == target.type()) {
-        Error<FunctionException>("Can't cast from the same type");
+        UnrecoverableError("Can't cast from the same type");
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kSmallInt: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kInteger: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kBigInt: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kHugeInt: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kFloat: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kDouble: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kDecimal: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         case LogicalType::kVarchar: {
-            Error<FunctionException>("Not implemented");
+            UnrecoverableError("Not implemented");
         }
         default: {
-            Error<TypeException>(fmt::format("Can't cast from Decimal type to {}", target.ToString()));
+            UnrecoverableError(fmt::format("Can't cast from Decimal type to {}", target.ToString()));
         }
     }
     return BoundCastFunc(nullptr);
@@ -74,7 +74,7 @@ inline BoundCastFunc BindDecimalCast(const DataType &source, DataType &target) {
 struct DecimalTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -83,7 +83,7 @@ struct DecimalTryCastToFixlen {
 struct DecimalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &, const SharedPtr<ColumnVector> &) {
-        Error<FunctionException>(
+        UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
@@ -92,49 +92,49 @@ struct DecimalTryCastToVarlen {
 // Cast DecimalT to TinyIntT
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, TinyIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, SmallIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, IntegerT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, BigIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, HugeIntT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, FloatT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToFixlen::Run(DecimalT, DoubleT &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 
 template <>
 inline bool DecimalTryCastToVarlen::Run(DecimalT, VarcharT &, const SharedPtr<ColumnVector> &) {
-    Error<NotImplementException>("Not implemented");
+    UnrecoverableError("Not implement: DecimalTryCastToFixlen::Run");
     return false;
 }
 

@@ -51,6 +51,7 @@ import infinity_context;
 import config;
 import data_block;
 import query_options;
+import status;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -118,7 +119,7 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         CreateTableOptions create_table_opts;
         if (database == nullptr) {
-            Error<NetworkException>("Database is null");
+            UnrecoverableError("Database is null");
         }
 
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
@@ -182,8 +183,9 @@ public:
                 return CopyFileType::kJSON;
             case infinity_thrift_rpc::CopyFileType::FVECS:
                 return CopyFileType::kFVECS;
-            default:
-                Error<NetworkException>("Not implemented copy file type");
+            default: {
+                UnrecoverableError("Not implemented copy file type");
+            }
         }
     }
 
@@ -202,7 +204,7 @@ public:
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
         auto &delimiter_string = request.import_option.delimiter;
         if (delimiter_string.size() != 1) {
-            Error<NetworkException>("Delimiter size must be 1");
+            RecoverableError(Status::SyntaxError("delimiter isn't a char."));
         }
         import_options.delimiter_ = delimiter_string[0];
 
@@ -248,7 +250,7 @@ public:
                          SharedPtr<TableDef> table_def,
                          Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
         if (column_count != all_column_vectors.size()) {
-            Error<NetworkException>("Column count not match");
+            UnrecoverableError("Column count not match");
         }
         for (SizeT col_index = 0; col_index < column_count; ++col_index) {
             auto column_def = table_def->columns()[col_index];
@@ -305,7 +307,7 @@ public:
         }
 
         if (current_offset != (i32)all_size) {
-            Error<NetworkException>("Varchar data size not match");
+            UnrecoverableError("Varchar data size not match");
         }
 
         output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -347,7 +349,7 @@ public:
 
         // select list
         if (request.__isset.select_list == false) {
-            Error<NetworkException>("Select list is empty");
+            UnrecoverableError("Select list is empty");
         }
 
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
@@ -454,8 +456,9 @@ public:
                             HandleRowIDType(output_column_field, row_count, result_column_vector);
                             break;
                         }
-                        default:
-                            Error<NetworkException>("Not implemented data type");
+                        default: {
+                            UnrecoverableError("Not implemented data type");
+                        }
                     }
                 }
             }
@@ -667,7 +670,7 @@ private:
         infinity_session_map_mutex_.unlock();
 
         if(iter == infinity_session_map_.end()) {
-            Error<NetworkException>("session id not found");
+            RecoverableError(Status::SessionNotFound(session_id));
         }
 
         return iter->second.get();
@@ -725,7 +728,7 @@ private:
             case infinity_thrift_rpc::LogicType::Varchar:
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
             default:
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
         }
         return nullptr;
     }
@@ -741,7 +744,7 @@ private:
             case infinity_thrift_rpc::Constraint::Unique:
                 return ConstraintType::kUnique;
             default:
-                Error<TypeException>("Invalid constraint type");
+                UnrecoverableError("Invalid constraint type");
         }
     }
 
@@ -762,7 +765,7 @@ private:
             case infinity_thrift_rpc::ElementType::ElementFloat64:
                 return EmbeddingDataType::kElemDouble;
             default:
-                Error<TypeException>("Invalid embedding data type");
+                UnrecoverableError("Invalid embedding data type");
         }
     }
 
@@ -775,7 +778,7 @@ private:
             case infinity_thrift_rpc::IndexType::IRSFullText:
                 return IndexType::kIRSFullText;
             default:
-                Error<TypeException>("Invalid index type");
+                UnrecoverableError("Invalid index type");
         }
         return IndexType::kInvalid;
     }
@@ -823,7 +826,7 @@ private:
                 return parsed_expr;
             }
             default: {
-                Error<TypeException>("Invalid constant type");
+                UnrecoverableError("Invalid constant type");
             }
         }
     }
@@ -906,7 +909,7 @@ private:
             auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
             return parsed_expr;
         } else {
-            Error<TypeException>("Invalid parsed expression type");
+            UnrecoverableError("Invalid parsed expression type");
         }
         return nullptr;
     }
@@ -922,7 +925,7 @@ private:
             case infinity_thrift_rpc::KnnDistanceType::Hamming:
                 return KnnDistanceType::kHamming;
             default:
-                Error<TypeException>("Invalid distance type");
+                UnrecoverableError("Invalid distance type");
         }
     }
 
@@ -945,7 +948,7 @@ private:
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
-            Error<TypeException>("Invalid embedding data type");
+            UnrecoverableError("Invalid embedding data type");
         }
         return std::make_pair(nullptr, 0);
     }
@@ -980,7 +983,7 @@ private:
             case LogicalType::kRowID:
                 return infinity_thrift_rpc::ColumnType::ColumnRowID;
             default:
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
         }
         return infinity_thrift_rpc::ColumnType::ColumnInvalid;
     }
@@ -1045,7 +1048,7 @@ private:
             }
             case LogicalType::kInvalid:
             default: {
-                Error<TypeException>("Invalid data type");
+                UnrecoverableError("Invalid data type");
             }
         }
         return nullptr;
@@ -1068,7 +1071,7 @@ private:
             case EmbeddingDataType::kElemDouble:
                 return infinity_thrift_rpc::ElementType::ElementFloat64;
             case EmbeddingDataType::kElemInvalid: {
-                Error<TypeException>("Invalid embedding element data type");
+                UnrecoverableError("Invalid embedding element data type");
             }
         }
         return infinity_thrift_rpc::ElementType::ElementFloat32;

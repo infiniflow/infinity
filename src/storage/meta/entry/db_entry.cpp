@@ -120,7 +120,7 @@ Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_na
 
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
@@ -138,9 +138,9 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_coll
 
     //    LOG_TRACE("Get a table entry {}", table_name);
     if (table_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No valid db meta.");
+        UniquePtr<String> err_msg = MakeUnique<String>("No valid table meta.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kNotFound, std::move(err_msg))};
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
     }
     return table_meta->GetEntry(txn_id, begin_ts);
 }
@@ -259,16 +259,16 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
 
 void DBEntry::MergeFrom(BaseEntry &other) {
     if (other.entry_type_ != EntryType::kDatabase) {
-        Error<StorageException>("MergeFrom requires the same type of BaseEntry");
+        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
     }
     DBEntry *db_entry2 = static_cast<DBEntry *>(&other);
 
     // No locking here since only the load stage needs MergeFrom.
     if (!IsEqual(*this->db_name_, *db_entry2->db_name_)) {
-        Error<StorageException>("DBEntry::MergeFrom requires db_name_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires db_name_ match");
     }
     if (!IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_)) {
-        Error<StorageException>("DBEntry::MergeFrom requires db_entry_dir_ match");
+        UnrecoverableError("DBEntry::MergeFrom requires db_entry_dir_ match");
     }
     for (auto &[table_name, table_meta2] : db_entry2->tables_) {
         auto it = this->tables_.find(table_name);

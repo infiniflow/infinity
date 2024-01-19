@@ -14,31 +14,31 @@
 
 module;
 
+module sum;
+
 import stl;
 import catalog;
-
+import status;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
 import parser;
 import third_party;
 
-module sum;
-
 namespace infinity {
 
 template <typename ValueType, typename ResultType>
 struct SumState {
 public:
-    inline void Initialize() { Error<NotImplementException>("Not implemented"); }
+    inline void Initialize() { RecoverableError(Status::NotSupport("Not implemented")); }
 
-    inline void Update(const ValueType *__restrict, SizeT) { Error<NotImplementException>("Not implemented"); }
+    inline void Update(const ValueType *__restrict, SizeT) { RecoverableError(Status::NotSupport("Not implemented")); }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { Error<NotImplementException>("Not implemented"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { RecoverableError(Status::NotSupport("Not implemented")); }
 
-    inline ptr_t Finalize() { Error<NotImplementException>("Not implemented"); }
+    inline ptr_t Finalize() { RecoverableError(Status::NotSupport("Not implemented")); }
 
-    inline static SizeT Size(const DataType &) { Error<NotImplementException>("Not implemented"); }
+    inline static SizeT Size(const DataType &) { RecoverableError(Status::NotSupport("Not implemented")); }
 };
 
 template <>

@@ -32,7 +32,7 @@ TEST_F(QueryProfilerTest, test1) {
     } catch (std::exception &e) {
         std::string result(e.what());
         std::string sub = result.substr(0, result.find_first_of('@', 0) - 1);
-        EXPECT_EQ(sub, "Executor Error: Invalid query phase in query profiler");
+        EXPECT_EQ(sub, "Invalid query phase in query profile");
     }
 }
 

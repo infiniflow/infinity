@@ -56,7 +56,7 @@ TEST_F(DBTxnTest, test1) {
     Txn *new_txn = txn_mgr->CreateTxn();
 
     // Txn1: Create db1 before txn start, NOT OK
-    EXPECT_THROW(new_txn->CreateDatabase("db1", ConflictType::kError), TransactionException);
+    EXPECT_THROW(new_txn->CreateDatabase("db1", ConflictType::kError), UnrecoverableException);
 
     // Txn1: Begin, OK
     new_txn->Begin();

@@ -55,7 +55,7 @@ TEST_F(BlobCastTest, blob_cast0) {
         BlobT source(blob_ptr, blob_len);
 
         TinyIntT target;
-        EXPECT_THROW(BlobTryCastToVarlen::Run(source, target, nullptr), FunctionException);
+        EXPECT_THROW(BlobTryCastToVarlen::Run(source, target, nullptr), UnrecoverableException);
     }
     {
         i64 blob_len = 128;
@@ -84,7 +84,7 @@ TEST_F(BlobCastTest, blob_cast1) {
     // Call BindBlobCast with wrong type of parameters
     {
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindBlobCast(target_type), TypeException);
+        EXPECT_THROW(BindBlobCast(target_type), UnrecoverableException);
     }
 
     SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kBlob);
