@@ -13,6 +13,8 @@ import data_block;
 import parser;
 import column_vector;
 import analyzer;
+import column_inverter;
+import task_executor;
 export module column_indexer;
 
 namespace infinity {
@@ -25,10 +27,14 @@ public:
 
     void Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
+    void Commit();
+
 private:
     void SetAnalyzer();
 
     PostingWriter *DoAddPosting(const String &term);
+
+    void SwitchActiveInverter();
 
 private:
     u64 column_id_;
@@ -39,5 +45,12 @@ private:
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
     bool is_real_time_{false};
+    Vector<UniquePtr<ColumnInverter>> free_inverters_;
+    Deque<UniquePtr<ColumnInverter>> inflight_inverters_;
+    UniquePtr<ColumnInverter> inverter_;
+    u32 num_inverters_;
+    u32 max_inverters_;
+    UniquePtr<SequencedTaskExecutor> invert_executor_;
+    UniquePtr<SequencedTaskExecutor> commit_executor_;
 };
 } // namespace infinity

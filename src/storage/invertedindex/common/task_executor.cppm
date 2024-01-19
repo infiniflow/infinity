@@ -7,7 +7,7 @@ export module task_executor;
 namespace infinity {
 
 export struct Runnable {
-    using func_t = std::function<int(Runnable &)>;
+    using FuncT = std::function<int(Runnable &)>;
 
     static int DefaultInitFunction(Runnable &target);
 
@@ -69,7 +69,7 @@ public:
         virtual ~Task() = default;
     };
 
-    TaskExecutor(Runnable::func_t func, u32 reserved_queue_size, u32 watermark, NanoSeconds reaction_time);
+    TaskExecutor(Runnable::FuncT func, u32 reserved_queue_size, u32 watermark, NanoSeconds reaction_time);
 
     virtual ~TaskExecutor();
 
@@ -157,7 +157,7 @@ public:
 
     void Execute(u32 id, UniquePtr<TaskExecutor::Task> task);
 
-    UniquePtr<SequencedTaskExecutor> Create(Runnable::func_t func, u32 threads, u32 task_limit);
+    static UniquePtr<SequencedTaskExecutor> Create(Runnable::FuncT func, u32 threads, u32 task_limit);
 
     void SyncAll();
 

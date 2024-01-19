@@ -2,14 +2,31 @@ module;
 
 export module column_inverter;
 import stl;
-import task_executor;
 import analyzer;
+import parser;
+import column_vector;
 import memory_pool;
 import pool_allocator;
 import term;
 import string_ref;
+
 namespace infinity {
-export class ColumnInverter : public TaskExecutor::Task {
+
+class RefCount {
+    std::mutex lock_;
+    std::condition_variable cv_;
+    u32 ref_count_;
+    void Retain() noexcept;
+    void Release() noexcept;
+
+public:
+    RefCount();
+    virtual ~RefCount();
+    void WaitForZeroRefCount();
+    bool ZeroRefCount();
+};
+
+export class ColumnInverter {
 public:
     ColumnInverter(Analyzer *analyzer, bool jieba_specialize, SharedPtr<MemoryPool> byte_slice_pool);
     ColumnInverter(const ColumnInverter &) = delete;
@@ -18,9 +35,15 @@ public:
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
     ~ColumnInverter();
 
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+
     void InvertColumn(u32 doc_id, const String &val);
 
     void Commit();
+
+    bool ZeroRefCount() { return ref_count_.ZeroRefCount(); }
+
+    void WaitForZeroRefCount() { return ref_count_.WaitForZeroRefCount(); }
 
     struct PosInfo {
         u32 term_num_{0};
@@ -78,5 +101,6 @@ private:
     PosInfoVec positions_;
     U32Vec term_refs_;
     TermList terms_once_;
+    RefCount ref_count_;
 };
 } // namespace infinity
