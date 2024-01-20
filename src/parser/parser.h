@@ -278,11 +278,12 @@ struct SQL_LTYPE {
     CONFIGS = 407,                 /* CONFIGS  */
     PROFILES = 408,                /* PROFILES  */
     STATUS = 409,                  /* STATUS  */
-    SEARCH = 410,                  /* SEARCH  */
-    MATCH = 411,                   /* MATCH  */
-    QUERY = 412,                   /* QUERY  */
-    FUSION = 413,                  /* FUSION  */
-    NUMBER = 414                   /* NUMBER  */
+    VAR = 410,                     /* VAR  */
+    SEARCH = 411,                  /* SEARCH  */
+    MATCH = 412,                   /* MATCH  */
+    QUERY = 413,                   /* QUERY  */
+    FUSION = 414,                  /* FUSION  */
+    NUMBER = 415                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -364,7 +365,7 @@ union SQLSTYPE
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-#line 368 "parser.h"
+#line 369 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

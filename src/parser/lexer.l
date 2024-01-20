@@ -167,6 +167,7 @@ UPDATE          { return UPDATE; }
 UUID            { return UUID; }
 USE             { return USE; }
 VALUES          { return VALUES; }
+VAR             { return VAR; }
 VARCHAR         { return VARCHAR; }
 VECTOR          { return VECTOR; }
 VIEW            { return VIEW; }

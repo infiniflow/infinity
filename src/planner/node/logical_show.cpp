@@ -48,6 +48,8 @@ String ToString(ShowType type) {
             return "Show session status";
         case ShowType::kShowGlobalStatus:
             return "Show global status";
+        case ShowType::kShowVar:
+            return "Show variables";
         case ShowType::kInvalid: {
             UnrecoverableError("Invalid chunk scan type");
         }

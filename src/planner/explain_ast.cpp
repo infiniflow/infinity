@@ -492,6 +492,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW GLOBAL STATUS"));
             break;
         }
+        case ShowStmtType::kVar: {
+            result->emplace_back(MakeShared<String>("SHOW VARIABLES"));
+            break;
+        }
     }
 }
 

@@ -68,6 +68,9 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
 // extern SharedPtr<spdlogger> infinity_logger;
 
 SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
+
+    SystemVariables::InitVariablesMap();
+
     SharedPtr<String> result;
 
     // Default general config
@@ -425,6 +428,33 @@ void Config::PrintAll() const {
 
     // Resource
     fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
+}
+
+void SystemVariables::InitVariablesMap() {
+    map_["query_count"] = SysVar::kQueryCount;
+    map_["session_count"] = SysVar::kSessionCount;
+    map_["buffer_pool_usage"] = SysVar::kBufferPoolUsage;
+    map_["version"] = SysVar::kVersion;
+    map_["query_memory_limit"] = SysVar::kQueryMemoryLimit;
+    map_["query_cpu_limit"] = SysVar::kQueryCpuLimit;
+    map_["log_level"] = SysVar::kLogLevel;
+    map_["schedule_policy"] = SysVar::kSchedulePolicy;
+    map_["listen_address"] = SysVar::kListenAddress;
+    map_["sql_port"] = SysVar::kSQLPort;
+    map_["sdk_port"] = SysVar::kSDKPort;
+    map_["http_api_port"] = SysVar::kHttpAPIPort;
+    map_["data_url"] = SysVar::kDataURL;
+    map_["time_zone"] = SysVar::kTimezone;
+}
+
+HashMap<String, SysVar> SystemVariables::map_;
+
+SysVar SystemVariables::GetSysVarEnumByName(const String& var_name) {
+    auto it = map_.find(var_name);
+    if(it != map_.end()) {
+        return it->second;
+    }
+    return SysVar::kInvalid;
 }
 
 } // namespace infinity

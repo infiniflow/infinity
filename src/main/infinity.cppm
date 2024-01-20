@@ -58,6 +58,8 @@ public:
 
     QueryResult Flush();
 
+    QueryResult ShowVariable(const String& variable_name);
+
     // For embedded sqllogictest
     QueryResult Query(const String& query_text);
 
