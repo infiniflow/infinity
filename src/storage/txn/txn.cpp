@@ -15,8 +15,8 @@
 module;
 
 #include <string>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 module txn;
 
@@ -50,11 +50,11 @@ namespace infinity {
 
 Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, NewCatalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
-      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
+      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
-      local_catalog_delta_ops_entry_(MakeShared<CatalogDeltaEntry>()) {}
+      local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);

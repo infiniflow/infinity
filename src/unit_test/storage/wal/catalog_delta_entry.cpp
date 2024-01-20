@@ -17,11 +17,8 @@
 import infinity_exception;
 
 import logger;
-import bitmask;
 import third_party;
 import stl;
-import infinity_context;
-import global_resource_usage;
 import catalog_delta_entry;
 
 class CatalogDeltaEntryTest : public BaseTest {};
@@ -29,11 +26,10 @@ class CatalogDeltaEntryTest : public BaseTest {};
 using namespace infinity;
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
-    // Create necessary objects for the test
-
     auto global_catalog_delta_entry = std::make_shared<GlobalCatalogDeltaEntry>();
-
     auto local_catalog_delta_entry = std::make_shared<CatalogDeltaEntry>();
+    local_catalog_delta_entry->set_txn_id(1);
+    local_catalog_delta_entry->set_commit_ts(1);
 
     String db_name{"db_test"};
     String db_dir{"data"};
@@ -126,20 +122,12 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     EXPECT_EQ(local_catalog_delta_entry->operations().size(), 26);
     // merge
     local_catalog_delta_entry->Merge(global_catalog_delta_entry);
-    // check vector
+    // check ops
     EXPECT_EQ(global_catalog_delta_entry->operations().size(), 0);
-    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 0);
+    EXPECT_EQ(global_catalog_delta_entry->global_operations().size(), 14);
     // check maps
-    EXPECT_EQ(global_catalog_delta_entry->db_meta_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->db_entry_map().size(), 2);
-    EXPECT_EQ(global_catalog_delta_entry->table_meta_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->table_entry_map().size(), 2);
-    EXPECT_EQ(global_catalog_delta_entry->segment_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->block_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->column_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->index_meta_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->table_index_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->irs_index_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->column_index_entry_map().size(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->segment_index_entry_map().size(), 1);
+    EXPECT_EQ(global_catalog_delta_entry->encode_op_to_id_map().size(), 14);
+    // check member
+    EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1);
+    EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1);
 }

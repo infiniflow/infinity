@@ -89,14 +89,14 @@ export struct ForceCheckpointTask final : public BGTask {
 
 export struct CatalogDeltaOpsMergeTask final : public BGTask {
 
-    explicit CatalogDeltaOpsMergeTask(SharedPtr<CatalogDeltaEntry> local_catalog_delta_entry, NewCatalog *catalog)
-        : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(local_catalog_delta_entry), catalog_(catalog) {}
+    explicit CatalogDeltaOpsMergeTask(UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry, NewCatalog *catalog)
+        : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(std::move(local_catalog_delta_entry)), catalog_(catalog) {}
 
     ~CatalogDeltaOpsMergeTask() = default;
 
-    String ToString() const final { return "Catalog Delta Ops Merge Task"; }
+    String ToString() const final { return "Catalog delta operation merge task"; }
 
-    SharedPtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
+    UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
     NewCatalog *catalog_{};
 };
 

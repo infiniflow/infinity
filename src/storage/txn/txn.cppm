@@ -190,7 +190,7 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
 
-    SharedPtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
+    UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done
     std::mutex lock_{};
