@@ -246,3 +246,41 @@ TEST_F(InfinityTest, test1) {
 
     Infinity::LocalUnInit();
 }
+
+TEST_F(InfinityTest, test2) {
+    using namespace infinity;
+    String path = "/tmp/infinity";
+
+    Infinity::LocalInit(path);
+
+    SharedPtr<Infinity> infinity = Infinity::LocalConnect();
+
+    {
+        QueryResult result = infinity->ShowVariable("version");
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("session_count");
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("query_count");
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("buffer_pool_usage");
+        EXPECT_EQ(result.IsOk(), true);
+    }
+
+    {
+        QueryResult result = infinity->ShowVariable("error");
+        EXPECT_EQ(result.IsOk(), false);
+    }
+
+    infinity->LocalDisconnect();
+
+    Infinity::LocalUnInit();
+}
