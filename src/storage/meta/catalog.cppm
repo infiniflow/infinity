@@ -102,6 +102,7 @@ public:
 };
 
 class GlobalCatalogDeltaEntry;
+class CatalogDeltaEntry;
 export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
@@ -249,8 +250,7 @@ public:
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
-    // Global physical wal log
-    SharedPtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeShared<GlobalCatalogDeltaEntry>()};
+    UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
 };
 
 } // namespace infinity

@@ -62,7 +62,9 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kCatalogDeltaOpsMerge: {
                 CatalogDeltaOpsMergeTask *task = static_cast<CatalogDeltaOpsMergeTask *>(bg_task.get());
-                task->local_catalog_delta_entry_->Merge(task->catalog_->global_catalog_delta_entry_);
+                auto &local_catalog_ops = task->local_catalog_delta_entry_;
+                auto *catalog = task->catalog_;
+                catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
                 break;
             }
             case BGTaskType::kInvalid: {

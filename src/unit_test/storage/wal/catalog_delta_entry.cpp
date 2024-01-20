@@ -26,8 +26,8 @@ class CatalogDeltaEntryTest : public BaseTest {};
 using namespace infinity;
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
-    auto global_catalog_delta_entry = std::make_shared<GlobalCatalogDeltaEntry>();
-    auto local_catalog_delta_entry = std::make_shared<CatalogDeltaEntry>();
+    auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
+    auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
     local_catalog_delta_entry->set_txn_id(1);
     local_catalog_delta_entry->set_commit_ts(1);
 
@@ -121,7 +121,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
 
     EXPECT_EQ(local_catalog_delta_entry->operations().size(), 26);
     // merge
-    local_catalog_delta_entry->Merge(global_catalog_delta_entry);
+    global_catalog_delta_entry->Merge(std::move(local_catalog_delta_entry));
     // check ops
     EXPECT_EQ(global_catalog_delta_entry->operations().size(), 0);
     EXPECT_EQ(global_catalog_delta_entry->global_operations().size(), 14);

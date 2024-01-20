@@ -496,12 +496,11 @@ String CatalogDeltaEntry::ToString() const {
     return str;
 }
 
-void CatalogDeltaEntry::Merge(SharedPtr<CatalogDeltaEntry> other) {
+void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
 
-    auto global_catalog_delta_entry = static_cast<GlobalCatalogDeltaEntry *>(other.get());
-    auto &global_map = global_catalog_delta_entry->encode_op_to_id_map();
-    auto &global_operations = global_catalog_delta_entry->global_operations();
-    auto &local_operations = this->operations_;
+    auto &global_map = this->encode_op_to_id_map_;
+    auto &global_operations = this->global_operations_;
+    auto &local_operations = other->operations();
 
     for (auto &local_operation : local_operations) {
         auto it = global_map.find(local_operation->EncodeIndex());
@@ -514,8 +513,8 @@ void CatalogDeltaEntry::Merge(SharedPtr<CatalogDeltaEntry> other) {
     }
 
     local_operations.clear();
-    global_catalog_delta_entry->txn_id_ = this->txn_id_;
-    global_catalog_delta_entry->commit_ts_ = this->commit_ts_;
+    this->set_txn_id(other->txn_id());
+    this->set_commit_ts(other->commit_ts());
 }
 
 } // namespace infinity

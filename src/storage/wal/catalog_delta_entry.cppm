@@ -530,8 +530,6 @@ public:
     void set_commit_ts(TransactionID commit_ts) { commit_ts_ = commit_ts; }
     Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
-    void Merge(SharedPtr<CatalogDeltaEntry> other);
-
 private:
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
@@ -539,6 +537,7 @@ private:
 export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
+    void Merge(UniquePtr<CatalogDeltaEntry> other);
     Deque<UniquePtr<CatalogDeltaOperation>> &global_operations() { return global_operations_; }
     HashMap<String, SizeT> &encode_op_to_id_map() { return encode_op_to_id_map_; }
 
