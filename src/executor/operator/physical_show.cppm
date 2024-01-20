@@ -91,6 +91,8 @@ private:
 
     void ExecuteShowGlobalStatus(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowVar(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};

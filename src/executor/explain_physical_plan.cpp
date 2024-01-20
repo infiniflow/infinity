@@ -1170,6 +1170,24 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowVar: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW VARIABLE ";
+            } else {
+                show_str = "SHOW VARIABLE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kInvalid: {
             UnrecoverableError("Invalid show type");
         }

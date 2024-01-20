@@ -113,4 +113,19 @@ private:
     SessionOptions default_session_options_;
 };
 
+export enum class SysVar {
+    kQueryCount,
+    kSessionCount,
+    kBufferPoolUsage,
+    kVersion,
+    kInvalid,
+};
+
+export struct SystemVariables {
+    static HashMap<String, SysVar> map_;
+
+    static void InitVariablesMap();
+    static SysVar GetSysVarEnumByName(const String& var_name);
+};
+
 } // namespace infinity
