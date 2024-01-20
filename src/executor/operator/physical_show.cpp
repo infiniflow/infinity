@@ -1678,6 +1678,71 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
+        case SysVar::kQueryMemoryLimit: {
+            u64 query_memory_limit = query_context->global_config()->query_memory_limit();
+            Value value = Value::MakeVarchar(std::to_string(query_memory_limit));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kQueryCpuLimit: {
+            u64 query_cpu_limit = query_context->global_config()->query_cpu_limit();
+            Value value = Value::MakeVarchar(std::to_string(query_cpu_limit));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kLogLevel: {
+            String log_level_str = LogLevel2Str(query_context->global_config()->log_level());
+            Value value = Value::MakeVarchar(log_level_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSchedulePolicy: {
+            String scheduler_policy = "Round Robin";
+            Value value = Value::MakeVarchar(scheduler_policy);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kListenAddress: {
+            Value value = Value::MakeVarchar(query_context->global_config()->listen_address());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSQLPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->pg_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSDKPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->sdk_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kHttpAPIPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->http_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDataURL: {
+            Value value = Value::MakeVarchar(query_context->global_config()->data_dir()->c_str());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kTimezone: {
+            String time_zone = fmt::format("{}-{}", query_context->global_config()->time_zone(), query_context->global_config()->time_zone_bias());
+            Value value = Value::MakeVarchar(time_zone);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));
         }

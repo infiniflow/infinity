@@ -435,6 +435,16 @@ void SystemVariables::InitVariablesMap() {
     map_["session_count"] = SysVar::kSessionCount;
     map_["buffer_pool_usage"] = SysVar::kBufferPoolUsage;
     map_["version"] = SysVar::kVersion;
+    map_["query_memory_limit"] = SysVar::kQueryMemoryLimit;
+    map_["query_cpu_limit"] = SysVar::kQueryCpuLimit;
+    map_["log_level"] = SysVar::kLogLevel;
+    map_["schedule_policy"] = SysVar::kSchedulePolicy;
+    map_["listen_address"] = SysVar::kListenAddress;
+    map_["sql_port"] = SysVar::kSQLPort;
+    map_["sdk_port"] = SysVar::kSDKPort;
+    map_["http_api_port"] = SysVar::kHttpAPIPort;
+    map_["data_url"] = SysVar::kDataURL;
+    map_["time_zone"] = SysVar::kTimezone;
 }
 
 HashMap<String, SysVar> SystemVariables::map_;

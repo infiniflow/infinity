@@ -118,6 +118,16 @@ export enum class SysVar {
     kSessionCount,
     kBufferPoolUsage,
     kVersion,
+    kQueryMemoryLimit,
+    kQueryCpuLimit,
+    kLogLevel,
+    kSchedulePolicy,
+    kListenAddress,
+    kSQLPort,
+    kSDKPort,
+    kHttpAPIPort,
+    kDataURL,
+    kTimezone,
     kInvalid,
 };
 

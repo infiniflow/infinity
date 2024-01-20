@@ -77,8 +77,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                                                                                String replay_table_index_dir) {
     TableIndexEntry *table_index_entry_ptr{nullptr};
 
-    Txn* txn{nullptr};
-    if (txn_mgr!= nullptr){
+    Txn *txn{nullptr};
+    if (txn_mgr != nullptr) {
         txn = txn_mgr->GetTxn(txn_id);
     }
 
@@ -100,8 +100,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry *header_base_entry = this->entry_list_.front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            auto table_index_entry =
-                TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
             table_index_entry_ptr = table_index_entry.get();
             this->entry_list_.emplace_front(std::move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
@@ -270,7 +269,10 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(Tra
     }
 }
 
-SharedPtr<String> TableIndexMeta::ToString() { UnrecoverableError("Not implemented"); }
+SharedPtr<String> TableIndexMeta::ToString() {
+    UnrecoverableError("Not implemented");
+    return nullptr;
+}
 
 nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
