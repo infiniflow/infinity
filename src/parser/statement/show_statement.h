@@ -30,7 +30,8 @@ enum class ShowStmtType {
     kProfiles,
     kSegments,
     kSessionStatus,
-    kGlobalStatus
+    kGlobalStatus,
+    kVar,
 };
 
 class ShowStatement : public BaseStatement {
@@ -44,6 +45,7 @@ public:
     std::string table_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
+    std::string var_name_{};
 };
 
 } // namespace infinity

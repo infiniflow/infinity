@@ -790,6 +790,9 @@ Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindC
         case ShowStmtType::kGlobalStatus: {
             return BuildShowGlobalStatus(statement, bind_context_ptr);
         }
+        case ShowStmtType::kVar: {
+            return BuildShowVar(statement, bind_context_ptr);
+        }
         default: {
             UnrecoverableError("Unexpected show statement type.");
         }
@@ -905,6 +908,19 @@ Status LogicalPlanner::BuildShowGlobalStatus(const ShowStatement *statement, Sha
                                                                   ShowType::kShowGlobalStatus,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  statement->block_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowVar(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowVar,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   statement->segment_id_,
                                                                   statement->block_id_);

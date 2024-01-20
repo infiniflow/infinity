@@ -23,7 +23,7 @@ u32 RoundUp2(u32 val) {
     return res;
 }
 
-std::thread Start(Runnable &runnable, Runnable::func_t init_func) {
+std::thread Start(Runnable &runnable, Runnable::FuncT init_func) {
     return std::thread([&runnable, init_fun = std::move(init_func)]() { init_fun(runnable); });
 }
 
@@ -37,7 +37,7 @@ double ExecutorIdleTracker::Reset(steady_time t, u32 num_threads) {
     return (elapsed > 0) ? (idle / elapsed) : 0.0;
 }
 
-TaskExecutor::TaskExecutor(Runnable::func_t func, u32 reserved_queue_size, u32 watermark, NanoSeconds reaction_time)
+TaskExecutor::TaskExecutor(Runnable::FuncT func, u32 reserved_queue_size, u32 watermark, NanoSeconds reaction_time)
     : watermark_ratio_(watermark < reserved_queue_size ? double(watermark) / reserved_queue_size : 1.0), task_limit_(RoundUp2(reserved_queue_size)),
       wanted_task_limit_(task_limit_.load()), rp_(0), tasks_(MakeUnique<TaskExecutor::Task::ptr[]>(task_limit_)), mutex_(), consumer_condition_(),
       producer_condition_(), thread_(), stopped_(false), idle_tracker_(steady_clock::now()), thread_idle_tracker_(), wakeup_count_(0),
@@ -224,7 +224,7 @@ void SequencedTaskExecutor::Execute(u32 id, UniquePtr<TaskExecutor::Task> task) 
     }
 }
 
-UniquePtr<SequencedTaskExecutor> SequencedTaskExecutor::Create(Runnable::func_t func, u32 threads, u32 task_limit) {
+UniquePtr<SequencedTaskExecutor> SequencedTaskExecutor::Create(Runnable::FuncT func, u32 threads, u32 task_limit) {
     auto executors = Vector<UniquePtr<TaskExecutor>>();
     for (u32 id = 0; id < threads; ++id) {
         u32 watermark = task_limit / 10;

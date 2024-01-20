@@ -1,6 +1,8 @@
 module;
 
 import stl;
+import parser;
+import default_values;
 
 export module index_defines;
 
@@ -69,5 +71,11 @@ export {
     constexpr u32 MAX_UNCOMPRESSED_SKIP_LIST_SIZE = 10;
     constexpr u8 SKIP_LIST_BUFFER_SIZE = 32;
 }
+
+export docid_t RowID2DocID(const RowID &row_id);
+
+export docid_t RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset);
+
+export RowID DocID2RowID(docid_t doc_id);
 
 } // namespace infinity

@@ -16,7 +16,7 @@ module;
 
 #include <string>
 
-#include "statement/extra/create_index_info.h"
+module physical_show;
 
 import stl;
 import txn;
@@ -52,8 +52,7 @@ import local_file_system;
 import utility;
 import buffer_manager;
 import session_manager;
-
-module physical_show;
+import compilation_config;
 
 namespace infinity {
 
@@ -209,6 +208,13 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowVar: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             RecoverableError(Status::NotSupport("Not implemented show type"));
         }
@@ -260,7 +266,11 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowGlobalStatus(query_context, show_operator_state);
             break;
         }
-        case ShowType::kInvalid: {
+        case ShowType::kShowVar: {
+            ExecuteShowVar(query_context, show_operator_state);
+            break;
+        }
+        default: {
             UnrecoverableError("Invalid chunk scan type");
         }
     }
@@ -321,10 +331,10 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     Vector<TableDetail> table_collections_detail;
     Status status = txn->GetTables(db_name_, table_collections_detail);
 
-    if(!status.ok()) {
+    if (!status.ok()) {
         show_operator_state->status_ = status;
         RecoverableError(status);
-        return ;
+        return;
     }
 
     // Prepare the output data block
@@ -1386,18 +1396,18 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                     case IndexType::kIVFFlat: {
                         const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base);
                         other_parameters = fmt::format("metric = {}, centroids_count = {}",
-                                                  MetricTypeToString(index_ivfflat->metric_type_),
-                                                  index_ivfflat->centroids_count_);
+                                                       MetricTypeToString(index_ivfflat->metric_type_),
+                                                       index_ivfflat->centroids_count_);
                         break;
                     }
                     case IndexType::kHnsw: {
                         const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base);
                         other_parameters = fmt::format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
-                                                  MetricTypeToString(index_hnsw->metric_type_),
-                                                  HnswEncodeTypeToString(index_hnsw->encode_type_),
-                                                  index_hnsw->M_,
-                                                  index_hnsw->ef_construction_,
-                                                  index_hnsw->ef_);
+                                                       MetricTypeToString(index_hnsw->metric_type_),
+                                                       HnswEncodeTypeToString(index_hnsw->encode_type_),
+                                                       index_hnsw->M_,
+                                                       index_hnsw->ef_construction_,
+                                                       index_hnsw->ef_);
                         break;
                     }
                     case IndexType::kIRSFullText: {
@@ -1613,6 +1623,128 @@ void PhysicalShow::ExecuteShowGlobalStatus(QueryContext *query_context, ShowOper
             Value value = Value::MakeVarchar(std::to_string(session_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    Vector<SharedPtr<ColumnDef>> output_column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "value", HashSet<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("variables"), output_column_defs);
+    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> output_column_types{
+        varchar_type,
+    };
+
+    output_block_ptr->Init(output_column_types);
+
+    SysVar system_var = SystemVariables::GetSysVarEnumByName(object_name_);
+    switch (system_var) {
+        case SysVar::kQueryCount: {
+            SizeT query_count = query_context->current_session()->query_count();
+            Value value = Value::MakeVarchar(std::to_string(query_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSessionCount: {
+            SessionManager *session_manager = query_context->session_manager();
+            u64 session_count = session_manager->GetSessionCount();
+            Value value = Value::MakeVarchar(std::to_string(session_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kBufferPoolUsage: {
+            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            u64 memory_limit = buffer_manager->memory_limit();
+            u64 memory_usage = buffer_manager->memory_usage();
+            Value value = Value::MakeVarchar(fmt::format("{}/{}", Utility::FormatByteSize(memory_usage), Utility::FormatByteSize(memory_limit)));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kVersion: {
+            Value value = Value::MakeVarchar(fmt::format("{}-{}", query_context->global_config()->version(), git_commit_id()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kQueryMemoryLimit: {
+            u64 query_memory_limit = query_context->global_config()->query_memory_limit();
+            Value value = Value::MakeVarchar(std::to_string(query_memory_limit));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kQueryCpuLimit: {
+            u64 query_cpu_limit = query_context->global_config()->query_cpu_limit();
+            Value value = Value::MakeVarchar(std::to_string(query_cpu_limit));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kLogLevel: {
+            String log_level_str = LogLevel2Str(query_context->global_config()->log_level());
+            Value value = Value::MakeVarchar(log_level_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSchedulePolicy: {
+            String scheduler_policy = "Round Robin";
+            Value value = Value::MakeVarchar(scheduler_policy);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kListenAddress: {
+            Value value = Value::MakeVarchar(query_context->global_config()->listen_address());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSQLPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->pg_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kSDKPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->sdk_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kHttpAPIPort: {
+            Value value = Value::MakeVarchar(std::to_string(query_context->global_config()->http_port()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kDataURL: {
+            Value value = Value::MakeVarchar(query_context->global_config()->data_dir()->c_str());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case SysVar::kTimezone: {
+            String time_zone = fmt::format("{}-{}", query_context->global_config()->time_zone(), query_context->global_config()->time_zone_bias());
+            Value value = Value::MakeVarchar(time_zone);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        default: {
+            RecoverableError(Status::NoSysVar(object_name_));
         }
     }
 

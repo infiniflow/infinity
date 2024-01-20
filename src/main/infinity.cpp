@@ -179,4 +179,19 @@ QueryResult Infinity::Flush() {
     return result;
 }
 
+QueryResult Infinity::ShowVariable(const String& variable_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->var_name_ = variable_name;
+    show_statement->show_type_ = ShowStmtType::kVar;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 } // namespace infinity

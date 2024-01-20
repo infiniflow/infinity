@@ -50,11 +50,11 @@ export {
     // column vector related constants
     constexpr i64 DEFAULT_VECTOR_SIZE = DEFAULT_BLOCK_CAPACITY;
     constexpr u64 INITIAL_VECTOR_CHUNK_ID = std::numeric_limits<u64>::max();
-    ;
+
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
-    ; // Each row has one chunk.
+    // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
 
     // segment related constants
@@ -72,11 +72,8 @@ export {
 
     // transaction related constants
     constexpr u64 MAX_TXN_ID = std::numeric_limits<u64>::max();
-    ;
     constexpr u64 MAX_TIMESTAMP = std::numeric_limits<u64>::max();
-    ;
     constexpr TxnTimeStamp UNCOMMIT_TS = std::numeric_limits<u64>::max();
-    ;
 
     constexpr SizeT KB = 1024;
     constexpr SizeT MB = 1024 * KB;

@@ -6,14 +6,42 @@ module;
 
 module column_inverter;
 import stl;
-import task_executor;
 import analyzer;
 import memory_pool;
 import pool_allocator;
 import string_ref;
 import term;
 import radix_sort;
+import index_defines;
+
 namespace infinity {
+
+RefCount::RefCount() : lock_(), cv_(), ref_count_(0u) {}
+
+RefCount::~RefCount() {}
+
+void RefCount::Retain() noexcept {
+    std::lock_guard<std::mutex> guard(lock_);
+    ++ref_count_;
+}
+
+void RefCount::Release() noexcept {
+    std::lock_guard<std::mutex> guard(lock_);
+    --ref_count_;
+    if (ref_count_ == 0u) {
+        cv_.notify_all();
+    }
+}
+
+void RefCount::WaitForZeroRefCount() {
+    std::unique_lock<std::mutex> guard(lock_);
+    cv_.wait(guard, [this] { return (ref_count_ == 0u); });
+}
+
+bool RefCount::ZeroRefCount() {
+    std::unique_lock<std::mutex> guard(lock_);
+    return (ref_count_ == 0u);
+}
 
 template <u32 T>
 static u32 Align(u32 unaligned) {
@@ -26,6 +54,13 @@ ColumnInverter::ColumnInverter(Analyzer *analyzer, bool jieba_specialize, Shared
 ColumnInverter::~ColumnInverter() {}
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
+
+void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
+    for (SizeT i = 0; i < column_vector->Size(); ++i) {
+        String data = column_vector->ToString(i);
+        InvertColumn(RowID2DocID(row_ids[i]), data);
+    }
+}
 
 void ColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     terms_once_.clear();

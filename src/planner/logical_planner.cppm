@@ -115,6 +115,8 @@ public:
 
     Status BuildShowGlobalStatus(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowVar(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

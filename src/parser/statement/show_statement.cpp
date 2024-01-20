@@ -64,6 +64,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show global status";
             break;
         }
+        case ShowStmtType::kVar: {
+            ss << "Show variable";
+            break;
+        }
     }
     return ss.str();
 }
