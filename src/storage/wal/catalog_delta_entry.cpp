@@ -479,21 +479,21 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
 
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
-    LOG_INFO(fmt::format("Snapshot txn_id {} commit_ts {}", txn_id, commit_ts));
+    LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
-        LOG_TRACE(fmt::format("Snapshot operation {}", operation->ToString()));
+        LOG_TRACE(fmt::format("SaveState operation {}", operation->ToString()));
         operation->SaveSate();
     }
 }
 
-String CatalogDeltaEntry::ToString() const {
-    String str;
+std::string CatalogDeltaEntry::ToString() const {
+    std::stringstream sstream;
     for (const auto &operation : operations_) {
-        str += operation->ToString() + "\n";
+        sstream << operation->ToString() << '\n';
     }
-    return str;
+    return sstream.str();
 }
 
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {

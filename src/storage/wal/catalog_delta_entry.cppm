@@ -14,9 +14,6 @@
 
 module;
 
-#include <parallel_hashmap/phmap_utils.h>
-#include <typeinfo>
-
 export module catalog_delta_entry;
 
 import table_def;
@@ -98,8 +95,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return String("ADD_DATABASE_META"); }
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}", i32(GetType()), this->db_name_)); }
+    const String ToString() const final { return "ADD_DATABASE_META"; }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}", i32(GetType()), this->db_name_)); }
 
 public:
     DBMeta *db_meta_{};
@@ -125,7 +122,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "ADD_TABLE_META"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}_{}", i32(GetType()), db_name_, table_name_)); }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}", i32(GetType()), db_name_, table_name_)); }
 
 public:
     TableMeta *table_meta_{};
@@ -152,7 +149,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "ADD_DATABASE_ENTRY"; };
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}_{}", i32(GetType()), is_delete_, db_name_)); }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}", i32(GetType()), is_delete_, db_name_)); }
 
 public:
     SharedPtr<DBEntry> db_entry_{};
@@ -179,7 +176,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "ADD_TABLE_ENTRY"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}_{}_{}", i32(GetType()), is_delete_, db_name_, table_name_)); }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), is_delete_, db_name_, table_name_)); }
 
 public:
     SharedPtr<TableEntry> table_entry_{};
@@ -213,7 +210,7 @@ public:
     void SaveSate() final;
     const String ToString() const final { return "ADD_SEGMENT_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}", i32(GetType()), this->db_name_, this->table_name_, this->segment_id_));
+        return String(fmt::format("{}#{}#{}#{}", i32(GetType()), this->db_name_, this->table_name_, this->segment_id_));
     }
 
 public:
@@ -263,7 +260,7 @@ public:
     void SaveSate() final;
     const String ToString() const final { return "ADD_BLOCK_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_));
     }
 
 public:
@@ -319,7 +316,7 @@ public:
     void SaveSate() final;
     const String ToString() const final { return "ADD_COLUMN_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_, column_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_, column_id_));
     }
 
 public:
@@ -351,8 +348,8 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddIndexMeta"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, index_name_)); }
+    const String ToString() const final { return "ADD_INDEX_META"; }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_)); }
 
 public:
     TableIndexMeta *index_meta_{};
@@ -381,7 +378,7 @@ public:
     void SaveSate() final;
     const String ToString() const final { return "ADD_TABLE_INDEX_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}_{}", i32(GetType()), is_delete_, db_name_, table_name_, index_name_));
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), is_delete_, db_name_, table_name_, index_name_));
     }
 
 public:
@@ -412,7 +409,7 @@ public:
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
     const String ToString() const final { return "ADD_IRS_INDEX_ENTRY"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, index_name_)); }
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_)); }
 
 public:
     SharedPtr<IrsIndexEntry> irs_index_entry_{};
@@ -445,9 +442,9 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddColumnIndexEntry"; }
+    const String ToString() const final { return "ADD_COLUMN_INDEX_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_));
     }
 
 public:
@@ -483,9 +480,9 @@ public:
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "AddSegmentColumnEntry"; }
+    const String ToString() const final { return "ADD_SEGMENT_COLUMN_INDEX_ENTRY"; }
     const String EncodeIndex() const final {
-        return String(fmt::format("{}_{}_{}_{}_{}_{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_, segment_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_, segment_id_));
     }
 
 public:
