@@ -24,7 +24,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 - [Community](#community)
 
 
-## 🌟 Key Features {#key-features}
+## 🌟 Key Features
 
 Infinity comes with high performance, flexibility, ease-of-use, and many features designed to address the challenges facing the next-generation AI applications:
 
@@ -49,7 +49,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 - Intuitive Python API. See the [Python API](docs/pysdk_api_reference.md)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
-## 🎮 Get Started {#get-started}
+## 🎮 Get Started
 
 ### Deploy Infinity database
 
@@ -135,15 +135,15 @@ print(res)
 > 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
 
 
-## 🛠️ Build from Source {#build-from-source}
+## 🛠️ Build from Source
 
 See [Build from Source](docs/build_from_source.md).
 
-## 📜 Roadmap {#roadmap}
+## 📜 Roadmap
 
 See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/338)
 
-## 🙌 Community {#community}
+## 🙌 Community
 
 - [Discord](https://discord.gg/jEfRUwEYEV)
 - [Twitter](https://twitter.com/infiniflowai)
