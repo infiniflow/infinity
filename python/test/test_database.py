@@ -91,3 +91,39 @@ class TestDatabase:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+    def test_create_database_fail(self):
+        """
+        1. connect server
+
+        2. create ' ' name db
+
+        3. disconnect server
+        :return:
+        """
+
+        # 1. connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+
+        # 2. create ' ' name db
+        try:
+            db = infinity_obj.create_database(" ")
+        except Exception as e:
+            print(e)
+
+        # 3. create ' a' name db
+        try:
+            db = infinity_obj.create_database(" a")
+        except Exception as e:
+            print(e)
+
+        # 4. create ' a' name db
+        try:
+            db = infinity_obj.create_database("a ")
+        except Exception as e:
+            print(e)
+
+        # 3. disconnect
+        res = infinity_obj.disconnect()
+
+        assert res.success
