@@ -29,10 +29,12 @@ module;
 #include <forward_list>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <map>
 #include <memory>
 #include <optional>
+#include <random>
 #include <set>
 #include <shared_mutex>
 #include <sstream>
@@ -44,7 +46,6 @@ module;
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include <random>
 
 export module stl;
 
@@ -176,6 +177,9 @@ using std::iota;
 
 using std::exception;
 using std::unordered_set;
+
+using std::back_inserter;
+using std::hash;
 } // namespace std
 
 namespace infinity {

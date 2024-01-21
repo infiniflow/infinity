@@ -25,17 +25,23 @@ struct CRCBase {
 
 template <class T, T polynomial, T initial_remainder, T final_xor_value>
 struct CRCImpl {
-    using ReturnType = T;
-
+    static CRCBase<T> base;
     static T makeCRC(const unsigned char *buf, SizeT size) {
-        static CRCBase<ReturnType> base(polynomial);
-
         T crc = initial_remainder;
         for (SizeT i = 0; i < size; ++i)
             crc = base.tab[(crc ^ buf[i]) & 0xff] ^ (crc >> 8);
         return crc ^ final_xor_value;
     }
+    void update(const unsigned char *buf, SizeT size) {
+        for (SizeT i = 0; i < size; ++i)
+            crc = base.tab[(crc ^ buf[i]) & 0xff] ^ (crc >> 8);
+    }
+    T finalize() { return crc ^ final_xor_value; }
+    T crc = initial_remainder;
 };
+
+template <class T, T polynomial, T initial_remainder, T final_xor_value>
+CRCBase<T> CRCImpl<T, polynomial, initial_remainder, final_xor_value>::base{polynomial};
 
 // CRC32IEEE is equivalent to boost::crc_32_type on little-endian machine.
 constexpr u32 CRC32_IEEE = 0xEDB88320;
