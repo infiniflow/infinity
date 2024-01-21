@@ -17,6 +17,13 @@
 
 Infinity is a cutting-edge AI-native database that provides a wide range of search capabilities for rich data types such as vectors, full-text, and structured data. It provides robust support for various LLM applications, including search, recommenders, question-answering, conversational AI, copilot, content generation, and many more **RAG** (Retrieval-augmented Generation) applications.
 
+- [Key Features](#key-features)
+- [Get Started](#get-started)
+- [Build from Source](#build-from-source)
+- [Roadmap](#roadmap)
+- [Community](#community)
+
+
 ## 🌟 Key Features
 
 Infinity comes with high performance, flexibility, ease-of-use, and many features designed to address the challenges facing the next-generation AI applications:
@@ -46,14 +53,14 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### Deploy Infinity database
 
-#### Deploy using Docker on Linux x86_64 and MacOS x86_64
+#### Deploy Infinity using Docker on Linux x86_64 and MacOS x86_64
 
 ```bash
 docker pull infiniflow/infinity:nightly
 docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host infiniflow/infinity:nightly
 ```
 
-#### Deploy using binary package on Linux x86_64
+#### Deploy Infinity using binary package on Linux x86_64
 
 You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases.
 
