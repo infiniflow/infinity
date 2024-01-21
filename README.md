@@ -17,11 +17,11 @@
 
 Infinity is a cutting-edge AI-native database that provides a wide range of search capabilities for rich data types such as vectors, full-text, and structured data. It provides robust support for various LLM applications, including search, recommenders, question-answering, conversational AI, copilot, content generation, and many more **RAG** (Retrieval-augmented Generation) applications.
 
-- [Key Features](#key-features)
-- [Get Started](#get-started)
-- [Build from Source](#build-from-source)
-- [Roadmap](#roadmap)
-- [Community](#community)
+- [Key Features](#-key-features)
+- [Get Started](#-get-started)
+- [Build from Source](#-build-from-source)
+- [Roadmap](#-roadmap)
+- [Community](#-community)
 
 
 ## 🌟 Key Features
