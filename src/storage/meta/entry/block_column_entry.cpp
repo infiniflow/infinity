@@ -54,6 +54,10 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     DataType *column_type = block_column_entry->column_type_.get();
     SizeT row_capacity = block_entry->row_capacity();
     SizeT total_data_size = row_capacity * column_type->Size();
+    if (column_type->type() == kBoolean) {
+        // TODO
+        total_data_size = (row_capacity + 7) / 8;
+    }
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
     auto buffer_manager = txn->buffer_manager();
@@ -178,17 +182,16 @@ void BlockColumnEntry::AppendRaw(SizeT dst_offset, const_ptr_t src_p, SizeT data
                 } else {
                     auto &long_info = varchar_layout->u.long_info_;
                     auto outline_info = this->outline_info_.get();
-                    auto base_file_size = std::min(SizeT(DEFAULT_BASE_FILE_SIZE * std::pow(DEFAULT_BASE_NUM, outline_info->next_file_idx)),
-                                                   DEFAULT_OUTLINE_FILE_MAX_SIZE);
+                    auto base_file_size = DEFAULT_FIXLEN_CHUNK_SIZE;
+                    if (varchar_type->length_ > base_file_size) {
+                        UnrecoverableError("Not implemented"); // TODO
+                    }
 
                     if (outline_info->written_buffers_.empty() ||
                         outline_info->written_buffers_.back().second + varchar_type->length_ > base_file_size) {
 
                         auto file_name = BlockColumnEntry::OutlineFilename(this->column_id_, outline_info->next_file_idx++);
-                        auto file_worker =
-                            MakeUnique<DataFileWorker>(this->base_dir_,
-                                                       file_name,
-                                                       DEFAULT_BASE_NUM * std::max(base_file_size, static_cast<SizeT>(varchar_type->length_)));
+                        auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, file_name, base_file_size);
 
                         BufferObj *buffer_obj = outline_info->buffer_mgr_->Allocate(std::move(file_worker));
                         outline_info->written_buffers_.emplace_back(buffer_obj, 0);

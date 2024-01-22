@@ -51,7 +51,7 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
     buffer_ptr->buffer_type_ = buffer_type;
     switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
-            buffer_ptr->InitializeCompactBit(capacity);
+            buffer_ptr->InitializeCompactBit(buffer_mgr, block_column_entry, capacity);
             break;
         }
         default: {
@@ -94,7 +94,24 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
 }
 
 void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
-    //
+    // UnrecoverableError("Not implemented.");
+    if (initialized_) {
+        UnrecoverableError("Vector buffer is already initialized.");
+    }
+    SizeT data_size = (capacity + 7) / 8;
+    auto *buffer_obj = block_column_entry->buffer();
+    if (buffer_obj == nullptr) {
+        UnrecoverableError("Buffer object is nullptr.");
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        UnrecoverableError("Buffer object size is not equal to data size.");
+    }
+    auto buffer_handle = buffer_obj->Load();
+    data_ = static_cast<char *>(buffer_handle.GetDataMut());
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
+    buffer_mgr_ = buffer_mgr;
 }
 
 void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity) {
@@ -117,6 +134,7 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
+    buffer_mgr_ = buffer_mgr;
 }
 
 void VectorBuffer::ResetToInit() {

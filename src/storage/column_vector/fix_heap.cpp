@@ -19,12 +19,12 @@ module;
 import stl;
 import third_party;
 import infinity_exception;
-import default_values;
 import vector_heap_chunk;
 import global_resource_usage;
 import parser;
 import catalog;
 import buffer_manager;
+import data_file_worker;
 
 module fix_heap;
 
@@ -82,14 +82,22 @@ Pair<u64, u64> FixHeapManager::Allocate(SizeT nbytes) {
 }
 
 VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
-    auto iter = chunks_.find(chunk_id);
-    if (iter != chunks_.end()) {
+    if (auto iter = chunks_.find(chunk_id); iter != chunks_.end()) {
         return iter->second;
     }
     if (buffer_mgr_ == nullptr) {
         UnrecoverableError("No such chunk in heap");
     }
-    UnrecoverableError("Not implemented yet");
+    auto filename = BlockColumnEntry::OutlineFilename(block_column_entry_->column_id(), chunk_id);
+    auto base_dir = block_column_entry_->base_dir();
+    auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, current_chunk_size_);
+    auto *buffer_obj = buffer_mgr_->Get(std::move(file_worker));
+
+    if (buffer_obj == nullptr) {
+        UnrecoverableError("No such chunk in heap");
+    }
+    auto [iter, insert_ok] = chunks_.emplace(chunk_id, VectorHeapChunk(buffer_obj));
+    return iter->second;
 }
 
 // return value: start chunk id & chunk offset

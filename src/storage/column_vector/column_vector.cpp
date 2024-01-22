@@ -118,6 +118,13 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
         UnrecoverableError("Column vector is already initialized.");
     }
     
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
+        nulls_ptr_ = Bitmask::Make(8);
+    } else {
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
+        nulls_ptr_ = Bitmask::Make(capacity_);
+    }
     data_ptr_ = buffer_->GetData();
 }
 

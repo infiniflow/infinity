@@ -51,7 +51,7 @@ Pair<const_ptr_t, SizeT> ColumnBuffer::GetVarcharAt(SizeT row_idx) {
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
         auto filename = BlockColumnEntry::OutlineFilename(column_id_, long_info.file_idx_);
         auto base_dir = outline_buffer_->base_dir_;
-        auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+        auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_FIXLEN_CHUNK_SIZE);
         auto buffer_obj = outline_buffer_->buffer_mgr_->Get(std::move(file_worker));
         outline_buffer_->outline_ele_ = buffer_obj->Load();
         outline_buffer_->current_file_idx_ = long_info.file_idx_;
@@ -121,7 +121,7 @@ Pair<ptr_t, SizeT> ColumnBuffer::GetVarcharAtPrefixMut(SizeT row_idx) {
     if (outline_buffer_->current_file_idx_ != long_info.file_idx_) {
         auto filename = BlockColumnEntry::OutlineFilename(column_id_, long_info.file_idx_);
         auto base_dir = outline_buffer_->base_dir_;
-        auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_OUTLINE_FILE_MAX_SIZE);
+        auto file_worker = MakeUnique<DataFileWorker>(base_dir, filename, DEFAULT_FIXLEN_CHUNK_SIZE);
         auto buffer_obj = outline_buffer_->buffer_mgr_->Get(std::move(file_worker));
         outline_buffer_->outline_ele_ = buffer_obj->Load();
         outline_buffer_->current_file_idx_ = long_info.file_idx_;

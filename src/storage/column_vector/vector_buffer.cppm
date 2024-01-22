@@ -40,7 +40,7 @@ public:
 
     ~VectorBuffer() {
         GlobalResourceUsage::DecrObjectCount();
-        if (data_) {
+        if (data_ && buffer_mgr_ == nullptr) {
             delete[] data_;
         }
     }
@@ -76,6 +76,8 @@ public:
 
 public:
     bool initialized_{false};
+
+    BufferManager *buffer_mgr_{nullptr};
     // UniquePtr<char[]> data_{nullptr};
     char *data_{};
     SizeT data_size_{0};

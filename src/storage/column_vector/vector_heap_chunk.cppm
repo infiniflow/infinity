@@ -31,14 +31,9 @@ export using ChunkId = u64;
 
 export struct VectorHeapChunk {
 public:
-    explicit VectorHeapChunk(BufferObj *buffer_obj, u64 capacity) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUnique<char[]>(capacity)) {
-        GlobalResourceUsage::IncrObjectCount();
-        auto &p = std::get<UniquePtr<char[]>>(ptr_);
-        auto p1 = p.get();
-        int a = 1;
-    }
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUnique<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 
@@ -60,14 +55,12 @@ public:
         if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
             return std::get<UniquePtr<char[]>>(ptr_).get();
         } else {
-            UnrecoverableError("Not implemented yet");
             return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
         }
     }
 
     char *GetPtrMut() {
         if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
-            auto &p = std::get<UniquePtr<char[]>>(ptr_);
             return std::get<UniquePtr<char[]>>(ptr_).get();
         } else {
             UnrecoverableError("Not implemented yet");
