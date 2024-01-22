@@ -74,9 +74,10 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             const BlockEntry* block_entry = table_ref->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
             for (SizeT k = 0; k < load_column_count; ++k) {
                 auto binding = load_metas[k].binding_;
-                BlockColumnEntry* block_column_ptr = block_entry->GetColumnBlockEntry(binding.column_idx);
-                ColumnBuffer column_buffer = block_column_ptr->GetColumnData(query_context->storage()->buffer_manager());
-                input_block->column_vectors[load_metas[k].index_]->AppendWith(column_buffer, block_offset, 1);
+                BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(binding.column_idx);
+
+                ColumnVector column_vector = block_column_ptr->GetColumnVector(query_context->storage()->buffer_manager());
+                input_block->column_vectors[load_metas[k].index_]->AppendWith(column_vector, block_offset, 1);
             }
         }
     }

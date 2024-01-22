@@ -18,6 +18,9 @@ import stl;
 import global_resource_usage;
 import heap_chunk;
 import fix_heap;
+import buffer_handle;
+
+#include <variant>
 
 export module vector_buffer;
 
@@ -38,12 +41,7 @@ public:
 public:
     explicit VectorBuffer() { GlobalResourceUsage::IncrObjectCount(); }
 
-    ~VectorBuffer() {
-        GlobalResourceUsage::DecrObjectCount();
-        if (data_ && buffer_mgr_ == nullptr) {
-            delete[] data_;
-        }
-    }
+    ~VectorBuffer() { GlobalResourceUsage::DecrObjectCount(); }
 
     void Initialize(SizeT type_size, SizeT capacity);
 
@@ -57,9 +55,20 @@ public:
 
     void Copy(ptr_t input, SizeT size);
 
-    [[nodiscard]] ptr_t GetData() const { 
-        // return data_.get(); 
-        return data_;
+    [[nodiscard]] ptr_t GetDataMut() {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<ptr_t>(std::get<BufferHandle>(ptr_).GetDataMut());
+        }
+    }
+
+    [[nodiscard]] const_ptr_t GetData() const {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<const_ptr_t>(std::get<BufferHandle>(ptr_).GetData());
+        }
     }
 
     [[nodiscard]] bool GetCompactBit(SizeT idx) const;
@@ -74,14 +83,15 @@ public:
 
     static void CopyCompactBits(u8 *dst, const u8 *src, SizeT dst_start_id, SizeT src_start_id, SizeT count);
 
-public:
+private:
     bool initialized_{false};
 
-    BufferManager *buffer_mgr_{nullptr};
-    // UniquePtr<char[]> data_{nullptr};
-    char *data_{};
+    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
+
     SizeT data_size_{0};
     SizeT capacity_{0};
+
+public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};

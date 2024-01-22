@@ -197,9 +197,9 @@ public:
 
 private:
     template <typename T>
-    static void CopyValue(const ColumnVector &src, const ColumnVector &dst, SizeT from, SizeT count) {
-        auto *src_ptr = (T *)(dst.data_ptr_);
-        T *dst_ptr = &((T *)(src.data_ptr_))[src.tail_index_];
+    static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+        auto *src_ptr = (T *)(src.data_ptr_);
+        T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from + idx];
         }
@@ -236,7 +236,7 @@ public:
 };
 
 template <>
-void ColumnVector::CopyValue<BooleanT>(const ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto dst_tail = dst.tail_index_;
     const VectorBuffer *src_buffer = src.buffer_.get();
     auto dst_buffer = dst.buffer_.get();
@@ -244,7 +244,7 @@ void ColumnVector::CopyValue<BooleanT>(const ColumnVector &dst, const ColumnVect
         SizeT dst_byte_offset = dst_tail / 8;
         SizeT src_byte_offset = from / 8;
         SizeT byte_count = (count + 7) / 8; // copy to tail
-        std::memcpy(dst_buffer->GetData() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
+        std::memcpy(dst_buffer->GetDataMut() + dst_byte_offset, src_buffer->GetData() + src_byte_offset, byte_count);
     } else {
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_buffer->SetCompactBit(dst_tail + idx, src_buffer->GetCompactBit(from + idx));
@@ -256,7 +256,7 @@ template <typename DataT>
 inline void
 ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         ((DataT *)(dst))[idx] = ((const DataT *)(src))[row_id];
@@ -280,7 +280,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
                                              SizeT count,
                                              const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
@@ -402,7 +402,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
                                                SizeT count,
                                                const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
@@ -420,7 +420,7 @@ inline void ColumnVector::CopyFrom(const VectorBuffer *__restrict src_buf,
                                    SizeT dest_start_idx,
                                    SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     SizeT source_end_idx = source_start_idx + count;
 
@@ -433,7 +433,7 @@ inline void ColumnVector::CopyFrom<BooleanT>(const VectorBuffer *__restrict src_
                                              SizeT source_start_idx,
                                              SizeT dest_start_idx,
                                              SizeT count) {
-    VectorBuffer::CopyCompactBits(reinterpret_cast<u8 *>(dst_buf->GetData()),
+    VectorBuffer::CopyCompactBits(reinterpret_cast<u8 *>(dst_buf->GetDataMut()),
                                   reinterpret_cast<const u8 *>(src_buf->GetData()),
                                   dest_start_idx,
                                   source_start_idx,
@@ -447,7 +447,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
                                              SizeT dest_start_idx,
                                              SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
@@ -581,7 +581,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
                                                SizeT dest_start_idx,
                                                SizeT count) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     SizeT source_end_idx = source_start_idx + count;
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
@@ -597,7 +597,7 @@ inline void ColumnVector::CopyFrom<EmbeddingT>(const VectorBuffer *__restrict sr
 template <typename DataT>
 inline void ColumnVector::CopyRowFrom(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     ((DataT *)(dst))[dst_idx] = ((const DataT *)(src))[src_idx];
 }
@@ -613,7 +613,7 @@ inline void
 ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
 
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
 
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
@@ -706,7 +706,7 @@ template <>
 inline void
 ColumnVector::CopyRowFrom<EmbeddingT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
     const_ptr_t src = src_buf->GetData();
-    ptr_t dst = dst_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
     const_ptr_t src_ptr = src + src_idx * data_type_size_;
     ptr_t dst_ptr = dst + dst_idx * data_type_size_;
     std::memcpy(dst_ptr, src_ptr, data_type_size_);

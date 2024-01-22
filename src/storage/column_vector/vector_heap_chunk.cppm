@@ -33,7 +33,7 @@ export struct VectorHeapChunk {
 public:
     explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUnique<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 

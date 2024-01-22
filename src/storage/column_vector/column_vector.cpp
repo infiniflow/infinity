@@ -40,6 +40,7 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
     if (initialized) {
         UnrecoverableError("Column vector is already initialized.");
     }
+    initialized = true;
     if (data_type_->type() == LogicalType::kInvalid) {
         UnrecoverableError("Data type isn't assigned.");
     }
@@ -97,7 +98,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
             nulls_ptr_ = Bitmask::Make(capacity_);
         }
-        data_ptr_ = buffer_->GetData();
+        data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
@@ -107,8 +108,6 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
             buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
         }
     }
-
-    initialized = true;
 }
 
 void ColumnVector::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, ColumnVectorType vector_type, SizeT capacity) {
@@ -125,7 +124,8 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
         nulls_ptr_ = Bitmask::Make(capacity_);
     }
-    data_ptr_ = buffer_->GetData();
+    data_ptr_ = buffer_->GetDataMut();
+    tail_index_ = capacity; // TODO
 }
 
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
