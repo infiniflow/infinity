@@ -17,11 +17,10 @@
 
 Infinity is a cutting-edge AI-native database that provides a wide range of search capabilities for rich data types such as vectors, full-text, and structured data. It provides robust support for various LLM applications, including search, recommenders, question-answering, conversational AI, copilot, content generation, and many more **RAG** (Retrieval-augmented Generation) applications.
 
-- [Key Features](#key-features)
-- [Get Started](#get-started)
-- [Build from Source](#build-from-source)
-- [Roadmap](#roadmap)
-- [Community](#community)
+- [Key Features](#-key-features)
+- [Get Started](#-get-started)
+- [Roadmap](#-roadmap)
+- [Community](#-community)
 
 
 ## 🌟 Key Features
@@ -76,6 +75,9 @@ Ubuntu
 sudo dpkg -i infinity-0.1.0-dev-x86_64.deb
 sudo systemctl start infinity
 ```
+#### 🛠️ Build from Source
+
+See [Build from Source](docs/build_from_source.md).
 
 ### Install Infinity's Python client
 
@@ -134,10 +136,6 @@ print(res)
 
 > 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
 
-
-## 🛠️ Build from Source
-
-See [Build from Source](docs/build_from_source.md).
 
 ## 📜 Roadmap
 
