@@ -27,7 +27,6 @@ import global_block_id;
 import block_index;
 import base_table_ref;
 import knn_scan_data;
-import column_buffer;
 import vector_buffer;
 import knn_distance;
 import third_party;

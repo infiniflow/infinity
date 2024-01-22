@@ -27,7 +27,6 @@ import value;
 import txn_store;
 import buffer_manager;
 import meta_state;
-import column_buffer;
 import wal;
 import infinity_exception;
 import status;
@@ -636,22 +635,21 @@ TEST_F(WalReplayTest, WalReplayImport) {
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
             BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
 
-            ColumnBuffer col0_obj = column0->GetColumnData(buffer_manager);
-            col0_obj.GetAll();
+            ColumnVector col0 = column0->GetColumnVector(buffer_manager);
+            Value v0 = col0.GetValue(0);
             DataType *col0_type = column0->column_type().get();
-            i8 *col0_ptr = (i8 *)(col0_obj.GetValueAt(0, *col0_type));
-            EXPECT_EQ(*col0_ptr, (1));
+            EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
-            ColumnBuffer col1_obj = column1->GetColumnData(buffer_manager);
+            ColumnVector col1 = column1->GetColumnVector(buffer_manager);
+            Value v1 = col1.GetValue(0);
             DataType *col1_type = column1->column_type().get();
-            i8 *col1_ptr = (i8 *)(col1_obj.GetValueAt(0, *col1_type));
-            EXPECT_EQ(*col1_ptr, (i64)(22));
+            EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
-            ColumnBuffer col2_obj = column2->GetColumnData(buffer_manager);
+            ColumnVector col2 = column2->GetColumnVector(buffer_manager);
+            Value v2 = col2.GetValue(0);
             DataType *col2_type = column2->column_type().get();
             EXPECT_EQ(col2_type->type(), LogicalType::kDouble);
-            f64 *col2_ptr = (f64 *)(col2_obj.GetValueAt(0, *col2_type));
-            EXPECT_EQ(col2_ptr[0], (f64)(3) + 0.33f);
+            EXPECT_EQ(v2.GetValue<DoubleT>(), (f64)(3) + 0.33f);
 
             txn_mgr->CommitTxn(txn);
         }

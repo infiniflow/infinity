@@ -27,7 +27,6 @@ import global_block_id;
 import data_block;
 import table_scan_function_data;
 import base_table_ref;
-import column_buffer;
 import block_index;
 import catalog;
 import default_values;

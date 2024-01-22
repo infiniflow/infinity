@@ -20,7 +20,6 @@ import stl;
 import physical_operator_type;
 import default_values;
 import operator_state;
-import column_buffer;
 import column_vector;
 import query_context;
 import parser;

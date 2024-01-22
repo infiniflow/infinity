@@ -22,7 +22,6 @@ import stl;
 import buffer_manager;
 import outline_info;
 import parser;
-import column_buffer;
 import buffer_obj;
 import buffer_handle;
 import column_vector;
@@ -86,18 +85,6 @@ BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, Colum
     }
 
     return block_column_entry;
-}
-
-// to be remove
-ColumnBuffer BlockColumnEntry::GetColumnData(BufferManager *buffer_manager) {
-    if (this->buffer_ == nullptr) {
-        // Get buffer handle from buffer manager
-        auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
-        this->buffer_ = buffer_manager->Get(std::move(file_worker));
-    }
-
-    bool outline = this->column_type_->type() == kVarchar;
-    return outline ? ColumnBuffer(this->column_id_, this->buffer_, buffer_manager, this->base_dir_) : ColumnBuffer(this->column_id_, this->buffer_);
 }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {

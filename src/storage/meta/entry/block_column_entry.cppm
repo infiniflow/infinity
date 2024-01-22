@@ -22,7 +22,6 @@ import stl;
 import buffer_obj;
 import parser;
 import third_party;
-import column_buffer;
 import outline_info;
 import buffer_manager;
 import column_vector;
@@ -66,8 +65,6 @@ public:
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
     Vector<String> OutlinePaths() const;
-
-    ColumnBuffer GetColumnData(BufferManager *buffer_manager);
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 

@@ -33,7 +33,6 @@ import txn;
 import catalog;
 import buffer_manager;
 import column_vector;
-import column_buffer;
 import table_entry_type;
 import meta_state;
 import status;

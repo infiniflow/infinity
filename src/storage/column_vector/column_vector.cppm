@@ -26,7 +26,6 @@ import bitmask;
 import selection;
 import default_values;
 import value;
-import column_buffer;
 import third_party;
 import infinity_exception;
 import fix_heap;
@@ -163,15 +162,7 @@ public:
 
     void AppendByPtr(const_ptr_t value_ptr);
 
-    // This two should merge into one function because `ColumnBuffer` will be removed.
     void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
-
-    // input parameter:
-    // column_buffer - input column
-    // start_row - start row number of ptr
-    // row_count - total row count to be copied
-    // return value: appended rows actually
-    SizeT AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count);
 
     // input parameter:
     // from - start RowID

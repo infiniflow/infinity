@@ -25,7 +25,6 @@ import default_values;
 import bitmask;
 import vector_buffer;
 import fix_heap;
-import column_buffer;
 import serialize;
 import third_party;
 import logger;
@@ -1310,105 +1309,6 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
     }
     this->tail_index_ += count;
-}
-
-SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count) {
-    if (row_count == 0) {
-        return 0;
-    }
-
-    SizeT appended_rows = row_count;
-     if (tail_index_ + row_count > capacity_) {
-         // attempt to append data rows more than the capacity;
-         appended_rows = capacity_ - tail_index_;
-     }
-
-     switch (data_type_->type()) {
-         case kBoolean: {
-             auto src_ptr = reinterpret_cast<const u8 *>(column_buffer.GetAll());
-             auto get_boolean_at = [src_ptr](SizeT row_idx) -> BooleanT {
-                 SizeT byte_idx = row_idx / 8;
-                 SizeT bit_idx = row_idx % 8;
-                 return (src_ptr[byte_idx] >> bit_idx) & u8(1);
-             };
-             auto dst_buffer = buffer_.get();
-             for (SizeT row_idx = 0; row_idx < appended_rows; ++row_idx) {
-                 dst_buffer->SetCompactBit(tail_index_ + row_idx, get_boolean_at(start_row + row_idx));
-             }
-             this->tail_index_ += appended_rows;
-             break;
-         }
-         case kTinyInt:
-         case kSmallInt:
-         case kInteger:
-         case kBigInt:
-         case kHugeInt:
-         case kDecimal:
-         case kFloat:
-         case kDouble:
-         case kDate:
-         case kTime:
-         case kDateTime:
-         case kTimestamp:
-         case kInterval:
-         case kPoint:
-         case kLine:
-         case kLineSeg:
-         case kBox:
-         case kCircle:
-//         case kBitmap:
-         case kUuid:
-         case kEmbedding:
-         case kRowID: {
-             const_ptr_t ptr = column_buffer.GetAll();
-             const_ptr_t src_ptr = ptr + start_row * data_type_size_;
-             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
-             std::memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
-             this->tail_index_ += appended_rows;
-             break;
-         }
-//
-         case kVarchar: {
-             for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
-                 auto [data_ptr, data_size] = column_buffer.GetVarcharAt(start_row + row_idx);
-                 const char* src_ptr = data_ptr;
-                 SizeT src_size = data_size;
-                 auto varchar_dst = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
-                 varchar_dst->is_value_ = false;
-                 if(src_size <= VARCHAR_INLINE_LEN) {
-                     std::memcpy(varchar_dst->short_.data_, src_ptr, src_size);
-                 } else {
-                     std::memcpy(varchar_dst->vector_.prefix_, src_ptr, VARCHAR_PREFIX_LEN);
-                     auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
-                     varchar_dst->vector_.chunk_id_ = chunk_id;
-                     varchar_dst->vector_.chunk_offset_ = chunk_offset;
-                 }
-                 varchar_dst->length_ = src_size;
-                 this->tail_index_++;
-             }
-             break;
-         }
-         case kArray:
-         case kTuple:
-//         case kPath:
-//         case kPolygon:
-//         case kBlob:
-         case kMixed:
-         case kNull: {
-             LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
-             UnrecoverableError("Not supported now in append data in column");
-         }
-         case kMissing:
-         case kInvalid: {
-             LOG_ERROR(fmt::format("Invalid data type {}", data_type_->ToString()));
-             UnrecoverableError("Invalid data type");
-         }
-         default: {
-             UnrecoverableError("Attempt to store an unaccepted type");
-             // Null/Missing/Invalid
-         }
-     }
-    return appended_rows;
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {

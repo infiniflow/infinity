@@ -29,7 +29,6 @@ import merge_knn_data;
 import knn_result_handler;
 import merge_knn;
 import block_index;
-import column_buffer;
 import buffer_manager;
 import third_party;
 import catalog;
@@ -37,6 +36,7 @@ import default_values;
 import data_block;
 import knn_expression;
 import value;
+import column_vector;
 
 namespace infinity {
 
@@ -139,20 +139,10 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 SizeT column_n = table_ref_->column_ids_.size();
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = table_ref_->column_ids_[i];
-                    ColumnBuffer column_buffer = block_entry->GetColumnBlockEntry(column_id)->GetColumnData(buffer_mgr);
-                    auto &column_type = block_entry->GetColumnBlockEntry(column_id)->column_type();
-
-                    if (column_type->Plain()) {
-                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column_type);
-                        output_data_block->AppendValueByPtr(i, ptr);
-                    } else {
-                        if (column_type->type() != LogicalType::kVarchar) {
-                            RecoverableError(Status::NotSupport("Not implement complex type reading from column buffer."));
-                        }
-                        auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
-                        Value value = Value::MakeVarchar(varchar_ptr, data_size);
-                        output_data_block->AppendValue(i, value);
-                    }
+                    // TODO: opt
+                    ColumnVector column_vector = block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                    Value value1 = column_vector.GetValue(block_offset);
+                    output_data_block->AppendValue(i, value1);
                 }
                 output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
