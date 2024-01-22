@@ -62,6 +62,7 @@ import dist_func_ip;
 import knn_expression;
 import value;
 import status;
+import buffer_obj;
 
 namespace infinity {
 
@@ -513,11 +514,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 SizeT column_n = base_table_ref_->column_ids_.size();
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = base_table_ref_->column_ids_[i];
-                    // TODO: opt
-                    ColumnVector column_vector =
-                        block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(query_context->storage()->buffer_manager());
-                    Value value1 = column_vector.GetValue(block_offset);
-                    output_block_ptr->AppendValue(i, value1);
+                    auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                    ColumnVector &&column_vector = block_column_entry->GetColumnVector(query_context->storage()->buffer_manager());
+
+                    output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
                 }
                 output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
                 output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);

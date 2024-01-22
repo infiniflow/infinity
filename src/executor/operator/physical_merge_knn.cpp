@@ -139,10 +139,8 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
                 SizeT column_n = table_ref_->column_ids_.size();
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = table_ref_->column_ids_[i];
-                    // TODO: opt
-                    ColumnVector column_vector = block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
-                    Value value1 = column_vector.GetValue(block_offset);
-                    output_data_block->AppendValue(i, value1);
+                    ColumnVector &&column_vector = block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                    output_data_block->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
                 }
                 output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
                 output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
