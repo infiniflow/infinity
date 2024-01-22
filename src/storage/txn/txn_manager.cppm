@@ -26,12 +26,13 @@ namespace infinity {
 
 using PutWalEntryFn = StdFunction<void(SharedPtr<WalEntry>)>;
 
+class BGTaskProcessor;
 struct NewCatalog;
-
 export class TxnManager {
 public:
     explicit TxnManager(NewCatalog *catalog,
                         BufferManager *buffer_mgr,
+                        BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
                         TransactionID start_txn_id = 0,
                         TxnTimeStamp start_ts = 1);
@@ -50,6 +51,8 @@ public:
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
+    BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
+
     TxnTimeStamp GetTimestamp(bool prepare_wal = false);
 
     void Invalidate(TxnTimeStamp commit_ts);
@@ -67,20 +70,21 @@ public:
     void RollBackTxn(Txn *txn);
 
 private:
-    u64 GetNewTxnID();
+    TransactionID GetNewTxnID();
 
 private:
     NewCatalog *catalog_{};
     std::shared_mutex rw_locker_{};
-    TransactionID txn_id_{};
     BufferManager *buffer_mgr_{};
+    BGTaskProcessor *bg_task_processor_{};
     HashMap<TransactionID, UniquePtr<Txn>> txn_map_{};
     // PutWalEntry function
     PutWalEntryFn put_wal_entry_{};
 
+    TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
-    TxnTimeStamp txn_ts_{};
+    TxnTimeStamp start_ts_{};
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};

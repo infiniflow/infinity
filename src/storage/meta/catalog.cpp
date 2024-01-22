@@ -39,7 +39,7 @@ import table_detail;
 import index_def;
 import txn_store;
 import data_access_state;
-import wal;
+import catalog_delta_entry;
 
 namespace infinity {
 
