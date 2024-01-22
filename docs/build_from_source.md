@@ -1,5 +1,7 @@
 # Build from Source
 
+Infinity can only be compiled natively on Linux. If your operating system is not Linux, build it using Docker.
+
 - [Build from source on Linux using Docker](#build-from-source-on-linux-using-docker)
 - [Build from source on Ubuntu 22.04](#build-from-source-on-ubuntu-2204)
 - [Build from source on Ubuntu 23.10](#build-from-source-on-ubuntu-2310)
