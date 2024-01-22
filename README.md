@@ -19,7 +19,6 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 - [Key Features](#-key-features)
 - [Get Started](#-get-started)
-- [Build from Source](#-build-from-source)
 - [Roadmap](#-roadmap)
 - [Community](#-community)
 
@@ -76,6 +75,10 @@ Ubuntu
 sudo dpkg -i infinity-0.1.0-dev-x86_64.deb
 sudo systemctl start infinity
 ```
+
+#### 🛠️ Build from Source
+
+See [Build from Source](docs/build_from_source.md).
 
 ### Install Infinity's Python client
 
@@ -135,9 +138,7 @@ print(res)
 > 💡 For more information about the Python API, see the [Python API Reference](docs/pysdk_api_reference.md).
 
 
-## 🛠️ Build from Source
 
-See [Build from Source](docs/build_from_source.md).
 
 ## 📜 Roadmap
 
