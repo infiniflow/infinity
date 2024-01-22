@@ -87,7 +87,7 @@ public:
     }
 
     ~ColumnVector() {
-        Reset();
+        // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
         GlobalResourceUsage::DecrObjectCount();
     }
 
@@ -139,6 +139,7 @@ public:
 
     void Initialize(BufferManager *buffer_mgr,
                     BlockColumnEntry *block_column_entry,
+                    SizeT current_row_count,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     SizeT capacity = DEFAULT_VECTOR_SIZE);
 
@@ -161,6 +162,8 @@ public:
     void Finalize(SizeT index);
 
     void AppendByPtr(const_ptr_t value_ptr);
+
+    void AppendByStringView(StringView sv, char delimiter);
 
     void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
 
@@ -193,6 +196,15 @@ private:
         T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
         for (SizeT idx = 0; idx < count; ++idx) {
             dst_ptr[idx] = src_ptr[from + idx];
+        }
+    }
+
+    template <typename T>
+    void AppendEmbedding(const Vector<StringView> &ele_str_views, SizeT dst_off) {
+        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+            T value = DataType::StringToValue<T>(ele_str_view);
+            ((T *)(data_ptr_ + dst_off))[i] = value;
+            ++i;
         }
     }
 

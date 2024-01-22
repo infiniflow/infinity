@@ -49,14 +49,6 @@ class WalReplayTest : public BaseTest {
 
 using namespace infinity;
 
-namespace {
-template <typename T>
-void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    T ele = DataType::StringToValue<T>(str_view);
-    column_data_entry->AppendRaw(dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
-}
-} // namespace
-
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {
         infinity::GlobalResourceUsage::Init();
@@ -569,9 +561,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = columns_vector[0]->data_type_size_;
                 EXPECT_EQ(data_type_size, 1);
-                ptr_t src_ptr = columns_vector[0].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry1->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry1->Append(columns_vector[0].get(), 0, 1, buffer_manager);
             }
             {
                 auto block_column_entry2 = last_block_entry->GetColumnBlockEntry(1);
@@ -579,9 +569,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
                 SizeT data_type_size = columns_vector[1]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8);
-                ptr_t src_ptr = columns_vector[1].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry2->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry2->Append(columns_vector[1].get(), 0, 1, buffer_manager);
             }
             {
                 auto block_column_entry3 = last_block_entry->GetColumnBlockEntry(2);
@@ -589,9 +577,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
                 SizeT data_type_size = columns_vector[2]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8);
-                ptr_t src_ptr = columns_vector[2].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry3->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry3->Append(columns_vector[2].get(), 0, 1, buffer_manager);
             }
 
             last_block_entry->IncreaseRowCount(1);

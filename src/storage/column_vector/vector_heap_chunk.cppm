@@ -63,7 +63,6 @@ public:
         if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
             return std::get<UniquePtr<char[]>>(ptr_).get();
         } else {
-            UnrecoverableError("Not implemented yet");
             return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
         }
     }

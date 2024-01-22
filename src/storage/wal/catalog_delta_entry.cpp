@@ -324,9 +324,7 @@ void AddColumnEntryOperation::SaveSate() {
     this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
     this->block_id_ = this->column_entry_->GetBlockEntry()->block_id();
     this->column_id_ = this->column_entry_->column_id();
-    if (this->column_entry_->outline_info_ptr() != nullptr) {
-        this->next_outline_idx_ = this->column_entry_->outline_info_ptr()->next_file_idx;
-    }
+    this->next_outline_idx_ = this->column_entry_->outline_buffers_.size();
     is_snapshotted_ = true;
 }
 
