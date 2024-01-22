@@ -16,22 +16,29 @@ module;
 
 #include <functional>
 
+module txn_manager;
+
 import txn;
 import txn_state;
 import stl;
 import catalog;
-
 import infinity_exception;
 import wal;
 import logger;
 import buffer_manager;
-
-module txn_manager;
+import backgroud_process;
+import catalog_delta_entry;
 
 namespace infinity {
 
-TxnManager::TxnManager(NewCatalog *catalog, BufferManager *buffer_mgr, PutWalEntryFn put_wal_entry_fn, u64 start_txn_id, TxnTimeStamp start_ts)
-    : catalog_(catalog), txn_id_(start_txn_id), buffer_mgr_(buffer_mgr), put_wal_entry_(put_wal_entry_fn), txn_ts_(start_ts), is_running_(false) {}
+TxnManager::TxnManager(NewCatalog *catalog,
+                       BufferManager *buffer_mgr,
+                       BGTaskProcessor *bg_task_processor,
+                       PutWalEntryFn put_wal_entry_fn,
+                       TransactionID start_txn_id,
+                       TxnTimeStamp start_ts)
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
+      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
@@ -40,7 +47,7 @@ Txn *TxnManager::CreateTxn() {
     }
     rw_locker_.lock();
     u64 new_txn_id = GetNewTxnID();
-    UniquePtr<Txn> new_txn = MakeUnique<Txn>(buffer_mgr_, this, catalog_, new_txn_id);
+    UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
     rw_locker_.unlock();
@@ -68,7 +75,7 @@ u64 TxnManager::GetNewTxnID() {
 
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
-    TxnTimeStamp ts = txn_ts_++;
+    TxnTimeStamp ts = start_ts_++;
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }

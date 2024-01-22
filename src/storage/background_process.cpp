@@ -20,6 +20,7 @@ import logger;
 import blocking_queue;
 import infinity_exception;
 import wal;
+import third_party;
 
 namespace infinity {
 
@@ -51,12 +52,19 @@ void BGTaskProcessor::Process() {
                 break;
             }
             case BGTaskType::kForceCheckpoint: {
-                ForceCheckpointTask *force_ckp_task = (ForceCheckpointTask *)(bg_task.get());
+                ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
                 wal_manager_->Checkpoint(force_ckp_task);
                 break;
             }
             case BGTaskType::kStopProcessor: {
                 running = false;
+                break;
+            }
+            case BGTaskType::kCatalogDeltaOpsMerge: {
+                CatalogDeltaOpsMergeTask *task = static_cast<CatalogDeltaOpsMergeTask *>(bg_task.get());
+                auto &local_catalog_ops = task->local_catalog_delta_entry_;
+                auto *catalog = task->catalog_;
+                catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
                 break;
             }
             case BGTaskType::kInvalid: {

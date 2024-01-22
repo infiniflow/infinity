@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module wal;
+module catalog_delta_entry;
 
 import crc;
 import serialize;
@@ -261,6 +261,7 @@ void AddTableMetaOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
+    this->db_name_ = this->table_meta_->db_name();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
     is_snapshotted_ = true;
@@ -270,6 +271,7 @@ void AddDBEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
+    this->is_delete_ = db_entry_->deleted_;
     String db_name = db_entry_->db_name();
     String db_entry_dir_ = db_entry_->db_entry_dir();
     this->db_name_ = db_name;
@@ -281,6 +283,7 @@ void AddTableEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
+    this->is_delete_ = this->table_entry_->deleted_;
     this->db_name_ = *this->table_entry_->GetDBName();
     this->table_name_ = *this->table_entry_->GetTableName();
     this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
@@ -342,6 +345,7 @@ void AddTableIndexEntryOperation::SaveSate() {
     if (is_snapshotted_) {
         return;
     }
+    this->is_delete_ = this->table_index_entry_->deleted_;
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
@@ -475,13 +479,42 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
 
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
-    LOG_INFO(fmt::format("Snapshot txn_id {} commit_ts {}", txn_id, commit_ts));
+    LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
-        LOG_TRACE(fmt::format("Snapshot operation {}", operation->ToString()));
+        LOG_TRACE(fmt::format("SaveState operation {}", operation->ToString()));
         operation->SaveSate();
     }
+}
+
+std::string CatalogDeltaEntry::ToString() const {
+    std::stringstream sstream;
+    for (const auto &operation : operations_) {
+        sstream << operation->ToString() << '\n';
+    }
+    return sstream.str();
+}
+
+void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
+
+    auto &global_map = this->encode_op_to_id_map_;
+    auto &global_operations = this->global_operations_;
+    auto &local_operations = other->operations();
+
+    for (auto &local_operation : local_operations) {
+        auto it = global_map.find(local_operation->EncodeIndex());
+        if (it == global_map.end()) {
+            global_map[local_operation->EncodeIndex()] = global_operations.size();
+            global_operations.push_back(std::move(local_operation));
+        } else {
+            global_operations[it->second] = std::move(local_operation);
+        }
+    }
+
+    local_operations.clear();
+    this->set_txn_id(other->txn_id());
+    this->set_commit_ts(other->commit_ts());
 }
 
 } // namespace infinity

@@ -25,7 +25,7 @@ import third_party;
 import defer_op;
 import local_file_system;
 import serialize;
-import wal;
+import catalog_delta_entry;
 
 import infinity_exception;
 import parser;
