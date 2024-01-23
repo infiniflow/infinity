@@ -1,5 +1,7 @@
 module;
 
+#include <string.h>
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -34,6 +36,11 @@ int IndexCommiter(Runnable &worker) {
     return 1;
 }
 
+bool ColumnIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
+    int ret = strcmp(lhs.c_str(), rhs.c_str());
+    return ret < 0;
+}
+
 ColumnIndexer::ColumnIndexer(u64 column_id,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
@@ -42,7 +49,7 @@ ColumnIndexer::ColumnIndexer(u64 column_id,
       max_inverters_(2) {
     posting_table_ = new PostingTable;
     SetAnalyzer();
-    inverter_ = MakeUnique<ColumnInverter>(analyzer_.get(), jieba_specialize_, byte_slice_pool);
+    inverter_ = MakeUnique<ColumnInverter>(this);
     invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, 1, 1);
     commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
 }
@@ -111,7 +118,7 @@ void ColumnIndexer::SwitchActiveInverter() {
         inverter_->WaitForZeroRefCount();
         return;
     }
-    inverter_ = MakeUnique<ColumnInverter>(analyzer_.get(), jieba_specialize_, byte_slice_pool_);
+    inverter_ = MakeUnique<ColumnInverter>(this);
     ++num_inverters_;
 }
 
