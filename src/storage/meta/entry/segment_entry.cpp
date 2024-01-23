@@ -66,6 +66,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
     }
     segment_entry->row_count_ = 0;
     segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+    segment_entry->remain_row_count_ = 0;
     segment_entry->segment_id_ = segment_id;
     segment_entry->min_row_ts_ = 0;
     segment_entry->max_row_ts_ = 0;
@@ -139,7 +140,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             total_copied += actual_appended;
             to_append_rows -= actual_appended;
             append_state_ptr->current_count_ += actual_appended;
-            this->row_count_ += actual_appended;
+            IncreaseRowCount(actual_appended);
         }
         if (to_append_rows == 0) {
             append_state_ptr->current_block_++;
@@ -152,15 +153,13 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
 void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
-    for (const auto &row_hash_map : block_row_hashmap) {
-        u16 block_id = row_hash_map.first;
+    for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
-        const Vector<RowID> &rows = row_hash_map.second;
-        block_entry->DeleteData(txn_id, commit_ts, rows);
+        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
     }
 }
 
@@ -345,14 +344,14 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
 void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
-    for (const auto &row_hash_map : block_row_hashmap) {
-        u16 block_id = row_hash_map.first;
+    for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
+        DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
         this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
     }
@@ -379,6 +378,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["max_row_ts"] = this->max_row_ts_;
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
+        json_res["remain_row_count"] = this->remain_row_count_;
         for (auto &block_entry : this->block_entries_) {
             if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
                 block_entries.push_back((BlockEntry *)block_entry.get());
@@ -419,6 +419,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
+    segment_entry->remain_row_count_ = segment_entry_json["remain_row_count"];
 
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {
@@ -468,6 +469,7 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     }
 
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
+    // TODO: remain_row_count
     this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
     this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
 

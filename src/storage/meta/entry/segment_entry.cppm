@@ -78,13 +78,27 @@ public:
 
     inline SizeT row_count() const { return row_count_; }
 
+    inline SizeT remain_row_count() const { return remain_row_count_; }
+
     int Room();
+
+    void SetDeprecated() { deprecated_.store(true); }
 
 public:
     // Used in WAL replay & Physical Import
     inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
 
-    inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
+    inline void IncreaseRowCount(SizeT increased_row_count) {
+        row_count_ += increased_row_count;
+        remain_row_count_ += increased_row_count;
+    }
+
+    inline void DecreaseRemainRow(SizeT decrease_row_count) {
+        if (decrease_row_count > remain_row_count_) {
+            UnrecoverableError("Decrease row count exceed remain row count");
+        }
+        remain_row_count_ -= decrease_row_count;
+    }
 
 public:
     // Used in PhysicalImport
@@ -125,12 +139,17 @@ protected:
 
     SizeT row_count_{};
     SizeT row_capacity_{};
+    SizeT remain_row_count_{}; // not deleted row count
     u64 column_count_{};
 
     TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
+
+private:
+    // this flag set by backend compacting, check when commit
+    Atomic<bool> deprecated_{false};
 };
 
 } // namespace infinity

@@ -127,7 +127,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     Txn *txn = query_context->GetTxn();
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
 
-    u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
     BlockEntry *last_block_entry = segment_entry->GetLastEntry();
     BufferHandle buffer_handle = last_block_entry->GetColumnBlockEntry(0)->buffer()->Load();
