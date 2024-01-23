@@ -18,6 +18,7 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
+import parser;
 
 export module bg_task;
 
@@ -28,12 +29,15 @@ export enum class BGTaskType {
     kForceCheckpoint, // Manually triggered by PhysicalImport
     kStopProcessor,
     kCatalogDeltaOpsMerge, // Merge
+    kCompactSegments,
     kInvalid
 };
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
+
     virtual ~BGTask() = default;
+
     BGTaskType type_{BGTaskType::kInvalid};
     bool async_{false};
 
@@ -98,6 +102,37 @@ export struct CatalogDeltaOpsMergeTask final : public BGTask {
 
     UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
     NewCatalog *catalog_{};
+};
+
+export class CompactSegmentsTask final : public BGTask {
+public:
+    explicit CompactSegmentsTask(TableEntry *table_entry);
+
+    String ToString() const override { return "Compact segments task"; }
+
+    SharedPtr<TableEntry> Execute();
+
+    void AddToDelete(HashMap<BlockID, Vector<RowID>> block_row_hashmap);
+
+private:
+    SharedPtr<SegmentEntry> CompactSegments(Vector<SegmentID> segment_ids);
+
+    void ApplyAllToDelete(TableEntry *table_entry);
+
+    void ApplyOneToDelete(TableEntry *table_entry, const HashMap<BlockID, Vector<RowID>> &to_delete);
+
+private:
+    TableEntry *const table_entry_{};
+    const SegmentID max_segment_id_{};
+
+    // A timestamp
+    
+    Vector<SegmentEntry *> segment_entries_;
+
+    List<HashMap<BlockID, Vector<RowID>>> to_deletes_;
+
+public:
+    std::mutex mtx_{};
 };
 
 } // namespace infinity

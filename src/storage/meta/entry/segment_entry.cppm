@@ -35,6 +35,13 @@ namespace infinity {
 
 class TxnTableStore;
 struct TableEntry;
+class CompactSegmentsTask;
+
+export enum class SegmentStatus : i8 {
+    kNormal,
+    kCompacting,
+    kDeprecated,
+};
 
 struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
@@ -82,7 +89,9 @@ public:
 
     int Room();
 
-    void SetDeprecated() { deprecated_.store(true); }
+    void SetCompacting(CompactSegmentsTask *compact_task);
+
+    void SetDeprecated();
 
 public:
     // Used in WAL replay & Physical Import
@@ -112,7 +121,7 @@ public:
 protected:
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<RowID>> &block_row_hashmap);
 
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
@@ -128,6 +137,8 @@ protected:
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
+
+    void AddDeleteToCompactTask(const HashMap<BlockID, Vector<RowID>> &block_row_hashmap);
 
 protected:
     std::shared_mutex rw_locker_{};
@@ -148,8 +159,9 @@ protected:
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
 private:
-    // this flag set by backend compacting, check when commit
-    Atomic<bool> deprecated_{false};
+    SegmentStatus status_{SegmentStatus::kNormal};
+
+    CompactSegmentsTask *compact_task_{};
 };
 
 } // namespace infinity

@@ -133,6 +133,8 @@ public:
 
     void GetFullTextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
 
+    SegmentID GetNextSegmentID() { return next_segment_id_.load(); }
+
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 

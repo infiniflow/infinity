@@ -53,6 +53,8 @@ import lvq_store;
 import plain_store;
 import segment_iter;
 import catalog_delta_entry;
+import status;
+import bg_task;
 
 namespace infinity {
 
@@ -105,6 +107,17 @@ int SegmentEntry::Room() {
     return this->row_capacity_ - this->row_count_;
 }
 
+void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task) {
+    std::unique_lock<std::shared_mutex> lock(rw_locker_);
+    compact_task_ = compact_task;
+    status_ = SegmentStatus::kCompacting;
+}
+
+void SegmentEntry::SetDeprecated() {
+    std::unique_lock<std::shared_mutex> lock(rw_locker_);
+    status_ = SegmentStatus::kDeprecated;
+}
+
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
@@ -150,7 +163,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<RowID>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
@@ -160,6 +173,20 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);
+    }
+
+    AddDeleteToCompactTask(block_row_hashmap);
+}
+
+void SegmentEntry::AddDeleteToCompactTask(const HashMap<BlockID, Vector<RowID>> &block_row_hashmap) {
+    if (status_ == SegmentStatus::kCompacting) {
+        // a task is compacting this segment. pass the deleted row_ids to the task.
+        // copy a hashmap here
+        compact_task_->AddToDelete(block_row_hashmap);
+    } else if (status_ == SegmentStatus::kDeprecated) {
+        // This segment is deprecated because of segment compaction
+        // Current function is called by `PrepareCommit`, throw exception will cause rollback.
+        RecoverableError(Status::TxnRollback(0));
     }
 }
 

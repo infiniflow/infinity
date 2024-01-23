@@ -67,6 +67,10 @@ void BGTaskProcessor::Process() {
                 catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
                 break;
             }
+            case BGTaskType::kCompactSegments: {
+                // TODO
+                break;
+            }
             case BGTaskType::kInvalid: {
                 UnrecoverableError("Invalid background task");
                 break;
