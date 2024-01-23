@@ -25,13 +25,10 @@ import txn;
 import storage;
 import local_file_system;
 import third_party;
-
 import catalog;
-
 import table_entry_type;
 import parser;
 import txn_store;
-
 import data_access_state;
 import status;
 import bg_task;
@@ -632,7 +629,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
                                                                                         true, /*is_replay*/
                                                                                         cmd.table_index_dir_);
 
-    auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
     NewCatalog::CreateIndexFile(table_entry,
@@ -689,7 +686,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    auto fake_txn = MakeUnique<Txn>(storage_->txn_manager(), storage_->catalog(), txn_id);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);

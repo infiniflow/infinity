@@ -27,7 +27,6 @@ import global_block_id;
 import block_index;
 import base_table_ref;
 import knn_scan_data;
-import column_buffer;
 import vector_buffer;
 import knn_distance;
 import third_party;
@@ -63,6 +62,7 @@ import dist_func_ip;
 import knn_expression;
 import value;
 import status;
+import buffer_obj;
 
 namespace infinity {
 
@@ -78,8 +78,8 @@ void ReadDataBlock(DataBlock *output,
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
-            ColumnBuffer column_buffer = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(buffer_mgr);
-            output->column_vectors[output_column_id++]->AppendWith(column_buffer, 0, row_count);
+            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+            output->column_vectors[output_column_id++]->AppendWith(column_vector, 0, row_count);
         }
     }
     output->Finalize();
@@ -269,9 +269,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             bool_column->Reset();
         }
 
-        ColumnBuffer column_buffer = block_column_entry->GetColumnData(buffer_mgr);
+        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
 
-        auto data = reinterpret_cast<const DataType *>(column_buffer.GetAll());
+        auto data = reinterpret_cast<const DataType *>(column_vector.data());
         merge_heap->Search(query,
                            data,
                            knn_scan_shared_data->dimension_,
@@ -514,20 +514,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 SizeT column_n = base_table_ref_->column_ids_.size();
                 for (SizeT i = 0; i < column_n; ++i) {
                     SizeT column_id = base_table_ref_->column_ids_[i];
-                    ColumnBuffer column_buffer =
-                        block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
-                    auto &column_type = block_entry->GetColumnBlockEntry(column_id)->column_type();
-                    if (column_type->Plain()) {
-                        const_ptr_t ptr = column_buffer.GetValueAt(block_offset, *column_type);
-                        output_block_ptr->AppendValueByPtr(i, ptr);
-                    } else {
-                        if (column_type->type() != LogicalType::kVarchar) {
-                            RecoverableError(Status::NotSupport("Not implement complex type reading from column buffer."));
-                        }
-                        auto [varchar_ptr, data_size] = column_buffer.GetVarcharAt(block_offset);
-                        Value value = Value::MakeVarchar(varchar_ptr, data_size);
-                        output_block_ptr->AppendValue(i, value);
-                    }
+                    auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                    ColumnVector &&column_vector = block_column_entry->GetColumnVector(query_context->storage()->buffer_manager());
+
+                    output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
                 }
                 output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
                 output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);

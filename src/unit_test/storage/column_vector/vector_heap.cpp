@@ -26,7 +26,7 @@ import infinity_context;
 import default_values;
 
 class VectorHeapTest : public BaseTest {};
-
+#if 0
 TEST_F(VectorHeapTest, var_heap1) {
     using namespace infinity;
     VarHeapManager vector_heap_mgr_;
@@ -99,7 +99,7 @@ TEST_F(VectorHeapTest, var_heap2) {
     std::cout << "total memory: " << vector_heap_mgr_.total_mem() << ", total size: " << total_size << std::endl;
     std::cout << vector_heap_mgr_.Stats() << std::endl;
 }
-
+#endif
 
 TEST_F(VectorHeapTest, fix_heap1) {
     using namespace infinity;

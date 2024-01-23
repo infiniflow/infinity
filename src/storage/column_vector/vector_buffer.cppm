@@ -18,10 +18,16 @@ import stl;
 import global_resource_usage;
 import heap_chunk;
 import fix_heap;
+import buffer_handle;
+
+#include <variant>
 
 export module vector_buffer;
 
 namespace infinity {
+
+class BufferManager;
+class BlockColumnEntry;
 
 export enum class VectorBufferType { kInvalid, kStandard, kHeap, kCompactBit };
 
@@ -29,27 +35,40 @@ export class VectorBuffer {
 public:
     static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
+    static SharedPtr<VectorBuffer>
+    Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
+
 public:
     explicit VectorBuffer() { GlobalResourceUsage::IncrObjectCount(); }
 
-    ~VectorBuffer() {
-        GlobalResourceUsage::DecrObjectCount();
-        if (data_) {
-            delete[] data_;
-        }
-    }
+    ~VectorBuffer() { GlobalResourceUsage::DecrObjectCount(); }
 
     void Initialize(SizeT type_size, SizeT capacity);
 
     void InitializeCompactBit(SizeT capacity);
 
+    void InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity);
+
+    void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
+
     void ResetToInit();
 
     void Copy(ptr_t input, SizeT size);
 
-    [[nodiscard]] ptr_t GetData() const { 
-        // return data_.get(); 
-        return data_;
+    [[nodiscard]] ptr_t GetDataMut() {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<ptr_t>(std::get<BufferHandle>(ptr_).GetDataMut());
+        }
+    }
+
+    [[nodiscard]] const_ptr_t GetData() const {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<const_ptr_t>(std::get<BufferHandle>(ptr_).GetData());
+        }
     }
 
     [[nodiscard]] bool GetCompactBit(SizeT idx) const;
@@ -64,12 +83,15 @@ public:
 
     static void CopyCompactBits(u8 *dst, const u8 *src, SizeT dst_start_id, SizeT src_start_id, SizeT count);
 
-public:
+private:
     bool initialized_{false};
-    // UniquePtr<char[]> data_{nullptr};
-    char *data_{};
+
+    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
+
     SizeT data_size_{0};
     SizeT capacity_{0};
+
+public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};

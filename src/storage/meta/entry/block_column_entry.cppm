@@ -22,8 +22,6 @@ import stl;
 import buffer_obj;
 import parser;
 import third_party;
-import column_buffer;
-import outline_info;
 import buffer_manager;
 import column_vector;
 import local_file_system;
@@ -52,7 +50,6 @@ public:
 
 public:
     // Getter
-    inline OutlineInfo *outline_info_ptr() const { return outline_info_ ? outline_info_.get() : nullptr; }
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }
@@ -60,21 +57,15 @@ public:
     inline const SharedPtr<String> &base_dir() const { return base_dir_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
-    static SharedPtr<String> OutlineFilename(u64 column_id, SizeT file_idx) {
-        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id, file_idx));
-    }
+    SharedPtr<String> OutlineFilename(SizeT file_idx) const { return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx)); }
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
     Vector<String> OutlinePaths() const;
 
-    ColumnBuffer GetColumnData(BufferManager *buffer_manager);
+    ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
-    // Append used in import and wal_replay
-    void AppendRaw(SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
-
-protected:
-    static void
-    Append(BlockColumnEntry *column_entry, u16 column_entry_offset, ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows);
+public:
+    void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
@@ -87,7 +78,8 @@ protected:
     SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
 
-    UniquePtr<OutlineInfo> outline_info_{};
+public:
+    Vector<BufferObj *> outline_buffers_{};
 };
 
 } // namespace infinity

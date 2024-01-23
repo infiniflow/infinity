@@ -25,7 +25,7 @@ import third_party;
 import defer_op;
 import local_file_system;
 import serialize;
-import wal;
+import catalog_delta_entry;
 
 import infinity_exception;
 import parser;
@@ -171,7 +171,11 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
     return {block_offset_begin, row_idx};
 }
 
-u16 BlockEntry::AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset input_block_offset, u16 append_rows, BufferManager *) {
+u16 BlockEntry::AppendData(TransactionID txn_id,
+                           DataBlock *input_data_block,
+                           BlockOffset input_block_offset,
+                           u16 append_rows,
+                           BufferManager *buffer_mgr) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         UnrecoverableError(
@@ -186,11 +190,7 @@ u16 BlockEntry::AppendData(TransactionID txn_id, DataBlock *input_data_block, Bl
 
     SizeT column_count = this->columns_.size();
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        BlockColumnEntry::Append(this->columns_[column_id].get(),
-                                 this->row_count_,
-                                 input_data_block->column_vectors[column_id].get(),
-                                 input_block_offset,
-                                 actual_copied);
+        this->columns_[column_id]->Append(input_data_block->column_vectors[column_id].get(), input_block_offset, actual_copied, buffer_mgr);
 
         LOG_TRACE(fmt::format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
                               this->segment_entry_->segment_id(),
@@ -388,7 +388,6 @@ void BlockEntry::MergeFrom(BaseEntry &other) {
     // // No locking here since only the load stage needs MergeFrom.
     if (*this->block_dir_ != *block_entry2->block_dir_) {
         UnrecoverableError("BlockEntry::MergeFrom requires base_dir_ match");
-
     }
     if (this->block_id_ != block_entry2->block_id_) {
         UnrecoverableError("BlockEntry::MergeFrom requires block_id_ match");

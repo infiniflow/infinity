@@ -46,6 +46,7 @@ struct ScanParam {
 
 class TxnManager;
 struct NewCatalog;
+class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
@@ -57,7 +58,11 @@ class CatalogDeltaOperation;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+    explicit Txn(TxnManager *txn_manager,
+                 BufferManager *buffer_manager,
+                 NewCatalog *catalog,
+                 BGTaskProcessor *bg_task_processor,
+                 TransactionID txn_id);
 
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
 
@@ -156,10 +161,10 @@ public:
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 private:
-    // Txn Manager
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
     BufferManager *buffer_mgr_{};
+    BGTaskProcessor *bg_task_processor_{};
     NewCatalog *catalog_{};
     TransactionID txn_id_{};
 
@@ -184,8 +189,8 @@ private:
     /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
-    // Physical log entry
-    SharedPtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
+
+    UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done
     std::mutex lock_{};

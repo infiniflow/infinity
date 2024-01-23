@@ -61,19 +61,21 @@ void Storage::Init() {
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
     i64 system_start_ts = wal_mgr_->ReplayWalFile();
-    ++ system_start_ts;
+    ++system_start_ts;
 
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get());
     // Construct txn manager
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
+                                      bg_processor_.get(),
                                       std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
                                       0,
                                       system_start_ts);
+
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get());
     bg_processor_->Start();
 
     BuiltinFunctions builtin_functions(new_catalog_);
@@ -87,6 +89,7 @@ void Storage::UnInit() {
     wal_mgr_->Stop();
 
     txn_mgr_.reset();
+    bg_processor_.reset();
     wal_mgr_.reset();
 
     // Buffer Manager need to be destroyed before catalog. since buffer manage hold the raw pointer owned by catalog:
@@ -130,7 +133,7 @@ void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
     Txn *new_txn = txn_mgr->CreateTxn();
     new_txn->Begin();
     Status status = new_txn->CreateDatabase("default", ConflictType::kError);
-    if(status.ok()) {
+    if (status.ok()) {
         txn_mgr->CommitTxn(new_txn);
     } else {
         txn_mgr->RollBackTxn(new_txn);

@@ -27,7 +27,6 @@ import global_block_id;
 import data_block;
 import table_scan_function_data;
 import base_table_ref;
-import column_buffer;
 import block_index;
 import catalog;
 import default_values;
@@ -35,6 +34,9 @@ import infinity_exception;
 import infinity_exception;
 import third_party;
 import logger;
+import column_vector;
+import infinity_exception;
+
 module physical_table_scan;
 
 namespace infinity {
@@ -170,9 +172,9 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                 u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
                 output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
             } else {
-                ColumnBuffer column_buffer =
-                    current_block_entry->GetColumnBlockEntry(column_id)->GetColumnData(query_context->storage()->buffer_manager());
-                output_ptr->column_vectors[output_column_id++]->AppendWith(column_buffer, read_offset, write_size);
+                ColumnVector column_vector =
+                    current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(query_context->storage()->buffer_manager());
+                output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
             }
         }
 

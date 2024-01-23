@@ -27,7 +27,6 @@ import value;
 import txn_store;
 import buffer_manager;
 import meta_state;
-import column_buffer;
 import wal;
 import infinity_exception;
 import status;
@@ -49,14 +48,6 @@ class WalReplayTest : public BaseTest {
 };
 
 using namespace infinity;
-
-namespace {
-template <typename T>
-void AppendSimpleData(BlockColumnEntry *column_data_entry, const StringView &str_view, SizeT dst_offset) {
-    T ele = DataType::StringToValue<T>(str_view);
-    column_data_entry->AppendRaw(dst_offset, reinterpret_cast<ptr_t>(&ele), sizeof(T), nullptr);
-}
-} // namespace
 
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {
@@ -570,9 +561,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = columns_vector[0]->data_type_size_;
                 EXPECT_EQ(data_type_size, 1);
-                ptr_t src_ptr = columns_vector[0].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry1->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry1->Append(columns_vector[0].get(), 0, 1, buffer_manager);
             }
             {
                 auto block_column_entry2 = last_block_entry->GetColumnBlockEntry(1);
@@ -580,9 +569,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
                 SizeT data_type_size = columns_vector[1]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8);
-                ptr_t src_ptr = columns_vector[1].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry2->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry2->Append(columns_vector[1].get(), 0, 1, buffer_manager);
             }
             {
                 auto block_column_entry3 = last_block_entry->GetColumnBlockEntry(2);
@@ -590,9 +577,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
                 SizeT data_type_size = columns_vector[2]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8);
-                ptr_t src_ptr = columns_vector[2].get()->data();
-                SizeT data_size = 1 * data_type_size;
-                block_column_entry3->AppendRaw(0, src_ptr, data_size, nullptr);
+                block_column_entry3->Append(columns_vector[2].get(), 0, 1, buffer_manager);
             }
 
             last_block_entry->IncreaseRowCount(1);
@@ -636,22 +621,21 @@ TEST_F(WalReplayTest, WalReplayImport) {
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
             BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
 
-            ColumnBuffer col0_obj = column0->GetColumnData(buffer_manager);
-            col0_obj.GetAll();
+            ColumnVector col0 = column0->GetColumnVector(buffer_manager);
+            Value v0 = col0.GetValue(0);
             DataType *col0_type = column0->column_type().get();
-            i8 *col0_ptr = (i8 *)(col0_obj.GetValueAt(0, *col0_type));
-            EXPECT_EQ(*col0_ptr, (1));
+            EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
-            ColumnBuffer col1_obj = column1->GetColumnData(buffer_manager);
+            ColumnVector col1 = column1->GetColumnVector(buffer_manager);
+            Value v1 = col1.GetValue(0);
             DataType *col1_type = column1->column_type().get();
-            i8 *col1_ptr = (i8 *)(col1_obj.GetValueAt(0, *col1_type));
-            EXPECT_EQ(*col1_ptr, (i64)(22));
+            EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
-            ColumnBuffer col2_obj = column2->GetColumnData(buffer_manager);
+            ColumnVector col2 = column2->GetColumnVector(buffer_manager);
+            Value v2 = col2.GetValue(0);
             DataType *col2_type = column2->column_type().get();
             EXPECT_EQ(col2_type->type(), LogicalType::kDouble);
-            f64 *col2_ptr = (f64 *)(col2_obj.GetValueAt(0, *col2_type));
-            EXPECT_EQ(col2_ptr[0], (f64)(3) + 0.33f);
+            EXPECT_EQ(v2.GetValue<DoubleT>(), (f64)(3) + 0.33f);
 
             txn_mgr->CommitTxn(txn);
         }

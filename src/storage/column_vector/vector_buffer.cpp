@@ -16,8 +16,11 @@ module;
 
 import stl;
 import fix_heap;
-
+import buffer_obj;
+import buffer_manager;
+import buffer_handle;
 import infinity_exception;
+import catalog;
 
 module vector_buffer;
 
@@ -39,14 +42,33 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(SizeT data_type_size, SizeT capacity,
     return buffer_ptr;
 }
 
+SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
+                                           BlockColumnEntry *block_column_entry,
+                                           SizeT data_type_size,
+                                           SizeT capacity,
+                                           VectorBufferType buffer_type) {
+    SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
+    buffer_ptr->buffer_type_ = buffer_type;
+    switch (buffer_type) {
+        case VectorBufferType::kCompactBit: {
+            buffer_ptr->InitializeCompactBit(buffer_mgr, block_column_entry, capacity);
+            break;
+        }
+        default: {
+            buffer_ptr->Initialize(buffer_mgr, block_column_entry, data_type_size, capacity);
+            break;
+        }
+    }
+    return buffer_ptr;
+}
+
 void VectorBuffer::InitializeCompactBit(SizeT capacity) {
     if (initialized_) {
         UnrecoverableError("Vector buffer is already initialized.");
     }
     SizeT data_size = (capacity + 7) / 8;
     if (data_size > 0) {
-        // data_ = MakeUnique<char[]>(data_size);
-        data_ = new char[data_size];
+        ptr_ = MakeUniqueForOverwrite<char[]>(data_size);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -59,11 +81,50 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     }
     SizeT data_size = type_size * capacity;
     if (data_size > 0) {
-        // data_ = MakeUnique<char[]>(data_size);
-        data_ = new char[data_size];
+        ptr_ = MakeUniqueForOverwrite<char[]>(data_size);
     }
     if (buffer_type_ == VectorBufferType::kHeap) {
         fix_heap_mgr_ = MakeUnique<FixHeapManager>();
+    }
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
+}
+
+void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
+    // UnrecoverableError("Not implemented.");
+    if (initialized_) {
+        UnrecoverableError("Vector buffer is already initialized.");
+    }
+    SizeT data_size = (capacity + 7) / 8;
+    auto *buffer_obj = block_column_entry->buffer();
+    if (buffer_obj == nullptr) {
+        UnrecoverableError("Buffer object is nullptr.");
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        UnrecoverableError("Buffer object size is not equal to data size.");
+    }
+    ptr_ = buffer_obj->Load();
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
+}
+
+void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity) {
+    if (initialized_) {
+        UnrecoverableError("Vector buffer is already initialized.");
+    }
+    SizeT data_size = type_size * capacity;
+    auto *buffer_obj = block_column_entry->buffer();
+    if (buffer_obj == nullptr) {
+        UnrecoverableError("Buffer object is nullptr.");
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        UnrecoverableError("Buffer object size is not equal to data size.");
+    }
+    ptr_ = buffer_obj->Load();
+    if (buffer_type_ == VectorBufferType::kHeap) {
+        fix_heap_mgr_ = MakeUnique<FixHeapManager>(buffer_mgr, block_column_entry);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -81,7 +142,7 @@ void VectorBuffer::Copy(ptr_t input, SizeT size) {
         UnrecoverableError("Attempt to copy an amount of data that cannot currently be accommodated");
     }
     // std::memcpy(data_.get(), input, size);
-    std::memcpy(data_, input, size);
+    std::memcpy(GetDataMut(), input, size);
 }
 
 bool VectorBuffer::RawPointerGetCompactBit(const u8 *src_ptr_u8, SizeT idx) {
@@ -94,7 +155,7 @@ bool VectorBuffer::GetCompactBit(SizeT idx) const {
     if (idx >= capacity_) {
         UnrecoverableError("Index out of range.");
     }
-    return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(data_), idx);
+    return VectorBuffer::RawPointerGetCompactBit(reinterpret_cast<const u8 *>(GetData()), idx);
 }
 
 void VectorBuffer::RawPointerSetCompactBit(u8 *dst_ptr_u8, SizeT idx, bool val) {
@@ -111,7 +172,7 @@ void VectorBuffer::SetCompactBit(SizeT idx, bool val) {
     if (idx >= capacity_) {
         UnrecoverableError("Index out of range.");
     }
-    VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(data_), idx, val);
+    VectorBuffer::RawPointerSetCompactBit(reinterpret_cast<u8 *>(GetDataMut()), idx, val);
 }
 
 bool VectorBuffer::CompactBitIsSame(const SharedPtr<VectorBuffer> &lhs, SizeT lhs_cnt, const SharedPtr<VectorBuffer> &rhs, SizeT rhs_cnt) {
@@ -123,8 +184,8 @@ bool VectorBuffer::CompactBitIsSame(const SharedPtr<VectorBuffer> &lhs, SizeT lh
     }
     SizeT full_byte_cnt = lhs_cnt / 8;
     SizeT last_byte_cnt = lhs_cnt % 8;
-    auto lhs_data = reinterpret_cast<const u8 *>(lhs->data_);
-    auto rhs_data = reinterpret_cast<const u8 *>(rhs->data_);
+    auto lhs_data = reinterpret_cast<const u8 *>(lhs->GetData());
+    auto rhs_data = reinterpret_cast<const u8 *>(rhs->GetData());
     for (SizeT idx = 0; idx < full_byte_cnt; ++idx) {
         if (lhs_data[idx] != rhs_data[idx]) {
             return false;

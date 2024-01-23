@@ -28,7 +28,7 @@ import third_party;
 import buffer_manager;
 import txn_state;
 import status;
-import wal;
+import catalog_delta_entry;
 import infinity_exception;
 
 namespace infinity {

@@ -29,7 +29,7 @@ import third_party;
 import txn_state;
 import txn_manager;
 import buffer_manager;
-import wal;
+import catalog_delta_entry;
 
 import third_party;
 import status;

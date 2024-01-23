@@ -17,28 +17,58 @@ module;
 import stl;
 import global_resource_usage;
 import allocator;
+import buffer_obj;
+import buffer_handle;
+import infinity_exception;
+
+#include <variant>
 
 export module vector_heap_chunk;
 
 namespace infinity {
 
+export using ChunkId = u64;
+
 export struct VectorHeapChunk {
 public:
-    inline explicit VectorHeapChunk(u64 capacity) : capacity_(capacity) {
-        GlobalResourceUsage::IncrObjectCount();
-        ptr_ = Allocator::allocate(capacity);
+    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
+
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
+
+    VectorHeapChunk(const VectorHeapChunk &) = delete;
+
+    VectorHeapChunk(VectorHeapChunk &&other) {
+        if (std::holds_alternative<UniquePtr<char[]>>(other.ptr_)) {
+            ptr_ = std::move(std::get<UniquePtr<char[]>>(other.ptr_));
+        } else {
+            ptr_ = std::move(std::get<BufferHandle>(other.ptr_));
+        }
     }
 
-    inline ~VectorHeapChunk() {
-        Allocator::deallocate(ptr_);
-        ptr_ = nullptr;
-        capacity_ = 0;
-        GlobalResourceUsage::DecrObjectCount();
+    VectorHeapChunk &operator=(const VectorHeapChunk &) = delete;
+
+    VectorHeapChunk &operator=(VectorHeapChunk &&) = delete;
+
+    ~VectorHeapChunk() { GlobalResourceUsage::DecrObjectCount(); }
+
+    const char *GetPtr() const { // Pattern Matching here
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<const char *>(std::get<BufferHandle>(ptr_).GetData());
+        }
     }
 
-    ptr_t ptr_{nullptr};
-    u64 capacity_{0};
+    char *GetPtrMut() {
+        if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+            return std::get<UniquePtr<char[]>>(ptr_).get();
+        } else {
+            return static_cast<char *>(std::get<BufferHandle>(ptr_).GetDataMut());
+        }
+    }
+
+private:
+    std::variant<UniquePtr<char[]>, BufferHandle> ptr_;
 };
 
-}
-
+} // namespace infinity

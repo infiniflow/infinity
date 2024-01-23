@@ -25,7 +25,7 @@ import vector_heap_chunk;
 module var_heap;
 
 namespace infinity {
-
+#if 0
 Pair<u64, u64> VarHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
         UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
@@ -175,5 +175,5 @@ String VarHeapManager::Stats() const {
        << ", Total size: " << total_size() << std::endl;
     return ss.str();
 }
-
+#endif
 } // namespace infinity
