@@ -22,7 +22,6 @@ import stl;
 import buffer_obj;
 import parser;
 import third_party;
-import outline_info;
 import buffer_manager;
 import column_vector;
 import local_file_system;
@@ -65,7 +64,6 @@ public:
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
-    // void AppendRaw(SizeT dst_offset, const_ptr_t src_ptr, SizeT data_size, SharedPtr<VectorBuffer> vector_buffer);
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 

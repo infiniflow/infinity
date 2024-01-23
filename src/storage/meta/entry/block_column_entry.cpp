@@ -20,7 +20,6 @@ module catalog;
 
 import stl;
 import buffer_manager;
-import outline_info;
 import parser;
 import buffer_obj;
 import buffer_handle;

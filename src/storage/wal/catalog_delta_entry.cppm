@@ -23,7 +23,6 @@ import stl;
 import parser;
 import infinity_exception;
 import catalog;
-import outline_info;
 import third_party;
 
 namespace infinity {
