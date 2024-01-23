@@ -158,8 +158,9 @@ auto main(int argc, char **argv) -> int {
     //    threaded_thrift_server.Init(9090);
     //    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
     u32 thrift_server_port = InfinityContext::instance().config()->sdk_port();
+    u64 connection_limit = InfinityContext::instance().config()->connection_limit();
 
-    pool_thrift_server.Init(thrift_server_port, 128);
+    pool_thrift_server.Init(thrift_server_port, connection_limit);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
     //    non_block_pool_thrift_server.Init(9070, 64);

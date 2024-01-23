@@ -664,12 +664,12 @@ private:
     // std::chrono::duration<double> phase_4_duration_{};
 
 private:
-    Infinity* GetInfinityBySessionID(i64 session_id) {
+    Infinity *GetInfinityBySessionID(i64 session_id) {
         infinity_session_map_mutex_.lock();
         auto iter = infinity_session_map_.find(session_id);
         infinity_session_map_mutex_.unlock();
 
-        if(iter == infinity_session_map_.end()) {
+        if (iter == infinity_session_map_.end()) {
             RecoverableError(Status::SessionNotFound(session_id));
         }
 

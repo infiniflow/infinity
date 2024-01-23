@@ -924,7 +924,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(*global_config->log_filename());
+            Value value = Value::MakeVarchar(global_config->log_filename());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -945,7 +945,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(*global_config->log_dir());
+            Value value = Value::MakeVarchar(global_config->log_dir());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }

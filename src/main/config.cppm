@@ -40,6 +40,7 @@ public:
     [[nodiscard]] inline i32 time_zone_bias() const { return system_option_.time_zone_bias; }
 
     inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
+
     [[nodiscard]] inline u64 worker_cpu_limit() const { return system_option_.worker_cpu_limit; }
 
     [[nodiscard]] inline u64 total_memory_size() const { return system_option_.total_memory_size; }
@@ -47,6 +48,8 @@ public:
     [[nodiscard]] inline u64 query_cpu_limit() const { return system_option_.query_cpu_limit; }
 
     [[nodiscard]] inline u64 query_memory_limit() const { return system_option_.query_memory_limit; }
+
+    [[nodiscard]] inline u64 connection_limit() const { return system_option_.connection_limit; }
 
     [[nodiscard]] inline String listen_address() const { return system_option_.listen_address; }
 
@@ -62,11 +65,11 @@ public:
     [[nodiscard]] inline SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
 
     // Log
-    [[nodiscard]] inline SharedPtr<String> log_filename() const { return system_option_.log_filename; }
+    [[nodiscard]] inline String& log_filename() const { return *system_option_.log_filename; }
 
-    [[nodiscard]] inline SharedPtr<String> log_dir() const { return system_option_.log_dir; }
+    [[nodiscard]] inline String& log_dir() const { return *system_option_.log_dir; }
 
-    [[nodiscard]] inline SharedPtr<String> log_file_path() const { return system_option_.log_file_path; }
+    [[nodiscard]] inline String& log_file_path() const { return *system_option_.log_file_path; }
 
     [[nodiscard]] inline bool log_to_stdout() const { return system_option_.log_to_stdout; }
 
