@@ -50,7 +50,6 @@ import column_vector;
 import global_block_id;
 import block_index;
 import query_context;
-import column_buffer;
 import default_values;
 import value;
 import buffer_manager;
@@ -405,13 +404,12 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
                         doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
                     } break;
                     case kVarchar: {
-                        ColumnBuffer column_buffer(column_id, buffer_handle, buffer_mgr, block_column_entry->base_dir());
                         auto field = MakeUnique<TextField>(index_base->column_name().c_str(),
                                                            irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
                                                            text_features,
                                                            analyzers[col].get());
-                        auto [src_ptr, data_size] = column_buffer.GetVarcharAt(i);
-                        field->f_ = String(src_ptr, data_size);
+                        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                        field->f_ = column_vector.GetValue(i).GetVarchar();
                         doc.Insert<irs::Action::INDEX, TextField>(field.get());
                     } break;
                     default:

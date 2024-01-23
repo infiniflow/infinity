@@ -25,36 +25,43 @@ import default_values;
 import bitmask;
 import vector_buffer;
 import fix_heap;
-import column_buffer;
 import serialize;
 import third_party;
 import logger;
 import value;
+import catalog;
+import buffer_manager;
+import status;
 
 module column_vector;
 
 namespace infinity {
 
-void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
+VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
         UnrecoverableError("Column vector is already initialized.");
     }
-    if (other.vector_type_ == ColumnVectorType::kInvalid) {
-        UnrecoverableError("Other column vector is invalid.");
+    initialized = true;
+    if (data_type_->type() == LogicalType::kInvalid) {
+        UnrecoverableError("Data type isn't assigned.");
+    }
+    if (vector_type == ColumnVectorType::kInvalid) {
+        UnrecoverableError("Attempt to initialize column vector to invalid type.");
     }
 
-    vector_type_ = other.vector_type_;
+    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
+    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
+    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
+        vector_type = ColumnVectorType::kCompactBit;
+    }
+
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    capacity_ = capacity;
+
+    tail_index_ = 0;
     data_type_size_ = data_type_->Size();
-
-    if (vector_type_ == ColumnVectorType::kConstant) {
-        // If the vector is constant, all elements are the same, so the select is meaningless.
-        capacity_ = other.capacity();
-    } else {
-        //        capacity_ = input_select.Size();
-        // Select size might not be the power of 2. Then, we use DEFAULT_VECTOR_SIZE;
-        capacity_ = DEFAULT_VECTOR_SIZE;
-    }
-
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch (data_type_->type()) {
             //        case LogicalType::kBlob:
@@ -78,6 +85,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             vector_buffer_type = VectorBufferType::kStandard;
         }
     }
+    return vector_buffer_type;
+}
+
+void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() == nullptr) {
         if (vector_type_ == ColumnVectorType::kConstant) {
@@ -87,7 +99,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
             nulls_ptr_ = Bitmask::Make(capacity_);
         }
-        data_ptr_ = buffer_->GetData();
+        data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
         if (vector_buffer_type == VectorBufferType::kHeap) {
@@ -97,8 +109,33 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
         }
     }
+}
 
-    initialized = true;
+void ColumnVector::Initialize(BufferManager *buffer_mgr,
+                              BlockColumnEntry *block_column_entry,
+                              SizeT current_row_count,
+                              ColumnVectorType vector_type,
+                              SizeT capacity) {
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
+
+    if (buffer_.get() != nullptr) {
+        UnrecoverableError("Column vector is already initialized.");
+    }
+
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
+        nulls_ptr_ = Bitmask::Make(8);
+    } else {
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
+        nulls_ptr_ = Bitmask::Make(capacity_); // TODO: version file is not managed by buffer_manager now.
+    }
+    data_ptr_ = buffer_->GetDataMut();
+    tail_index_ = current_row_count;
+}
+
+void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
+    ColumnVectorType vector_type = other.vector_type_;
+    Initialize(vector_type, vector_type == ColumnVectorType::kConstant ? other.capacity() : DEFAULT_VECTOR_SIZE);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
         tail_index_ = other.tail_index_;
@@ -235,136 +272,11 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
     }
 }
 
-void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    if (initialized) {
-        UnrecoverableError("Column vector is already initialized.");
-    }
-    if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
-    }
-    if (vector_type == ColumnVectorType::kInvalid) {
-        UnrecoverableError("Attempt to initialize column vector to invalid type.");
-    }
-
-    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
-    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
-    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
-        vector_type = ColumnVectorType::kCompactBit;
-    }
-
-    // TODO: No check on capacity value.
-
-    vector_type_ = vector_type;
-    capacity_ = capacity;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
-//        case LogicalType::kBlob:
-//        case LogicalType::kBitmap:
-//        case LogicalType::kPolygon:
-//        case LogicalType::kPath:
-        case LogicalType::kBoolean: {
-            vector_buffer_type = VectorBufferType::kCompactBit;
-            break;
-        }
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            UnrecoverableError("Unexpected data type for column vector.");
-        }
-        default: {
-            vector_buffer_type = VectorBufferType::kStandard;
-        }
-    }
-    if (buffer_.get() == nullptr) {
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(8);
-        } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(capacity_);
-        }
-        data_ptr_ = buffer_->GetData();
-    } else {
-        // Initialize after reset will come to this branch
-        if (vector_buffer_type == VectorBufferType::kHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr) {
-                UnrecoverableError("Vector heap should be null.");
-            }
-            buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
-        }
-    }
-
-    initialized = true;
-}
-
 void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx) {
-    if (initialized) {
-        UnrecoverableError("Column vector is already initialized.");
-    }
-    if (data_type_->type() == LogicalType::kInvalid) {
-        UnrecoverableError("Data type isn't assigned.");
-    }
     if (end_idx <= start_idx) {
         UnrecoverableError("End index should larger than start index.");
     }
-
-    vector_type_ = vector_type;
-    capacity_ = end_idx - start_idx;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
-
-    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
-            //        case LogicalType::kBlob:
-            //        case LogicalType::kBitmap:
-            //        case LogicalType::kPolygon:
-            //        case LogicalType::kPath:
-        case LogicalType::kBoolean: {
-            vector_buffer_type = VectorBufferType::kCompactBit;
-            break;
-        }
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
-            break;
-        }
-        case LogicalType::kInvalid:
-        case LogicalType::kNull:
-        case LogicalType::kMissing: {
-            UnrecoverableError("Unexpected data type for column vector.");
-        }
-        default: {
-            vector_buffer_type = VectorBufferType::kStandard;
-        }
-    }
-
-    if (buffer_.get() == nullptr) {
-        if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(8);
-        } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
-            nulls_ptr_ = Bitmask::Make(capacity_);
-        }
-        data_ptr_ = buffer_->GetData();
-    } else {
-        // Initialize after reset will come to this branch
-        if (vector_buffer_type == VectorBufferType::kHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr) {
-                UnrecoverableError("Vector heap should be null.");
-            }
-            buffer_->fix_heap_mgr_ = MakeUnique<FixHeapManager>();
-        }
-    }
-
-    initialized = true;
+    Initialize(vector_type, end_idx - start_idx);
 
     if (vector_type_ == ColumnVectorType::kConstant) {
         tail_index_ = 1;
@@ -700,12 +612,15 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                if(varchar_ref.IsValue()) {
+                if (varchar_ref.IsValue()) {
                     UnrecoverableError("Must be vector type of varchar, here");
                 }
                 String result_str;
                 result_str.resize(varchar_ref.length_);
-                buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(), varchar_ref.vector_.chunk_id_, varchar_ref.vector_.chunk_offset_, varchar_ref.length_);
+                buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(),
+                                                     varchar_ref.vector_.chunk_id_,
+                                                     varchar_ref.vector_.chunk_offset_,
+                                                     varchar_ref.length_);
                 return result_str;
             }
         }
@@ -742,20 +657,20 @@ String ColumnVector::ToString(SizeT row_index) const {
         case kBox: {
             UnrecoverableError("Not implemented");
         }
-//        case kPath: {
-//        }
-//        case kPolygon: {
-//        }
+            //        case kPath: {
+            //        }
+            //        case kPolygon: {
+            //        }
         case kCircle: {
             UnrecoverableError("Not implemented");
         }
-//        case kBitmap: {
-//        }
+            //        case kBitmap: {
+            //        }
         case kUuid: {
             UnrecoverableError("Not implemented");
         }
-//        case kBlob: {
-//        }
+            //        case kBlob: {
+            //        }
         case kEmbedding: {
             //            UnrecoverableError("Not implemented");
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
@@ -900,10 +815,11 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         UnrecoverableError("Column vector isn't initialized.");
     }
     if (index > tail_index_) {
-        UnrecoverableError(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                       std::to_string(index),
-                                       std::to_string(tail_index_),
-                                       std::to_string(capacity_)));
+        UnrecoverableError(
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_)));
     }
 
     // TODO: Check if the value type is same as column vector type
@@ -1039,8 +955,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             SizeT src_size;
             std::tie(src_ptr, src_size) = value.GetEmbedding();
             if (src_size != data_type_->Size()) {
-                UnrecoverableError(
-                    fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}", data_type_->Size(), src_size));
+                UnrecoverableError(fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}",
+                                               data_type_->Size(),
+                                               src_size));
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
             std::memcpy(dst_ptr, src_ptr, src_size);
@@ -1068,10 +985,11 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         UnrecoverableError(fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_));
     }
     if (index > tail_index_) {
-        UnrecoverableError(fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                       std::to_string(index),
-                                       std::to_string(tail_index_),
-                                       std::to_string(capacity_)));
+        UnrecoverableError(
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_)));
     }
     // We assume the value_ptr point to the same type data.
 
@@ -1244,14 +1162,131 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
     }
 }
 
+namespace {
+Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
+    SizeT data_size = data.size();
+    if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
+        RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
+    }
+    Vector<StringView> ret;
+    SizeT i = 1, j = 1;
+    while (true) {
+        if (data[i] == delimiter || data[i] == ' ' || i == data_size - 1) {
+            if (i > j) {
+                ret.emplace_back(data.begin() + j, data.begin() + i);
+            }
+            j = i + 1;
+        }
+        if (i == data_size - 1) {
+            break;
+        }
+        i++;
+    }
+    return ret;
+}
+
+} // namespace
+
+void ColumnVector::AppendByStringView(StringView sv, char delimiter) {
+    SizeT index = tail_index_++;
+    switch (data_type_->type()) {
+        case kBoolean: {
+            buffer_->SetCompactBit(index, DataType::StringToValue<BooleanT>(sv));
+            break;
+        }
+        case kTinyInt: {
+            ((TinyIntT *)data_ptr_)[index] = DataType::StringToValue<TinyIntT>(sv);
+            break;
+        }
+        case kSmallInt: {
+            ((SmallIntT *)data_ptr_)[index] = DataType::StringToValue<SmallIntT>(sv);
+            break;
+        }
+        case kInteger: {
+            ((IntegerT *)data_ptr_)[index] = DataType::StringToValue<IntegerT>(sv);
+            break;
+        }
+        case kBigInt: {
+            ((BigIntT *)data_ptr_)[index] = DataType::StringToValue<BigIntT>(sv);
+            break;
+        }
+        case kFloat: {
+            ((FloatT *)data_ptr_)[index] = DataType::StringToValue<FloatT>(sv);
+            break;
+        }
+        case kDouble: {
+            ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
+            break;
+        }
+        case kEmbedding: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            Vector<StringView> ele_str_views = SplitArrayElement(sv, delimiter);
+            if (embedding_info->Dimension() < ele_str_views.size()) {
+                RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
+            }
+            SizeT dst_off = index * data_type_->Size();
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    UnrecoverableError("Not implemented");
+                    break;
+                }
+                case kElemInt8: {
+                    AppendEmbedding<TinyIntT>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendEmbedding<SmallIntT>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendEmbedding<IntegerT>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendEmbedding<BigIntT>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendEmbedding<FloatT>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemDouble: {
+                    AppendEmbedding<DoubleT>(ele_str_views, dst_off);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid embedding type");
+                }
+            }
+            break;
+        }
+        case kVarchar: {
+            auto &varchar = (reinterpret_cast<VarcharT *>(data_ptr_))[index];
+            varchar.is_value_ = false;
+            varchar.length_ = sv.size();
+            if (sv.size() <= VARCHAR_INLINE_LENGTH) {
+                std::memcpy(varchar.short_.data_, sv.data(), sv.size());
+            } else {
+                std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
+                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(sv.data(), sv.size());
+                varchar.vector_.chunk_id_ = chunk_id;
+                varchar.vector_.chunk_offset_ = chunk_offset;
+            }
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented");
+        }
+    }
+}
+
 void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count) {
     if (count == 0) {
         return;
     }
 
     if (*this->data_type_ != *other.data_type_) {
-        UnrecoverableError(
-            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
+        UnrecoverableError(fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString()));
     }
 
     if (this->tail_index_ + count > this->capacity_) {
@@ -1403,105 +1438,6 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
     }
     this->tail_index_ += count;
-}
-
-SizeT ColumnVector::AppendWith(ColumnBuffer &column_buffer, SizeT start_row, SizeT row_count) {
-    if (row_count == 0) {
-        return 0;
-    }
-
-    SizeT appended_rows = row_count;
-     if (tail_index_ + row_count > capacity_) {
-         // attempt to append data rows more than the capacity;
-         appended_rows = capacity_ - tail_index_;
-     }
-
-     switch (data_type_->type()) {
-         case kBoolean: {
-             auto src_ptr = reinterpret_cast<const u8 *>(column_buffer.GetAll());
-             auto get_boolean_at = [src_ptr](SizeT row_idx) -> BooleanT {
-                 SizeT byte_idx = row_idx / 8;
-                 SizeT bit_idx = row_idx % 8;
-                 return (src_ptr[byte_idx] >> bit_idx) & u8(1);
-             };
-             auto dst_buffer = buffer_.get();
-             for (SizeT row_idx = 0; row_idx < appended_rows; ++row_idx) {
-                 dst_buffer->SetCompactBit(tail_index_ + row_idx, get_boolean_at(start_row + row_idx));
-             }
-             this->tail_index_ += appended_rows;
-             break;
-         }
-         case kTinyInt:
-         case kSmallInt:
-         case kInteger:
-         case kBigInt:
-         case kHugeInt:
-         case kDecimal:
-         case kFloat:
-         case kDouble:
-         case kDate:
-         case kTime:
-         case kDateTime:
-         case kTimestamp:
-         case kInterval:
-         case kPoint:
-         case kLine:
-         case kLineSeg:
-         case kBox:
-         case kCircle:
-//         case kBitmap:
-         case kUuid:
-         case kEmbedding:
-         case kRowID: {
-             const_ptr_t ptr = column_buffer.GetAll();
-             const_ptr_t src_ptr = ptr + start_row * data_type_size_;
-             ptr_t dst_ptr = data_ptr_ + tail_index_ * data_type_size_;
-             std::memcpy(dst_ptr, src_ptr, appended_rows * data_type_size_);
-             this->tail_index_ += appended_rows;
-             break;
-         }
-//
-         case kVarchar: {
-             for (SizeT row_idx = 0; row_idx < appended_rows; row_idx++) {
-                 auto [data_ptr, data_size] = column_buffer.GetVarcharAt(start_row + row_idx);
-                 const char* src_ptr = data_ptr;
-                 SizeT src_size = data_size;
-                 auto varchar_dst = reinterpret_cast<VarcharT *>(data_ptr_) + tail_index_;
-                 varchar_dst->is_value_ = false;
-                 if(src_size <= VARCHAR_INLINE_LEN) {
-                     std::memcpy(varchar_dst->short_.data_, src_ptr, src_size);
-                 } else {
-                     std::memcpy(varchar_dst->vector_.prefix_, src_ptr, VARCHAR_PREFIX_LEN);
-                     auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
-                     varchar_dst->vector_.chunk_id_ = chunk_id;
-                     varchar_dst->vector_.chunk_offset_ = chunk_offset;
-                 }
-                 varchar_dst->length_ = src_size;
-                 this->tail_index_++;
-             }
-             break;
-         }
-         case kArray:
-         case kTuple:
-//         case kPath:
-//         case kPolygon:
-//         case kBlob:
-         case kMixed:
-         case kNull: {
-             LOG_ERROR(fmt::format("{} isn't supported", data_type_->ToString()));
-             UnrecoverableError("Not supported now in append data in column");
-         }
-         case kMissing:
-         case kInvalid: {
-             LOG_ERROR(fmt::format("Invalid data type {}", data_type_->ToString()));
-             UnrecoverableError("Invalid data type");
-         }
-         default: {
-             UnrecoverableError("Attempt to store an unaccepted type");
-             // Null/Missing/Invalid
-         }
-     }
-    return appended_rows;
 }
 
 SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
@@ -1696,7 +1632,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     // read variable part
     if (data_type->type() == kVarchar) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
-        if(heap_len > 0) {
+        if (heap_len > 0) {
             column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
             ptr += heap_len;
         }

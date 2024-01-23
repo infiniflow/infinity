@@ -40,7 +40,6 @@ import value;
 import third_party;
 import iresearch_analyzer;
 import base_table_ref;
-import column_buffer;
 import load_meta;
 import catalog;
 
@@ -123,8 +122,8 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         SizeT column_id = 0;
         for (; column_id < column_n; ++column_id) {
             BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
-            ColumnBuffer column_buffer = block_column_ptr->GetColumnData(query_context->storage()->buffer_manager());
-            output_data_block->column_vectors[column_id]->AppendWith(column_buffer, block_offset, 1);
+            ColumnVector column_vector = block_column_ptr->GetColumnVector(query_context->storage()->buffer_manager());
+            output_data_block->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
         }
 
         // 3.3 add hiden columns: score, row_id

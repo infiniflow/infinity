@@ -27,6 +27,7 @@ import catalog;
 import zsv;
 import load_meta;
 import infinity_exception;
+import column_vector;
 
 export module physical_import;
 
@@ -40,6 +41,7 @@ public:
     TableEntry *const table_entry_{};
     Txn *const txn_{};
     SharedPtr<SegmentEntry> segment_entry_{};
+    Vector<ColumnVector> column_vectors_{};
     const char delimiter_{};
 
 public:
@@ -102,7 +104,7 @@ private:
 
     static void CSVRowHandler(void *);
 
-    void JSONLRowHandler(const nlohmann::json &line_json, BlockEntry *block_entry);
+    void JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

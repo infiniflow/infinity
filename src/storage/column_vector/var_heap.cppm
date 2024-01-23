@@ -23,7 +23,7 @@ import vector_heap_chunk;
 export module var_heap;
 
 namespace infinity {
-
+#if 0
 export struct VarHeapManager {
     // Use to store string.
     static constexpr u64 CHUNK_COUNT_LIMIT = MAX_VECTOR_CHUNK_COUNT;
@@ -69,5 +69,5 @@ private:
     u64 current_chunk_idx_{INITIAL_VECTOR_CHUNK_ID};
     u64 current_chunk_offset_{0};
 };
-
+#endif
 } // namespace infinity
