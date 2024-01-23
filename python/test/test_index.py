@@ -89,3 +89,28 @@ class TestIndex:
 
         res = table_obj.drop_index("my_index")
         assert res.success
+
+    # drop non-existent index
+    # create created index
+    # create / drop index with invalid options
+    # create index on dropped table instance
+
+    # create index then show index
+    # drop index then show index
+    # create index on different type of column and show index
+
+    # insert / import data, then create index
+    # create index then insert / import data
+    # create index on all data are deleted table.
+    # create index on all data are updated.
+    # create index on no date are deleted.
+    # create index on no date are update.
+    # create index on table has multiple segments
+    # create index on table has only one segment
+    # create index on empty table
+
+    # create / drop index repeatedly
+    # create index on same column with different parameters
+
+    # show index on table
+    # show index on dropped table instance

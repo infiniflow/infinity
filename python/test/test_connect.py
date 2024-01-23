@@ -66,6 +66,20 @@ class TestConnection:
         except Exception as e:
             print(e)
 
+
+        INVALID_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", -1)
+        WRONG_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", 23815)
+
+        try:
+            infinity_instance = infinity.connect(INVALID_PORT_LOCAL_HOST)
+        except Exception as e:
+            print(e)
+
+        try:
+            infinity_instance = infinity.connect(WRONG_PORT_LOCAL_HOST)
+        except Exception as e:
+            print(e)
+
     def test_repeat_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
@@ -106,3 +120,4 @@ class TestConnection:
 
 # possible cases
 # 1. connections are more than connection limit defined by infinity variables.
+# 2. Concurrently run DDL/DML and disconnect in different thread

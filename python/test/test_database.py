@@ -92,14 +92,14 @@ class TestDatabase:
 
         assert res.success
 
-    def test_create_database_fail(self):
+    # create db with invalid names
+    def test_create_database_invalid_name(self):
         """
         1. connect server
 
         2. create ' ' name db
 
         3. disconnect server
-        :return:
         """
 
         # 1. connect
@@ -117,7 +117,7 @@ class TestDatabase:
         except Exception as e:
             print(e)
 
-        # 4. create ' a' name db
+        # 4. create 'a ' name db
         try:
             db = infinity_obj.create_database("a ")
         except Exception as e:
@@ -127,3 +127,30 @@ class TestDatabase:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+    # create same db in different thread to test conflict and show dbs
+
+    # create too many db (1M) to reach the limitation, then drop these dbs. show dbs
+
+    # create / drop same db 1000 times and show dbs
+
+    # create db with invalid option
+    # drop db with invalid option
+    # drop db with invalid name
+
+    # create db with ignore-if-existence option
+    # create db with ignore-if-existence option when conflict repeatedly
+    # drop non-existent db
+    # drop non-existent db with ignore if non-existent option repeatedly
+
+    # create / drop db name in chinese
+
+    # describe non-existent db
+    # describe existent db
+    # describe dropped db
+    # describe chinese named db
+
+    # after disconnection, create/drop/describe/list databases
+    # get non-exist db
+    # one thread get db, another thread drop this db
+    #
