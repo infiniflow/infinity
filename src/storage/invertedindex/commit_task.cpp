@@ -7,7 +7,9 @@ import column_inverter;
 
 namespace infinity {
 
-CommitTask::CommitTask(ColumnInverter *inverter) : inverter_(inverter) {}
+CommitTask::CommitTask(ColumnInverter *inverter) : inverter_(inverter) { inverter_->Retain(); }
+
+CommitTask::~CommitTask() { inverter_->Release(); }
 
 void CommitTask::Run() { inverter_->Commit(); }
 

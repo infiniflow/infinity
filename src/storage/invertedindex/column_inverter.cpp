@@ -13,7 +13,7 @@ import string_ref;
 import term;
 import radix_sort;
 import index_defines;
-
+import column_indexer;
 namespace infinity {
 
 RefCount::RefCount() : lock_(), cv_(), ref_count_(0u) {}
@@ -48,8 +48,9 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(Analyzer *analyzer, bool jieba_specialize, SharedPtr<MemoryPool> pool)
-    : analyzer_(analyzer), jieba_specialize_(jieba_specialize), alloc_(pool.get()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
+ColumnInverter::ColumnInverter(ColumnIndexer *column_indexer)
+    : column_indexer_(column_indexer), analyzer_(column_indexer->GetAnalyzer()), jieba_specialize_(column_indexer->IsJiebaSpecialize()),
+      alloc_(column_indexer->GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
 
 ColumnInverter::~ColumnInverter() {}
 

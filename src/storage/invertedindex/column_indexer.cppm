@@ -21,6 +21,10 @@ namespace infinity {
 export class ColumnIndexer {
     using PostingTable = HashMap<String, PostingWriter *>;
 
+    struct KeyComp {
+        bool operator()(const String &lhs, const String &rhs) const;
+    };
+
 public:
     ColumnIndexer(u64 column_id, const InvertedIndexConfig &index_config, SharedPtr<MemoryPool> byte_slice_pool, SharedPtr<RecyclePool> buffer_pool);
     ~ColumnIndexer();
@@ -28,6 +32,12 @@ public:
     void Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
     void Commit();
+
+    Analyzer *GetAnalyzer() { return analyzer_.get(); }
+
+    bool IsJiebaSpecialize() { return jieba_specialize_; }
+
+    MemoryPool *GetPool() { return byte_slice_pool_.get(); }
 
 private:
     void SetAnalyzer();

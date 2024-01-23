@@ -16,19 +16,20 @@ class RefCount {
     std::mutex lock_;
     std::condition_variable cv_;
     u32 ref_count_;
-    void Retain() noexcept;
-    void Release() noexcept;
 
 public:
     RefCount();
     virtual ~RefCount();
+    void Retain() noexcept;
+    void Release() noexcept;
     void WaitForZeroRefCount();
     bool ZeroRefCount();
 };
 
+class ColumnIndexer;
 export class ColumnInverter {
 public:
-    ColumnInverter(Analyzer *analyzer, bool jieba_specialize, SharedPtr<MemoryPool> byte_slice_pool);
+    ColumnInverter(ColumnIndexer *column_indexer);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
@@ -41,9 +42,15 @@ public:
 
     void Commit();
 
+    void Retain() { ref_count_.Retain(); }
+
+    void Release() { ref_count_.Release(); }
+
     bool ZeroRefCount() { return ref_count_.ZeroRefCount(); }
 
     void WaitForZeroRefCount() { return ref_count_.WaitForZeroRefCount(); }
+
+    RefCount &GetRefCount() { return ref_count_; }
 
     struct PosInfo {
         u32 term_num_{0};
@@ -94,6 +101,7 @@ private:
 
     void SortTerms();
 
+    ColumnIndexer *column_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;
