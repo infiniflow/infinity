@@ -85,7 +85,7 @@ public:
 
     inline SizeT row_count() const { return row_count_; }
 
-    inline SizeT remain_row_count() const { return remain_row_count_; }
+    SizeT remain_row_count() const { return remain_row_count_; }
 
     int Room();
 
@@ -121,7 +121,7 @@ public:
 protected:
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<RowID>> &block_row_hashmap);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
 
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
@@ -133,12 +133,12 @@ protected:
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
-    void AddDeleteToCompactTask(const HashMap<BlockID, Vector<RowID>> &block_row_hashmap);
+    void AddDeleteToCompactTask(const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
 
 protected:
     std::shared_mutex rw_locker_{};

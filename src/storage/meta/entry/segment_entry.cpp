@@ -163,7 +163,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
@@ -178,11 +178,11 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
     AddDeleteToCompactTask(block_row_hashmap);
 }
 
-void SegmentEntry::AddDeleteToCompactTask(const HashMap<BlockID, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::AddDeleteToCompactTask(const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
     if (status_ == SegmentStatus::kCompacting) {
         // a task is compacting this segment. pass the deleted row_ids to the task.
         // copy a hashmap here
-        compact_task_->AddToDelete(block_row_hashmap);
+        compact_task_->AddToDelete(segment_id_, block_row_hashmap);
     } else if (status_ == SegmentStatus::kDeprecated) {
         // This segment is deprecated because of segment compaction
         // Current function is called by `PrepareCommit`, throw exception will cause rollback.
@@ -368,7 +368,7 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
     block_entry->CommitAppend(txn_id, commit_ts);
 }
 
-void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {

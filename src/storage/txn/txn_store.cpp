@@ -107,23 +107,13 @@ TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
     //    auto &rows = delete_state_.rows_;
-    HashMap<u32, HashMap<u16, Vector<RowID>>> &row_hash_table = delete_state_.rows_;
+    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_.rows_;
     for (auto row_id : row_ids) {
-        auto seg_it = row_hash_table.find(row_id.segment_id_);
-        if (seg_it != row_hash_table.end()) {
-            u16 block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-            auto block_it = seg_it->second.find(block_id);
-            if (block_it != seg_it->second.end()) {
-                block_it->second.push_back(row_id);
-            } else {
-                seg_it->second.emplace(block_id, Vector<RowID>{row_id});
-            }
-        } else {
-            HashMap<u16, Vector<RowID>> block_row_hash_table;
-            u16 block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-            block_row_hash_table.emplace(block_id, Vector<RowID>{row_id});
-            row_hash_table.emplace(row_id.segment_id_, block_row_hash_table);
-        }
+        BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
+        BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+        auto &seg_map = row_hash_table[row_id.segment_id_];
+        auto &block_vec = seg_map[block_id];
+        block_vec.emplace_back(block_offset);
     }
 
     return {nullptr, Status::OK()};

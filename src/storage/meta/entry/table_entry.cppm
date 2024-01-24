@@ -102,9 +102,9 @@ private:
 
     Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
-    static inline u32 GetNextSegmentID(TableEntry *table_entry) { return table_entry->next_segment_id_++; }
+    SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
-    static inline u32 GetMaxSegmentID(const TableEntry *table_entry) { return table_entry->next_segment_id_; }
+    SegmentID GetMaxSegmentID() const { return next_segment_id_ == 0 ? 0 : next_segment_id_ - 1; }
 
     static SegmentEntry *GetSegmentByID(const TableEntry *table_entry, u32 seg_id);
 
@@ -132,8 +132,6 @@ public:
     SharedPtr<BlockIndex> GetBlockIndex(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void GetFullTextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
-
-    SegmentID GetNextSegmentID() { return next_segment_id_.load(); }
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);

@@ -29,7 +29,7 @@ public:
     BlockIter(const BlockEntry *entry, const Vector<SizeT> &column_ids) {
         Vector<BlockColumnIter> column_iters;
         for (auto column_id : column_ids) {
-            column_iters.emplace_back(entry->GetColumnDataByID(column_id), entry->row_count());
+            column_iters.emplace_back(entry->GetColumnBlockEntry(column_id), entry->row_count());
         }
         column_iters_ = column_iters;
     }

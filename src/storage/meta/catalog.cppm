@@ -190,9 +190,9 @@ public:
 
     static Status ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
-    static u32 GetNextSegmentID(TableEntry *table_entry);
+    static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
-    static u32 GetMaxSegmentID(const TableEntry *table_entry);
+    static SegmentID GetMaxSegmentID(const TableEntry *table_entry);
 
     static void ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry);
 

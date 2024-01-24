@@ -203,7 +203,7 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
     return actual_copied;
 }
 
-void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
+void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         UnrecoverableError(
@@ -216,8 +216,7 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
     u16 block_id = this->block_id_;
 
     auto &block_version = this->block_version_;
-    for (RowID row_id : rows) {
-        u16 block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+    for (BlockOffset block_offset : rows) {
         block_version->deleted_[block_offset] = commit_ts;
     }
 

@@ -110,16 +110,16 @@ public:
 
     String ToString() const override { return "Compact segments task"; }
 
-    SharedPtr<TableEntry> Execute();
+    void Execute();
 
-    void AddToDelete(HashMap<BlockID, Vector<RowID>> block_row_hashmap);
+    void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap);
 
 private:
     SharedPtr<SegmentEntry> CompactSegments(Vector<SegmentID> segment_ids);
 
-    void ApplyAllToDelete(TableEntry *table_entry);
+    void ApplyAllToDelete();
 
-    void ApplyOneToDelete(TableEntry *table_entry, const HashMap<BlockID, Vector<RowID>> &to_delete);
+    void ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete);
 
 private:
     TableEntry *const table_entry_{};
@@ -129,9 +129,8 @@ private:
     
     Vector<SegmentEntry *> segment_entries_;
 
-    List<HashMap<BlockID, Vector<RowID>>> to_deletes_;
+    List<Pair<SegmentID, HashMap<BlockID, Vector<BlockOffset>>>> to_deletes_;
 
-public:
     std::mutex mtx_{};
 };
 

@@ -23,12 +23,16 @@ import default_values;
 import infinity_exception;
 import parser;
 import data_access_state;
+import column_vector;
+import buffer_manager;
+import txn;
+import infinity_exception;
 
 namespace infinity {
 
-class ToCompactSegmentGenerator {
+class GreedySegGenerator {
 public:
-    ToCompactSegmentGenerator(const Vector<Pair<SegmentID, SizeT>> &segments, SizeT max_segment_size) : max_segment_size_(max_segment_size) {
+    GreedySegGenerator(const Vector<Pair<SegmentID, SizeT>> &segments, SizeT max_segment_size) : max_segment_size_(max_segment_size) {
         for (const auto &[segment_id, row_count] : segments) {
             segments_.emplace(row_count, segment_id);
         }
@@ -61,7 +65,7 @@ private:
 };
 
 CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry)
-    : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), max_segment_id_(table_entry_->GetNextSegmentID() - 1) {
+    : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), max_segment_id_(NewCatalog::GetMaxSegmentID(table_entry_)) {
 
     for (const auto &[segment_id, segment] : table_entry_->segment_map()) {
         if (segment_id > max_segment_id_) {
@@ -71,15 +75,14 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry)
     }
 }
 
-SharedPtr<TableEntry> CompactSegmentsTask::Execute() {
+void CompactSegmentsTask::Execute() {
     // TODO: allocate a new table_entry
-    SharedPtr<TableEntry> table_entry = nullptr;
 
     Vector<Pair<SegmentID, SizeT>> segments;
     for (const auto *segment_entry : segment_entries_) {
         segments.emplace_back(segment_entry->segment_id(), segment_entry->remain_row_count());
     }
-    ToCompactSegmentGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
+    GreedySegGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
     while (true) {
         Vector<SegmentID> to_compact_segments = generator();
         if (to_compact_segments.empty()) {
@@ -89,13 +92,12 @@ SharedPtr<TableEntry> CompactSegmentsTask::Execute() {
         // TODO: add segment to table_entry
     }
 
-    ApplyAllToDelete(table_entry.get());
-    return table_entry;
+    ApplyAllToDelete();
 }
 
-void CompactSegmentsTask::AddToDelete(HashMap<BlockID, Vector<RowID>> block_row_hashmap) {
+void CompactSegmentsTask::AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap) {
     std::lock_guard<std::mutex> lock(mtx_);
-    to_deletes_.emplace_back(std::move(block_row_hashmap));
+    to_deletes_.emplace_back(segment_id, std::move(block_row_hashmap));
 }
 
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(Vector<SegmentID> segment_ids) {
@@ -109,14 +111,14 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(Vector<SegmentID> s
     return nullptr;
 }
 
-void CompactSegmentsTask::ApplyAllToDelete(TableEntry *table_entry) {
+void CompactSegmentsTask::ApplyAllToDelete() {
     mtx_.lock();
     SizeT to_delete_count = to_deletes_.size();
     auto iter = to_deletes_.begin();
     while (iter != to_deletes_.end()) {
         mtx_.unlock();
-        const HashMap<BlockID, Vector<RowID>> &to_delete = *iter;
-        ApplyOneToDelete(table_entry, to_delete);
+        const auto &[segment_id, to_delete] = *iter;
+        ApplyOneToDelete(segment_id, to_delete);
 
         mtx_.lock();
         ++iter;
@@ -134,19 +136,19 @@ void CompactSegmentsTask::ApplyAllToDelete(TableEntry *table_entry) {
             --iter;
         }
         while (iter != to_deletes_.end()) {
-            const HashMap<BlockID, Vector<RowID>> &to_delete = *iter;
-            ApplyOneToDelete(table_entry, to_delete);
+            const auto &[segment_id, to_delete] = *iter;
+            ApplyOneToDelete(segment_id, to_delete);
 
             ++iter;
         }
     }
 }
 
-void CompactSegmentsTask::ApplyOneToDelete(TableEntry *table_entry, const HashMap<BlockID, Vector<RowID>> &to_delete) {
+void CompactSegmentsTask::ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete) {
     // TODO: remap the delete row id
     DeleteState remapped_delete;
 
-    NewCatalog::Delete(table_entry, 0, 0, remapped_delete);
+    NewCatalog::Delete(table_entry_, 0, 0, remapped_delete);
 }
 
 } // namespace infinity

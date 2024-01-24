@@ -317,9 +317,9 @@ Status NewCatalog::ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts
     return table_entry->ImportSegment(commit_ts, segment);
 }
 
-u32 NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return TableEntry::GetNextSegmentID(table_entry); }
+SegmentID NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
-u32 NewCatalog::GetMaxSegmentID(const TableEntry *table_entry) { return TableEntry::GetMaxSegmentID(table_entry); }
+SegmentID NewCatalog::GetMaxSegmentID(const TableEntry *table_entry) { return table_entry->GetMaxSegmentID(); }
 
 void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
     table_entry->segment_map_.emplace(segment_id, std::move(segment_entry));

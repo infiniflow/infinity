@@ -91,9 +91,6 @@ public:
     // Used in physical import
     void FlushData(i64 checkpoint_row_count);
 
-    // Used in block iterator
-    inline BlockColumnEntry *GetColumnDataByID(u64 column_id) const { return this->columns_[column_id].get(); }
-
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
@@ -103,7 +100,7 @@ public:
 protected:
     u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts);
 
