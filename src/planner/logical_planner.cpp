@@ -306,8 +306,8 @@ Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<B
         case DDLType::kIndex: {
             return BuildCreateIndex(statement, bind_context_ptr);
         }
-        case DDLType::kSchema: {
-            return BuildCreateSchema(statement, bind_context_ptr);
+        case DDLType::kDatabase: {
+            return BuildCreateDatabase(statement, bind_context_ptr);
         }
         default: {
             UnrecoverableError("Not supported");
@@ -379,7 +379,7 @@ Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, S
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCreateSchema(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_schema_info = (CreateSchemaInfo *)statement->create_info_.get();
 
     if (!ValidIdentifier(create_schema_info->schema_name_)) {
@@ -517,7 +517,7 @@ Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindC
         case DDLType::kCollection: {
             return BuildDropCollection(statement, bind_context_ptr);
         }
-        case DDLType::kSchema: {
+        case DDLType::kDatabase: {
             return BuildDropSchema(statement, bind_context_ptr);
         }
         case DDLType::kIndex: {

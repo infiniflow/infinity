@@ -52,7 +52,7 @@ public:
     // Create operator
     Status BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildCreateSchema(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCreateDatabase(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildCreateTable(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
