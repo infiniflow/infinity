@@ -16,6 +16,7 @@ module backgroud_process;
 
 import stl;
 import bg_task;
+import compact_segments_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
@@ -68,7 +69,8 @@ void BGTaskProcessor::Process() {
                 break;
             }
             case BGTaskType::kCompactSegments: {
-                // TODO
+                auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
+                task->Execute();
                 break;
             }
             case BGTaskType::kInvalid: {

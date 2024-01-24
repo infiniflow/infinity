@@ -104,34 +104,4 @@ export struct CatalogDeltaOpsMergeTask final : public BGTask {
     NewCatalog *catalog_{};
 };
 
-export class CompactSegmentsTask final : public BGTask {
-public:
-    explicit CompactSegmentsTask(TableEntry *table_entry);
-
-    String ToString() const override { return "Compact segments task"; }
-
-    void Execute();
-
-    void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap);
-
-private:
-    SharedPtr<SegmentEntry> CompactSegments(Vector<SegmentID> segment_ids);
-
-    void ApplyAllToDelete();
-
-    void ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete);
-
-private:
-    TableEntry *const table_entry_{};
-    const SegmentID max_segment_id_{};
-
-    // A timestamp
-    
-    Vector<SegmentEntry *> segment_entries_;
-
-    List<Pair<SegmentID, HashMap<BlockID, Vector<BlockOffset>>>> to_deletes_;
-
-    std::mutex mtx_{};
-};
-
 } // namespace infinity

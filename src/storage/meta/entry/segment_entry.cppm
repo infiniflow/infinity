@@ -47,7 +47,7 @@ struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:
-    explicit SegmentEntry(const TableEntry *table_entry);
+    explicit SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count);
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
@@ -73,7 +73,9 @@ public:
 
     inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
 
-    inline TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+
+    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
 
     inline SegmentID segment_id() const { return segment_id_; }
 
@@ -144,14 +146,13 @@ protected:
     std::shared_mutex rw_locker_{};
 
     const TableEntry *table_entry_{};
-
-    SharedPtr<String> segment_dir_{};
-    SegmentID segment_id_{};
+    const SharedPtr<String> segment_dir_{};
+    const SegmentID segment_id_{};
+    const SizeT row_capacity_{};
+    const u64 column_count_{};
 
     SizeT row_count_{};
-    SizeT row_capacity_{};
     SizeT remain_row_count_{}; // not deleted row count
-    u64 column_count_{};
 
     TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry

@@ -15,8 +15,6 @@
 module;
 #include <vector>
 
-module bg_task;
-
 import stl;
 import catalog;
 import default_values;
@@ -27,6 +25,9 @@ import column_vector;
 import buffer_manager;
 import txn;
 import infinity_exception;
+import bg_task;
+
+module compact_segments_task;
 
 namespace infinity {
 
@@ -101,14 +102,59 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, HashMap<BlockID, Vec
 }
 
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(Vector<SegmentID> segment_ids) {
+    Txn *txn = nullptr;
+    SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+
+    TxnTimeStamp ts = 0;
+    SizeT column_count = table_entry_->ColumnCount();
+    BufferManager *buffer_mgr = nullptr;
+
     auto &segment_map = table_entry_->segment_map();
+    auto current_block_entry = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn);
     for (SegmentID segment_id : segment_ids) {
         auto *segment_entry = segment_map.at(segment_id).get();
-
         segment_entry->SetCompacting(this);
-        // TODO: compact segment
+
+        for (auto &block_entry : segment_entry->block_entries()) {
+            SizeT read_offset = 0;
+            Vector<ColumnVector> input_column_vectors;
+            for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
+                auto *column_block_entry = block_entry->GetColumnBlockEntry(column_id);
+                input_column_vectors.emplace_back(column_block_entry->GetColumnVector(buffer_mgr));
+            }
+            while (true) {
+                auto [row_begin, row_end] = block_entry->GetVisibleRange(ts, read_offset);
+                SizeT read_size = row_end - row_begin;
+                if (read_size == 0) {
+                    break;
+                }
+                auto BlockEntryAppend = [&](SizeT row_begin, SizeT read_size) {
+                    for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
+                        auto *current_column_block_entry = current_block_entry->GetColumnBlockEntry(column_id);
+                        current_column_block_entry->Append(&input_column_vectors[column_id], row_begin, read_size, buffer_mgr);
+                    }
+                    RowID new_row_id(new_segment->segment_id(),
+                                     current_block_entry->block_id() * DEFAULT_BLOCK_CAPACITY + current_block_entry->row_count());
+                    remapper_.AddMap(segment_id, block_entry->block_id(), row_begin, new_row_id);
+                };
+
+                if (read_size + current_block_entry->row_count() > current_block_entry->row_capacity()) {
+                    SizeT read_size1 = current_block_entry->row_capacity() - current_block_entry->row_count();
+                    BlockEntryAppend(row_begin, read_size1);
+                    row_begin += read_size1;
+                    new_segment->AppendBlockEntry(std::move(current_block_entry));
+                    current_block_entry = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn);
+                }
+                BlockEntryAppend(row_begin, read_size);
+            }
+        }
     }
-    return nullptr;
+    if (current_block_entry->row_count() > 0) {
+        new_segment->AppendBlockEntry(std::move(current_block_entry));
+    }
+
+    return new_segment;
 }
 
 void CompactSegmentsTask::ApplyAllToDelete() {
@@ -146,9 +192,18 @@ void CompactSegmentsTask::ApplyAllToDelete() {
 
 void CompactSegmentsTask::ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete) {
     // TODO: remap the delete row id
-    DeleteState remapped_delete;
+    DeleteState remapped_delete_state;
+    auto &delete_rows = remapped_delete_state.rows_[segment_id];
+    for (const auto &[block_id, block_offsets] : to_delete) {
+        for (BlockOffset block_offset : block_offsets) {
+            RowID new_row_id = remapper_.GetNewRowID(segment_id, block_id, block_offset);
+            BlockID new_block_id = new_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
+            BlockOffset new_block_offset = new_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+            delete_rows[new_block_id].push_back(new_block_offset);
+        }
+    }
 
-    NewCatalog::Delete(table_entry_, 0, 0, remapped_delete);
+    NewCatalog::Delete(table_entry_, 0, 0, remapped_delete_state);
 }
 
 } // namespace infinity

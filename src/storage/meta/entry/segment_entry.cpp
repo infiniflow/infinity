@@ -54,29 +54,29 @@ import plain_store;
 import segment_iter;
 import catalog_delta_entry;
 import status;
-import bg_task;
+import compact_segments_task;
 
 namespace infinity {
 
-SegmentEntry::SegmentEntry(const TableEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
+SegmentEntry::SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count)
+    : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
+      column_count_(column_count) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
-    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
+    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
+                                                                     SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
+                                                                     segment_id,
+                                                                     DEFAULT_SEGMENT_CAPACITY,
+                                                                     table_entry->ColumnCount());
     if (txn != nullptr) {
         auto operation = MakeUnique<AddSegmentEntryOperation>(segment_entry.get());
         txn->AddCatalogDeltaOperation(std::move(operation));
     }
     segment_entry->row_count_ = 0;
-    segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
     segment_entry->remain_row_count_ = 0;
-    segment_entry->segment_id_ = segment_id;
-    segment_entry->min_row_ts_ = 0;
-    segment_entry->max_row_ts_ = 0;
+    segment_entry->min_row_ts_ = UNCOMMIT_TS;
+    segment_entry->max_row_ts_ = UNCOMMIT_TS;
 
-    const auto *table_ptr = (const TableEntry *)table_entry;
-    segment_entry->column_count_ = table_ptr->ColumnCount();
-
-    segment_entry->segment_dir_ = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
     if (segment_entry->block_entries_.empty()) {
         auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
         segment_entry->block_entries_.emplace_back(std::move(block_entry));
@@ -89,16 +89,9 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
                                                             SegmentID segment_id,
                                                             const SharedPtr<String> &segment_dir,
                                                             TxnTimeStamp commit_ts) {
-
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry);
-    segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
-    segment_entry->segment_id_ = segment_id;
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount());
     segment_entry->min_row_ts_ = commit_ts;
-    segment_entry->max_row_ts_ = commit_ts;
-
-    const auto *table_ptr = (const TableEntry *)table_entry;
-    segment_entry->column_count_ = table_ptr->ColumnCount();
-    segment_entry->segment_dir_ = segment_dir;
+    segment_entry->max_row_ts_ = UNCOMMIT_TS;
     return segment_entry;
 }
 
@@ -359,7 +352,7 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
     SharedPtr<BlockEntry> block_entry;
     {
         std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-        if (this->min_row_ts_ == 0) {
+        if (this->min_row_ts_ == UNCOMMIT_TS) {
             this->min_row_ts_ = commit_ts;
         }
         this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
@@ -434,13 +427,11 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
 }
 
 SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
-    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
-
-    segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
-    segment_entry->row_capacity_ = segment_entry_json["row_capacity"];
-
-    segment_entry->segment_id_ = segment_entry_json["segment_id"];
-    segment_entry->column_count_ = segment_entry_json["column_count"];
+    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
+                                                                     MakeShared<String>(segment_entry_json["segment_dir"]),
+                                                                     segment_entry_json["segment_id"],
+                                                                     segment_entry_json["row_capacity"],
+                                                                     segment_entry_json["column_count"]);
 
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
@@ -498,7 +489,6 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
     // TODO: remain_row_count
     this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
-    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
 
     SizeT block_count = this->block_entries_.size();
     SizeT idx = 0;

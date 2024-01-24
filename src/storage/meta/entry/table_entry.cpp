@@ -342,7 +342,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     }
 
     segment->min_row_ts_ = commit_ts;
-    segment->max_row_ts_ = commit_ts;
+    // FIXME: max_row_ts is set when the segment is deprecated
 
     SizeT row_count = 0;
     for (auto &block_entry : segment->block_entries_) {
@@ -406,6 +406,7 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     result->Reserve(this->segment_map_.size());
 
+    // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
         result->Insert(segment_pair.second.get(), begin_ts);
     }
