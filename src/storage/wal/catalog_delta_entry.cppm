@@ -23,6 +23,7 @@ import stl;
 import parser;
 import infinity_exception;
 import catalog;
+import serialize;
 import third_party;
 
 namespace infinity {
@@ -65,6 +66,16 @@ public:
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
     SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(bool); }
+    void WriteAdvBase(char *&buf) const {
+        WriteBufAdv(buf, this->begin_ts_);
+        WriteBufAdv(buf, this->is_delete_);
+    }
+    Tuple<TxnTimeStamp, bool> ReadAdvBase(char *&ptr) {
+        TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+        bool is_delete = ReadBufAdv<bool>(ptr);
+        return {begin_ts, is_delete};
+    }
+
     virtual void SaveSate() = 0;
     virtual const String ToString() const = 0;
     virtual const String EncodeIndex() const = 0;
@@ -89,7 +100,7 @@ public:
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_DATABASE_META; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size =
-            sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->data_dir_.size() + GetBaseSizeInBytes();
+            sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->data_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -114,8 +125,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_META), table_meta_(table_meta) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_META; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->table_name_.size() + sizeof(i32) + this->db_entry_dir_.size() +
-                          GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->db_entry_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -142,7 +153,7 @@ public:
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_DATABASE_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_entry_dir_.size() +
-                          sizeof(bool) + GetBaseSizeInBytes();
+                          +GetBaseSizeInBytes();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -168,8 +179,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_ENTRY), table_entry_(table_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->table_entry_dir_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->table_entry_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -201,8 +212,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_SEGMENT_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->segment_dir_.size() + sizeof(u32) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + +sizeof(SegmentID) + sizeof(i32) + this->segment_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -251,8 +262,9 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_BLOCK_ENTRY), block_entry_(block_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_BLOCK_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          +sizeof(SegmentID) + sizeof(BlockID) + sizeof(i32) + this->block_dir_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(SegmentID) + sizeof(BlockID) + sizeof(i32) + this->block_dir_.size() + sizeof(u16) +
+                          sizeof(u16);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -307,8 +319,8 @@ public:
 
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_COLUMN_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          +sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(next_outline_idx_);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -341,8 +353,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_INDEX_META), index_meta_(index_meta) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_INDEX_META; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->index_name_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -369,8 +381,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->index_name_.size() + sizeof(i32) + this->index_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -401,8 +413,8 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->index_name_.size() + sizeof(i32) + this->index_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -435,8 +447,9 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY), column_index_entry_(column_index_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + sizeof(ColumnID) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->index_name_.size() + sizeof(i32) + this->col_index_dir_.size() +
+                          sizeof(column_id_);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -473,8 +486,10 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY), segment_column_index_entry_(segment_column_index_entry) {}
     CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + sizeof(ColumnID) + sizeof(SegmentID) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOperationType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->index_name_.size() + sizeof(column_id_) + sizeof(segment_id_) +
+                          sizeof(min_ts_) + sizeof(max_ts_);
+
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -502,13 +517,14 @@ private:
 // the same value to assist backward iterating.
 // payload. User shall populate it before writing to wal.
 /// class CatalogDeltaEntryHeader
-export class CatalogDeltaEntryHeader {
-public:
-    CatalogDeltaEntryHeader() = default;
-    i32 size_{};
-    u32 checksum_{};
-    TransactionID txn_id_{};
-    TxnTimeStamp commit_ts_{};
+export struct CatalogDeltaEntryHeader {
+    i32 size_{}; // size of payload, including the header, round to multi
+    // of 4. There's 4 bytes pad just after the payload storing
+    // the same value to assist backward iterating.
+    u32 checksum_{}; // crc32 of the entry, including the header and the
+    // payload. User shall populate it before writing to wal.
+    i64 txn_id_{};    // txn id of the entry
+    i64 commit_ts_{}; // commit timestamp of the txn
 };
 
 /// class CatalogDeltaEntry
@@ -524,22 +540,21 @@ public:
     void set_txn_id(TransactionID txn_id) { txn_id_ = txn_id; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { commit_ts_ = commit_ts; }
-    Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
+    Deque<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
 private:
-    Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
+    Deque<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
 export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
+    [[nodiscard]] String ToString() const;
     void Merge(UniquePtr<CatalogDeltaEntry> other);
-    Deque<UniquePtr<CatalogDeltaOperation>> &global_operations() { return global_operations_; }
-    HashMap<String, SizeT> &encode_op_to_id_map() { return encode_op_to_id_map_; }
+    HashMap<String, SizeT> &encode_to_id_map() { return encode_to_id_map_; }
 
 private:
-    Deque<UniquePtr<CatalogDeltaOperation>> global_operations_{};
-    HashMap<String, SizeT> encode_op_to_id_map_{};
+    HashMap<String, SizeT> encode_to_id_map_{};
 };
 
 } // namespace infinity

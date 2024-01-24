@@ -129,52 +129,46 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
 
 void AddDBMetaOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->data_dir_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddTableMetaOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddDBEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
-
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddTableEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_entry_dir_);
-
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->segment_dir_);
-
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddBlockEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_BLOCK_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
@@ -182,61 +176,58 @@ void AddBlockEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->block_dir_);
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->row_capacity_);
-
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddColumnEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->block_id_);
     WriteBufAdv(buf, this->column_id_);
     WriteBufAdv(buf, this->next_outline_idx_);
-
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddIndexMetaOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_INDEX_META);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY);
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY);
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, this->col_index_dir_);
     WriteBufAdv(buf, this->column_id_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY);
+    WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
@@ -244,23 +235,21 @@ void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->min_ts_);
     WriteBufAdv(buf, this->max_ts_);
-    WriteBufAdv(buf, this->begin_ts_);
-    WriteBufAdv(buf, this->is_delete_);
 }
 
 void AddDBMetaOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->db_meta_->db_name();
     this->data_dir_ = *this->db_meta_->data_dir();
     is_snapshotted_ = true;
 }
 
 void AddTableMetaOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = this->table_meta_->db_name();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
@@ -268,9 +257,9 @@ void AddTableMetaOperation::SaveSate() {
 }
 
 void AddDBEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->is_delete_ = db_entry_->deleted_;
     String db_name = db_entry_->db_name();
     String db_entry_dir_ = db_entry_->db_entry_dir();
@@ -280,9 +269,9 @@ void AddDBEntryOperation::SaveSate() {
 }
 
 void AddTableEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->is_delete_ = this->table_entry_->deleted_;
     this->db_name_ = *this->table_entry_->GetDBName();
     this->table_name_ = *this->table_entry_->GetTableName();
@@ -291,9 +280,9 @@ void AddTableEntryOperation::SaveSate() {
 }
 
 void AddSegmentEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
@@ -302,9 +291,9 @@ void AddSegmentEntryOperation::SaveSate() {
 }
 
 void AddBlockEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetTableName();
     this->segment_id_ = this->block_entry_->GetSegmentEntry()->segment_id();
@@ -316,9 +305,9 @@ void AddBlockEntryOperation::SaveSate() {
 }
 
 void AddColumnEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetTableName();
     this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
@@ -330,9 +319,9 @@ void AddColumnEntryOperation::SaveSate() {
 
 /// Related to index
 void AddIndexMetaOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->index_meta_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->index_meta_->GetTableEntry()->GetTableName();
     this->index_name_ = this->index_meta_->index_name();
@@ -340,9 +329,9 @@ void AddIndexMetaOperation::SaveSate() {
 }
 
 void AddTableIndexEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->is_delete_ = this->table_index_entry_->deleted_;
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
@@ -353,9 +342,9 @@ void AddTableIndexEntryOperation::SaveSate() {
 }
 
 void AddIrsIndexEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->irs_index_entry_->table_index_entry()->table_index_meta()->index_name();
@@ -364,9 +353,9 @@ void AddIrsIndexEntryOperation::SaveSate() {
 }
 
 void AddColumnIndexEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->column_index_entry_->table_index_entry()->table_index_meta()->index_name();
@@ -376,9 +365,9 @@ void AddColumnIndexEntryOperation::SaveSate() {
 }
 
 void AddSegmentColumnIndexEntryOperation::SaveSate() {
-    if (is_snapshotted_) {
-        return;
-    }
+    //    if (is_snapshotted_) {
+    //        return;
+    //    }
     this->db_name_ = *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ =
         *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
@@ -463,7 +452,15 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     SizeT operation_count = operations_.size();
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
+        LOG_INFO(fmt::format("!!!Write Adv {}", operation->ToString()));
+        char *const save_ptr = ptr;
         operation->WriteAdv(ptr);
+        i32 act_size = ptr - save_ptr;
+        i32 exp_size = operation->GetSizeInBytes();
+        if (exp_size != act_size) {
+            LOG_ERROR(fmt::format("catalog delta operation write failed, exp_size: {}, act_size: {}", exp_size, act_size));
+            UnrecoverableError(fmt::format("Serialization size not match"));
+        }
     }
     i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
@@ -495,9 +492,8 @@ std::string CatalogDeltaEntry::ToString() const {
 }
 
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
-
-    auto &global_map = this->encode_op_to_id_map_;
-    auto &global_operations = this->global_operations_;
+    auto &global_map = this->encode_to_id_map();
+    auto &global_operations = this->operations();
     auto &local_operations = other->operations();
 
     for (auto &local_operation : local_operations) {
@@ -514,5 +510,4 @@ void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
     this->set_txn_id(other->txn_id());
     this->set_commit_ts(other->commit_ts());
 }
-
 } // namespace infinity

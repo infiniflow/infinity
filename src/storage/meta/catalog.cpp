@@ -14,8 +14,8 @@
 
 module;
 
+#include <fstream>
 #include <vector>
-
 module catalog;
 
 import stl;
@@ -40,6 +40,7 @@ import index_def;
 import txn_store;
 import data_access_state;
 import catalog_delta_entry;
+import file_writer;
 
 namespace infinity {
 
@@ -51,6 +52,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        //TODO commit ts ==0 is true??
         db_entry->commit_ts_ = 0;
         DBMeta::AddEntry(db_meta.get(), std::move(db_entry));
 
@@ -403,35 +405,22 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     return json_res;
 }
 
-// void NewCatalog::CheckCatalog() {
-//     for (auto &[db_name, db_meta] : this->databases_) {
-//         for (auto &base_entry : db_meta->entry_list()) {
-//             if (base_entry->entry_type_ == EntryType::kDummy) {
-//                 continue;
-//             }
-//             auto db_entry = static_cast<DBEntry *>(base_entry.get());
-//             for (auto &[table_name, table_meta] : db_entry->tables_) {
-//                 for (auto &base_entry : table_meta->entry_list_) {
-//                     if (base_entry->entry_type_ == EntryType::kDummy) {
-//                         continue;
-//                     }
-//                     auto table_entry = static_cast<TableEntry *>(base_entry.get());
-//                     if (table_entry->table_entry_->db_entry_ != db_entry) {
-//                         //                        int a = 1;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog1 = MakeUnique<NewCatalog>(nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
-    // Load the latest full checkpoint.
+    // 1. load fist
+    // 1.1 load json
+    // 1.2 load entries
+
+    //    UniquePtr<NewCatalog> catalog{nullptr};
+    //    for (auto &entry_path : catalog_paths) {
+    //        UniquePtr<NewCatalog> catalog = NewCatalog::LoadFromEntry(entry_path, buffer_mgr);
+    //    }
+
     LOG_INFO(fmt::format("Load base catalog1 from: {}", catalog_paths[0]));
+    //    if ()
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
@@ -457,6 +446,22 @@ void NewCatalog::MergeFrom(NewCatalog &other) {
 }
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
+    UniquePtr<NewCatalog> catalog = nullptr;
+    LocalFileSystem fs;
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
+    String json_str(file_size, 0);
+    SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
+    if (file_size != nbytes) {
+        RecoverableError(Status::CatalogCorrupted(catalog_path));
+    }
+
+    nlohmann::json catalog_json = nlohmann::json::parse(json_str);
+    Deserialize(catalog_json, buffer_mgr, catalog);
+    return catalog;
+}
+
+UniquePtr<NewCatalog> NewCatalog::LoadFromEntry(const String &catalog_path, BufferManager *buffer_mgr) {
     UniquePtr<NewCatalog> catalog = nullptr;
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -500,9 +505,9 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
 
     String file_name = fmt::format("META_{}", max_commit_ts);
     if (is_full_checkpoint)
-        file_name += ".full.json";
+        file_name += ".FULL.json";
     else
-        file_name += ".delta.json";
+        file_name += ".DELTA.json";
     String file_path = fmt::format("{}/{}", dir, file_name);
 
     u8 fileflags = FileFlags::WRITE_FLAG;
@@ -523,6 +528,38 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
 
     LOG_INFO(fmt::format("Saved catalog to: {}", file_path));
     return file_path;
+}
+
+String NewCatalog::FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_commit_ts) {
+    LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
+
+
+    auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
+    this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
+
+    // assert catalog entry commit ts <= max_commit_ts
+    auto global_entry_commit_ts = global_catalog_delta_entry->commit_ts();
+    LOG_WARN(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
+    if (global_entry_commit_ts > max_commit_ts) {
+        UnrecoverableError(
+            fmt::format("Global catalog delta entry commit ts {} not match checkpoint max commit ts {}", global_entry_commit_ts, max_commit_ts));
+    }
+
+    auto exp_size = global_catalog_delta_entry->GetSizeInBytes();
+    Vector<char> buf(exp_size);
+    char *ptr = buf.data();
+    global_catalog_delta_entry->WriteAdv(ptr);
+    i32 act_size = ptr - buf.data();
+    if (exp_size != act_size) {
+        LOG_ERROR(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size));
+        UnrecoverableError(fmt::format("Serialization size not match"));
+    }
+
+    std::ofstream outfile;
+    outfile.open(dir, std::ios::binary);
+    outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
+    outfile.close();
+    return dir;
 }
 
 } // namespace infinity

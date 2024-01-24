@@ -219,6 +219,8 @@ public:
 
     String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
+    String FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_commit_);
+
     void MergeFrom(NewCatalog &other);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
@@ -226,6 +228,8 @@ public:
     static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
     static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+
+    static UniquePtr<NewCatalog> LoadFromEntry(const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -239,7 +243,7 @@ public:
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
-    u64 next_txn_id_{};
+    TransactionID next_txn_id_{};
     u64 catalog_version_{};
     std::shared_mutex rw_locker_{};
 

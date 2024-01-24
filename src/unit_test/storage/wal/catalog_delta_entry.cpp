@@ -123,10 +123,9 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     // merge
     global_catalog_delta_entry->Merge(std::move(local_catalog_delta_entry));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 0);
-    EXPECT_EQ(global_catalog_delta_entry->global_operations().size(), 14);
+    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 14);
     // check maps
-    EXPECT_EQ(global_catalog_delta_entry->encode_op_to_id_map().size(), 14);
+    EXPECT_EQ(global_catalog_delta_entry->encode_to_id_map().size(), 14);
     // check member
     EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1);
     EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1);

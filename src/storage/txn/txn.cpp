@@ -409,7 +409,11 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
-void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
+void Txn::Begin() {
+    TxnTimeStamp ts = txn_mgr_->GetTimestamp();
+    LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+    txn_context_.BeginCommit(ts);
+}
 
 TxnTimeStamp Txn::Commit() {
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
@@ -481,7 +485,7 @@ void Txn::CommitBottom() {
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
     }
 
-    LOG_INFO(fmt::format("Txn: {} is committed.", txn_id_));
+    LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
@@ -538,8 +542,31 @@ void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
 }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
-    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, is_full_checkpoint);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path));
+    if (is_full_checkpoint) {
+        FullCheckpoint(max_commit_ts);
+    } else {
+        DeltaCheckpoint(max_commit_ts);
+    }
 }
+
+// Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
+void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
+    LOG_INFO("DELTA CKPT");
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
+    // only save the catalog delta entry
+    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts);
+    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, false);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, catalog_path));
+}
+
+void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
+    LOG_INFO("FULL CKPT");
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.FULL.{}", dir_name, max_commit_ts));
+    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts);
+    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, true);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, catalog_path));
+}
+
 } // namespace infinity
