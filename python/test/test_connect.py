@@ -95,14 +95,13 @@ class TestConnection:
         method: multiple connection to server
         expected: success
         """
-        infinity_instance1 = infinity.connect(REMOTE_HOST)
-        infinity_instance2 = infinity.connect(REMOTE_HOST)
-        infinity_instance3 = infinity.connect(REMOTE_HOST)
-        infinity_instance4 = infinity.connect(REMOTE_HOST)
-        infinity_instance1.disconnect()
-        infinity_instance2.disconnect()
-        infinity_instance3.disconnect()
-        infinity_instance4.disconnect()
+        connection_limit = 128
+        infinity_instances = []
+        for i in range(0, connection_limit):
+            infinity_instances.append(infinity.connect(REMOTE_HOST))
+
+        for i in range(0, connection_limit):
+            infinity_instances[i].disconnect()
 
     def test_repeat_disconnect(self):
         """
@@ -117,7 +116,3 @@ class TestConnection:
             infinity_instance.disconnect()
         except Exception as e:
             print(e)
-
-# possible cases
-# 1. connections are more than connection limit defined by infinity variables.
-# 2. Concurrently run DDL/DML and disconnect in different thread

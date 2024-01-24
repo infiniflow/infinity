@@ -14,7 +14,7 @@
 
 import infinity
 from infinity.common import NetworkAddress, REMOTE_HOST
-
+import common_values
 
 class TestDatabase:
 
@@ -105,23 +105,13 @@ class TestDatabase:
         # 1. connect
         infinity_obj = infinity.connect(REMOTE_HOST)
 
-        # 2. create ' ' name db
-        try:
-            db = infinity_obj.create_database(" ")
-        except Exception as e:
-            print(e)
-
-        # 3. create ' a' name db
-        try:
-            db = infinity_obj.create_database(" a")
-        except Exception as e:
-            print(e)
-
-        # 4. create 'a ' name db
-        try:
-            db = infinity_obj.create_database("a ")
-        except Exception as e:
-            print(e)
+        # 2. create db with invalid name
+        for db_name in common_values.invalid_name_array:
+            try:
+                # print('db name: ', db_name)
+                db = infinity_obj.create_database(db_name)
+            except Exception as e:
+                print(e)
 
         # 3. disconnect
         res = infinity_obj.disconnect()
