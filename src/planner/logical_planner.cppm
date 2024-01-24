@@ -137,22 +137,7 @@ public:
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:
-    static bool ValidIdentifier(const String &identifier) {
-        if (identifier.empty()) {
-            return false;
-        }
-        if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
-            return false;
-        }
-        for (SizeT i = 1; i < identifier.length(); i++) {
-            char ch = identifier[i];
-            if (!std::isalnum(ch) && ch != '_') {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    static Status ValidIdentifier(const String &identifier);
 
     QueryContext *query_context_ptr_{};
 

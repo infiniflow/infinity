@@ -71,6 +71,42 @@ import index_full_text;
 import base_table_ref;
 import catalog;
 
+namespace {
+
+using namespace infinity;
+
+enum class IdentifierValidationStatus {
+    kOk,
+    kEmpty,
+    kExceedLimit,
+    kInvalidName,
+};
+
+IdentifierValidationStatus IdentifierValidation(const String &identifier) {
+    if (identifier.empty()) {
+        return IdentifierValidationStatus::kEmpty;
+    }
+
+    u64 identifier_len = identifier.length();
+    if (identifier_len >= MAX_IDENTIFIER_NAME_LENGTH) {
+        return IdentifierValidationStatus::kExceedLimit;
+    }
+
+    if (!std::isalpha(identifier[0]) && identifier[0] != '_') {
+        return IdentifierValidationStatus::kInvalidName;
+    }
+    for (SizeT i = 1; i < identifier_len; i++) {
+        char ch = identifier[i];
+        if (!std::isalnum(ch) && ch != '_') {
+            return IdentifierValidationStatus::kInvalidName;
+        }
+    }
+
+    return IdentifierValidationStatus::kOk;
+}
+
+} // namespace
+
 namespace infinity {
 
 Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -324,9 +360,19 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     SizeT column_count = create_table_info->column_defs_.size();
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
-        if (!ValidIdentifier(create_table_info->column_defs_[idx]->name())) {
-            return Status::InvalidIndexName("invalid column name");
+
+        switch (IdentifierValidation(create_table_info->column_defs_[idx]->name())) {
+            case IdentifierValidationStatus::kOk:
+                return Status::OK();
+            case IdentifierValidationStatus::kEmpty:
+                return Status::EmptyColumnName();
+            case IdentifierValidationStatus::kExceedLimit:
+                return Status::ExceedColumnNameLength(create_table_info->column_defs_[idx]->name().length());
+            case IdentifierValidationStatus::kInvalidName: {
+                return Status::InvalidColumnName(create_table_info->column_defs_[idx]->name());
+            }
         }
+
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
                                                                 create_table_info->column_defs_[idx]->type(),
                                                                 create_table_info->column_defs_[idx]->name(),
@@ -336,8 +382,16 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_table_info->schema_name_);
 
-    if (!ValidIdentifier(create_table_info->table_name_)) {
-        return Status::InvalidTableName(create_table_info->table_name_);
+    switch (IdentifierValidation(create_table_info->table_name_)) {
+        case IdentifierValidationStatus::kOk:
+            return Status::OK();
+        case IdentifierValidationStatus::kEmpty:
+            return Status::EmptyTableName();
+        case IdentifierValidationStatus::kExceedLimit:
+            return Status::ExceedTableNameLength(create_table_info->table_name_.length());
+        case IdentifierValidationStatus::kInvalidName: {
+            return Status::InvalidTableName(create_table_info->table_name_);
+        }
     }
 
     SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
@@ -382,8 +436,16 @@ Status LogicalPlanner::BuildCreateCollection(const CreateStatement *statement, S
 Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_schema_info = (CreateSchemaInfo *)statement->create_info_.get();
 
-    if (!ValidIdentifier(create_schema_info->schema_name_)) {
-        return Status::InvalidDBName(create_schema_info->schema_name_);
+    switch (IdentifierValidation(create_schema_info->schema_name_)) {
+        case IdentifierValidationStatus::kOk:
+            return Status::OK();
+        case IdentifierValidationStatus::kEmpty:
+            return Status::EmptyDBName();
+        case IdentifierValidationStatus::kExceedLimit:
+            return Status::ExceedDBNameLength(create_schema_info->schema_name_.length());
+        case IdentifierValidationStatus::kInvalidName: {
+            return Status::InvalidDBName(create_schema_info->schema_name_);
+        }
     }
 
     SharedPtr<String> schema_name_ptr = MakeShared<String>(create_schema_info->schema_name_);

@@ -84,15 +84,6 @@ void Infinity::LocalDisconnect() {
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {
-    QueryResult query_result;
-    if(db_name.empty()) {
-        query_result.result_table_ = nullptr;
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty database name is given.");
-        LOG_ERROR(*err_msg);
-        query_result.status_ = Status::EmptyDBNameIsGiven();
-        return query_result;
-    }
-
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -105,7 +96,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     create_statement->create_info_ = create_schema_info;
 
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
-    query_result = query_context_ptr->QueryStatement(create_statement.get());
+    QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
     return query_result;
 }
 
