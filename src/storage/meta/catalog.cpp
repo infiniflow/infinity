@@ -44,6 +44,7 @@ import file_writer;
 
 namespace infinity {
 
+// TODO Consider letting it commit as a transaction.
 NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
     if (create_default_db) {
         // db current dir is same level as catalog
@@ -52,7 +53,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
         UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
-        //TODO commit ts ==0 is true??
+        // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         DBMeta::AddEntry(db_meta.get(), std::move(db_entry));
 
@@ -410,27 +411,40 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
-    // 1. load fist
-    // 1.1 load json
-    // 1.2 load entries
-
-    //    UniquePtr<NewCatalog> catalog{nullptr};
-    //    for (auto &entry_path : catalog_paths) {
-    //        UniquePtr<NewCatalog> catalog = NewCatalog::LoadFromEntry(entry_path, buffer_mgr);
-    //    }
-
-    LOG_INFO(fmt::format("Load base catalog1 from: {}", catalog_paths[0]));
-    //    if ()
+    // 1. load json
+    // 2. load entries
+    LOG_INFO(fmt::format("Load base FULL catalog json from: {}", catalog_paths[0]));
     catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     for (SizeT i = 1; i < catalog_paths.size(); i++) {
-        LOG_INFO(fmt::format("Load delta catalog1 from: {}", catalog_paths[i]));
-        UniquePtr<NewCatalog> catalog2 = NewCatalog::LoadFromFile(catalog_paths[i], buffer_mgr);
-        catalog1->MergeFrom(*catalog2);
+        LOG_TRACE(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
+        NewCatalog::LoadFromEntry(catalog1.get(), catalog_paths[i], buffer_mgr);
     }
 
     return catalog1;
+}
+
+void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
+    LocalFileSystem fs;
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
+    Vector<char> buf(file_size);
+    fs.Read(*catalog_file_handler, buf.data(), file_size);
+    fs.Close(*catalog_file_handler);
+    char *ptr = buf.data();
+    auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
+    i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
+    if (file_size != n_bytes) {
+        RecoverableError(Status::CatalogCorrupted(catalog_path));
+    }
+
+    auto commit_ts = catalog_delta_entry->commit_ts();
+    auto txn_id = catalog_delta_entry->txn_id();
+    auto &operations = catalog_delta_entry->operations();
+    for (auto &op : operations) {
+        //////// catalog->
+    }
 }
 
 void NewCatalog::MergeFrom(NewCatalog &other) {
@@ -446,22 +460,6 @@ void NewCatalog::MergeFrom(NewCatalog &other) {
 }
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
-    UniquePtr<NewCatalog> catalog = nullptr;
-    LocalFileSystem fs;
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
-    String json_str(file_size, 0);
-    SizeT nbytes = catalog_file_handler->Read(json_str.data(), file_size);
-    if (file_size != nbytes) {
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
-    }
-
-    nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    Deserialize(catalog_json, buffer_mgr, catalog);
-    return catalog;
-}
-
-UniquePtr<NewCatalog> NewCatalog::LoadFromEntry(const String &catalog_path, BufferManager *buffer_mgr) {
     UniquePtr<NewCatalog> catalog = nullptr;
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -532,7 +530,6 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
 
 String NewCatalog::FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_commit_ts) {
     LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
-
 
     auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
     this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();

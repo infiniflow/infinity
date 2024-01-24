@@ -34,52 +34,50 @@ namespace infinity {
 
 UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
-    UniquePtr<CatalogDeltaOperation> operation = nullptr;
+    UniquePtr<CatalogDeltaOperation> operation{nullptr};
     auto operation_type = ReadBufAdv<CatalogDeltaOperationType>(ptr);
     switch (operation_type) {
         case CatalogDeltaOperationType::ADD_DATABASE_META: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String data_dir = ReadBufAdv<String>(ptr);
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
             operation = MakeUnique<AddDBMetaOperation>(begin_ts, is_delete, db_name, data_dir);
             break;
         }
+        case CatalogDeltaOperationType::ADD_TABLE_META: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String db_entry_dir = ReadBufAdv<String>(ptr);
+            operation = MakeUnique<AddTableMetaOperation>(begin_ts, is_delete, db_name, table_name, db_entry_dir);
+            break;
+        }
         case CatalogDeltaOperationType::ADD_DATABASE_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
             operation = MakeUnique<AddDBEntryOperation>(begin_ts, is_delete, db_name, db_entry_dir);
-            operation->begin_ts_ = begin_ts;
-            operation->is_delete_ = is_delete;
             break;
         }
         case CatalogDeltaOperationType::ADD_TABLE_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_entry_dir = ReadBufAdv<String>(ptr);
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
             operation = MakeUnique<AddTableEntryOperation>(begin_ts, is_delete, db_name, table_name, table_entry_dir);
-            operation->begin_ts_ = begin_ts;
-            operation->is_delete_ = is_delete;
             break;
         }
         case CatalogDeltaOperationType::ADD_SEGMENT_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
-
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
             operation = MakeUnique<AddSegmentEntryOperation>(begin_ts, is_delete, db_name, table_name, segment_id, segment_dir);
-            operation->begin_ts_ = begin_ts;
-            operation->is_delete_ = is_delete;
             break;
         }
         case CatalogDeltaOperationType::ADD_BLOCK_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -87,9 +85,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String block_dir = ReadBufAdv<String>(ptr);
             u16 row_count = ReadBufAdv<u16>(ptr);
             u16 row_capacity = ReadBufAdv<u16>(ptr);
-
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
             operation = MakeUnique<AddBlockEntryOperation>(begin_ts,
                                                            is_delete,
                                                            db_name,
@@ -102,40 +97,93 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         case CatalogDeltaOperationType::ADD_COLUMN_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             BlockID block_id = ReadBufAdv<BlockID>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
             i32 next_outline_idx = ReadBufAdv<i32>(ptr);
-
-            TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            bool is_delete = ReadBufAdv<bool>(ptr);
-
             operation =
                 MakeUnique<AddColumnEntryOperation>(begin_ts, is_delete, db_name, table_name, segment_id, block_id, column_id, next_outline_idx);
             break;
         }
+        case CatalogDeltaOperationType::ADD_INDEX_META: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            operation = MakeUnique<AddIndexMetaOperation>(begin_ts, is_delete, db_name, table_name, index_name);
+            break;
+        }
+        case CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            String index_dir = ReadBufAdv<String>(ptr);
+            // String index_def = ReadBufAdv<String>(ptr);
+            //  TODO: index_def
+            operation = MakeUnique<AddTableIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, index_dir);
+            break;
+        }
+        case CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            String index_dir = ReadBufAdv<String>(ptr);
+            operation = MakeUnique<AddIrsIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, index_dir);
+            break;
+        }
+        case CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            String col_index_dir = ReadBufAdv<String>(ptr);
+            ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
+            operation = MakeUnique<AddColumnIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, col_index_dir, column_id);
+            break;
+        }
+        case CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
+            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            TxnTimeStamp min_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            TxnTimeStamp max_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            operation = MakeUnique<AddSegmentColumnIndexEntryOperation>(begin_ts,
+                                                                        is_delete,
+                                                                        db_name,
+                                                                        table_name,
+                                                                        index_name,
+                                                                        column_id,
+                                                                        segment_id,
+                                                                        min_ts,
+                                                                        max_ts);
+            break;
+        }
         default:
-            UnrecoverableException(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
+            UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
     }
 
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableException("ptr goes out of range when reading CatalogDeltaOperation");
+        UnrecoverableError("ptr goes out of range when reading CatalogDeltaOperation");
     }
     return operation;
 }
 
 void AddDBMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->data_dir_);
 }
 
 void AddTableMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_META);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -143,14 +191,12 @@ void AddTableMetaOperation::WriteAdv(char *&buf) const {
 }
 
 void AddDBEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_DATABASE_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
 }
 
 void AddTableEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -158,7 +204,6 @@ void AddTableEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -167,7 +212,6 @@ void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddBlockEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_BLOCK_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -179,7 +223,6 @@ void AddBlockEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddColumnEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -190,7 +233,6 @@ void AddColumnEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddIndexMetaOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_INDEX_META);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -198,7 +240,6 @@ void AddIndexMetaOperation::WriteAdv(char *&buf) const {
 }
 
 void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -207,7 +248,6 @@ void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -216,7 +256,6 @@ void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -226,7 +265,6 @@ void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
 }
 
 void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY);
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -395,7 +433,7 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
 SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
-        UnrecoverableException("ptr goes out of range when reading WalEntry");
+        UnrecoverableError("ptr goes out of range when reading WalEntry");
     }
     auto entry = MakeShared<CatalogDeltaEntry>();
     auto *header = (CatalogDeltaEntryHeader *)ptr;
@@ -417,15 +455,15 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            UnrecoverableException("ptr goes out of range when reading WalEntry");
+            UnrecoverableError("ptr goes out of range when reading WalEntry");
         }
         UniquePtr<CatalogDeltaOperation> operation = CatalogDeltaOperation::ReadAdv(ptr, max_bytes);
-        entry->operations_.emplace_back(std::move(operation));
+        entry->operations_.push_back(std::move(operation));
     }
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableException("ptr goes out of range when reading WalEntry");
+        UnrecoverableError("ptr goes out of range when reading WalEntry");
     }
     return entry;
 }
@@ -452,14 +490,13 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     SizeT operation_count = operations_.size();
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
-        LOG_INFO(fmt::format("!!!Write Adv {}", operation->ToString()));
+        LOG_TRACE(fmt::format("!!!Write Adv {}", operation->ToString()));
         char *const save_ptr = ptr;
         operation->WriteAdv(ptr);
         i32 act_size = ptr - save_ptr;
         i32 exp_size = operation->GetSizeInBytes();
         if (exp_size != act_size) {
-            LOG_ERROR(fmt::format("catalog delta operation write failed, exp_size: {}, act_size: {}", exp_size, act_size));
-            UnrecoverableError(fmt::format("Serialization size not match"));
+            UnrecoverableError(fmt::format("catalog delta operation write failed, exp_size: {}, act_size: {}", exp_size, act_size));
         }
     }
     i32 size = ptr - saved_ptr + sizeof(i32);
@@ -473,7 +510,6 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
 }
 
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
-
     LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;

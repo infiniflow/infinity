@@ -503,7 +503,7 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
         if (replay_entries[replay_count]->IsCheckPoint()) {
-            LOG_TRACE(fmt::format("\nReplay Skip checkpoint entry: {}", replay_entries[replay_count]->ToString()));
+            LOG_TRACE(fmt::format("\nSKIP checkpoint entry: {}", replay_entries[replay_count]->ToString()));
             continue;
         }
         ReplayWalEntry(*replay_entries[replay_count]);

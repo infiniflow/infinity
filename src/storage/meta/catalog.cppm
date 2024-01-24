@@ -229,7 +229,7 @@ public:
 
     static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
 
-    static UniquePtr<NewCatalog> LoadFromEntry(const String &catalog_path, BufferManager *buffer_mgr);
+    static void LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods

@@ -476,11 +476,10 @@ void Txn::CommitBottom() {
         table_index_entry->Commit(commit_ts);
     }
 
-    // Snapshot the physical operations in one txn
-    local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
-
+    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+        // Snapshot the physical operations in one txn
+        local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
         auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
     }
@@ -557,7 +556,7 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     // only save the catalog delta entry
     String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts);
     String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, false);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, catalog_path));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
