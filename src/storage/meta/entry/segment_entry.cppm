@@ -117,9 +117,9 @@ public:
 
 protected:
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
-
+public:
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
-
+protected:
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
                                                        TxnTimeStamp create_ts,

@@ -320,6 +320,7 @@ export {
 
     // Related to entry
     using BlockOffset = uint16_t;
+    using SegmentOffset = uint32_t;
 
     // Concurrency
     using ThreadPool = ctpl::thread_pool;

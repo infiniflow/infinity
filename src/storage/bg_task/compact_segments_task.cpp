@@ -71,31 +71,46 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Txn *txn)
     : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), txn_(txn) {}
 
 void CompactSegmentsTask::Execute() {
-    Vector<SegmentEntry *> deprecated_segments;
+    Execute1();
+    Execute2();
+}
+
+void CompactSegmentsTask::Execute1() {
     Vector<Pair<SegmentID, SizeT>> segments;
     TxnTimeStamp begin_ts = txn_->BeginTS();
     // scan the segments
     for (const auto &[segment_id, segment_entry] : table_entry_->segment_map()) {
         if (segment_entry->min_row_ts() <= begin_ts && segment_entry->max_row_ts() >= begin_ts) {
-            deprecated_segments.push_back(segment_entry.get());
             segments.emplace_back(segment_id, segment_entry->remain_row_count());
         }
     }
 
     GreedySegGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
-    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data;
+
     while (true) {
         Vector<SegmentID> to_compact_segments = generator();
         if (to_compact_segments.empty()) {
             break;
         }
         auto new_segment = CompactSegments(to_compact_segments);
-        segment_data.emplace_back(new_segment, std::move(to_compact_segments));
+        segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
+        new_segments_.emplace(new_segment->segment_id(), new_segment);
     }
 
     // TODO: Create new index file here
-    SaveSegmentsData(std::move(segment_data));
+}
+
+void CompactSegmentsTask::Execute2() {
+    SaveSegmentsData(std::move(segment_data_));
     // Apply the delete op commit in process of compacting
+
+    TxnTimeStamp begin_ts = txn_->BeginTS();
+    Vector<SegmentEntry *> deprecated_segments;
+    for (const auto &[segment_id, segment_entry] : table_entry_->segment_map()) {
+        if (segment_entry->min_row_ts() <= begin_ts && segment_entry->max_row_ts() >= begin_ts) {
+            deprecated_segments.push_back(segment_entry.get());
+        }
+    }
     ApplyToDelete(deprecated_segments);
 }
 
@@ -176,11 +191,11 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(const Vector<Segmen
                     SizeT read_size1 = current_block_entry->row_capacity() - current_block_entry->row_count();
                     block_entry_append(row_begin, read_size1);
                     row_begin += read_size1;
+                    read_size -= read_size1;
                     if (p.get() != nullptr) {
                         new_segment->AppendBlockEntry(std::move(p));
-                        new_segment->IncreaseRowCount(p->row_count());
                     }
-                    BlockID next_block_id = segment_entry->block_entries().size();
+                    BlockID next_block_id = new_segment->block_entries().size();
                     p = BlockEntry::NewBlockEntry(new_segment.get(), next_block_id, 0, column_count, txn_);
                     current_block_entry = p.get();
                 }
@@ -190,7 +205,10 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(const Vector<Segmen
     }
     if (p.get() != nullptr && p->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(p));
-        new_segment->IncreaseRowCount(p->row_count());
+    }
+
+    for (auto &block_entry : new_segment->block_entries()) {
+        new_segment->IncreaseRowCount(block_entry->row_count());
     }
 
     return new_segment;
@@ -200,18 +218,21 @@ void CompactSegmentsTask::ApplyToDelete(const Vector<SegmentEntry *> &segment_en
     for (auto &delete_info : to_deletes_) {
         // remap the delete row id
         DeleteState remapped_delete_state;
-        auto &delete_rows = remapped_delete_state.rows_[delete_info.segment_id_];
         for (const auto &[block_id, block_offsets] : delete_info.block_row_hashmap_) {
             for (BlockOffset block_offset : block_offsets) {
                 RowID new_row_id = remapper_.GetNewRowID(delete_info.segment_id_, block_id, block_offset);
                 BlockID new_block_id = new_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
                 BlockOffset new_block_offset = new_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+                auto &delete_rows = remapped_delete_state.rows_[new_row_id.segment_id_];
                 delete_rows[new_block_id].push_back(new_block_offset);
             }
         }
 
         // Add delete state to txn_state
-        NewCatalog::Delete(table_entry_, txn_->TxnID(), delete_info.commit_ts_, remapped_delete_state);
+        // NewCatalog::Delete(table_entry_, txn_->TxnID(), delete_info.commit_ts_, remapped_delete_state);
+        for (const auto [segment_id, delete_rows] : remapped_delete_state.rows_) {
+            new_segments_[segment_id]->DeleteData(txn_->TxnID(), delete_info.commit_ts_, delete_rows);
+        }
     }
     to_deletes_.clear();
 }

@@ -415,17 +415,17 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         }
     }
     for (BlockEntry *block_entry : block_entries) {
-//        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
+        //        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        //                              block_entry->checkpoint_ts(),
+        //                              block_entry->min_row_ts(),
+        //                              block_entry->max_row_ts(),
+        //                              max_commit_ts));
         block_entry->Flush(max_commit_ts);
-//        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
+        //        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        //                              block_entry->checkpoint_ts(),
+        //                              block_entry->min_row_ts(),
+        //                              block_entry->max_row_ts(),
+        //                              max_commit_ts));
         // WARNING: this operation may influence data visibility
         //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
         //            continue;

@@ -40,6 +40,8 @@ import index_hnsw;
 import index_base;
 import index_full_text;
 import index_def;
+import compact_segments_task;
+import default_values;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
@@ -644,6 +646,120 @@ TEST_F(WalReplayTest, WalReplayImport) {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+    }
+}
+
+TEST_F(WalReplayTest, WalReplayCompact) {
+    int test_segment_n = 2;
+    {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+
+        Storage *storage = infinity::InfinityContext::instance().storage();
+        BufferManager *buffer_manager = storage->buffer_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
+
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            i64 column_id = 0;
+            {
+                HashSet<ConstraintType> constraints;
+                auto column_def_ptr =
+                    MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                columns.emplace_back(column_def_ptr);
+            }
+        }
+        { // create table
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+
+            txn_mgr->CommitTxn(txn);
+        }
+
+        for (int i = 0; i < test_segment_n; ++i) { // add 100 segments
+            auto txn2 = txn_mgr->CreateTxn();
+            txn2->Begin();
+
+            auto [table_entry, status] = txn2->GetTableEntry("default", "tbl1");
+            EXPECT_NE(table_entry, nullptr);
+
+            SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2);
+            EXPECT_EQ(segment_entry->segment_id(), i);
+
+            auto last_block_entry = segment_entry->GetLastEntry();
+
+            Vector<SharedPtr<ColumnVector>> column_vectors;
+            {
+                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(LogicalType::kTinyInt));
+                column_vector->Initialize();
+                Value v = Value::MakeTinyInt(static_cast<TinyIntT>(1));
+                column_vector->AppendValue(v);
+                column_vectors.push_back(column_vector);
+            }
+
+            {
+                auto block_column_entry1 = last_block_entry->GetColumnBlockEntry(0);
+                auto column_type1 = block_column_entry1->column_type().get();
+                EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
+                SizeT data_type_size = column_vectors[0]->data_type_size_;
+                EXPECT_EQ(data_type_size, 1);
+                block_column_entry1->Append(column_vectors[0].get(), 0, 1, buffer_manager);
+            }
+            last_block_entry->IncreaseRowCount(1);
+            segment_entry->IncreaseRowCount(1);
+
+            auto txn_store = txn2->GetTxnTableStore(table_entry);
+            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            txn_mgr->CommitTxn(txn2);
+        }
+
+        { // add compact
+            auto txn4 = txn_mgr->CreateTxn();
+            txn4->Begin();
+
+            auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
+            EXPECT_NE(table_entry, nullptr);
+
+            CompactSegmentsTask compact_task(table_entry, txn4);
+            compact_task.Execute();
+            txn_mgr->CommitTxn(txn4);
+        }
+        infinity::InfinityContext::instance().UnInit();
+        infinity::GlobalResourceUsage::UnInit();
+    }
+    // Restart db instance
+    system("tree  /tmp/infinity");
+    {
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+
+        Storage *storage = infinity::InfinityContext::instance().storage();
+        TxnManager *txn_mgr = storage->txn_manager();
+        BufferManager *buffer_manager = storage->buffer_manager();
+
+        {
+            auto txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
+            EXPECT_NE(table_entry, nullptr);
+
+            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
+            for (int i = 0; i < test_segment_n; ++i) {
+                auto *segment = table_entry->segment_map()[0].get();
+                EXPECT_NE(segment->max_row_ts(), UNCOMMIT_TS);
+            }
+            auto compact_segment = table_entry->segment_map()[test_segment_n].get();
+            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->remain_row_count(), test_segment_n);
+        }
     }
 }
 

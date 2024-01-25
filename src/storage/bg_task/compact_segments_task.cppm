@@ -15,7 +15,7 @@
 module;
 
 #include <vector>
-
+#include <algorithm>
 import stl;
 import bg_task;
 import catalog;
@@ -40,10 +40,15 @@ public:
         auto &segment_map = row_id_map_.at(segment_id);
         auto &block_vec = segment_map.at(block_id);
         auto iter =
-            std::lower_bound(block_vec.begin(), block_vec.end(), block_offset, [](const auto &lhs, const auto &rhs) { return lhs.first < rhs; });
-        if (iter == block_vec.end()) {
+            std::upper_bound(block_vec.begin(),
+                             block_vec.end(),
+                             block_offset,
+                             [](BlockOffset block_offset, const Pair<BlockOffset, RowID> &pair) { return block_offset < pair.first; } // NOLINT
+            );
+        if (iter == block_vec.begin()) {
             UnrecoverableError("RowID not found");
         }
+        --iter;
         RowID rtn = iter->second;
         rtn.segment_offset_ += iter->first - block_offset;
         return rtn;
@@ -82,6 +87,10 @@ public:
 
     void Execute();
 
+    void Execute1();
+
+    void Execute2();
+
     // Called by `SegmentEntry::DeleteData` which is called by wal thread.
     // So to_deletes_ is thread-safe.
     void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> &&block_row_hashmap, TxnTimeStamp commit_ts);
@@ -101,5 +110,8 @@ private:
     Vector<ToDeleteInfo> to_deletes_;
 
     RowIDRemapper remapper_;
+
+    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data_;
+    HashMap<SegmentID, SharedPtr<SegmentEntry>> new_segments_;
 };
 } // namespace infinity
