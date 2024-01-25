@@ -253,6 +253,7 @@ void TableEntry::CreateIndexFile(void *txn_store,
             ColumnIndexEntry *column_index_entry = (ColumnIndexEntry *)(base_entry);
             SharedPtr<ColumnDef> column_def = this->columns_[column_id];
             for (const auto &[segment_id, segment_entry] : this->segment_map_) {
+                // TODO: Check the segment min/max_row_ts
                 SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
                     segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr, prepare, is_replay);
 

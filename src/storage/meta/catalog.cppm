@@ -192,8 +192,6 @@ public:
 
     static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
-    static SegmentID GetMaxSegmentID(const TableEntry *table_entry);
-
     static void ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry);
 
     static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);

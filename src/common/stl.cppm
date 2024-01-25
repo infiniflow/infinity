@@ -212,6 +212,9 @@ export {
     template <typename S, typename T>
     using Map = std::map<S, T>;
 
+    template <typename S, typename T>
+    using MultiMap = std::multimap<S, T>;
+
     template <typename T>
     using Set = std::set<T>;
 

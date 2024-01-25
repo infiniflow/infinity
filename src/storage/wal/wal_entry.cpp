@@ -110,6 +110,18 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
             break;
         }
+        case WalCommandType::COMPACT: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 deprecated_n = ReadBufAdv<i32>(ptr);
+            Vector<SegmentID> deprecated_segment_ids;
+            for (i32 i = 0; i < deprecated_n; ++i) {
+                SegmentID deprecated_segment_id = ReadBufAdv<SegmentID>(ptr);
+                deprecated_segment_ids.push_back(deprecated_segment_id);
+            }
+            cmd = MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(deprecated_segment_ids));
+            break;
+        }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
     }
@@ -173,6 +185,20 @@ bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
 }
 
+bool WalCmdCompact::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdCompact *>(&other);
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
+        deprecated_segment_ids_.size() != other_cmd->deprecated_segment_ids_.size()) {
+        return false;
+    }
+    for (SizeT i = 0; i < deprecated_segment_ids_.size(); i++) {
+        if (deprecated_segment_ids_[i] != other_cmd->deprecated_segment_ids_[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
 
 i32 WalCmdDropDatabase::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size(); }
@@ -210,6 +236,11 @@ i32 WalCmdDelete::GetSizeInBytes() const {
 }
 
 i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
+
+i32 WalCmdCompact::GetSizeInBytes() const {
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+           this->deprecated_segment_ids_.size() * sizeof(SegmentID);
+}
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::CREATE_DATABASE);
@@ -283,6 +314,17 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
+}
+
+void WalCmdCompact::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::COMPACT);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    i32 deprecated_n = static_cast<i32>(this->deprecated_segment_ids_.size());
+    WriteBufAdv(buf, deprecated_n);
+    for (i32 i = 0; i < deprecated_n; ++i) {
+        WriteBufAdv(buf, this->deprecated_segment_ids_[i]);
+    }
 }
 
 bool WalEntry::operator==(const WalEntry &other) const {
@@ -497,6 +539,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::DROP_INDEX:
             command = "DROP_INDEX";
+            break;
+        case WalCommandType::COMPACT:
+            command = "COMPACT";
             break;
         default:
             UnrecoverableError("Unknown command type");

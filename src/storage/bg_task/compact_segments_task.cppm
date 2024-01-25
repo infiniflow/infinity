@@ -22,6 +22,7 @@ import catalog;
 import parser;
 import default_values;
 import infinity_exception;
+import txn;
 
 export module compact_segments_task;
 
@@ -65,34 +66,39 @@ private:
     HashMap<SegmentID, HashMap<BlockID, Vector<Pair<BlockOffset, RowID>>>> row_id_map_;
 };
 
+struct ToDeleteInfo {
+    const SegmentID segment_id_;
+
+    const HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap_;
+
+    const TxnTimeStamp commit_ts_;
+};
+
 export class CompactSegmentsTask final : public BGTask {
 public:
-    explicit CompactSegmentsTask(TableEntry *table_entry);
+    explicit CompactSegmentsTask(TableEntry *table_entry, Txn *txn);
 
     String ToString() const override { return "Compact segments task"; }
 
     void Execute();
 
-    void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap);
+    // Called by `SegmentEntry::DeleteData` which is called by wal thread.
+    // So to_deletes_ is thread-safe.
+    void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> &&block_row_hashmap, TxnTimeStamp commit_ts);
+
+    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&data);
 
 private:
-    SharedPtr<SegmentEntry> CompactSegments(Vector<SegmentID> segment_ids);
+    SharedPtr<SegmentEntry> CompactSegments(const Vector<SegmentID> &segment_ids);
 
-    void ApplyAllToDelete();
-
-    void ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete);
+    void ApplyToDelete(const Vector<SegmentEntry *> &segment_entries);
 
 private:
-    TableEntry *const table_entry_{};
-    const SegmentID max_segment_id_{};
+    TableEntry *const table_entry_;
 
-    // A timestamp, txn
+    Txn *const txn_;
 
-    Vector<SegmentEntry *> segment_entries_;
-
-    List<Pair<SegmentID, HashMap<BlockID, Vector<BlockOffset>>>> to_deletes_;
-
-    std::mutex mtx_{};
+    Vector<ToDeleteInfo> to_deletes_;
 
     RowIDRemapper remapper_;
 };

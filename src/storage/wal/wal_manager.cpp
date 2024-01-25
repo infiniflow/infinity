@@ -539,7 +539,7 @@ void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
 }
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
     for (const auto &cmd : entry.cmds_) {
-        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalManager::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
+        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
             case WalCommandType::CREATE_DATABASE:
                 WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
@@ -572,6 +572,9 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::CHECKPOINT:
+                break;
+            case WalCommandType::COMPACT:
+                WalCmdCompactReplay(*static_cast<const WalCmdCompact *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             default: {
                 UnrecoverableError("WalManager::ReplayWalEntry unknown wal command type");
@@ -695,6 +698,18 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 
+void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
+    }
+
+    for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
+        auto *segment_entry = table_entry->segment_map()[segment_id].get();
+        segment_entry->SetDeprecated(commit_ts);
+    }
+}
+
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
@@ -712,52 +727,6 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
     NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
-}
-
-String WalManager::WalCommandTypeToString(WalCommandType type) {
-    String wal_cmd_type{};
-    switch (type) {
-        case WalCommandType::INVALID:
-            wal_cmd_type = "INVALID";
-            break;
-        case WalCommandType::CREATE_DATABASE:
-            wal_cmd_type = "CREATE_DATABASE";
-            break;
-        case WalCommandType::DROP_DATABASE:
-            wal_cmd_type = "DROP_DATABASE";
-            break;
-        case WalCommandType::CREATE_TABLE:
-            wal_cmd_type = "CREATE_TABLE";
-            break;
-        case WalCommandType::DROP_TABLE:
-            wal_cmd_type = "DROP_TABLE";
-            break;
-        case WalCommandType::ALTER_INFO:
-            wal_cmd_type = "ALTER_INFO";
-            break;
-        case WalCommandType::IMPORT:
-            wal_cmd_type = "IMPORT";
-            break;
-        case WalCommandType::APPEND:
-            wal_cmd_type = "APPEND";
-            break;
-        case WalCommandType::DELETE:
-            wal_cmd_type = "DELETE";
-            break;
-        case WalCommandType::CHECKPOINT:
-            wal_cmd_type = "CHECKPOINT";
-            break;
-        case WalCommandType::CREATE_INDEX:
-            wal_cmd_type = "CREATE_INDEX";
-            break;
-        case WalCommandType::DROP_INDEX:
-            wal_cmd_type = "DROP_INDEX";
-            break;
-        default: {
-            UnrecoverableError("Not supported wal command type");
-        }
-    }
-    return wal_cmd_type;
 }
 
 } // namespace infinity

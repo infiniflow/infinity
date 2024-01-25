@@ -26,6 +26,7 @@ import buffer_manager;
 import txn;
 import infinity_exception;
 import bg_task;
+import wal;
 
 module compact_segments_task;
 
@@ -46,10 +47,11 @@ public:
             SizeT segment_size = max_segment_size_;
 
             while (true) {
-                auto iter = segments_.lower_bound(segment_size);
-                if (iter == segments_.end()) {
+                auto iter = segments_.upper_bound(segment_size);
+                if (iter == segments_.begin()) {
                     break;
                 }
+                --iter;
                 auto [row_count, segment_id] = *iter;
                 segments_.erase(iter);
                 result.push_back(segment_id);
@@ -60,150 +62,158 @@ public:
     }
 
 private:
-    Map<SizeT, SegmentID> segments_;
+    MultiMap<SizeT, SegmentID> segments_;
 
     const SizeT max_segment_size_;
 };
 
-CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry)
-    : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), max_segment_id_(NewCatalog::GetMaxSegmentID(table_entry_)) {
-
-    for (const auto &[segment_id, segment] : table_entry_->segment_map()) {
-        if (segment_id > max_segment_id_) {
-            continue;
-        }
-        segment_entries_.emplace_back(segment.get());
-    }
-}
+CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Txn *txn)
+    : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), txn_(txn) {}
 
 void CompactSegmentsTask::Execute() {
-    // TODO: allocate a new table_entry
-
+    Vector<SegmentEntry *> deprecated_segments;
     Vector<Pair<SegmentID, SizeT>> segments;
-    for (const auto *segment_entry : segment_entries_) {
-        segments.emplace_back(segment_entry->segment_id(), segment_entry->remain_row_count());
+    TxnTimeStamp begin_ts = txn_->BeginTS();
+    // scan the segments
+    for (const auto &[segment_id, segment_entry] : table_entry_->segment_map()) {
+        if (segment_entry->min_row_ts() <= begin_ts && segment_entry->max_row_ts() >= begin_ts) {
+            deprecated_segments.push_back(segment_entry.get());
+            segments.emplace_back(segment_id, segment_entry->remain_row_count());
+        }
     }
+
     GreedySegGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
+    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data;
     while (true) {
         Vector<SegmentID> to_compact_segments = generator();
         if (to_compact_segments.empty()) {
             break;
         }
-        auto segment_entry = CompactSegments(std::move(to_compact_segments));
-        // TODO: add segment to table_entry
+        auto new_segment = CompactSegments(to_compact_segments);
+        segment_data.emplace_back(new_segment, std::move(to_compact_segments));
     }
 
-    ApplyAllToDelete();
+    // TODO: Create new index file here
+    SaveSegmentsData(std::move(segment_data));
+    // Apply the delete op commit in process of compacting
+    ApplyToDelete(deprecated_segments);
 }
 
-void CompactSegmentsTask::AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    to_deletes_.emplace_back(segment_id, std::move(block_row_hashmap));
+void CompactSegmentsTask::AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> &&block_row_hashmap, TxnTimeStamp commit_ts) {
+    to_deletes_.emplace_back(ToDeleteInfo{segment_id, std::move(block_row_hashmap), commit_ts});
 }
 
-SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(Vector<SegmentID> segment_ids) {
-    Txn *txn = nullptr;
+// Set old segment deprecated and add compact_wal_cmd, import_wal_cmd
+void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&data) {
+    TxnTimeStamp begin_ts = txn_->BeginTS();
+    for (auto &[new_segment, old_segment_ids] : data) {
+        new_segment->FlushData();
+
+        auto *txn_store = txn_->GetTxnTableStore(table_entry_);
+        txn_store->Import(new_segment);
+
+        const auto &block_entries = new_segment->block_entries();
+        SizeT block_entries_size = block_entries.size();
+        u16 last_block_row_count = block_entries.back()->row_count();
+        String db_name = *table_entry_->GetDBName();
+        String table_name = *table_entry_->GetTableName();
+        txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                                 table_name,
+                                                 *new_segment->segment_dir(),
+                                                 new_segment->segment_id(),
+                                                 block_entries_size,
+                                                 DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
+                                                 last_block_row_count));
+
+        for (SegmentID segment_id : old_segment_ids) {
+            auto *segment_entry = table_entry_->segment_map().at(segment_id).get();
+            segment_entry->SetDeprecated(begin_ts);
+        }
+
+        txn_->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(old_segment_ids)));
+    }
+}
+
+SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(const Vector<SegmentID> &segment_ids) {
     SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn_);
 
-    TxnTimeStamp ts = 0;
+    TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry_->ColumnCount();
-    BufferManager *buffer_mgr = nullptr;
+    BufferManager *buffer_mgr = txn_->buffer_manager();
 
     auto &segment_map = table_entry_->segment_map();
-    auto current_block_entry = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn);
+
+    auto *current_block_entry = new_segment->GetLastEntry(); // why segment has at least one block? TODO: remove it
+    UniquePtr<BlockEntry> p = nullptr;
     for (SegmentID segment_id : segment_ids) {
         auto *segment_entry = segment_map.at(segment_id).get();
-        segment_entry->SetCompacting(this);
+        segment_entry->SetCompacting(this, begin_ts);
 
         for (auto &block_entry : segment_entry->block_entries()) {
-            SizeT read_offset = 0;
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
                 auto *column_block_entry = block_entry->GetColumnBlockEntry(column_id);
                 input_column_vectors.emplace_back(column_block_entry->GetColumnVector(buffer_mgr));
             }
+            SizeT read_offset = 0;
             while (true) {
-                auto [row_begin, row_end] = block_entry->GetVisibleRange(ts, read_offset);
+                auto [row_begin, row_end] = block_entry->GetVisibleRange(begin_ts, read_offset);
                 SizeT read_size = row_end - row_begin;
                 if (read_size == 0) {
                     break;
                 }
-                auto BlockEntryAppend = [&](SizeT row_begin, SizeT read_size) {
-                    for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
-                        auto *current_column_block_entry = current_block_entry->GetColumnBlockEntry(column_id);
-                        current_column_block_entry->Append(&input_column_vectors[column_id], row_begin, read_size, buffer_mgr);
-                    }
+
+                auto block_entry_append = [&](SizeT row_begin, SizeT read_size) {
+                    current_block_entry->AppendBlock(input_column_vectors, row_begin, read_size, buffer_mgr);
                     RowID new_row_id(new_segment->segment_id(),
                                      current_block_entry->block_id() * DEFAULT_BLOCK_CAPACITY + current_block_entry->row_count());
                     remapper_.AddMap(segment_id, block_entry->block_id(), row_begin, new_row_id);
+                    read_offset = row_begin + read_size;
                 };
 
                 if (read_size + current_block_entry->row_count() > current_block_entry->row_capacity()) {
                     SizeT read_size1 = current_block_entry->row_capacity() - current_block_entry->row_count();
-                    BlockEntryAppend(row_begin, read_size1);
+                    block_entry_append(row_begin, read_size1);
                     row_begin += read_size1;
-                    new_segment->AppendBlockEntry(std::move(current_block_entry));
-                    current_block_entry = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn);
+                    if (p.get() != nullptr) {
+                        new_segment->AppendBlockEntry(std::move(p));
+                        new_segment->IncreaseRowCount(p->row_count());
+                    }
+                    BlockID next_block_id = segment_entry->block_entries().size();
+                    p = BlockEntry::NewBlockEntry(new_segment.get(), next_block_id, 0, column_count, txn_);
+                    current_block_entry = p.get();
                 }
-                BlockEntryAppend(row_begin, read_size);
+                block_entry_append(row_begin, read_size);
             }
         }
     }
-    if (current_block_entry->row_count() > 0) {
-        new_segment->AppendBlockEntry(std::move(current_block_entry));
+    if (p.get() != nullptr && p->row_count() > 0) {
+        new_segment->AppendBlockEntry(std::move(p));
+        new_segment->IncreaseRowCount(p->row_count());
     }
 
     return new_segment;
 }
 
-void CompactSegmentsTask::ApplyAllToDelete() {
-    mtx_.lock();
-    SizeT to_delete_count = to_deletes_.size();
-    auto iter = to_deletes_.begin();
-    while (iter != to_deletes_.end()) {
-        mtx_.unlock();
-        const auto &[segment_id, to_delete] = *iter;
-        ApplyOneToDelete(segment_id, to_delete);
-
-        mtx_.lock();
-        ++iter;
-    }
-    mtx_.unlock();
-    for (auto *segment_entry : segment_entries_) {
-        segment_entry->SetDeprecated();
-    }
-    mtx_.lock();
-    SizeT to_delete_count2 = to_deletes_.size();
-    mtx_.unlock();
-    if (to_delete_count != to_delete_count2) {
-        auto iter = to_deletes_.end();
-        for (SizeT i = 0; i < to_delete_count2 - to_delete_count; ++i) {
-            --iter;
+void CompactSegmentsTask::ApplyToDelete(const Vector<SegmentEntry *> &segment_entries) {
+    for (auto &delete_info : to_deletes_) {
+        // remap the delete row id
+        DeleteState remapped_delete_state;
+        auto &delete_rows = remapped_delete_state.rows_[delete_info.segment_id_];
+        for (const auto &[block_id, block_offsets] : delete_info.block_row_hashmap_) {
+            for (BlockOffset block_offset : block_offsets) {
+                RowID new_row_id = remapper_.GetNewRowID(delete_info.segment_id_, block_id, block_offset);
+                BlockID new_block_id = new_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
+                BlockOffset new_block_offset = new_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+                delete_rows[new_block_id].push_back(new_block_offset);
+            }
         }
-        while (iter != to_deletes_.end()) {
-            const auto &[segment_id, to_delete] = *iter;
-            ApplyOneToDelete(segment_id, to_delete);
 
-            ++iter;
-        }
+        // Add delete state to txn_state
+        NewCatalog::Delete(table_entry_, txn_->TxnID(), delete_info.commit_ts_, remapped_delete_state);
     }
-}
-
-void CompactSegmentsTask::ApplyOneToDelete(SegmentID segment_id, const HashMap<BlockID, Vector<BlockOffset>> &to_delete) {
-    // TODO: remap the delete row id
-    DeleteState remapped_delete_state;
-    auto &delete_rows = remapped_delete_state.rows_[segment_id];
-    for (const auto &[block_id, block_offsets] : to_delete) {
-        for (BlockOffset block_offset : block_offsets) {
-            RowID new_row_id = remapper_.GetNewRowID(segment_id, block_id, block_offset);
-            BlockID new_block_id = new_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-            BlockOffset new_block_offset = new_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
-            delete_rows[new_block_id].push_back(new_block_offset);
-        }
-    }
-
-    NewCatalog::Delete(table_entry_, 0, 0, remapped_delete_state);
+    to_deletes_.clear();
 }
 
 } // namespace infinity

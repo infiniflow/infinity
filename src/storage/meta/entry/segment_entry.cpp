@@ -77,11 +77,8 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
     segment_entry->min_row_ts_ = UNCOMMIT_TS;
     segment_entry->max_row_ts_ = UNCOMMIT_TS;
 
-    if (segment_entry->block_entries_.empty()) {
-        auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
-        segment_entry->block_entries_.emplace_back(std::move(block_entry));
-    }
-
+    auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
+    segment_entry->block_entries_.emplace_back(std::move(block_entry));
     return segment_entry;
 }
 
@@ -106,15 +103,16 @@ void SegmentEntry::FlushData() {
     }
 }
 
-void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task) {
+void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
     std::unique_lock<std::shared_mutex> lock(rw_locker_);
     compact_task_ = compact_task;
-    status_ = SegmentStatus::kCompacting;
+    compacting_ts_ = compacting_ts;
 }
 
-void SegmentEntry::SetDeprecated() {
+void SegmentEntry::SetDeprecated(TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lock(rw_locker_);
-    status_ = SegmentStatus::kDeprecated;
+    compact_task_ = nullptr;
+    max_row_ts_ = commit_ts;
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
@@ -174,18 +172,23 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);
     }
 
-    AddDeleteToCompactTask(block_row_hashmap);
+    AddDeleteToCompactTask(txn_id, block_row_hashmap, commit_ts);
 }
 
-void SegmentEntry::AddDeleteToCompactTask(const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
-    if (status_ == SegmentStatus::kCompacting) {
-        // a task is compacting this segment. pass the deleted row_ids to the task.
-        // copy a hashmap here
-        compact_task_->AddToDelete(segment_id_, block_row_hashmap);
-    } else if (status_ == SegmentStatus::kDeprecated) {
-        // This segment is deprecated because of segment compaction
-        // Current function is called by `PrepareCommit`, throw exception will cause rollback.
-        RecoverableError(Status::TxnRollback(0));
+void SegmentEntry::AddDeleteToCompactTask(TransactionID txn_id,
+                                          const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
+                                          TxnTimeStamp commit_ts) {
+    if (commit_ts >= compacting_ts_) {
+        if (commit_ts < max_row_ts_) {
+            // a task is compacting this segment. pass the deleted row_ids to the task.
+            // copy the hashmap here
+            auto hashmap_copy = block_row_hashmap;
+            compact_task_->AddToDelete(segment_id_, std::move(hashmap_copy), commit_ts);
+        } else {
+            // This segment is deprecated because of segment compaction
+            // Current function is called by `PrepareCommit`, throw exception will cause rollback.
+            RecoverableError(Status::TxnRollback(txn_id));
+        }
     }
 }
 

@@ -37,12 +37,6 @@ class TxnTableStore;
 struct TableEntry;
 class CompactSegmentsTask;
 
-export enum class SegmentStatus : i8 {
-    kNormal,
-    kCompacting,
-    kDeprecated,
-};
-
 struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
 
@@ -91,12 +85,12 @@ public:
 
     void FlushData();
 
-    void SetCompacting(CompactSegmentsTask *compact_task);
+    void SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
 
-    void SetDeprecated();
+    void SetDeprecated(TxnTimeStamp commit_ts);
 
 public:
-    // Used in WAL replay & Physical Import
+    // Used in WAL replay & Physical Import & SegmentCompaction
     inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
 
     inline void IncreaseRowCount(SizeT increased_row_count) {
@@ -104,6 +98,7 @@ public:
         remain_row_count_ += increased_row_count;
     }
 
+private:
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > remain_row_count_) {
             UnrecoverableError("Decrease row count exceed remain row count");
@@ -140,7 +135,7 @@ protected:
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
-    void AddDeleteToCompactTask(const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
+    void AddDeleteToCompactTask(TransactionID txn_id, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, TxnTimeStamp commit_ts);
 
 protected:
     std::shared_mutex rw_locker_{};
@@ -154,14 +149,13 @@ protected:
     SizeT row_count_{};
     SizeT remain_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
-    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
+    TxnTimeStamp min_row_ts_{0};              // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
+    TxnTimeStamp max_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
 private:
-    SegmentStatus status_{SegmentStatus::kNormal};
-
     CompactSegmentsTask *compact_task_{};
 };
 

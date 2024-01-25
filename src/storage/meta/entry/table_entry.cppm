@@ -104,8 +104,6 @@ private:
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
-    SegmentID GetMaxSegmentID() const { return next_segment_id_ == 0 ? 0 : next_segment_id_ - 1; }
-
     static SegmentEntry *GetSegmentByID(const TableEntry *table_entry, u32 seg_id);
 
 public:

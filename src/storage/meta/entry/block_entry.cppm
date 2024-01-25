@@ -24,6 +24,7 @@ import default_values;
 import third_party;
 import parser;
 import local_file_system;
+import column_vector;
 
 namespace infinity {
 
@@ -72,11 +73,8 @@ public:
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
 
-    static UniquePtr<BlockEntry> NewBlockEntry(const SegmentEntry *segment_entry,
-                                               BlockID block_id,
-                                               TxnTimeStamp checkpoint_ts,
-                                               u64 column_count,
-                                               Txn *txn);
+    static UniquePtr<BlockEntry>
+    NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn);
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
                                                      u16 block_id,
@@ -96,6 +94,8 @@ public:
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(BaseEntry &other) override;
+
+    void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
 protected:
     u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
@@ -166,7 +166,6 @@ protected:
     TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
-    BufferManager *buffer_{nullptr};
 
     // checkpoint state
     u16 checkpoint_row_count_{0};

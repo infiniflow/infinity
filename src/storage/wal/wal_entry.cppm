@@ -60,6 +60,7 @@ export enum class WalCommandType : i8 {
     // Flush
     // -----------------------------
     CHECKPOINT = 99,
+    COMPACT = 100,
 };
 
 // WalCommandType -> String
@@ -238,6 +239,23 @@ export struct WalCmdCheckpoint : public WalCmd {
     i64 max_commit_ts_{};
     bool is_full_checkpoint_;
     String catalog_path_{};
+};
+
+export struct WalCmdCompact : public WalCmd {
+    WalCmdCompact(String &&db_name, String &&table_name, Vector<SegmentID> &&deprecated_segment_ids)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
+
+    WalCommandType GetType() override { return WalCommandType::COMPACT; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    const String db_name_{};
+    const String table_name_{};
+    const Vector<SegmentID> deprecated_segment_ids_{};
 };
 
 export struct WalEntryHeader {

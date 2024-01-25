@@ -27,9 +27,6 @@ class BGTaskProcessor;
 
 export class WalManager {
 public:
-    static String WalCommandTypeToString(WalCommandType type);
-
-public:
     WalManager(Storage *storage,
                String wal_path,
                u64 wal_size_threshold,
@@ -82,6 +79,7 @@ private:
     void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     u64 wal_size_threshold_{};
