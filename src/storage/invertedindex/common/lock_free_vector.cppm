@@ -5,5 +5,6 @@ module;
 export module lock_free_vector;
 
 namespace infinity {
-export using infinity::LockFreeVector;
+export using infinity::SPLockFreeVector;
+export using infinity::MPLockFreeVector;
 }

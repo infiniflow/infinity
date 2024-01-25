@@ -81,13 +81,19 @@ using std::is_same;
 using std::fill;
 using std::lower_bound;
 
-using std::shared_mutex;
+using std::condition_variable;
+using std::lock_guard;
+using std::memory_order;
+using std::memory_order_acq_rel;
+using std::memory_order_acquire;
+using std::memory_order_consume;
+using std::memory_order_relaxed;
+using std::memory_order_release;
+using std::memory_order_seq_cst;
 using std::mutex;
 using std::shared_lock;
+using std::shared_mutex;
 using std::unique_lock;
-using std::lock_guard;
-using std::condition_variable;
-using std::memory_order;
 
 using std::forward_list;
 using std::isalpha;
