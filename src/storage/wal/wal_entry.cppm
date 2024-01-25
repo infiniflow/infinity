@@ -172,9 +172,15 @@ export struct WalCmdDropIndex : public WalCmd {
 };
 
 export struct WalCmdImport : public WalCmd {
-    WalCmdImport(String db_name, String table_name, String segment_dir, u32 segment_id, u16 block_entries_size, Vector<u16> &row_counts)
+    WalCmdImport(String db_name,
+                 String table_name,
+                 String segment_dir,
+                 u32 segment_id,
+                 u16 block_entries_size,
+                 u32 block_capacity,
+                 u16 last_block_row_count)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_dir_(std::move(segment_dir)), segment_id_(segment_id),
-          block_entries_size_(block_entries_size), row_counts_(row_counts) {}
+          block_entries_size_(block_entries_size), block_capacity_(block_capacity), last_block_row_count_(last_block_row_count) {}
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const override;
@@ -186,8 +192,8 @@ export struct WalCmdImport : public WalCmd {
     String segment_dir_{};
     u32 segment_id_{};
     u16 block_entries_size_{};
-    // row_counts_[i] means the number of rows in the i-th block entry
-    Vector<u16> row_counts_{};
+    u32 block_capacity_{};
+    u16 last_block_row_count_{};
 };
 
 export struct WalCmdAppend : public WalCmd {

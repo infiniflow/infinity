@@ -73,9 +73,8 @@ void MockWalFile(const String &wal_file_path = "/tmp/infinity/wal/wal.log") {
         auto entry = MakeShared<WalEntry>();
         entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("default2"));
         entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("default", MockTableDesc2()));
-        Vector<u16> row_counts{1, 2, 3};
         entry->cmds_.push_back(
-            MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
+            MakeShared<WalCmdImport>("default", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3));
 
         auto data_block = DataBlock::Make();
         Vector<SharedPtr<DataType>> column_types;
@@ -155,8 +154,8 @@ TEST_F(WalEntryTest, ReadWrite) {
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
     entry->cmds_.push_back(MakeShared<WalCmdCreateTable>("db1", MockTableDesc2()));
     entry->cmds_.push_back(MakeShared<WalCmdDropTable>("db1", "tbl1"));
-    Vector<u16> row_counts{1, 2, 3};
-    entry->cmds_.push_back(MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, row_counts));
+    entry->cmds_.push_back(
+        MakeShared<WalCmdImport>("db1", "tbl1", "/tmp/infinity/data/default/txn_66/tbl1/ENkJMWTQ8N_seg_0", 0, 3, DEFAULT_BLOCK_CAPACITY, 3));
 
     Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
 

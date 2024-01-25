@@ -100,6 +100,12 @@ int SegmentEntry::Room() {
     return this->row_capacity_ - this->row_count_;
 }
 
+void SegmentEntry::FlushData() {
+    for (const auto &block_entry : this->block_entries_) {
+        block_entry->FlushData(block_entry->row_count());
+    }
+}
+
 void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock<std::shared_mutex> lock(rw_locker_);
     compact_task_ = compact_task;

@@ -665,17 +665,18 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_i
     auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, cmd.segment_id_, segment_dir_ptr, commit_ts);
 
     for (i32 id = 0; id < cmd.block_entries_size_; ++id) {
+        u16 row_count = (id == cmd.block_entries_size_ - 1) ? cmd.last_block_row_count_ : cmd.block_capacity_;
         auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
                                                            id,
                                                            0,
                                                            table_entry->ColumnCount(),
                                                            storage_->buffer_manager(),
-                                                           cmd.row_counts_[id],
+                                                           row_count,
                                                            commit_ts,
                                                            commit_ts);
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
-        segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
+        segment_entry->IncreaseRowCount(row_count);
     }
 
     NewCatalog::ImportSegment(table_entry, cmd.segment_id_, segment_entry);

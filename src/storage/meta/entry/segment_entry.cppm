@@ -69,8 +69,6 @@ public:
                             SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
 
 public:
-    const String &DirPath() { return *segment_dir_; }
-
     inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
 
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
@@ -90,6 +88,8 @@ public:
     SizeT remain_row_count() const { return remain_row_count_; }
 
     int Room();
+
+    void FlushData();
 
     void SetCompacting(CompactSegmentsTask *compact_task);
 
