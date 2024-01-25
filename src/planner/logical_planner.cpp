@@ -363,7 +363,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
 
         switch (IdentifierValidation(create_table_info->column_defs_[idx]->name())) {
             case IdentifierValidationStatus::kOk:
-                return Status::OK();
+                break;
             case IdentifierValidationStatus::kEmpty:
                 return Status::EmptyColumnName();
             case IdentifierValidationStatus::kExceedLimit:
@@ -384,7 +384,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
 
     switch (IdentifierValidation(create_table_info->table_name_)) {
         case IdentifierValidationStatus::kOk:
-            return Status::OK();
+            break;
         case IdentifierValidationStatus::kEmpty:
             return Status::EmptyTableName();
         case IdentifierValidationStatus::kExceedLimit:
@@ -438,7 +438,7 @@ Status LogicalPlanner::BuildCreateDatabase(const CreateStatement *statement, Sha
 
     switch (IdentifierValidation(create_schema_info->schema_name_)) {
         case IdentifierValidationStatus::kOk:
-            return Status::OK();
+            break;
         case IdentifierValidationStatus::kEmpty:
             return Status::EmptyDBName();
         case IdentifierValidationStatus::kExceedLimit:
@@ -638,6 +638,18 @@ Status LogicalPlanner::BuildDropCollection(const DropStatement *statement, Share
 
 Status LogicalPlanner::BuildDropSchema(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *drop_schema_info = (DropSchemaInfo *)statement->drop_info_.get();
+    switch (IdentifierValidation(drop_schema_info->schema_name_)) {
+        case IdentifierValidationStatus::kOk:
+            break;
+        case IdentifierValidationStatus::kEmpty:
+            return Status::EmptyDBName();
+        case IdentifierValidationStatus::kExceedLimit:
+            return Status::ExceedDBNameLength(drop_schema_info->schema_name_.length());
+        case IdentifierValidationStatus::kInvalidName: {
+            return Status::InvalidDBName(drop_schema_info->schema_name_);
+        }
+    }
+
     if (IsEqual(drop_schema_info->schema_name_, query_context_ptr_->schema_name())) {
         RecoverableError(Status::DroppingUsingDb(drop_schema_info->schema_name_));
     }
