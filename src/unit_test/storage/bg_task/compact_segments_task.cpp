@@ -31,6 +31,7 @@ import table_def;
 import value;
 import physical_import;
 import default_values;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -330,7 +331,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
             txn_mgr->CommitTxn(txn);
         }
-        Vector<SizeT> segment_sizes{1, 10, 100, 1000};
+        Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
         int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
@@ -342,10 +343,10 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
             Vector<RowID> delete_row_ids;
             for (int i = 0; i < (int)segment_sizes.size(); ++i) {
-                int delete_n1 = segment_sizes[i] / 2;
+                int delete_n1 = segment_sizes[i] / 4;
                 Vector<SegmentOffset> offsets;
                 for (int j = 0; j < delete_n1; ++j) {
-                    offsets.push_back(rand() % (segment_sizes[i] - 1));
+                    offsets.push_back(rand() % (segment_sizes[i] / 2));
                 }
                 std::sort(offsets.begin(), offsets.end());
                 offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
@@ -375,15 +376,163 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
                 Vector<RowID> delete_row_ids;
                 for (int i = 0; i < (int)segment_sizes.size(); ++i) {
-                    delete_row_ids.emplace_back(i, segment_sizes[i] - 1);
+                    int delete_n2 = segment_sizes[i] / 4;
+                    Vector<SegmentOffset> offsets;
+                    for (int j = 0; j < delete_n2; ++j) {
+                        offsets.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 2) + segment_sizes[i] / 2);
+                    }
+                    std::sort(offsets.begin(), offsets.end());
+                    offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
+                    for (SegmentOffset offset : offsets) {
+                        delete_row_ids.emplace_back(i, offset);
+                    }
+                    delete_n += offsets.size();
                 }
-                delete_n += segment_sizes.size();
 
                 txn5->Delete("default", table_name, delete_row_ids);
                 txn_mgr->CommitTxn(txn5);
             }
 
             compact_task.CommitCompacts(std::move(state));
+            txn_mgr->CommitTxn(txn4);
+
+            int test_segment_n = segment_sizes.size();
+
+            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
+            for (int i = 0; i < test_segment_n; ++i) {
+                auto *segment_entry = table_entry->segment_map().at(i).get();
+                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+            }
+            auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
+            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
+
+            EXPECT_EQ(compact_segment->remain_row_count(), row_count - delete_n);
+        }
+        infinity::InfinityContext::instance().UnInit();
+        infinity::GlobalResourceUsage::UnInit();
+    }
+}
+
+TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
+    {
+        String table_name = "tbl1";
+        infinity::GlobalResourceUsage::Init();
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+
+        Storage *storage = infinity::InfinityContext::instance().storage();
+        BufferManager *buffer_manager = storage->buffer_manager();
+        TxnManager *txn_mgr = storage->txn_manager();
+
+        Vector<SharedPtr<ColumnDef>> columns;
+        {
+            i64 column_id = 0;
+            {
+                HashSet<ConstraintType> constraints;
+                auto column_def_ptr =
+                    MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kTinyInt)), "tiny_int_col", constraints);
+                columns.emplace_back(column_def_ptr);
+            }
+        }
+        { // create table
+            auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>(table_name), columns);
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+
+            Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+
+            txn_mgr->CommitTxn(txn);
+        }
+        Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
+        int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
+
+        this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
+
+        int delete_n = 0;
+        {
+            auto txn3 = txn_mgr->CreateTxn();
+            txn3->Begin();
+
+            Vector<RowID> delete_row_ids;
+            for (int i = 0; i < (int)segment_sizes.size(); ++i) {
+                int delete_n1 = segment_sizes[i] / 6;
+                Vector<SegmentOffset> offsets;
+                for (int j = 0; j < delete_n1; ++j) {
+                    offsets.push_back(rand() % (segment_sizes[i] / 3));
+                }
+                std::sort(offsets.begin(), offsets.end());
+                offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
+                for (SegmentOffset offset : offsets) {
+                    delete_row_ids.emplace_back(i, offset);
+                }
+                delete_n += offsets.size();
+            }
+            txn3->Delete("default", table_name, delete_row_ids);
+
+            txn_mgr->CommitTxn(txn3);
+        }
+
+        { // add compact
+            auto txn4 = txn_mgr->CreateTxn();
+            txn4->Begin();
+
+            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            EXPECT_NE(table_entry, nullptr);
+
+            CompactSegmentsTask compact_task(table_entry, txn4);
+            auto state = compact_task.CompactSegs();
+
+            auto txn6 = txn_mgr->CreateTxn();
+            txn6->Begin();
+            {
+                auto txn5 = txn_mgr->CreateTxn();
+                txn5->Begin();
+
+                Vector<RowID> delete_row_ids;
+                Vector<RowID> delete_row_ids2;
+
+                for (int i = 0; i < (int)segment_sizes.size(); ++i) {
+                    int delete_n2 = segment_sizes[i] / 6;
+
+                    Vector<SegmentOffset> offsets;
+                    Vector<SegmentOffset> offsets2;
+                    for (int j = 0; j < delete_n2; ++j) {
+                        offsets.push_back(rand() % (segment_sizes[i] / 3) + segment_sizes[i] / 3);
+                        offsets2.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 3 * 2) + segment_sizes[i] / 3 * 2);
+                    }
+                    std::sort(offsets.begin(), offsets.end());
+                    std::sort(offsets2.begin(), offsets2.end());
+                    offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
+                    offsets2.erase(std::unique(offsets2.begin(), offsets2.end()), offsets2.end());
+                    for (SegmentOffset offset : offsets) {
+                        delete_row_ids.emplace_back(i, offset);
+                        delete_row_ids2.emplace_back(i, offset);
+                    }
+
+                    delete_n += offsets.size();
+                }
+
+                txn5->Delete("default", table_name, delete_row_ids);
+                txn_mgr->CommitTxn(txn5);
+
+                txn6->Delete("default", table_name, delete_row_ids2);
+            }
+
+            compact_task.CommitCompacts(std::move(state));
+
+            try {
+                throw RecoverableException(Status::TxnRollback(0));
+            } catch (const RecoverableException &e) {
+                EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+            }
+
+            // try {
+            //     txn_mgr->CommitTxn(txn6);
+            // } catch (const RecoverableException &e) {
+            //     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+            // }
+
             txn_mgr->CommitTxn(txn4);
 
             int test_segment_n = segment_sizes.size();
