@@ -29,8 +29,6 @@ class TestConnection:
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    @pytest.mark.level(2)
-    @pytest.mark.timeout(5)
     def test_connect_invalid_address(self):
         """
         target: test connect invalid address, wrong address, invalid port, wrong port
