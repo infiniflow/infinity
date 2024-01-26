@@ -141,20 +141,59 @@ void ColumnInverter::Commit() {
                                                                                        &positions_[0],
                                                                                        positions_.size(),
                                                                                        16);
+    if (column_indexer_->IsRealTime()) {
+        DoRTInsert();
+    } else {
+        DoInsert();
+    }
+}
+
+void ColumnInverter::DoInsert() {
     u32 last_term_num = 0;
     u32 last_term_pos = 0;
     u32 last_doc_id = 0;
     StringRef term;
+    ColumnIndexer::PostingPtr posting = nullptr;
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
             if (last_term_num != i.term_num_) {
                 last_term_num = i.term_num_;
                 term = GetTermFromNum(last_term_num);
+                posting = column_indexer_->GetOrAddPosting(String(term.data()));
             }
             last_doc_id = i.doc_id_;
+            if (last_doc_id != 0) {
+                posting->EndDocument(last_doc_id, 0);
+            }
         }
         if (i.term_pos_ != last_term_pos) {
             last_term_pos = i.term_pos_;
+            posting->AddPosition(last_term_pos);
+        }
+    }
+}
+
+void ColumnInverter::DoRTInsert() {
+    u32 last_term_num = 0;
+    u32 last_term_pos = 0;
+    u32 last_doc_id = 0;
+    StringRef term;
+    ColumnIndexer::RTPostingPtr posting = nullptr;
+    for (auto &i : positions_) {
+        if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
+            if (last_term_num != i.term_num_) {
+                last_term_num = i.term_num_;
+                term = GetTermFromNum(last_term_num);
+                posting = column_indexer_->GetOrAddRTPosting(String(term.data()));
+            }
+            last_doc_id = i.doc_id_;
+            if (last_doc_id != 0) {
+                posting->EndDocument(last_doc_id, 0);
+            }
+        }
+        if (i.term_pos_ != last_term_pos) {
+            last_term_pos = i.term_pos_;
+            posting->AddPosition(last_term_pos);
         }
     }
 }
