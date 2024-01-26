@@ -72,20 +72,25 @@ public:
     // Normal Constructor
     explicit BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts);
 
-    static UniquePtr<BlockEntry> NewBlockEntry(const SegmentEntry *segment_entry,
-                                               BlockID block_id,
-                                               TxnTimeStamp checkpoint_ts,
-                                               u64 column_count,
-                                               Txn *txn);
+    static UniquePtr<BlockEntry>
+    NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn);
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
-                                                     u16 block_id,
+                                                     BlockID block_id,
                                                      TxnTimeStamp checkpoint_ts,
                                                      u64 column_count,
                                                      BufferManager *buffer_mgr,
                                                      u16 row_count,
                                                      TxnTimeStamp min_row_ts,
                                                      TxnTimeStamp max_row_ts);
+
+    static UniquePtr<BlockEntry> NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
+                                                            BlockID block_id,
+                                                            u16 row_count,
+                                                            u16 row_capacity,
+                                                            TxnTimeStamp min_row_ts,
+                                                            TxnTimeStamp max_row_ts,
+                                                            BufferManager *buffer_mgr);
 
 public:
     // Used in physical import
@@ -148,6 +153,8 @@ public:
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 
+    Vector<UniquePtr<BlockColumnEntry>> &columns() { return columns_; }
+
 public:
     // Setter
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
@@ -175,6 +182,6 @@ protected:
     u16 checkpoint_row_count_{0};
 
     // Column data
-    Vector<UniquePtr<BlockColumnEntry>> columns_;
+    Vector<UniquePtr<BlockColumnEntry>> columns_{};
 };
 } // namespace infinity

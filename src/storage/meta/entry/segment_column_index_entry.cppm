@@ -44,10 +44,21 @@ export class SegmentColumnIndexEntry : public BaseEntry {
 public:
     static SharedPtr<SegmentColumnIndexEntry> NewIndexEntry(ColumnIndexEntry *column_index_entry,
                                                             SegmentID segment_id,
-                                                            Txn * txn,
+                                                            Txn *txn,
                                                             TxnTimeStamp create_ts,
                                                             BufferManager *buffer_manager,
                                                             CreateIndexParam *create_index_param);
+
+    static SharedPtr<SegmentColumnIndexEntry> NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
+                                                                         TableEntry *table_entry,
+                                                                         SegmentID segment_id,
+                                                                         BufferManager *buffer_manager,
+                                                                         TxnTimeStamp min_ts,
+                                                                         TxnTimeStamp max_ts,
+                                                                         TransactionID txn_id,
+                                                                         TxnTimeStamp begin_ts,
+                                                                         TxnTimeStamp commit_ts,
+                                                                         bool is_delete);
 
     [[nodiscard]] BufferHandle GetIndex();
 

@@ -93,7 +93,7 @@ NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeS
         // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
         // In replay phase, not need to recording the catalog delta operation.
         if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddDBMetaOperation>(new_db_meta.get());
+            auto operation = MakeUnique<AddDBMetaOp>(new_db_meta.get(), begin_ts);
             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
         }
 
@@ -422,13 +422,15 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
         NewCatalog::LoadFromEntry(catalog1.get(), catalog_paths[i], buffer_mgr);
     }
 
+    LOG_TRACE(fmt::format("Catalog Delta Op is done"));
+
     return catalog1;
 }
 
 void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    SizeT file_size = fs.GetFileSize(*catalog_file_handler);
+    i32 file_size = fs.GetFileSize(*catalog_file_handler);
     Vector<char> buf(file_size);
     fs.Read(*catalog_file_handler, buf.data(), file_size);
     fs.Close(*catalog_file_handler);
@@ -440,10 +442,346 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
     }
 
     auto commit_ts = catalog_delta_entry->commit_ts();
-    auto txn_id = catalog_delta_entry->txn_id();
+    auto global_entry_txn_id = catalog_delta_entry->txn_id();
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
-        //////// catalog->
+        auto type = op->GetType();
+        LOG_TRACE(fmt::format("Catalog Delta Op is {}", op->ToString()));
+        switch (type) {
+            case CatalogDeltaOpType::ADD_DATABASE_META: {
+                auto add_db_meta_op = static_cast<AddDBMetaOp *>(op.get());
+                auto db_dir = add_db_meta_op->data_dir();
+                auto db_name = add_db_meta_op->db_name();
+                UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(MakeShared<String>(db_dir), MakeShared<String>(db_name));
+
+                catalog->databases_.insert({db_name, std::move(new_db_meta)});
+                break;
+            }
+            case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+                auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
+                auto db_name = add_db_entry_op->db_name();
+                auto begin_ts = add_db_entry_op->begin_ts();
+                auto is_delete = add_db_entry_op->is_delete();
+                TransactionID txn_id = add_db_entry_op->txn_id();
+
+                auto db_meta = catalog->databases_.at(db_name).get();
+                auto db_entry = DBEntry::NewReplayDBEntry(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
+                if (db_meta->entry_list_.empty()) {
+                    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+                    db_meta->entry_list_.emplace_front(std::move(dummy_entry));
+                }
+                db_meta->entry_list_.emplace_front(std::move(db_entry));
+                break;
+            }
+            case CatalogDeltaOpType::ADD_TABLE_META: {
+                auto add_table_meta_op = static_cast<AddTableMetaOp *>(op.get());
+                auto db_name = add_table_meta_op->db_name();
+                auto table_name = add_table_meta_op->table_name();
+                auto begin_ts = add_table_meta_op->begin_ts();
+                TransactionID txn_id = add_table_meta_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = TableMeta::NewTableMeta(db_entry->db_entry_dir_, MakeShared<String>(table_name), db_entry);
+                db_entry->tables_.insert({table_name, std::move(table_meta)});
+                break;
+            }
+            case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+                auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
+                auto db_name = add_table_entry_op->db_name();
+                auto table_name = add_table_entry_op->table_name();
+                auto table_entry_dir = add_table_entry_op->table_entry_dir();
+                auto begin_ts = add_table_entry_op->begin_ts();
+                auto is_delete = add_table_entry_op->is_delete();
+                auto column_defs = add_table_entry_op->column_defs();
+                auto entry_type = add_table_entry_op->table_entry_type();
+                TransactionID txn_id = add_table_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto table_entry = TableEntry::NewReplayTableEntry(table_meta,
+                                                                   MakeUnique<String>(table_entry_dir),
+                                                                   MakeUnique<String>(table_name),
+                                                                   column_defs,
+                                                                   entry_type,
+                                                                   txn_id,
+                                                                   begin_ts,
+                                                                   commit_ts,
+                                                                   is_delete);
+                if (table_meta->entry_list_.empty()) {
+                    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+                    table_meta->entry_list_.emplace_front(std::move(dummy_entry));
+                }
+                table_meta->entry_list_.emplace_front(std::move(table_entry));
+                break;
+            }
+            case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+                auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
+                auto db_name = add_segment_entry_op->db_name();
+                auto table_name = add_segment_entry_op->table_name();
+                auto segment_id = add_segment_entry_op->segment_id();
+                auto segment_dir = add_segment_entry_op->segment_dir();
+                auto begin_ts = add_segment_entry_op->begin_ts();
+                TransactionID txn_id = add_segment_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_id, MakeUnique<String>(segment_dir), commit_ts);
+                table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
+                break;
+            }
+            case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+                auto add_block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
+                auto db_name = add_block_entry_op->db_name();
+                auto table_name = add_block_entry_op->table_name();
+                auto segment_id = add_block_entry_op->segment_id();
+                auto block_id = add_block_entry_op->block_id();
+                auto block_dir = add_block_entry_op->block_dir();
+                auto begin_ts = add_block_entry_op->begin_ts();
+                auto row_count = add_block_entry_op->row_count();
+                auto row_capacity = add_block_entry_op->row_capacity();
+                auto min_row_ts = add_block_entry_op->min_row_ts();
+                auto max_row_ts = add_block_entry_op->max_row_ts();
+                TransactionID txn_id = add_block_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
+                auto block_entry =
+                    BlockEntry::NewReplayCatalogBlockEntry(segment_entry, block_id, row_count, row_capacity, min_row_ts, max_row_ts, buffer_mgr);
+                segment_entry->block_entries().push_back(std::move(block_entry));
+                break;
+            }
+            case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+                auto add_column_entry_op = static_cast<AddColumnEntryOp *>(op.get());
+                auto db_name = add_column_entry_op->db_name();
+                auto table_name = add_column_entry_op->table_name();
+                auto segment_id = add_column_entry_op->segment_id();
+                auto block_id = add_column_entry_op->block_id();
+                auto column_id = add_column_entry_op->column_id();
+                auto begin_ts = add_column_entry_op->begin_ts();
+                TransactionID txn_id = add_column_entry_op->txn_id();
+
+                LOG_TRACE(fmt::format("db name: {}", db_name));
+                LOG_TRACE(fmt::format("table_name: {}", table_name));
+                LOG_TRACE(fmt::format("segment_id: {}", segment_id));
+                LOG_TRACE(fmt::format("block_id: {}", block_id));
+                LOG_TRACE(fmt::format("column_id: {}", column_id));
+                LOG_TRACE(fmt::format("txn_id: {}", txn_id));
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
+                auto block_entry = segment_entry->GetBlockEntryByID(block_id);
+                auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr);
+                block_entry->columns().push_back(std::move(column_entry));
+                LOG_TRACE("ADD_COLUMN_ENTRY DONE");
+                break;
+            }
+
+            case CatalogDeltaOpType::ADD_INDEX_META: {
+                auto add_index_meta_op = static_cast<AddIndexMetaOp *>(op.get());
+                String db_name = add_index_meta_op->db_name();
+                auto table_name = add_index_meta_op->table_name();
+                auto index_name = add_index_meta_op->index_name();
+                auto begin_ts = add_index_meta_op->begin_ts();
+                TransactionID txn_id = add_index_meta_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto index_meta = TableIndexMeta::NewTableIndexMeta(table_entry, MakeShared<String>(index_name));
+                table_entry->index_meta_map_.insert({index_name, std::move(index_meta)});
+                break;
+            }
+            case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+                auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
+                auto db_name = add_table_index_entry_op->db_name();
+                auto table_name = add_table_index_entry_op->table_name();
+                auto index_name = add_table_index_entry_op->index_name();
+                auto index_dir = add_table_index_entry_op->index_dir();
+                auto begin_ts = add_table_index_entry_op->begin_ts();
+                auto is_delete = add_table_index_entry_op->is_delete();
+                auto index_def = add_table_index_entry_op->index_def();
+                TransactionID txn_id = add_table_index_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto index_meta = table_entry->index_meta_map_.at(index_name).get();
+                auto table_index_entry = TableIndexEntry::NewReplayTableIndexEntry(index_meta,
+                                                                                   index_def,
+                                                                                   MakeUnique<String>(index_dir),
+                                                                                   txn_id,
+                                                                                   begin_ts,
+                                                                                   commit_ts,
+                                                                                   is_delete);
+                if (index_meta->entry_list().empty()) {
+                    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+                    index_meta->entry_list().emplace_front(std::move(dummy_entry));
+                }
+                index_meta->entry_list().emplace_front(std::move(table_index_entry));
+                break;
+            }
+            case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
+                auto add_irs_index_entry_op = static_cast<AddIrsIndexEntryOp *>(op.get());
+                auto db_name = add_irs_index_entry_op->db_name();
+                auto table_name = add_irs_index_entry_op->table_name();
+                auto index_name = add_irs_index_entry_op->index_name();
+                auto index_dir = add_irs_index_entry_op->index_dir();
+                auto begin_ts = add_irs_index_entry_op->begin_ts();
+                auto is_delete = add_irs_index_entry_op->is_delete();
+                TransactionID txn_id = add_irs_index_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto *index_meta = table_entry->index_meta_map_.at(index_name).get();
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!index_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto irs_index_entry =
+                    IrsIndexEntry::NewReplayIrsIndexEntry(table_index_entry, MakeUnique<String>(index_dir), txn_id, begin_ts, commit_ts, is_delete);
+                table_index_entry->irs_index_entry() = std::move(irs_index_entry);
+                break;
+            }
+            case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
+                auto add_column_index_entry_op = static_cast<AddColumnIndexEntryOp *>(op.get());
+                auto db_name = add_column_index_entry_op->db_name();
+                auto table_name = add_column_index_entry_op->table_name();
+                auto index_name = add_column_index_entry_op->index_name();
+                auto column_id = add_column_index_entry_op->column_id();
+                auto index_base = add_column_index_entry_op->index_base();
+                auto begin_ts = add_column_index_entry_op->begin_ts();
+                auto column_index_dir = add_column_index_entry_op->col_index_dir();
+                auto is_delete = add_column_index_entry_op->is_delete();
+                TransactionID txn_id = add_column_index_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto *index_meta = table_entry->index_meta_map_.at(index_name).get();
+                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                if (!index_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto column_index_entry = ColumnIndexEntry::NewReplayColumnIndexEntry(table_index_entry,
+                                                                                      index_base,
+                                                                                      column_id,
+                                                                                      MakeUnique<String>(column_index_dir),
+                                                                                      txn_id,
+                                                                                      begin_ts,
+                                                                                      commit_ts,
+                                                                                      is_delete);
+                table_index_entry->column_index_map().insert({column_id, std::move(column_index_entry)});
+                break;
+            }
+
+            case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
+                auto add_segment_column_index_entry_op = static_cast<AddSegmentColumnIndexEntryOp *>(op.get());
+                auto db_name = add_segment_column_index_entry_op->db_name();
+                auto table_name = add_segment_column_index_entry_op->table_name();
+                auto index_name = add_segment_column_index_entry_op->index_name();
+                auto segment_id = add_segment_column_index_entry_op->segment_id();
+                auto min_ts = add_segment_column_index_entry_op->min_ts();
+                auto max_ts = add_segment_column_index_entry_op->max_ts();
+                auto column_id = add_segment_column_index_entry_op->column_id();
+
+                auto begin_ts = add_segment_column_index_entry_op->begin_ts();
+                auto is_delete = add_segment_column_index_entry_op->is_delete();
+                TransactionID txn_id = add_segment_column_index_entry_op->txn_id();
+
+                auto *db_meta = catalog->databases_.at(db_name).get();
+                LOG_TRACE(fmt::format("at db {}", db_name));
+                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto table_meta = db_entry->tables_.at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto *index_meta = table_entry->index_meta_map_.at(index_name).get();
+                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                if (!index_status.ok()) {
+                    UnrecoverableError("!!!");
+                }
+                auto *column_index_entry = table_index_entry->column_index_map().at(column_id).get();
+                auto segment_column_index_entry = SegmentColumnIndexEntry::NewReplaySegmentIndexEntry(column_index_entry,
+                                                                                                      table_entry,
+                                                                                                      segment_id,
+                                                                                                      buffer_mgr,
+                                                                                                      min_ts,
+                                                                                                      max_ts,
+                                                                                                      txn_id,
+                                                                                                      begin_ts,
+                                                                                                      commit_ts,
+                                                                                                      is_delete);
+                column_index_entry->index_by_segment().insert({segment_id, std::move(segment_column_index_entry)});
+                break;
+            }
+        }
     }
 }
 

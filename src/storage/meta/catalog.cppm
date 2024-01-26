@@ -198,6 +198,7 @@ public:
 
     static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);
 
+
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
@@ -244,7 +245,7 @@ public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
     TransactionID next_txn_id_{};
-    u64 catalog_version_{};
+    u64 catalog_version_{}; // TODO seems useless
     std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.

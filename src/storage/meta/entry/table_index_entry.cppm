@@ -58,6 +58,14 @@ public:
 
     static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                               const SharedPtr<IndexDef> &index_def,
+                                                               const SharedPtr<String> &index_dir,
+                                                               TransactionID txn_id,
+                                                               TxnTimeStamp begin_ts,
+                                                               TxnTimeStamp commit_ts,
+                                                               bool is_delete);
+
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static SharedPtr<TableIndexEntry>
@@ -68,7 +76,7 @@ public:
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexDef *index_def() const { return index_def_.get(); }
     const SharedPtr<IndexDef> &table_index_def() { return index_def_; }
-    const SharedPtr<IrsIndexEntry> &irs_index_entry() const { return irs_index_entry_; }
+    SharedPtr<IrsIndexEntry> &irs_index_entry() { return irs_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
 

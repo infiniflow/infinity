@@ -37,13 +37,7 @@ import infinity_exception;
 
 namespace infinity {
 
-UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_dir,
-                                             const SharedPtr<String> &table_name,
-                                             DBEntry *db_entry,
-                                             TxnManager *txn_mgr,
-                                             TransactionID txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             bool is_delete) {
+UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> &table_name, DBEntry *db_entry) {
     auto table_meta = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
 
     return table_meta;
@@ -72,19 +66,15 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
     TableEntry *table_entry_ptr{nullptr};
 
     if (this->entry_list_.empty()) {
-        // Insert a dummy entry.
         UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
-        dummy_entry->deleted_ = true;
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
-        // Insert the new table entry
         SharedPtr<TableEntry> table_entry =
             TableEntry::NewTableEntry(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
 
-        // physical wal log
         {
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
@@ -105,7 +95,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
             // physical wal log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                    auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -127,7 +117,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     // physical wal log
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                            auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
@@ -169,7 +159,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                             // physical wal log
                             {
                                 if (txn_mgr != nullptr) {
-                                    auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                                    auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                                 }
                             }
@@ -208,7 +198,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     // physical wal log
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                            auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
@@ -269,7 +259,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
             // physical wal log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddTableEntryOperation>(table_entry);
+                    auto operation = MakeUnique<AddTableEntryOp>(table_entry);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -298,7 +288,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
             // Physical log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddTableEntryOperation>(table_entry_ptr);
+                    auto operation = MakeUnique<AddTableEntryOp>(table_entry_ptr);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -377,6 +367,23 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
     UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
     LOG_ERROR(*err_msg);
     return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+}
+
+Tuple<TableEntry *, Status> TableMeta::GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    if (this->entry_list_.empty()) {
+        UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
+        LOG_ERROR(*err_msg);
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+    }
+
+    for (const auto &table_entry : this->entry_list_) {
+        if (table_entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
+            LOG_ERROR(*err_msg);
+            return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        }
+        return {static_cast<TableEntry *>(table_entry.get()), Status::OK()};
+    }
 }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }

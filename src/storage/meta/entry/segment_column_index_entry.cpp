@@ -42,7 +42,7 @@ SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_
 
 SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry,
                                                                           SegmentID segment_id,
-                                                                          Txn * txn,
+                                                                          Txn *txn,
                                                                           TxnTimeStamp create_ts,
                                                                           BufferManager *buffer_manager,
                                                                           CreateIndexParam *param) {
@@ -52,13 +52,45 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
     auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
     segment_column_index_entry->min_ts_ = create_ts;
     segment_column_index_entry->max_ts_ = create_ts;
+    auto begin_ts = txn->BeginTS();
+    segment_column_index_entry->begin_ts_ = begin_ts;
 
     {
         if (txn != nullptr) {
-            auto operation = MakeUnique<AddSegmentColumnIndexEntryOperation>(segment_column_index_entry);
+            auto operation = MakeUnique<AddSegmentColumnIndexEntryOp>(segment_column_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
+    return segment_column_index_entry;
+}
+
+SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
+                                                                                       TableEntry *table_entry,
+                                                                                       SegmentID segment_id,
+                                                                                       BufferManager *buffer_manager,
+                                                                                       TxnTimeStamp min_ts,
+                                                                                       TxnTimeStamp max_ts,
+                                                                                       TransactionID txn_id,
+                                                                                       TxnTimeStamp begin_ts,
+                                                                                       TxnTimeStamp commit_ts,
+                                                                                       bool is_delete) {
+
+    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    ColumnID column_id = column_index_entry->column_id();
+    auto create_index_param =
+        SegmentEntry::GetCreateIndexParam(segment_row_count, column_index_entry->index_base_ptr(), table_entry->GetColumnDefByID(column_id));
+    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
+    auto buffer = buffer_manager->Get(std::move(file_worker));
+    auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
+    if (segment_column_index_entry.get() == nullptr) {
+        UnrecoverableError("Failed to load index entry");
+    }
+    segment_column_index_entry->min_ts_ = min_ts;
+    segment_column_index_entry->max_ts_ = max_ts;
+    segment_column_index_entry->commit_ts_.store(commit_ts);
     return segment_column_index_entry;
 }
 

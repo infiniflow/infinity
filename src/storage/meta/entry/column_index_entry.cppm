@@ -48,25 +48,37 @@ public:
                      TxnTimeStamp begin_ts);
 
     static SharedPtr<ColumnIndexEntry> NewColumnIndexEntry(SharedPtr<IndexBase> index_base,
-                                                           u64 column_id,
+                                                           ColumnID column_id,
                                                            TableIndexEntry *table_index_entry,
-                                                           Txn* txn,
+                                                           Txn *txn,
                                                            TransactionID txn_id,
                                                            SharedPtr<String> col_index_dir,
                                                            TxnTimeStamp begin_ts);
 
+    static SharedPtr<ColumnIndexEntry> NewReplayColumnIndexEntry(TableIndexEntry *table_index_entry,
+                                                                 SharedPtr<IndexBase> index_base,
+                                                                 ColumnID column_id,
+                                                                 SharedPtr<String> col_index_dir,
+                                                                 TransactionID txn_id,
+                                                                 TxnTimeStamp begin_ts,
+                                                                 TxnTimeStamp commit_ts,
+                                                                 bool is_delete);
+
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static SharedPtr<ColumnIndexEntry>
-    Deserialize(const nlohmann::json &column_index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
+    static SharedPtr<ColumnIndexEntry> Deserialize(const nlohmann::json &column_index_entry_json,
+                                                   TableIndexEntry *table_index_entry,
+                                                   BufferManager *buffer_mgr,
+                                                   TableEntry *table_entry);
 
 public:
     // Getter
     const SharedPtr<String> &col_index_dir() const { return col_index_dir_; }
     ColumnID column_id() const { return column_id_; }
     const IndexBase *index_base_ptr() const { return index_base_.get(); }
+    const SharedPtr<IndexBase> index_base() const { return index_base_; }
     TableIndexEntry *table_index_entry() const { return table_index_entry_; }
-    const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>& index_by_segment() const { return index_by_segment_; }
+    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment() { return index_by_segment_; }
 
     // Used in segment column index entry
     UniquePtr<IndexFileWorker> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
@@ -83,7 +95,7 @@ private:
 
     TableIndexEntry *table_index_entry_{};
     ColumnID column_id_{};
-    SharedPtr<String> col_index_dir_{}; // xxxx/col1
+    SharedPtr<String> col_index_dir_{};
     const SharedPtr<IndexBase> index_base_{};
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};
 };

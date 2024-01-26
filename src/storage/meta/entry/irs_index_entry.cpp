@@ -45,10 +45,23 @@ SharedPtr<IrsIndexEntry> IrsIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_
 
     {
         if (txn != nullptr) {
-            auto operation = MakeUnique<AddIrsIndexEntryOperation>(irs_index_entry);
+            auto operation = MakeUnique<AddIrsIndexEntryOp>(irs_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
+    return irs_index_entry;
+}
+
+SharedPtr<IrsIndexEntry> IrsIndexEntry::NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
+                                                               SharedPtr<String> index_dir,
+                                                               TransactionID txn_id,
+                                                               TxnTimeStamp begin_ts,
+                                                               TxnTimeStamp commit_ts,
+                                                               bool is_delete) {
+    auto irs_index_entry = MakeShared<IrsIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
+    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    irs_index_entry->commit_ts_.store(commit_ts);
+    irs_index_entry->deleted_ = is_delete;
     return irs_index_entry;
 }
 

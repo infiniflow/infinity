@@ -40,13 +40,7 @@ public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)
         : db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
 
-    static UniquePtr<TableMeta> NewTableMeta(const SharedPtr<String> &db_entry_dir,
-                                             const SharedPtr<String> &name,
-                                             DBEntry *db_entry,
-                                             TxnManager *txn_mgr,
-                                             TransactionID txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             bool is_delete);
+    static UniquePtr<TableMeta> NewTableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> &name, DBEntry *db_entry);
 
     SharedPtr<String> ToString();
 
@@ -77,6 +71,8 @@ private:
     void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<TableEntry *, Status> GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
     std::shared_mutex rw_locker_{};

@@ -332,6 +332,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
             return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
         }
 
+        TransactionID entry_txn_id = entry->txn_id_.load();
         if (entry->commit_ts_ < UNCOMMIT_TS) {
             // committed
             if (begin_ts > entry->commit_ts_) {
@@ -344,7 +345,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
                     return {table_index_entry, Status::OK()};
                 }
             }
-        } else if (txn_id == entry->txn_id_) {
+        } else if (txn_id == entry_txn_id) {
             // same txn
             table_index_entry = static_cast<TableIndexEntry *>(entry.get());
             return {table_index_entry, Status::OK()};
@@ -354,6 +355,57 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
     return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+}
+
+Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+
+    TableIndexEntry *table_index_entry{nullptr};
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
+    if (!this->entry_list_.empty()){
+        const auto& entry = entry_list_.front();
+
+        if (entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+            LOG_ERROR(*err_msg);
+            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+        }
+
+        TransactionID entry_txn_id = entry->txn_id_.load();
+        // committed
+        if (begin_ts > entry->commit_ts_) {
+            if (entry->deleted_) {
+                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                LOG_ERROR(*err_msg);
+                return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+            } else {
+                table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+                return {table_index_entry, Status::OK()};
+            }
+        } else {
+            if (txn_id == entry_txn_id) {
+                table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+                return {table_index_entry, Status::OK()};
+            }
+        }
+    }
+
+    UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+    LOG_ERROR(*err_msg);
+    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+}
+
+Tuple<TableIndexEntry *, Status> TableIndexMeta::GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
+
+    for (const auto &entry : this->entry_list_) {
+        if (entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+            LOG_ERROR(*err_msg);
+            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+        }
+
+        auto table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+        return {table_index_entry, Status::OK()};
+    }
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {

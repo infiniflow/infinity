@@ -59,10 +59,22 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewColumnIndexEntry(SharedPtr<Inde
     auto column_index_entry = MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
     {
         if (txn != nullptr) {
-            UniquePtr<AddColumnIndexEntryOperation> operation = MakeUnique<AddColumnIndexEntryOperation>(column_index_entry);
+            UniquePtr<AddColumnIndexEntryOp> operation = MakeUnique<AddColumnIndexEntryOp>(column_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
+    return column_index_entry;
+}
+
+SharedPtr<ColumnIndexEntry> ColumnIndexEntry::NewReplayColumnIndexEntry(TableIndexEntry *table_index_entry,
+                                                                        SharedPtr<IndexBase> index_base,
+                                                                        ColumnID column_id,
+                                                                        SharedPtr<String> col_index_dir,
+                                                                        TransactionID txn_id,
+                                                                        TxnTimeStamp begin_ts,
+                                                                        TxnTimeStamp commit_ts,
+                                                                        bool is_delete) {
+    auto column_index_entry = MakeShared<ColumnIndexEntry>(index_base, table_index_entry, column_id, col_index_dir, txn_id, begin_ts);
     return column_index_entry;
 }
 

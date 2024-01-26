@@ -60,15 +60,19 @@ SegmentEntry::SegmentEntry(const TableEntry *table_entry) : BaseEntry(EntryType:
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddSegmentEntryOperation>(segment_entry.get());
+    {
+        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
         txn->AddCatalogDeltaOperation(std::move(operation));
     }
+
     segment_entry->row_count_ = 0;
     segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
     segment_entry->segment_id_ = segment_id;
     segment_entry->min_row_ts_ = 0;
     segment_entry->max_row_ts_ = 0;
+
+    auto begin_ts = txn->BeginTS();
+    segment_entry->begin_ts_ = begin_ts;
 
     const auto *table_ptr = (const TableEntry *)table_entry;
     segment_entry->column_count_ = table_ptr->ColumnCount();
@@ -379,6 +383,11 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["max_row_ts"] = this->max_row_ts_;
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
+
+        json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
+        json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
+        json_res["txn_id"] = TransactionID(this->txn_id_);
+
         for (auto &block_entry : this->block_entries_) {
             if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
                 block_entries.push_back((BlockEntry *)block_entry.get());
@@ -386,17 +395,17 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         }
     }
     for (BlockEntry *block_entry : block_entries) {
-//        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
+        //        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        //                              block_entry->checkpoint_ts(),
+        //                              block_entry->min_row_ts(),
+        //                              block_entry->max_row_ts(),
+        //                              max_commit_ts));
         block_entry->Flush(max_commit_ts);
-//        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
+        //        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+        //                              block_entry->checkpoint_ts(),
+        //                              block_entry->min_row_ts(),
+        //                              block_entry->max_row_ts(),
+        //                              max_commit_ts));
         // WARNING: this operation may influence data visibility
         //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
         //            continue;
@@ -419,6 +428,10 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
+
+    segment_entry->commit_ts_ = segment_entry_json["commit_ts"];
+    segment_entry->begin_ts_ = segment_entry_json["begin_ts"];
+    segment_entry->txn_id_ = segment_entry_json["txn_id"];
 
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {

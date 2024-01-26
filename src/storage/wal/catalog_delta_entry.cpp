@@ -35,49 +35,80 @@ namespace infinity {
 UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     UniquePtr<CatalogDeltaOperation> operation{nullptr};
-    auto operation_type = ReadBufAdv<CatalogDeltaOperationType>(ptr);
+    auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     switch (operation_type) {
-        case CatalogDeltaOperationType::ADD_DATABASE_META: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_DATABASE_META: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String data_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBMetaOperation>(begin_ts, is_delete, db_name, data_dir);
+            operation = MakeUnique<AddDBMetaOp>(begin_ts, is_delete, db_name, data_dir);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_TABLE_META: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_TABLE_META: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddTableMetaOperation>(begin_ts, is_delete, db_name, table_name, db_entry_dir);
+            operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, db_name, table_name, db_entry_dir);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_DATABASE_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBEntryOperation>(begin_ts, is_delete, db_name, db_entry_dir);
+            operation = MakeUnique<AddDBEntryOp>(begin_ts, is_delete, db_name, db_entry_dir);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_TABLE_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddTableEntryOperation>(begin_ts, is_delete, db_name, table_name, table_entry_dir);
+
+            i32 columns_size = ReadBufAdv<i32>(ptr);
+            Vector<SharedPtr<ColumnDef>> columns;
+            for (i32 i = 0; i < columns_size; i++) {
+                i64 id = ReadBufAdv<i64>(ptr);
+                max_bytes = ptr_end - ptr;
+                if (max_bytes <= 0) {
+                    UnrecoverableError("ptr goes out of range when reading TableDef");
+                }
+                SharedPtr<DataType> column_type = DataType::ReadAdv(ptr, max_bytes);
+                String column_name = ReadBufAdv<String>(ptr);
+                i32 constraints_size = ReadBufAdv<i32>(ptr);
+                HashSet<ConstraintType> constraints;
+                for (i32 j = 0; j < constraints_size; j++) {
+                    ConstraintType ct = ReadBufAdv<ConstraintType>(ptr);
+                    constraints.insert(ct);
+                }
+                SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
+                columns.push_back(cd);
+            }
+
+            operation = MakeUnique<AddTableEntryOp>(begin_ts, is_delete, db_name, table_name, table_entry_dir, columns);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_SEGMENT_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddSegmentEntryOperation>(begin_ts, is_delete, db_name, table_name, segment_id, segment_dir);
+            operation = MakeUnique<AddSegmentEntryOp>(begin_ts, is_delete, db_name, table_name, segment_id, segment_dir);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_BLOCK_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -85,69 +116,86 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String block_dir = ReadBufAdv<String>(ptr);
             u16 row_count = ReadBufAdv<u16>(ptr);
             u16 row_capacity = ReadBufAdv<u16>(ptr);
-            operation = MakeUnique<AddBlockEntryOperation>(begin_ts,
-                                                           is_delete,
-                                                           db_name,
-                                                           table_name,
-                                                           segment_id,
-                                                           block_id,
-                                                           block_dir,
-                                                           row_count,
-                                                           row_capacity);
+            TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            operation = MakeUnique<AddBlockEntryOp>(begin_ts,
+                                                    is_delete,
+                                                    db_name,
+                                                    table_name,
+                                                    segment_id,
+                                                    block_id,
+                                                    block_dir,
+                                                    row_count,
+                                                    row_capacity,
+                                                    min_row_ts,
+                                                    max_row_ts);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_COLUMN_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             BlockID block_id = ReadBufAdv<BlockID>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
             i32 next_outline_idx = ReadBufAdv<i32>(ptr);
-            operation =
-                MakeUnique<AddColumnEntryOperation>(begin_ts, is_delete, db_name, table_name, segment_id, block_id, column_id, next_outline_idx);
+            operation = MakeUnique<AddColumnEntryOp>(begin_ts, is_delete, db_name, table_name, segment_id, block_id, column_id, next_outline_idx);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_INDEX_META: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_INDEX_META: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIndexMetaOperation>(begin_ts, is_delete, db_name, table_name, index_name);
+            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, db_name, table_name, index_name);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            // String index_def = ReadBufAdv<String>(ptr);
+            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
             //  TODO: index_def
-            operation = MakeUnique<AddTableIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, index_dir);
+            operation = MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, db_name, table_name, index_name, index_dir, index_def);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIrsIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, index_dir);
+            operation = MakeUnique<AddIrsIndexEntryOp>(begin_ts, is_delete, db_name, table_name, index_name, index_dir);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String col_index_dir = ReadBufAdv<String>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
-            operation = MakeUnique<AddColumnIndexEntryOperation>(begin_ts, is_delete, db_name, table_name, index_name, col_index_dir, column_id);
+
+            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+            operation = MakeUnique<AddColumnIndexEntryOp>(begin_ts, is_delete, db_name, table_name, index_name, col_index_dir, column_id, index_base);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
-        case CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
-            auto [begin_ts, is_delete] = ReadAdvBase(ptr);
+        case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
+            auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
@@ -155,15 +203,10 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             TxnTimeStamp min_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            operation = MakeUnique<AddSegmentColumnIndexEntryOperation>(begin_ts,
-                                                                        is_delete,
-                                                                        db_name,
-                                                                        table_name,
-                                                                        index_name,
-                                                                        column_id,
-                                                                        segment_id,
-                                                                        min_ts,
-                                                                        max_ts);
+            operation =
+                MakeUnique<AddSegmentColumnIndexEntryOp>(begin_ts, is_delete, db_name, table_name, index_name, column_id, segment_id, min_ts, max_ts);
+            operation->commit_ts_ = commit_ts;
+            operation->txn_id_ = txn_id;
             break;
         }
         default:
@@ -177,33 +220,46 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     return operation;
 }
 
-void AddDBMetaOperation::WriteAdv(char *&buf) const {
+void AddDBMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->data_dir_);
 }
 
-void AddTableMetaOperation::WriteAdv(char *&buf) const {
+void AddTableMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
 }
 
-void AddDBEntryOperation::WriteAdv(char *&buf) const {
+void AddDBEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
 }
 
-void AddTableEntryOperation::WriteAdv(char *&buf) const {
+void AddTableEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_entry_dir_);
+
+    WriteBufAdv(buf, (i32)(column_defs_.size()));
+    SizeT column_count = column_defs_.size();
+    for (SizeT idx = 0; idx < column_count; ++idx) {
+        const ColumnDef &cd = *column_defs_[idx];
+        WriteBufAdv<i64>(buf, cd.id_);
+        cd.column_type_->WriteAdv(buf);
+        WriteBufAdv(buf, cd.name_);
+        WriteBufAdv(buf, (i32)cd.constraints_.size());
+        for (const auto &cons : cd.constraints_) {
+            WriteBufAdv(buf, cons);
+        }
+    }
 }
 
-void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
+void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -211,7 +267,7 @@ void AddSegmentEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->segment_dir_);
 }
 
-void AddBlockEntryOperation::WriteAdv(char *&buf) const {
+void AddBlockEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -220,9 +276,11 @@ void AddBlockEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->block_dir_);
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->row_capacity_);
+    WriteBufAdv(buf, this->min_row_ts_);
+    WriteBufAdv(buf, this->max_row_ts_);
 }
 
-void AddColumnEntryOperation::WriteAdv(char *&buf) const {
+void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -232,14 +290,23 @@ void AddColumnEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->next_outline_idx_);
 }
 
-void AddIndexMetaOperation::WriteAdv(char *&buf) const {
+void AddIndexMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
 }
 
-void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
+void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, this->index_dir_);
+    index_def_->WriteAdv(buf);
+}
+
+void AddIrsIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -247,24 +314,17 @@ void AddTableIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->index_dir_);
 }
 
-void AddIrsIndexEntryOperation::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
-    WriteBufAdv(buf, this->index_dir_);
-}
-
-void AddColumnIndexEntryOperation::WriteAdv(char *&buf) const {
+void AddColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->col_index_dir_);
     WriteBufAdv(buf, this->column_id_);
+    index_base_->WriteAdv(buf);
 }
 
-void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
+void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -275,7 +335,7 @@ void AddSegmentColumnIndexEntryOperation::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_ts_);
 }
 
-void AddDBMetaOperation::SaveSate() {
+void AddDBMetaOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
@@ -284,21 +344,22 @@ void AddDBMetaOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddTableMetaOperation::SaveSate() {
+void AddTableMetaOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
-    //    }
+    //
     this->db_name_ = this->table_meta_->db_name();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
     is_snapshotted_ = true;
 }
 
-void AddDBEntryOperation::SaveSate() {
+void AddDBEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
     this->is_delete_ = db_entry_->deleted_;
+    this->begin_ts_ = db_entry_->begin_ts_;
     String db_name = db_entry_->db_name();
     String db_entry_dir_ = db_entry_->db_entry_dir();
     this->db_name_ = db_name;
@@ -306,21 +367,25 @@ void AddDBEntryOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddTableEntryOperation::SaveSate() {
+void AddTableEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
     this->is_delete_ = this->table_entry_->deleted_;
+    this->begin_ts_ = this->table_entry_->begin_ts_;
     this->db_name_ = *this->table_entry_->GetDBName();
     this->table_name_ = *this->table_entry_->GetTableName();
     this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
+    this->column_defs_ = this->table_entry_->column_defs();
     is_snapshotted_ = true;
 }
 
-void AddSegmentEntryOperation::SaveSate() {
+void AddSegmentEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = segment_entry_->deleted_;
+    this->begin_ts_ = segment_entry_->begin_ts_;
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
@@ -328,10 +393,12 @@ void AddSegmentEntryOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddBlockEntryOperation::SaveSate() {
+void AddBlockEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = block_entry_->deleted_;
+    this->begin_ts_ = block_entry_->begin_ts_;
     this->db_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetTableName();
     this->segment_id_ = this->block_entry_->GetSegmentEntry()->segment_id();
@@ -342,10 +409,12 @@ void AddBlockEntryOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddColumnEntryOperation::SaveSate() {
+void AddColumnEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = column_entry_->deleted_;
+    this->begin_ts_ = column_entry_->begin_ts_;
     this->db_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetTableName();
     this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
@@ -356,7 +425,7 @@ void AddColumnEntryOperation::SaveSate() {
 }
 
 /// Related to index
-void AddIndexMetaOperation::SaveSate() {
+void AddIndexMetaOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
@@ -366,11 +435,12 @@ void AddIndexMetaOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddTableIndexEntryOperation::SaveSate() {
+void AddTableIndexEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
-    this->is_delete_ = this->table_index_entry_->deleted_;
+    this->is_delete_ = table_index_entry_->deleted_;
+    this->begin_ts_ = table_index_entry_->begin_ts_;
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
@@ -379,10 +449,12 @@ void AddTableIndexEntryOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddIrsIndexEntryOperation::SaveSate() {
+void AddIrsIndexEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = irs_index_entry_->deleted_;
+    this->begin_ts_ = irs_index_entry_->begin_ts_;
     this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->irs_index_entry_->table_index_entry()->table_index_meta()->index_name();
@@ -390,22 +462,27 @@ void AddIrsIndexEntryOperation::SaveSate() {
     is_snapshotted_ = true;
 }
 
-void AddColumnIndexEntryOperation::SaveSate() {
+void AddColumnIndexEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = column_index_entry_->deleted_;
+    this->begin_ts_ = column_index_entry_->begin_ts_;
     this->db_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->column_index_entry_->table_index_entry()->table_index_meta()->index_name();
     this->col_index_dir_ = *this->column_index_entry_->col_index_dir();
     this->column_id_ = this->column_index_entry_->column_id();
+    this->index_base_ = this->column_index_entry_->index_base();
     is_snapshotted_ = true;
 }
 
-void AddSegmentColumnIndexEntryOperation::SaveSate() {
+void AddSegmentColumnIndexEntryOp::SaveSate() {
     //    if (is_snapshotted_) {
     //        return;
     //    }
+    this->is_delete_ = segment_column_index_entry_->deleted_;
+    this->begin_ts_ = segment_column_index_entry_->begin_ts_;
     this->db_name_ = *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ =
         *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
@@ -516,6 +593,8 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("SaveState operation {}", operation->ToString()));
         operation->SaveSate();
+        operation->txn_id_ = txn_id;
+        operation->commit_ts_ = commit_ts;
     }
 }
 
@@ -533,13 +612,13 @@ void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
     auto &local_operations = other->operations();
 
     for (auto &local_operation : local_operations) {
-        auto it = global_map.find(local_operation->EncodeIndex());
-        if (it == global_map.end()) {
-            global_map[local_operation->EncodeIndex()] = global_operations.size();
-            global_operations.push_back(std::move(local_operation));
-        } else {
-            global_operations[it->second] = std::move(local_operation);
-        }
+        //        auto it = global_map.find(local_operation->EncodeIndex());
+        //        if (it == global_map.end()) {
+        //            global_map[local_operation->EncodeIndex()] = global_operations.size();
+        global_operations.push_back(std::move(local_operation));
+        //        } else {
+        //            global_operations[it->second] = std::move(local_operation);
+        //        }
     }
 
     local_operations.clear();

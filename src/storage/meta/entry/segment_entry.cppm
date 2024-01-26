@@ -80,6 +80,8 @@ public:
 
     int Room();
 
+    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
+
 public:
     // Used in WAL replay & Physical Import
     inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }

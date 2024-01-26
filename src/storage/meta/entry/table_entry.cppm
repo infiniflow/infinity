@@ -61,6 +61,16 @@ public:
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts);
 
+    static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
+                                                     SharedPtr<String> db_entry_dir,
+                                                     SharedPtr<String> table_name,
+                                                     Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                     TableEntryType table_entry_type,
+                                                     TransactionID txn_id,
+                                                     TxnTimeStamp begin_ts,
+                                                     TxnTimeStamp commit_ts,
+                                                     bool is_delete);
+
 private:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
                                                  ConflictType conflict_type,
@@ -131,7 +141,10 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void GetFullTextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<IrsIndexEntry> &irs_index_entry, Map<String, String> &column2analyzer);
+    void GetFullTextAnalyzers(TransactionID txn_id,
+                              TxnTimeStamp begin_ts,
+                              SharedPtr<IrsIndexEntry> &irs_index_entry,
+                              Map<String, String> &column2analyzer);
 
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -146,6 +159,8 @@ public:
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_; }
+
+    Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
 
 protected:
     TableMeta *table_meta_{};

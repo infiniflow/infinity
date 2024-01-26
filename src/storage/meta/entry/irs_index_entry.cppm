@@ -39,6 +39,13 @@ public:
     static SharedPtr<IrsIndexEntry>
     NewIrsIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
 
+    static SharedPtr<IrsIndexEntry> NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
+                                                           SharedPtr<String> index_dir,
+                                                           TransactionID txn_id,
+                                                           TxnTimeStamp begin_ts,
+                                                           TxnTimeStamp commit_ts,
+                                                           bool is_delete);
+
     void AddColumn(SharedPtr<IndexBase> index_base, ColumnID column_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
@@ -52,6 +59,7 @@ private:
 public:
     const TableIndexEntry *table_index_entry() { return table_index_entry_; }
     const String index_dir() { return *index_dir_; }
+    HashMap<u64, SharedPtr<IndexFullText>> &index_info_map() { return index_info_map_; }
 
 public:
     std::shared_mutex rw_locker_{};

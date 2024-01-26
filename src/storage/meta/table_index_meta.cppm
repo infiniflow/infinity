@@ -46,6 +46,10 @@ public:
 
     Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<TableIndexEntry *, Status> GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+
 private:
     Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                                            ConflictType conflict_type,
@@ -55,7 +59,8 @@ private:
                                                            bool is_replay,
                                                            String replay_table_index_dir);
 
-    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<TableIndexEntry *, Status>
+    DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     SharedPtr<String> ToString();
 
@@ -79,6 +84,7 @@ private:
 public:
     String index_name() const { return *index_name_; }
     List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
+
 private:
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};
