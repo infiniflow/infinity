@@ -146,14 +146,6 @@ public:
     /// Returns the address of the root node of this fst.
     CompiledAddr RootAddr() { return meta_.root_addr_; }
 
-    Optional<Output> EmptyFinalOutput() {
-        auto root = Root();
-        if (root->IsFinal()) {
-            return root->FinalOutput();
-        }
-        return {};
-    }
-
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
@@ -164,12 +156,12 @@ public:
 
 private:
     /// Returns the root node of this fst.
-    UniquePtr<Node> Root() { return UniquePtr<Node>(new Node(meta_.version_, meta_.root_addr_, data_ptr_, data_len_)); }
+    UniquePtr<Node> Root() { return MakeUnique<Node>(meta_.version_, meta_.root_addr_, data_ptr_); }
 
     /// Returns the node at the given address.
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
-    UniquePtr<Node> NodeAt(CompiledAddr addr) { return MakeUnique<Node>(meta_.version_, addr, data_ptr_, data_len_); }
+    UniquePtr<Node> NodeAt(CompiledAddr addr) { return MakeUnique<Node>(meta_.version_, addr, data_ptr_); }
 };
 
 export enum BoundType {
@@ -223,6 +215,42 @@ private:
 public:
     Stream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst), end_at_(max) { SeekMin(min); }
 
+    /// @brief Get next key-value pair per lexicographical order
+    /// @param key Stores the key of the pair when found
+    /// @param val Stores the value of the pair when found
+    /// @return true if found next pair, false if not
+    bool Next(Vector<u8> &key, u64 &val) {
+        while (!stack_.empty()) {
+            StreamState &state = stack_.back();
+            if (state.trans_ >= state.node_->Len()) {
+                if (state.node_->Addr() != fst_.RootAddr()) {
+                    inp_.pop_back();
+                }
+                stack_.pop_back();
+                continue;
+            }
+            Transition trans = state.node_->TransAt(state.trans_);
+            Output out = state.out_.Cat(trans.out_);
+            UniquePtr<Node> next_node = fst_.NodeAt(trans.addr_);
+            inp_.push_back(trans.inp_);
+            if (end_at_.ExceededBy(inp_.data(), inp_.size())) {
+                // We are done, forever.
+                stack_.clear();
+                return false;
+            }
+            bool is_final = next_node->IsFinal();
+            if (is_final) {
+                key = inp_;
+                val = out.Cat(next_node->FinalOutput()).Value();
+            }
+            state.trans_++;
+            stack_.emplace_back(std::move(next_node), 0, out);
+            if (is_final)
+                return true;
+        }
+        return false;
+    }
+
 private:
     /// Seeks the underlying stream such that the next key to be read is the
     /// smallest key in the underlying fst that satisfies the given minimum
@@ -233,9 +261,6 @@ private:
     /// states.
     void SeekMin(Bound min) {
         if (min.IsEmpty()) {
-            if (min.IsInclusive()) {
-                empty_output_ = fst_.EmptyFinalOutput();
-            }
             stack_.emplace_back(fst_.Root(), 0, Output());
             return;
         }
@@ -285,48 +310,6 @@ private:
                 stack_.emplace_back(fst_.NodeAt(addr), 0, out);
             }
         }
-    }
-
-    /// @brief Get next key-value pair per lexicographical order
-    /// @param key Stores the key of the pair when found
-    /// @param val Stores the value of the pair when found
-    /// @return true if found next pair, false if not
-    bool Next(Vector<u8> &key, Output &val) {
-        if (empty_output_.has_value()) {
-            if (end_at_.ExceededBy(nullptr, 0)) {
-                stack_.clear();
-                return false;
-            }
-        }
-        while (!stack_.empty()) {
-            StreamState &state = stack_.back();
-            if (state.trans_ >= state.node_->Len()) {
-                stack_.pop_back();
-                if (state.node_->Addr() != fst_.RootAddr()) {
-                    inp_.pop_back();
-                }
-                continue;
-            }
-            Transition trans = state.node_->TransAt(state.trans_);
-            Output out = state.out_.Cat(trans.out_);
-            UniquePtr<Node> next_node = fst_.NodeAt(trans.addr_);
-            inp_.push_back(trans.inp_);
-            if (end_at_.ExceededBy(inp_.data(), inp_.size())) {
-                // We are done, forever.
-                stack_.clear();
-                return false;
-            }
-            bool is_final = next_node->IsFinal();
-            if (is_final) {
-                key = inp_;
-                val = out.Cat(next_node->FinalOutput());
-            }
-            state.trans_++;
-            stack_.emplace_back(std::move(next_node), 0, out);
-            if (is_final)
-                return true;
-        }
-        return false;
     }
 };
 

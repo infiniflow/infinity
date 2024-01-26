@@ -210,7 +210,7 @@ struct Node {
 
     /// Creates a new note at the address given.
     /// `data` should be a slice to an entire FST.
-    Node(u64 version, CompiledAddr addr, u8 *data_ptr, SizeT data_len);
+    Node(u64 version, CompiledAddr addr, u8 *data_ptr);
 
     static void Compile(Writer &wtr, CompiledAddr last_addr, CompiledAddr addr, BuilderNode &node);
 
@@ -227,7 +227,7 @@ struct Node {
 
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
-    Output FinalOutput() { return final_output_; }
+    Output FinalOutput() { return is_final_ ? final_output_ : Output::Zero(); }
 
     /// Returns true if and only if this node corresponds to a final or "match"
     /// state in the finite state transducer.
@@ -448,7 +448,7 @@ public:
     }
 
     Output OutputOf(const Node &node) const {
-        SizeT osize = node.sizes_.TransitionPackSize();
+        SizeT osize = node.sizes_.OutputPackSize();
         if (osize == 0)
             return Output::Zero();
         SizeT tsize = node.sizes_.TransitionPackSize();
@@ -519,10 +519,14 @@ public:
             if (node.is_final_) {
                 PackUintIn(wtr, node.final_output_.Value(), osize);
             }
+            for (int i = int(ntrans) - 1; i >= 0; i--) {
+                const Transition &t = node.trans_[i];
+                PackUintIn(wtr, t.out_.Value(), osize);
+            }
         }
         for (int i = int(ntrans) - 1; i >= 0; i--) {
             const Transition &t = node.trans_[i];
-            PackUintIn(wtr, t.out_.Value(), osize);
+            State::PackDeltaIn(wtr, addr, t.addr_, tsize);
         }
         for (int i = int(ntrans) - 1; i >= 0; i--) {
             const Transition &t = node.trans_[i];
@@ -684,10 +688,9 @@ public:
         if (osize == 0) {
             return Output::Zero();
         }
-        SizeT at = node.start_ - NtransLen() - 1                              // pack size
-                   - TotalTransSize(node.version_, node.sizes_, node.ntrans_) // outputs
-                   - (i * osize)                                              // the previous output values
-                   - osize;                                                   // the desired output value
+        SizeT at = node.start_ - NtransLen() - 1                                            // pack size
+                   - TotalTransSize(node.version_, node.sizes_, node.ntrans_) - (i * osize) // the previous output values
+                   - osize;                                                                 // the desired output value
         return Output(UnpackUint(node.data_ptr_ + at, osize));
     }
 
@@ -724,8 +727,8 @@ UniquePtr<State> State::New(u8 *data_ptr, SizeT addr) {
     }
 }
 
-Node::Node(u64 version, CompiledAddr addr, u8 *data_ptr, SizeT data_len)
-    : version_(version), data_ptr_(data_ptr), data_len_(data_len), final_output_(Output::Zero()) {
+Node::Node(u64 version, CompiledAddr addr, u8 *data_ptr)
+    : version_(version), data_ptr_(data_ptr), data_len_(addr + 1), final_output_(Output::Zero()) {
     if (addr == EMPTY_ADDRESS) {
         data_len_ = 0;
         state_ = MakeUnique<StateEmptyFinal>();
@@ -736,34 +739,35 @@ Node::Node(u64 version, CompiledAddr addr, u8 *data_ptr, SizeT data_len)
         sizes_ = PackSizes();
         return;
     }
-    data_len_ = addr + 1;
     start_ = addr;
     u8 val = data_ptr[addr];
     switch ((val & 0b11000000) >> 6) {
         case 0b11: {
             auto state = MakeUnique<StateOneTransNext>(val);
-            end_ = state->EndAddr(data_len);
+            end_ = state->EndAddr(data_len_);
             is_final_ = false;
             ntrans_ = 1;
             sizes_ = PackSizes();
             state_ = std::move(state);
+            break;
         }
         case 0b10: {
             auto state = MakeUnique<StateOneTrans>(val);
-            sizes_ = state->Sizes(data_ptr, data_len);
-            end_ = state->EndAddr(data_len, sizes_);
+            sizes_ = state->Sizes(data_ptr, data_len_);
+            end_ = state->EndAddr(data_len_, sizes_);
             is_final_ = false;
             ntrans_ = 1;
             state_ = std::move(state);
+            break;
         }
         default: {
             auto state = MakeUnique<StateAnyTrans>(val);
-            SizeT ntrans = state->Ntrans(data_ptr, data_len);
-            sizes_ = state->Sizes(data_ptr, data_len);
-            end_ = state->EndAddr(version, data_len, sizes_, ntrans);
+            SizeT ntrans = state->Ntrans(data_ptr, data_len_);
+            sizes_ = state->Sizes(data_ptr, data_len_);
+            end_ = state->EndAddr(version, data_len_, sizes_, ntrans);
             is_final_ = state->IsFinalState();
             ntrans_ = ntrans;
-            final_output_ = state->FinalOutput(version, data_ptr, data_len, sizes_, ntrans);
+            final_output_ = state->FinalOutput(version, data_ptr, data_len_, sizes_, ntrans);
             state_ = std::move(state);
         }
     }
