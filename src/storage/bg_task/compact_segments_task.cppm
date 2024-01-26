@@ -14,8 +14,6 @@
 
 module;
 
-#include <vector>
-#include <algorithm>
 import stl;
 import bg_task;
 import catalog;
@@ -30,44 +28,27 @@ namespace infinity {
 
 class RowIDRemapper {
 public:
+    RowIDRemapper(SizeT block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
+
     void AddMap(SegmentID segment_id, BlockID block_id, BlockOffset block_offset, RowID new_row_id) {
         auto &segment_map = row_id_map_[segment_id];
         auto &block_vec = segment_map[block_id];
         block_vec.emplace_back(block_offset, new_row_id);
     }
 
-    RowID GetNewRowID(SegmentID segment_id, BlockID block_id, BlockOffset block_offset) {
-        auto &segment_map = row_id_map_.at(segment_id);
-        auto &block_vec = segment_map.at(block_id);
-        auto iter =
-            std::upper_bound(block_vec.begin(),
-                             block_vec.end(),
-                             block_offset,
-                             [](BlockOffset block_offset, const Pair<BlockOffset, RowID> &pair) { return block_offset < pair.first; } // NOLINT
-            );
-        if (iter == block_vec.begin()) {
-            UnrecoverableError("RowID not found");
-        }
-        --iter;
-        RowID rtn = iter->second;
-        rtn.segment_offset_ += iter->first - block_offset;
-        return rtn;
-    }
+    RowID GetNewRowID(SegmentID segment_id, BlockID block_id, BlockOffset block_offset) const;
 
     void AddMap(RowID old_row_id, RowID new_row_id) {
-        AddMap(old_row_id.segment_id_,
-               old_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY,
-               old_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY,
-               new_row_id);
+        AddMap(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_, new_row_id);
     }
 
-    RowID GetNewRowID(RowID old_row_id) {
-        return GetNewRowID(old_row_id.segment_id_,
-                           old_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY,
-                           old_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY);
+    RowID GetNewRowID(RowID old_row_id) const {
+        return GetNewRowID(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_);
     }
 
 private:
+    const SizeT block_capacity_;
+
     HashMap<SegmentID, HashMap<BlockID, Vector<Pair<BlockOffset, RowID>>>> row_id_map_;
 };
 
@@ -79,6 +60,12 @@ struct ToDeleteInfo {
     const TxnTimeStamp commit_ts_;
 };
 
+export struct CompactSegmentsTaskState {
+    RowIDRemapper remapper_;
+
+    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data_;
+};
+
 export class CompactSegmentsTask final : public BGTask {
 public:
     explicit CompactSegmentsTask(TableEntry *table_entry, Txn *txn);
@@ -87,20 +74,22 @@ public:
 
     void Execute();
 
-    void Execute1();
-
-    void Execute2();
-
-    // Called by `SegmentEntry::DeleteData` which is called by wal thread.
+    // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
     void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> &&block_row_hashmap, TxnTimeStamp commit_ts);
 
-    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&data);
+public:
+    // these two are called by unit test. Do not use them directly.
+    CompactSegmentsTaskState CompactSegs();
+
+    void CommitCompacts(CompactSegmentsTaskState &&state);
 
 private:
-    SharedPtr<SegmentEntry> CompactSegments(const Vector<SegmentID> &segment_ids);
+    SharedPtr<SegmentEntry> CompactSegsIntoOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids);
 
-    void ApplyToDelete(const Vector<SegmentEntry *> &segment_entries);
+    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&segment_data);
+
+    void ApplyToDelete(const RowIDRemapper &remapper);
 
 private:
     TableEntry *const table_entry_;
@@ -108,10 +97,5 @@ private:
     Txn *const txn_;
 
     Vector<ToDeleteInfo> to_deletes_;
-
-    RowIDRemapper remapper_;
-
-    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data_;
-    HashMap<SegmentID, SharedPtr<SegmentEntry>> new_segments_;
 };
 } // namespace infinity

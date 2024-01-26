@@ -367,7 +367,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_NE(table_entry, nullptr);
 
             CompactSegmentsTask compact_task(table_entry, txn4);
-            compact_task.Execute1();
+            auto state = compact_task.CompactSegs();
 
             {
                 auto txn5 = txn_mgr->CreateTxn();
@@ -383,7 +383,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                 txn_mgr->CommitTxn(txn5);
             }
 
-            compact_task.Execute2();
+            compact_task.CommitCompacts(std::move(state));
             txn_mgr->CommitTxn(txn4);
 
             int test_segment_n = segment_sizes.size();

@@ -271,14 +271,14 @@ export {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
     }
 
-    template<class BidirIt>
-    BidirIt Prev(BidirIt it, typename std::iterator_traits<BidirIt>::difference_type n = 1) {
+    template<class BidirIteratorType>
+    BidirIteratorType Prev(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
         std::advance(it, -n);
         return it;
     }
 
-    template<class BidirIt>
-    BidirIt Next(BidirIt it, typename std::iterator_traits<BidirIt>::difference_type n = 1) {
+    template<class BidirIteratorType>
+    BidirIteratorType Next(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
         std::advance(it, n);
         return it;
     }
