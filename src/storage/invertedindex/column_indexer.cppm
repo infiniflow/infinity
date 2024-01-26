@@ -68,6 +68,10 @@ public:
 
     RTPostingTable *GetRTPostingTable() { return rt_posting_store_.get(); }
 
+    PostingPtr GetOrAddPosting(const TermKey &term);
+
+    RTPostingPtr GetOrAddRTPosting(const TermKey &term);
+
 private:
     void SetAnalyzer();
 

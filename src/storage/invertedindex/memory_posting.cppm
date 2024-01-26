@@ -34,12 +34,15 @@ public:
 
     ~MemoryPosting();
 
-    void Add() {}
+    void AddPosition(pos_t pos);
+
+    void EndDocument(docid_t doc_id, docpayload_t doc_payload);
 
 private:
     typename PostingTraits<REALTIME>::DocIDVector doc_ids_;
     typename PostingTraits<REALTIME>::TermFreqVector term_freqs_;
     typename PostingTraits<REALTIME>::PositionVector positions_;
+    u32 cur_tf_{0};
 };
 
 } // namespace infinity

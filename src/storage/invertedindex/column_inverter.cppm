@@ -101,6 +101,10 @@ private:
 
     void SortTerms();
 
+    void DoInsert();
+
+    void DoRTInsert();
+
     ColumnIndexer *column_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};

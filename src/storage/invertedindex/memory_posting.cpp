@@ -17,6 +17,19 @@ MemoryPosting<REALTIME>::MemoryPosting(MemoryPool *pool, PostingFormatOption pos
 template <bool REALTIME>
 MemoryPosting<REALTIME>::~MemoryPosting() {}
 
+template <bool REALTIME>
+void MemoryPosting<REALTIME>::AddPosition(pos_t pos) {
+    positions_.PushBack(pos);
+    cur_tf_++;
+}
+
+template <bool REALTIME>
+void MemoryPosting<REALTIME>::EndDocument(docid_t doc_id, docpayload_t doc_payload) {
+    term_freqs_.PushBack(cur_tf_);
+    doc_ids_.PushBack(doc_id);
+    cur_tf_ = 0;
+}
+
 template class MemoryPosting<true>;
 template class MemoryPosting<false>;
 } // namespace infinity

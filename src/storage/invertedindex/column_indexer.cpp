@@ -144,6 +144,28 @@ void ColumnIndexer::Commit() {
     SwitchActiveInverter();
 }
 
+ColumnIndexer::PostingPtr ColumnIndexer::GetOrAddPosting(const TermKey &term) {
+    ColumnIndexer::PostingTable::Iterator iter = posting_store_->find(term);
+    if (iter.valid())
+        return iter.getData();
+    else {
+        ColumnIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
+        posting_store_->insert(iter, term, posting);
+        return posting;
+    }
+}
+
+ColumnIndexer::RTPostingPtr ColumnIndexer::GetOrAddRTPosting(const TermKey &term) {
+    ColumnIndexer::RTPostingTable::Iterator iter = rt_posting_store_->find(term);
+    if (iter.valid())
+        return iter.getData();
+    else {
+        ColumnIndexer::RTPostingPtr posting = new MemoryPosting<true>(GetPool(), index_config_.GetPostingFormatOption());
+        rt_posting_store_->insert(iter, term, posting);
+        return posting;
+    }
+}
+
 } // namespace infinity
 
 namespace vespalib::btree {
