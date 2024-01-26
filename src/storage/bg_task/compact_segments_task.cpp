@@ -215,25 +215,17 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegments(const Vector<Segmen
 }
 
 void CompactSegmentsTask::ApplyToDelete(const Vector<SegmentEntry *> &segment_entries) {
+    Vector<RowID> row_ids;
     for (auto &delete_info : to_deletes_) {
         // remap the delete row id
-        DeleteState remapped_delete_state;
         for (const auto &[block_id, block_offsets] : delete_info.block_row_hashmap_) {
             for (BlockOffset block_offset : block_offsets) {
                 RowID new_row_id = remapper_.GetNewRowID(delete_info.segment_id_, block_id, block_offset);
-                BlockID new_block_id = new_row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-                BlockOffset new_block_offset = new_row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
-                auto &delete_rows = remapped_delete_state.rows_[new_row_id.segment_id_];
-                delete_rows[new_block_id].push_back(new_block_offset);
+                row_ids.push_back(new_row_id);
             }
         }
-
-        // Add delete state to txn_state
-        // NewCatalog::Delete(table_entry_, txn_->TxnID(), delete_info.commit_ts_, remapped_delete_state);
-        for (const auto [segment_id, delete_rows] : remapped_delete_state.rows_) {
-            new_segments_[segment_id]->DeleteData(txn_->TxnID(), delete_info.commit_ts_, delete_rows);
-        }
     }
+    txn_->Delete(*table_entry_->GetDBName(), *table_entry_->GetTableName(), row_ids);
     to_deletes_.clear();
 }
 
