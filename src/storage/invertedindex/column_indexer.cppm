@@ -15,21 +15,46 @@ import column_vector;
 import analyzer;
 import column_inverter;
 import task_executor;
+import memory_posting;
+import third_party;
+
 export module column_indexer;
+
+namespace vespalib::alloc {
+class MemoryPoolAllocator;
+}
 
 namespace infinity {
 export class ColumnIndexer {
-    using PostingTable = HashMap<String, PostingWriter *>;
+public:
+    using TermKey = String;
+    using PostingPtr = MemoryPosting<false> *;
+    using RTPostingPtr = MemoryPosting<true> *;
+    using PostingTable = Btree<TermKey, PostingPtr>;
+    using RTPostingTable = Btree<TermKey, RTPostingPtr>;
 
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
+        // bool operator()(const TermKey &lhs, const TermKey &rhs) const;
     };
 
-public:
+    enum IndexMode {
+        REAL_TIME,
+        NEAR_REAL_TIME,
+        OFFLINE,
+    };
+
     ColumnIndexer(u64 column_id, const InvertedIndexConfig &index_config, SharedPtr<MemoryPool> byte_slice_pool, SharedPtr<RecyclePool> buffer_pool);
+
     ~ColumnIndexer();
 
-    void Add(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void SetIndexMode(IndexMode index_mode);
+
+    bool IsRealTime() { return index_mode_ == REAL_TIME; }
+    // realtime insert
+    void Insert(RowID row_id, String &data);
+
+    void Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
     void Commit();
 
@@ -39,22 +64,26 @@ public:
 
     MemoryPool *GetPool() { return byte_slice_pool_.get(); }
 
+    PostingTable *GetPostingTable() { return posting_store_.get(); }
+
+    RTPostingTable *GetRTPostingTable() { return rt_posting_store_.get(); }
+
 private:
     void SetAnalyzer();
-
-    PostingWriter *DoAddPosting(const String &term);
 
     void SwitchActiveInverter();
 
 private:
+    IndexMode index_mode_{NEAR_REAL_TIME};
     u64 column_id_;
     InvertedIndexConfig index_config_;
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
-    PostingTable *posting_table_{nullptr};
+    SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
+    UniquePtr<PostingTable> posting_store_;
+    UniquePtr<RTPostingTable> rt_posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
-    bool is_real_time_{false};
     Vector<UniquePtr<ColumnInverter>> free_inverters_;
     Deque<UniquePtr<ColumnInverter>> inflight_inverters_;
     UniquePtr<ColumnInverter> inverter_;

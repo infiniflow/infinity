@@ -58,7 +58,7 @@ void Indexer::Add(DataBlock *data_block) {
     for (SizeT i = 0; i < column_vectors.size(); ++i) {
         /// TODO column_id ?
         u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Add(column_vectors[i], row_ids);
+        column_indexers_[column_id]->Insert(column_vectors[i], row_ids);
     }
 }
 
