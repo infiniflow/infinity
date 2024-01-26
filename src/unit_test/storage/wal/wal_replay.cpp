@@ -754,11 +754,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment = table_entry->segment_map()[0].get();
-                EXPECT_NE(segment->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment->deprecate_ts(), UNCOMMIT_TS);
             }
             auto compact_segment = table_entry->segment_map()[test_segment_n].get();
-            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
-            EXPECT_EQ(compact_segment->remain_row_count(), test_segment_n);
+            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
         }
     }
 }

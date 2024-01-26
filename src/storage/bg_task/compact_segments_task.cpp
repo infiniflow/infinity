@@ -14,6 +14,11 @@
 
 module;
 
+#include <algorithm>
+#include <vector>
+
+module compact_segments_task;
+
 import stl;
 import catalog;
 import default_values;
@@ -26,17 +31,12 @@ import txn;
 import infinity_exception;
 import bg_task;
 import wal;
-
-#include <algorithm>
-#include <vector>
-
-module compact_segments_task;
+import global_block_id;
 
 namespace infinity {
 
 RowID RowIDRemapper::GetNewRowID(SegmentID segment_id, BlockID block_id, BlockOffset block_offset) const {
-    auto &segment_map = row_id_map_.at(segment_id);
-    auto &block_vec = segment_map.at(block_id);
+    auto &block_vec = row_id_map_.at(GlobalBlockID(segment_id, block_id));
     auto iter = std::upper_bound(block_vec.begin(),
                                  block_vec.end(),
                                  block_offset,
@@ -51,15 +51,15 @@ RowID RowIDRemapper::GetNewRowID(SegmentID segment_id, BlockID block_id, BlockOf
     return rtn;
 }
 
-class GreedyCompactableSegsGenerator {
+class GreedyCompactableSegmentsGenerator {
 public:
-    GreedyCompactableSegsGenerator(const Vector<Pair<SegmentID, SizeT>> &segments, SizeT max_segment_size) : max_segment_size_(max_segment_size) {
+    GreedyCompactableSegmentsGenerator(const Vector<Pair<SegmentID, SizeT>> &segments, SizeT max_segment_size) : max_segment_size_(max_segment_size) {
         for (const auto &[segment_id, row_count] : segments) {
             segments_.emplace(row_count, segment_id);
         }
     }
 
-    Vector<SegmentID> operator()() {
+    Vector<SegmentID> generate() {
         Vector<SegmentID> result;
         do {
             result.clear();
@@ -90,29 +90,29 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Txn *txn)
     : BGTask(BGTaskType::kCompactSegments, false), table_entry_(table_entry), txn_(txn) {}
 
 void CompactSegmentsTask::Execute() {
-    auto state = CompactSegs();
+    auto state = CompactSegments();
     CommitCompacts(std::move(state));
 }
 
-CompactSegmentsTaskState CompactSegmentsTask::CompactSegs() {
+CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
     CompactSegmentsTaskState state;
 
     Vector<Pair<SegmentID, SizeT>> segments;
     TxnTimeStamp begin_ts = txn_->BeginTS();
     // scan the segments
     for (const auto &[segment_id, segment_entry] : table_entry_->segment_map()) {
-        if (segment_entry->min_row_ts() <= begin_ts && segment_entry->max_row_ts() >= begin_ts) {
-            segments.emplace_back(segment_id, segment_entry->remain_row_count());
+        if (segment_entry->min_row_ts() <= begin_ts && segment_entry->deprecate_ts() >= begin_ts) {
+            segments.emplace_back(segment_id, segment_entry->actual_row_count());
         }
     }
-    GreedyCompactableSegsGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
+    GreedyCompactableSegmentsGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
 
     while (true) {
-        Vector<SegmentID> to_compact_segments = generator();
+        Vector<SegmentID> to_compact_segments = generator.generate();
         if (to_compact_segments.empty()) {
             break;
         }
-        auto new_segment = CompactSegsIntoOne(state.remapper_, to_compact_segments);
+        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
         state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
     }
 
@@ -132,7 +132,7 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, HashMap<BlockID, Vec
     to_deletes_.emplace_back(ToDeleteInfo{segment_id, std::move(block_row_hashmap), commit_ts});
 }
 
-SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegsIntoOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids) {
+SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids) {
     SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
     auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn_);
 

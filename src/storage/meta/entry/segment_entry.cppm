@@ -67,7 +67,7 @@ public:
 
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
 
-    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+    TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
 
     inline SegmentID segment_id() const { return segment_id_; }
 
@@ -79,7 +79,7 @@ public:
 
     inline SizeT row_count() const { return row_count_; }
 
-    SizeT remain_row_count() const { return remain_row_count_; }
+    SizeT actual_row_count() const { return actual_row_count_; }
 
     int Room();
 
@@ -87,7 +87,7 @@ public:
 
     void SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
 
-    void SetDeprecated(TxnTimeStamp commit_ts);
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction
@@ -95,15 +95,15 @@ public:
 
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
-        remain_row_count_ += increased_row_count;
+        actual_row_count_ += increased_row_count;
     }
 
 private:
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
-        if (decrease_row_count > remain_row_count_) {
+        if (decrease_row_count > actual_row_count_) {
             UnrecoverableError("Decrease row count exceed remain row count");
         }
-        remain_row_count_ -= decrease_row_count;
+        actual_row_count_ -= decrease_row_count;
     }
 
 public:
@@ -117,8 +117,10 @@ public:
 
 protected:
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
+
 public:
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
+
 protected:
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
@@ -147,11 +149,11 @@ protected:
     const u64 column_count_{};
 
     SizeT row_count_{};
-    SizeT remain_row_count_{}; // not deleted row count
+    SizeT actual_row_count_{}; // not deleted row count
 
     TxnTimeStamp min_row_ts_{0};              // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
-    TxnTimeStamp max_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 

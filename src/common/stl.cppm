@@ -218,13 +218,11 @@ export {
     template <typename T>
     using Set = std::set<T>;
 
-    template <typename T>
-    inline size_t Hash(T t) {
-        return std::hash<T>()(t);
-    }
+    template<typename T>
+    using Hash = std::hash<T>;
 
-    template <typename S, typename T, typename H = std::hash<S>>
-    using HashMap = std::unordered_map<S, T, H>;
+    template <typename S, typename T, typename H = std::hash<S>, typename Eq = std::equal_to<S>>
+    using HashMap = std::unordered_map<S, T, H, Eq>;
 
     template <typename S, typename T, typename H = std::hash<S>>
     using MultiHashMap = std::unordered_multimap<S, T, H>;

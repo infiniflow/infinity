@@ -14,6 +14,8 @@
 
 module;
 
+export module compact_segments_task;
+
 import stl;
 import bg_task;
 import catalog;
@@ -21,18 +23,19 @@ import parser;
 import default_values;
 import infinity_exception;
 import txn;
-
-export module compact_segments_task;
+import global_block_id;
 
 namespace infinity {
 
 class RowIDRemapper {
+private:
+    using RowIDMap = HashMap<GlobalBlockID, Vector<Pair<BlockOffset, RowID>>, GlobalBlockIDHash>;
+
 public:
     RowIDRemapper(SizeT block_capacity = DEFAULT_BLOCK_CAPACITY) : block_capacity_(block_capacity) {}
 
     void AddMap(SegmentID segment_id, BlockID block_id, BlockOffset block_offset, RowID new_row_id) {
-        auto &segment_map = row_id_map_[segment_id];
-        auto &block_vec = segment_map[block_id];
+        auto &block_vec = row_id_map_[GlobalBlockID(segment_id, block_id)];
         block_vec.emplace_back(block_offset, new_row_id);
     }
 
@@ -49,7 +52,7 @@ public:
 private:
     const SizeT block_capacity_;
 
-    HashMap<SegmentID, HashMap<BlockID, Vector<Pair<BlockOffset, RowID>>>> row_id_map_;
+    RowIDMap row_id_map_;
 };
 
 struct ToDeleteInfo {
@@ -80,12 +83,12 @@ public:
 
 public:
     // these two are called by unit test. Do not use them directly.
-    CompactSegmentsTaskState CompactSegs();
+    CompactSegmentsTaskState CompactSegments();
 
     void CommitCompacts(CompactSegmentsTaskState &&state);
 
 private:
-    SharedPtr<SegmentEntry> CompactSegsIntoOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids);
+    SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids);
 
     void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&segment_data);
 

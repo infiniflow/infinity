@@ -134,11 +134,11 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             auto compact_segment = table_entry->segment_map().at(test_segment_n).get();
-            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
-            EXPECT_EQ(compact_segment->remain_row_count(), row_count);
+            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->actual_row_count(), row_count);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -197,13 +197,13 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 2);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
                 auto *compact_segment = table_entry->segment_map().at(i).get();
-                EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
-                cnt += compact_segment->remain_row_count();
+                EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+                cnt += compact_segment->actual_row_count();
             }
             EXPECT_EQ(cnt, row_count);
         }
@@ -288,12 +288,12 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
-            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
 
-            EXPECT_EQ(compact_segment->remain_row_count(), row_count - delete_n);
+            EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -368,7 +368,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_NE(table_entry, nullptr);
 
             CompactSegmentsTask compact_task(table_entry, txn4);
-            auto state = compact_task.CompactSegs();
+            auto state = compact_task.CompactSegments();
 
             {
                 auto txn5 = txn_mgr->CreateTxn();
@@ -401,12 +401,12 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
-            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
 
-            EXPECT_EQ(compact_segment->remain_row_count(), row_count - delete_n);
+            EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -481,7 +481,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             EXPECT_NE(table_entry, nullptr);
 
             CompactSegmentsTask compact_task(table_entry, txn4);
-            auto state = compact_task.CompactSegs();
+            auto state = compact_task.CompactSegments();
 
             auto txn6 = txn_mgr->CreateTxn();
             txn6->Begin();
@@ -540,12 +540,12 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->max_row_ts(), UNCOMMIT_TS);
+                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
-            EXPECT_EQ(compact_segment->max_row_ts(), UNCOMMIT_TS);
+            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
 
-            EXPECT_EQ(compact_segment->remain_row_count(), row_count - delete_n);
+            EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();

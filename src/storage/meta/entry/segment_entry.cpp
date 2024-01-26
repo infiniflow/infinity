@@ -73,9 +73,9 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
         txn->AddCatalogDeltaOperation(std::move(operation));
     }
     segment_entry->row_count_ = 0;
-    segment_entry->remain_row_count_ = 0;
+    segment_entry->actual_row_count_ = 0;
     segment_entry->min_row_ts_ = UNCOMMIT_TS;
-    segment_entry->max_row_ts_ = UNCOMMIT_TS;
+    segment_entry->deprecate_ts_ = UNCOMMIT_TS;
 
     auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
     segment_entry->block_entries_.emplace_back(std::move(block_entry));
@@ -88,7 +88,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
                                                             TxnTimeStamp commit_ts) {
     auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount());
     segment_entry->min_row_ts_ = commit_ts;
-    segment_entry->max_row_ts_ = UNCOMMIT_TS;
+    segment_entry->deprecate_ts_ = UNCOMMIT_TS;
     return segment_entry;
 }
 
@@ -112,7 +112,7 @@ void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp
 void SegmentEntry::SetDeprecated(TxnTimeStamp commit_ts) {
     std::unique_lock<std::shared_mutex> lock(rw_locker_);
     compact_task_ = nullptr;
-    max_row_ts_ = commit_ts;
+    deprecate_ts_ = commit_ts;
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
@@ -179,7 +179,7 @@ void SegmentEntry::AddDeleteToCompactTask(TransactionID txn_id,
                                           const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
                                           TxnTimeStamp commit_ts) {
     if (commit_ts >= compacting_ts_) {
-        if (commit_ts < max_row_ts_) {
+        if (commit_ts < deprecate_ts_) {
             // a task is compacting this segment. pass the deleted row_ids to the task.
             // copy the hashmap here
             auto hashmap_copy = block_row_hashmap;
@@ -187,6 +187,7 @@ void SegmentEntry::AddDeleteToCompactTask(TransactionID txn_id,
         } else {
             // This segment is deprecated because of segment compaction
             // Current function is called by `PrepareCommit`, throw exception will cause rollback.
+            // TODO: this function cannot throw exception, remove it.
             RecoverableError(Status::TxnRollback(txn_id));
         }
     }
@@ -364,7 +365,7 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
         if (this->min_row_ts_ == UNCOMMIT_TS) {
             this->min_row_ts_ = commit_ts;
         }
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
         block_entry = this->block_entries_[block_id];
     }
     block_entry->CommitAppend(txn_id, commit_ts);
@@ -382,7 +383,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
 
         DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
     }
 }
 
@@ -404,10 +405,10 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["segment_id"] = this->segment_id_;
         json_res["column_count"] = this->column_count_;
         json_res["min_row_ts"] = this->min_row_ts_;
-        json_res["max_row_ts"] = this->max_row_ts_;
+        json_res["max_row_ts"] = this->deprecate_ts_;
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
-        json_res["remain_row_count"] = this->remain_row_count_;
+        json_res["actual_row_count"] = this->actual_row_count_;
         for (auto &block_entry : this->block_entries_) {
             if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
                 block_entries.push_back((BlockEntry *)block_entry.get());
@@ -443,10 +444,10 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
                                                                      segment_entry_json["column_count"]);
 
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
-    segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
+    segment_entry->deprecate_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
-    segment_entry->remain_row_count_ = segment_entry_json["remain_row_count"];
+    segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
 
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {
@@ -496,8 +497,8 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     }
 
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
-    // TODO: remain_row_count
-    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
+    // TODO: actual_row_count
+    this->deprecate_ts_ = std::max(this->deprecate_ts_, segment_entry2->deprecate_ts_);
 
     SizeT block_count = this->block_entries_.size();
     SizeT idx = 0;
