@@ -27,6 +27,7 @@ import infinity_exception;
 import column_vector;
 import third_party;
 import catalog;
+import buffer_manager;
 import secondary_index_pgm;
 
 namespace infinity {
@@ -60,9 +61,31 @@ struct ConvertToOrdered<T> {
     using type = i64;
 };
 
-template <typename T>
+export template <typename T>
     requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T>
 using ConvertToOrderedType = ConvertToOrdered<T>::type;
+
+export template <typename RawValueType>
+ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
+    static_assert(false, "type not supported");
+}
+
+export template <KeepOrderedSelf RawValueType>
+ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
+    return value;
+}
+
+// DateT, TimeT
+export template <ConvertToOrderedI32 RawValueType>
+ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
+    return value.GetValue();
+}
+
+// DateTimeT, TimestampT
+export template <ConvertToOrderedI64 RawValueType>
+ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
+    return value.GetEpochTime();
+}
 
 template <typename T>
 LogicalType GetLogicalType = kInvalid;
@@ -93,7 +116,8 @@ class SecondaryIndexDataBuilderBase {
 public:
     SecondaryIndexDataBuilderBase() = default;
     virtual ~SecondaryIndexDataBuilderBase() = default;
-    virtual void AppendColumnVector(const void *append_ptr, u32 append_num) = 0;
+    virtual void
+    LoadSegmentData(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp begin_ts, bool check_ts) = 0;
     virtual void StartOutput() = 0;
     virtual void EndOutput() = 0;
     virtual void OutputToHeader(SecondaryIndexDataHead *index_head) = 0;
@@ -108,21 +132,23 @@ template <typename RawValueType>
 class SecondaryIndexDataBuilder final : public SecondaryIndexDataBuilderBase {
 public:
     using KeyType = ConvertToOrderedType<RawValueType>;
-    using OffsetType = u32;
+    using OffsetType = SegmentOffset;
     using KeyOffsetPair = Pair<KeyType, OffsetType>;
 
-    explicit SecondaryIndexDataBuilder(u32 data_num, u32 input_block_max_row, u32 part_capacity)
-        : input_block_max_row_(input_block_max_row), data_num_(data_num), output_part_capacity_(part_capacity) {
+    explicit SecondaryIndexDataBuilder(u32 data_num, u32 part_capacity) : data_num_(data_num), output_part_capacity_(part_capacity) {
         output_part_num_ = (data_num_ + output_part_capacity_ - 1) / output_part_capacity_;
         index_key_type_ = GetLogicalType<KeyType>;
         output_offset_type_ = LogicalType::kInteger; // used to store u32 offsets
         sorted_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(data_num_);
-        append_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(input_block_max_row_);
     }
 
     ~SecondaryIndexDataBuilder() override final = default;
 
-    void AppendColumnVector(const void *append_ptr, u32 append_num) override final;
+    void LoadSegmentData(const SegmentEntry *segment_entry,
+                         BufferManager *buffer_mgr,
+                         ColumnID column_id,
+                         TxnTimeStamp begin_ts,
+                         bool check_ts) override final;
 
     void StartOutput() override final;
 
@@ -133,12 +159,9 @@ public:
     void OutputToPart(SecondaryIndexDataPart *index_part) override final;
 
 private:
-    u32 size_{};                                         // number of pairs in sorted_key_offset_pair_
-    u32 input_block_max_row_{};                          // number of rows in each full input block
-    const u32 data_num_{};                               // number of rows in the segment
+    const u32 data_num_{};                               // number of rows in the segment, except those deleted
     LogicalType index_key_type_ = LogicalType::kInvalid; // type of ordered keys stored in the raw index
     UniquePtr<KeyOffsetPair[]> sorted_key_offset_pair_;  // size: data_num_. Will be destroyed in OutputToHeader().
-    UniquePtr<KeyOffsetPair[]> append_key_offset_pair_;  // size: part_capacity_. Will be destroyed in StartOutput().
 private:
     // record output progress
     u32 output_part_capacity_{};                             // number of rows in each full output part
@@ -153,8 +176,8 @@ private:
 // now only support index for single column
 // now only support create index for POD type with size <= sizeof(i64)
 // need to convert values in column into ordered number type
-export UniquePtr<SecondaryIndexDataBuilderBase>
-GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 data_num, u32 input_block_max_row, u32 part_capacity);
+// data_num : number of rows in the segment, except those deleted
+export UniquePtr<SecondaryIndexDataBuilderBase> GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 data_num, u32 part_capacity);
 
 // includes: metadata and PGM index
 class SecondaryIndexDataHead {
@@ -191,6 +214,17 @@ public:
 
     ~SecondaryIndexDataHead() = default;
 
+    [[nodiscard]] u32 GetPartCapacity() const { return part_capacity_; }
+    [[nodiscard]] u32 GetPartNum() const { return part_num_; }
+    [[nodiscard]] u32 GetDataNum() const { return data_num_; }
+
+    [[nodiscard]] auto SearchPGM(const void *val_ptr) const {
+        if (!pgm_index_) {
+            UnrecoverableError("Not initialized yet.");
+        }
+        return pgm_index_->SearchIndex(val_ptr);
+    }
+
     void SaveIndexInner(FileHandler &file_handler) const;
 
     void ReadIndexInner(FileHandler &file_handler);
@@ -224,6 +258,14 @@ public:
     explicit SecondaryIndexDataPart(u32 part_id, u32 part_size) : part_id_(part_id), part_size_(part_size) {}
 
     ~SecondaryIndexDataPart() = default;
+
+    [[nodiscard]] u32 GetPartId() const { return part_id_; }
+
+    [[nodiscard]] u32 GetPartSize() const { return part_size_; }
+
+    [[nodiscard]] const void *GetColumnKeyData() const { return column_key_->data(); }
+
+    [[nodiscard]] const void *GetColumnOffsetData() const { return column_offset_->data(); }
 
     void SaveIndexInner(FileHandler &file_handler) const;
 

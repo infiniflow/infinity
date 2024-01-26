@@ -61,6 +61,7 @@ export enum class LogicalNodeType : u8 {
 
     // Scan
     kTableScan,
+    kIndexScan,
     kViewScan,
     kDummyScan,
     kKnnScan,

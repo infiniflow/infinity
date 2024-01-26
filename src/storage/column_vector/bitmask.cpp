@@ -239,6 +239,31 @@ void Bitmask::Merge(const Bitmask &other) {
     }
 }
 
+void Bitmask::MergeOr(const Bitmask &other) {
+    if (this->IsAllTrue()) {
+        return;
+    }
+
+    if (other.IsAllTrue()) {
+        SetAllTrue();
+        return;
+    }
+
+    if (data_ptr_ == other.data_ptr_) {
+        // Totally same bitmask
+        return;
+    }
+
+    if (count() != other.count()) {
+        UnrecoverableError("Attempt to merge two bitmasks with different size.");
+    }
+
+    SizeT u64_count = BitmaskBuffer::UnitCount(count_);
+    for (SizeT i = 0; i < u64_count; ++i) {
+        data_ptr_[i] |= other.data_ptr_[i];
+    }
+}
+
 bool Bitmask::operator==(const Bitmask &other) const {
     if (count_ != other.count_)
         return false;

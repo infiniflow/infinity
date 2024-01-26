@@ -65,6 +65,7 @@ import physical_sink;
 import physical_sort;
 import physical_source;
 import physical_table_scan;
+import physical_index_scan;
 import physical_top;
 import physical_union_all;
 import physical_update;
@@ -95,6 +96,7 @@ import logical_update;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
+import logical_index_scan;
 import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
@@ -210,6 +212,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kTableScan: {
             result = BuildTableScan(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kIndexScan: {
+            result = BuildIndexScan(logical_operator);
             break;
         }
         case LogicalNodeType::kViewScan: {
@@ -787,6 +793,17 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTableScan(const SharedPtr<Logi
                                          logical_table_scan->base_table_ref_,
                                          logical_operator->load_metas(),
                                          logical_table_scan->add_row_id_);
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildIndexScan(const SharedPtr<LogicalNode> &logical_operator) const {
+    SharedPtr<LogicalIndexScan> logical_index_scan = static_pointer_cast<LogicalIndexScan>(logical_operator);
+    return MakeUnique<PhysicalIndexScan>(logical_operator->node_id(),
+                                         logical_index_scan->base_table_ref_,
+                                         logical_index_scan->index_filter_qualified_,
+                                         std::move(logical_index_scan->column_index_map_),
+                                         std::move(logical_index_scan->filter_execute_command_),
+                                         logical_operator->load_metas(),
+                                         logical_index_scan->add_row_id_);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const {

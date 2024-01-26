@@ -24,7 +24,7 @@ namespace infinity {
 class QueryContext;
 export class OptimizerRule {
 public:
-    virtual void ApplyToPlan(QueryContext *query_context_ptr, const SharedPtr<LogicalNode> &logical_plan) = 0;
+    virtual void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) = 0;
 
     virtual String name() const = 0;
 

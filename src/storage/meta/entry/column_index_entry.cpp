@@ -238,7 +238,8 @@ Status ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry,
     auto *txn_store = txn->GetTxnTableStore(table_entry);
 
     for (const auto *segment_entry : block_index->segments_) {
-        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), column_def);
+        // use actual_row_count to exclude the deleted rows
+        auto create_index_param = GetCreateIndexParam(segment_entry->actual_row_count(), column_def);
         SegmentID segment_id = segment_entry->segment_id();
         SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
             SegmentColumnIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());

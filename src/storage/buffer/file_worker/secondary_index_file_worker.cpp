@@ -46,7 +46,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
         } else {
             if (u32 previous_rows = (worker_id_ - 1) * part_capacity_; previous_rows < row_count_) [[likely]] {
                 auto part_size = std::min<u32>(part_capacity_, row_count_ - previous_rows);
-                data_ = static_cast<void *>(new SecondaryIndexDataPart(worker_id_, part_size));
+                data_ = static_cast<void *>(new SecondaryIndexDataPart(worker_id_ - 1, part_size));
             } else {
                 UnrecoverableError(fmt::format("AllocateInMemory: previous_rows: {} >= row_count_: {}.", previous_rows, row_count_));
             }

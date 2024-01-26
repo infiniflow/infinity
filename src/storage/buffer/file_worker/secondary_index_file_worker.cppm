@@ -27,7 +27,7 @@ import default_values;
 namespace infinity {
 
 export struct CreateSecondaryIndexParam : public CreateIndexParam {
-    const u32 row_count_{};     // rows in the segment
+    const u32 row_count_{};     // rows in the segment, need to exclude the deleted rows
     const u32 part_capacity_{}; // split sorted index data into parts
     CreateSecondaryIndexParam(const IndexBase *index_base, const ColumnDef *column_def, u32 row_count, u32 part_capacity)
         : CreateIndexParam(index_base, column_def), row_count_(row_count), part_capacity_(part_capacity) {}
