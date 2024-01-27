@@ -20,8 +20,10 @@ struct BuilderNodeUnfinished {
     Optional<LastTransition> last_;
 
     void LastCompiled(CompiledAddr addr) {
-        assert(last_.has_value());
-        node_->trans_.push_back(Transition{last_->inp_, last_->out_, addr});
+        if (last_.has_value()) {
+            node_->trans_.push_back(Transition{last_->inp_, last_->out_, addr});
+            last_.reset();
+        }
     }
 
     void AddOutputPrefix(Output prefix) {
@@ -40,6 +42,11 @@ struct BuilderNodeUnfinished {
 
 struct UnfinishedNodes {
     Vector<UniquePtr<BuilderNodeUnfinished>> stack_;
+
+    UnfinishedNodes() {
+        stack_.reserve(64);
+        PushEmpty(false);
+    }
 
     SizeT Len() { return stack_.size(); }
 
@@ -90,8 +97,7 @@ struct UnfinishedNodes {
         assert(!unfinished->last_.has_value());
         unfinished->last_ = LastTransition{bs_ptr[0], out};
         for (SizeT i = 1; i < bs_len; i++) {
-            auto node = MakeUnique<BuilderNode>();
-            auto unfinished = MakeUnique<BuilderNodeUnfinished>(std::move(node), LastTransition{bs_ptr[i], Output::Zero()});
+            auto unfinished = MakeUnique<BuilderNodeUnfinished>(MakeUnique<BuilderNode>(), LastTransition{bs_ptr[i], Output::Zero()});
             stack_.push_back(std::move(unfinished));
         }
         PushEmpty(true);
@@ -110,19 +116,20 @@ struct UnfinishedNodes {
     }
 
     SizeT FindCommonPrefixAndSetOutput(u8 *bs_ptr, SizeT bs_len, Output &out) {
+        assert(stack_.size() >= 1);
         SizeT i = 0;
-        for (; i < bs_len; i++) {
-            if (i >= stack_.size())
-                break;
+        SizeT common_len = std::min(bs_len, stack_.size() - 1);
+        for (; i < common_len; i++) {
             auto &t = stack_[i]->last_;
-            if (!t.has_value() || t->inp_ != bs_ptr[i])
+            assert(t.has_value());
+            if (t->inp_ != bs_ptr[i])
                 break;
             Output common_pre = t->out_.Prefix(out);
             Output add_prefix = t->out_.Sub(common_pre);
             out = out.Sub(common_pre);
-            t->out_ = common_pre;
             if (!add_prefix.IsZero()) {
-                stack_[i]->AddOutputPrefix(add_prefix);
+                t->out_ = common_pre;
+                stack_[i + 1]->AddOutputPrefix(add_prefix);
             }
         }
         return i;

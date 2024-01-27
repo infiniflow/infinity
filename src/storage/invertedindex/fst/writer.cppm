@@ -4,7 +4,7 @@ import stl;
 import crc;
 export module fst:writer;
 
-namespace infinity {
+export namespace infinity {
 
 class Writer {
 public:
@@ -14,29 +14,15 @@ public:
 };
 
 class BufferWriter : public Writer {
-private:
-    u8 *buffer_;
-    SizeT bufferSize_;
-    SizeT currentPos_;
+public:
+    Vector<u8> &buffer_;
 
 public:
-    BufferWriter(u8 *buf, SizeT size) : buffer_(buf), bufferSize_(size), currentPos_(0) {}
+    BufferWriter(Vector<u8> &buffer) : buffer_(buffer) {}
 
-    void Write(const u8 *buf, SizeT size) override {
-        SizeT remainingSpace = bufferSize_ - currentPos_;
-        assert(size <= remainingSpace);
-        SizeT bytesToCopy = std::min(remainingSpace, size);
-        std::memcpy(buffer_ + currentPos_, buf, bytesToCopy);
-        currentPos_ += bytesToCopy;
-    }
+    void Write(const u8 *data_ptr, SizeT data_size) override { buffer_.insert(buffer_.end(), data_ptr, data_ptr + data_size); }
 
     void Flush() override {}
-
-    // Additional method to get the content of the buffer
-    const u8 *GetBuffer() const { return buffer_; }
-
-    // Additional method to get the current position in the buffer
-    SizeT GetCurrentPosition() const { return currentPos_; }
 };
 
 class OstreamWriter : public Writer {

@@ -48,12 +48,13 @@ void FstBuilder::InsertOutput(u8 *bs_ptr, SizeT bs_len, u64 val) {
 void FstBuilder::CompileFrom(SizeT istate) {
     SizeT addr = NONE_ADDRESS;
     while (istate + 1 < unfinished_.Len()) {
-        UniquePtr<BuilderNode> node;
-        if (addr == NONE_ADDRESS)
-            node = unfinished_.PopEmpty();
-        else
-            node = unfinished_.PopFreeze(addr);
-        addr = Compile(*node);
+        if (addr == NONE_ADDRESS) {
+            UniquePtr<BuilderNode> node = unfinished_.PopEmpty();
+            addr = Compile(*node);
+        } else {
+            UniquePtr<BuilderNode> node = unfinished_.PopFreeze(addr);
+            addr = Compile(*node);
+        }
         assert(addr != NONE_ADDRESS);
     }
     unfinished_.TopLastFreeze(addr);
@@ -69,7 +70,7 @@ CompiledAddr FstBuilder::Compile(BuilderNode &node) {
     CompiledAddr start_addr = wtr_.Count();
     Node::Compile(wtr_, last_addr_, start_addr, node);
     last_addr_ = wtr_.Count() - 1;
-    registry_.Insert(node, start_addr);
+    registry_.Insert(node, last_addr_);
     return last_addr_;
 }
 
