@@ -66,6 +66,24 @@ TEST_F(FstTest, BuildFile) {
     EXPECT_EQ(std::filesystem::file_size("/tmp/infinity/months.fst"), written + 4);
 }
 
+TEST_F(FstTest, Get) {
+    Vector<u8> buffer;
+    BufferWriter wtr(buffer);
+    FstBuilder builder(wtr);
+    for (auto &month : months) {
+        builder.Insert((u8 *)month.first.c_str(), month.first.length(), month.second);
+    }
+    builder.Finish();
+
+    Fst f(buffer.data(), buffer.size());
+    f.Verify();
+    for (auto &month : months) {
+        Optional<u64> val = f.Get((u8 *)month.first.c_str(), month.first.length());
+        EXPECT_TRUE(val.has_value());
+        EXPECT_EQ(val.value(), month.second);
+    }
+}
+
 TEST_F(FstTest, Iterate) {
     Vector<u8> buffer;
     BufferWriter wtr(buffer);
@@ -76,7 +94,8 @@ TEST_F(FstTest, Iterate) {
     builder.Finish();
 
     Fst f(buffer.data(), buffer.size());
-    Stream s(f);
+    f.Verify();
+    FstStream s(f);
     Vector<u8> key;
     u64 val;
     SizeT i = 0;
@@ -86,4 +105,17 @@ TEST_F(FstTest, Iterate) {
         EXPECT_EQ(val, months[i].second);
         i++;
     }
+
+    SizeT b1_num = 3, b2_num = 7;
+    Bound b1(Bound::kIncluded, (u8 *)months[b1_num].first.data(), months[b1_num].first.length());
+    Bound b2(Bound::kExcluded, (u8 *)months[b2_num].first.data(), months[b2_num].first.length());
+    s.Reset(b1, b2);
+    i = b1_num;
+    while (s.Next(key, val)) {
+        String name((char *)key.data(), key.size());
+        EXPECT_EQ(name, months[i].first);
+        EXPECT_EQ(val, months[i].second);
+        i++;
+    }
+    EXPECT_EQ(i, b2_num);
 }

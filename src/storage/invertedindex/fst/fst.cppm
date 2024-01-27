@@ -15,6 +15,7 @@ import :node;
 /// compresses suffixes.
 
 namespace infinity {
+
 struct Meta {
     u64 version_;
     CompiledAddr root_addr_;
@@ -31,7 +32,7 @@ private:
     u8 *data_ptr_;
     SizeT data_len_;
 
-    friend class Stream;
+    friend class FstStream;
 
 public:
     /// Creates a transducer from its representation as a raw byte sequence.
@@ -149,10 +150,27 @@ public:
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
-    Optional<Output> Get(u8 *key_ptr, SizeT key_len);
+    Optional<u64> Get(u8 *key_ptr, SizeT key_len) {
+        Output out;
+        UniquePtr<Node> node = Root();
+        for (SizeT i = 0; i < key_len; i++) {
+            Optional<SizeT> ti = node->FindInput(key_ptr[i]);
+            if (!ti.has_value()) {
+                return None;
+            }
+            Transition t = node->TransAt(ti.value());
+            node = NodeAt(t.addr_);
+            out = out.Cat(t.out_);
+        }
+        if (!node->IsFinal()) {
+            return None;
+        }
+        out = out.Cat(node->FinalOutput());
+        return out.Value();
+    }
 
     /// Returns true if and only if the given key is in this FST.
-    bool ContainsKey(u8 *key_ptr, SizeT key_len);
+    bool ContainsKey(u8 *key_ptr, SizeT key_len) { return Get(key_ptr, key_len).has_value(); }
 
 private:
     /// Returns the root node of this fst.
@@ -164,14 +182,12 @@ private:
     UniquePtr<Node> NodeAt(CompiledAddr addr) { return MakeUnique<Node>(meta_.version_, addr, data_ptr_); }
 };
 
-export enum BoundType {
-    kIncluded,
-    kExcluded,
-    kUnbounded,
-};
-
 export struct Bound {
-    BoundType ty_ = kUnbounded;
+    enum BoundType {
+        kIncluded,
+        kExcluded,
+        kUnbounded,
+    } ty_ = kUnbounded;
     Vector<u8> key_;
 
     Bound() : ty_(kUnbounded){};
@@ -203,17 +219,22 @@ struct StreamState {
 };
 
 /// A lexicographically ordered stream of key-value pairs from an fst.
-export class Stream {
+export class FstStream {
 private:
     Fst &fst_;
-    Bound max_;
-    Vector<u8> inp_;
-    Optional<Output> empty_output_;
-    Vector<StreamState> stack_;
     Bound end_at_;
+    Vector<u8> inp_;
+    Vector<StreamState> stack_;
 
 public:
-    Stream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst), end_at_(max) { SeekMin(min); }
+    FstStream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst), end_at_(max) { SeekMin(min); }
+
+    void Reset(Bound min = Bound(), Bound max = Bound()) {
+        end_at_ = max;
+        inp_.clear();
+        stack_.clear();
+        SeekMin(min);
+    }
 
     /// @brief Get next key-value pair per lexicographical order
     /// @param key Stores the key of the pair when found

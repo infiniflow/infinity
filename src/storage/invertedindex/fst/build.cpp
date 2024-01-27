@@ -64,13 +64,13 @@ CompiledAddr FstBuilder::Compile(BuilderNode &node) {
     if (node.is_final_ && node.trans_.empty() && node.final_output_.IsZero()) {
         return EMPTY_ADDRESS;
     }
-    SizeT addr = registry_.Find(node);
-    if (addr != 0)
-        return addr;
+    RegistryEntry ent = registry_.Find(node);
+    if (ent.found_)
+        return ent.value_;
     CompiledAddr start_addr = wtr_.Count();
     Node::Compile(wtr_, last_addr_, start_addr, node);
     last_addr_ = wtr_.Count() - 1;
-    registry_.Insert(node, last_addr_);
+    registry_.Insert(ent.slot_, node, last_addr_);
     return last_addr_;
 }
 

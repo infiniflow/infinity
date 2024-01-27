@@ -14,6 +14,8 @@
 
 module;
 
+#include "CLI11.hpp"
+
 #include "cxxopts.hpp"
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
@@ -21,6 +23,7 @@ module;
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+
 #include "json.hpp"
 
 #include "toml.hpp"
@@ -37,8 +40,10 @@ module;
 #include "analysis/token_streams.hpp"
 #include "index/index_writer.hpp"
 #include "index/norm.hpp"
+#include "utils/index_utils.hpp"
 #include "utils/noncopyable.hpp"
 #include "utils/object_pool.hpp"
+#include "utils/text_format.hpp"
 #include "utils/type_info.hpp"
 
 #include "parallel_hashmap/phmap.h"
@@ -74,6 +79,23 @@ namespace spdlog {
     }
 }
 
+namespace CLI {
+export using CLI::App;
+export using CLI::ParseError;
+export using CLI::FileError;
+export using CLI::ConversionError;
+export using CLI::ValidationError;
+export using CLI::RequiredError;
+export using CLI::RequiresError;
+export using CLI::ExcludesError;
+export using CLI::ExtrasError;
+export using CLI::ConfigError;
+export using CLI::InvalidError;
+export using CLI::HorribleError;
+export using CLI::OptionNotFound;
+export using CLI::ArgumentMismatch;
+} // namespace CLI
+
 namespace cxxopts {
     // cxxopts
     export using cxxopts::Options;
@@ -103,6 +125,16 @@ namespace magic_enum {
 namespace moodycamel {
     export using moodycamel::ConcurrentQueue;
 }
+
+namespace irs {
+export using irs::Norm;
+export using irs::Norm2;
+namespace index_utils {
+export using irs::index_utils::ConsolidateByOrder;
+export using irs::index_utils::ConsolidateCount;
+export using irs::index_utils::MakePolicy;
+} // namespace index_utils
+} // namespace irs
 
 namespace infinity {
 

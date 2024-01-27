@@ -18,45 +18,52 @@ import fst;
 
 using namespace infinity;
 
+struct Key {
+    int k_{0};
+    Key() = default;
+    Key(int k) : k_(k){}
+    bool operator==(const Key &rhs) const { return k_ == rhs.k_; }
+    SizeT Hash() const { return SizeT(k_); }
+};
+
 class RegistryTest : public ::testing::Test {
 protected:
-    Registry<int> registry{3};
+    Registry<Key, SizeT> registry{3};
 };
 
 TEST_F(RegistryTest, InsertAndFind) {
-    registry.Insert(1, 100UL);
-    registry.Insert(2, 200UL);
-    registry.Insert(3, 300UL);
+    Key key;
+    RegistryEntry<SizeT> ent;
 
-    EXPECT_EQ(registry.Find(1), 100UL);
-    EXPECT_EQ(registry.Find(2), 200UL);
-    EXPECT_EQ(registry.Find(3), 300UL);
-}
+    key.k_ = 1;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 1UL);
+    registry.Insert(ent.slot_, key, 100UL);
+    ent = registry.Find(key);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 100UL);
 
-TEST_F(RegistryTest, FindNonExistentKey) { EXPECT_EQ(registry.Find(4), 0UL); }
+    key.k_ = 2;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 2UL);
+    registry.Insert(ent.slot_, key, 200UL);
+    ent = registry.Find(key);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 200UL);
 
-TEST_F(RegistryTest, InsertBeyondMaxSize) {
-    registry.Insert(1, 100UL);
-    EXPECT_EQ(registry.Size(), 1UL);
-    registry.Insert(2, 200UL);
-    EXPECT_EQ(registry.Size(), 2UL);
-    registry.Insert(3, 300UL);
-    EXPECT_EQ(registry.Size(), 3UL);
-    registry.Insert(4, 400UL); // This should evict the first entry (1, 100)
-    EXPECT_EQ(registry.Size(), 3UL);
+    key.k_ = 3;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 0UL);
+    registry.Insert(ent.slot_, key, 300UL);
+    ent = registry.Find(key);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 300UL);
 
-    EXPECT_EQ(registry.Find(1), (SizeT)0); // Key 1 should have been evicted
-    EXPECT_EQ(registry.Find(2), 200UL);
-    EXPECT_EQ(registry.Find(3), 300UL);
-    EXPECT_EQ(registry.Find(4), 400UL);
+    key.k_ = 4;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 1UL);
+    registry.Insert(ent.slot_, key, 400UL);
+    ent = registry.Find(key);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 400UL);
 
-    registry.Clear();
-    EXPECT_EQ(registry.Size(), 0UL);
-}
-
-TEST_F(RegistryTest, ReinsertKey) {
-    registry.Insert(1, 100UL);
-    registry.Insert(1, 200UL); // This should update the value of key 1
-
-    EXPECT_EQ(registry.Find(1), 200UL);
+    key.k_ = 1;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 1UL);
 }

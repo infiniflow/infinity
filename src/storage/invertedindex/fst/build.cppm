@@ -44,7 +44,7 @@ struct UnfinishedNodes {
     Vector<UniquePtr<BuilderNodeUnfinished>> stack_;
 
     UnfinishedNodes() {
-        stack_.reserve(64);
+        stack_.reserve(256);
         PushEmpty(false);
     }
 
@@ -180,7 +180,7 @@ private:
     /// A finished node is one that has been compiled and written to `wtr`.
     /// After this point, the node is considered immutable and will never
     /// change.
-    Registry<BuilderNode> registry_;
+    Registry<BuilderNode, CompiledAddr> registry_;
     /// The last word added.
     ///
     /// This is used to enforce the invariant that words are added in sorted
@@ -197,7 +197,7 @@ private:
     SizeT len_;
 
 public:
-    FstBuilder(Writer &wtr, FstType ty = 0) : wtr_(wtr), registry_(10000), last_addr_(NONE_ADDRESS), len_(0) {
+    FstBuilder(Writer &wtr, FstType ty = 0) : wtr_(wtr), registry_(16), last_addr_(NONE_ADDRESS), len_(0) {
         IoWriteU64LE(VERSION, wtr_);
         IoWriteU64LE(ty, wtr_);
     }

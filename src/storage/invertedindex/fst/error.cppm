@@ -1,8 +1,18 @@
 module;
 import stl;
+import third_party;
 export module fst:error;
 
 namespace infinity {
+
+export String FormatBytes(u8 *bs_data, SizeT bs_len) {
+    String output = "[";
+    for (SizeT i = 0; i < bs_len; i++) {
+        output += fmt::format("{:02X}", bs_data[i]);
+    }
+    output += "]";
+    return output;
+}
 
 export enum FstErrorCode : long {
     kOk = 0, // success

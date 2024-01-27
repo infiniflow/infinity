@@ -137,13 +137,4 @@ int CompareBytes(u8 *bs1_data, SizeT bs1_len, u8 *bs2_data, SizeT bs2_len) {
     }
 }
 
-String FormatBytes(u8 *bs_data, SizeT bs_len) {
-    String output = "[";
-    for (SizeT i = 0; i < bs_len; i++) {
-        output += fmt::format("{:02X}", bs_data[i]);
-    }
-    output += "]";
-    return output;
-}
-
 } // namespace infinity
