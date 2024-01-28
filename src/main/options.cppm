@@ -46,7 +46,6 @@ export struct SystemOptions {
     u64 profile_record_capacity{};
 
     // Network
-    u64 connection_limit{};
     String listen_address{};
     u16 pg_port{};
     u32 http_port{};

@@ -49,8 +49,6 @@ public:
 
     [[nodiscard]] inline u64 query_memory_limit() const { return system_option_.query_memory_limit; }
 
-    [[nodiscard]] inline u64 connection_limit() const { return system_option_.connection_limit; }
-
     [[nodiscard]] inline String listen_address() const { return system_option_.listen_address; }
 
     [[nodiscard]] inline u16 pg_port() const { return system_option_.pg_port; }
@@ -65,11 +63,11 @@ public:
     [[nodiscard]] inline SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
 
     // Log
-    [[nodiscard]] inline String& log_filename() const { return *system_option_.log_filename; }
+    [[nodiscard]] inline SharedPtr<String> log_filename() const { return system_option_.log_filename; }
 
-    [[nodiscard]] inline String& log_dir() const { return *system_option_.log_dir; }
+    [[nodiscard]] inline SharedPtr<String> log_dir() const { return system_option_.log_dir; }
 
-    [[nodiscard]] inline String& log_file_path() const { return *system_option_.log_file_path; }
+    [[nodiscard]] inline SharedPtr<String> log_file_path() const { return system_option_.log_file_path; }
 
     [[nodiscard]] inline bool log_to_stdout() const { return system_option_.log_to_stdout; }
 

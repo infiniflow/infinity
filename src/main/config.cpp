@@ -90,7 +90,6 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 default_profile_record_capacity = 100;
 
     // Default network config
-    u64 default_connection_limit = 128;
     String default_listen_address = "0.0.0.0";
     u32 default_pg_port = 5432;
     u32 default_http_port = 8088;
@@ -159,7 +158,6 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
         // Network
         {
-            system_option_.connection_limit = default_connection_limit;
             system_option_.listen_address = default_listen_address;
             system_option_.pg_port = default_pg_port;
             system_option_.http_port = default_http_port;
@@ -294,7 +292,6 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Network
         {
             auto network_config = config["network"];
-            system_option_.connection_limit = network_config["connection_limit"].value_or(default_connection_limit);
             system_option_.listen_address = network_config["listen_address"].value_or(default_listen_address);
 
             // Validate the address format
