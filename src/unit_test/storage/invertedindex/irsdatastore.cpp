@@ -93,9 +93,8 @@ public:
 IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
     path_ = Path(directory) / table_name;
     directory_ = path_.string();
-    std::error_code ec;
     std::filesystem::remove_all(path_);
-    std::filesystem::create_directories(path_, ec);
+    std::filesystem::create_directories(path_);
     irs_directory_ = MakeUnique<irs::FSDirectory>(directory_.c_str());
     AnalyzerPool::instance().Set(SEGMENT);
     Open(false);
@@ -252,7 +251,7 @@ static irs::bstring toBstring(const std::string &str) {
 TEST_F(IRSDatastoreTest, test1) {
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
     static Features text_features{TEXT_FEATURES.data(), TEXT_FEATURES.size()};
-    IRSDataStore datastore("wiki", "./");
+    IRSDataStore datastore("wiki", "/tmp/infinity");
     UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
     {
         auto ctx = datastore.index_writer_->GetBatch();
