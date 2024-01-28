@@ -227,3 +227,23 @@ class TestInsert:
         values = [{"c1": 1} for _ in range(8193)]
         res = table_obj.insert(values)
         assert res.success is False
+
+
+    # insert primitive data type not aligned with table definition
+    # insert large varchar which exceeds the limit to table
+    # insert embedding data which type info isn't match with table definition
+    # insert data into non-existent table, dropped table
+    # insert empty into table
+    # insert data into index created table
+
+    # insert table with 10000 columns.
+    # insert table with columns isn't matched (more and less)
+    # insert table with column value exceeding invalid value range
+
+    # batch insert, within limit
+    # batch insert with 10000 columns
+    # batch insert, batch size limit? 8192?
+    # batch insert, with invalid data type inside.
+    # batch insert, with invalid column count
+
+

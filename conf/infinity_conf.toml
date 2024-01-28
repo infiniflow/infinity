@@ -1,10 +1,6 @@
 [general]
 version                 = "0.1.0"
 timezone                = "utc-8"
-listen_address          = "0.0.0.0"
-pg_port                 = 5432
-http_port               = 8088
-sdk_port                = 23817
 
 [system]
 # 0 means use all cpus
@@ -15,6 +11,12 @@ total_memory_size       = "8GB"
 query_memory_limit      = 0
 # query cpu limit per query
 query_cpu_limit         = "4MB"
+
+[network]
+listen_address          = "0.0.0.0"
+pg_port                 = 5432
+http_port               = 8088
+sdk_port                = 23817
 
 [profiler]
 enable                  = false

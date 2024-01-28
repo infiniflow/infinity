@@ -127,7 +127,13 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        fmt::print("No config file is given, use default configs.\n");
+        if(config_path.get() == nullptr) {
+            fmt::print("No config file is given, use default configs.\n");
+        } else {
+            if(!fs.Exists(*config_path)) {
+                fmt::print("Config file: {} is not existent.\n", *config_path);
+            }
+        }
 
         // General
         {

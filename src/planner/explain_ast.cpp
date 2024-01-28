@@ -79,7 +79,7 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
         case DDLType::kInvalid: {
             UnrecoverableError("Invalid DDL type.");
         }
-        case DDLType::kSchema: {
+        case DDLType::kDatabase: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
             result->emplace_back(MakeShared<String>(create_schema));
             auto *schema_info = (CreateSchemaInfo *)create_statement->create_info_.get();
@@ -183,7 +183,7 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
         case DDLType::kInvalid: {
             UnrecoverableError("Invalid DDL type.");
         }
-        case DDLType::kSchema: {
+        case DDLType::kDatabase: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
             result->emplace_back(MakeShared<String>(drop_schema));
             auto *schema_info = (DropSchemaInfo *)drop_statement->drop_info_.get();

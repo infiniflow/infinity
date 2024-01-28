@@ -92,3 +92,18 @@ class TestUpdate:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+
+    # update empty table
+    # update non-existent table
+    # update table, no row is met the condition
+    # update table, all rows are met the condition
+    # update table with only one block
+    # update table with multiple blocks, but only one segment
+    # update before delete, select after delete and check the change.
+    # update just inserted data and select to check
+    # update inserted long before and select to check
+    # update dropped table
+    # update new value is invalid
+    # update new value type is not match with table
+    #

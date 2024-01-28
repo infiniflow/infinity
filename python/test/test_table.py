@@ -101,3 +101,20 @@ class TestTable:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+    # create/drop/describe/get valid table name with different column types
+    # create/drop/describe/get table with 10000 columns with various column types.
+    # create/drop table with different invalid options
+    # create/drop/describe/get 1000 tables with 10000 columns with various column types.
+
+    # after disconnection, create / drop / describe / list / get table
+    # create/drop table with invalid options
+    # create created table, drop dropped table.
+    # describe created table, describe not-created table, describe dropped table
+
+    # create/drop same table in different thread to test conflict
+    # create/drop/list/get 1M table to reach the limit
+    # create/drop/list/get table with name in chinese.
+    # create/drop/list/get table with column name in chinese.
+    # create table with invalid column name, invalid column option.
+    # create empty column table

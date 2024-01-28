@@ -55,3 +55,20 @@ class TestImport:
         print(res)
         res = db_obj.drop_table("test_import")
         assert res.success
+
+    # import different file format data
+    # import empty file
+    # import format unrecognized data
+    # import csv with different delimiter
+    # import csv with delimiter more than one charactor
+    # import csv with headers
+    # import csv without headers
+    # import fvecs, when table with more columns
+    # import json, json has nested structure
+    # import file into non-existent table, dropped table
+    # import table with embedding not match with the table definition.
+    # import table with varchar not match with the table definition.
+    # import table with 10000 columns.
+    # import table with columns isn't matched (more and less)
+    # import table with column value exceeding invalid value range
+

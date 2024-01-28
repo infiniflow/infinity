@@ -21,6 +21,9 @@ import stl;
 namespace infinity {
 
 export {
+    // infinity related constants
+    constexpr u64 MAX_IDENTIFIER_NAME_LENGTH = 65536;
+
     // hidden columns' id
     constexpr ColumnID COLUMN_IDENTIFIER_ROW_ID = (ColumnID)(std::numeric_limits<u64>::max() - 1);
     constexpr ColumnID COLUMN_IDENTIFIER_CREATE = (ColumnID)(std::numeric_limits<u64>::max() - 2);
