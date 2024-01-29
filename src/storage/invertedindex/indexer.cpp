@@ -69,5 +69,7 @@ void Indexer::Commit() {
     }
 }
 
-SharedPtr<IndexSegmentReader> Indexer::CreateInMemSegmentReader() { return MakeShared<InMemIndexSegmentReader>(); }
+SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
+    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id].get());
+}
 } // namespace infinity

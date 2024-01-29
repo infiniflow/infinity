@@ -28,7 +28,7 @@ void IndexReader::Open(const InvertedIndexConfig &index_config) {
             segment_readers_.push_back(segment_reader);
             base_doc_ids_.push_back(segment.GetBaseDocId());
         } else {
-            SharedPtr<IndexSegmentReader> segment_reader = CreateInMemSegmentReader(segment);
+            SharedPtr<InMemIndexSegmentReader> segment_reader = CreateInMemSegmentReader(segment);
             segment_readers_.push_back(segment_reader);
             base_doc_ids_.push_back(segment.GetBaseDocId());
         }
@@ -43,9 +43,9 @@ SharedPtr<DiskIndexSegmentReader> IndexReader::CreateDiskSegmentReader(const Seg
     return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
-SharedPtr<IndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &segment) {
+SharedPtr<InMemIndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &segment) {
     SharedPtr<Indexer> index_writer = segment.GetIndexWriter();
-    return index_writer->CreateInMemSegmentReader();
+    return index_writer->CreateInMemSegmentReader(segment.GetColumnID());
 }
 
 PostingIterator *IndexReader::Lookup(const String &term, MemoryPool *session_pool) {

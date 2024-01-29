@@ -29,7 +29,7 @@ public:
 private:
     SharedPtr<DiskIndexSegmentReader> CreateDiskSegmentReader(const Segment &segment);
 
-    SharedPtr<IndexSegmentReader> CreateInMemSegmentReader(Segment &segment);
+    SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(Segment &segment);
 
 private:
     String root_dir_;

@@ -15,6 +15,7 @@ export struct SegmentMeta {
 
     void Store() {}
 
+    u64 column_id_;
     segmentid_t segment_id_;
     docid_t base_doc_id_;
     u64 doc_count_{0};
@@ -30,6 +31,7 @@ public:
     ~Segment() = default;
 
 public:
+    u64 GetColumnID() const { return segment_meta_.column_id_; }
     segmentid_t GetSegmentID() const { return segment_meta_.segment_id_; }
     docid_t GetBaseDocId() const { return segment_meta_.base_doc_id_; }
     u64 GetDocCount() const { return segment_meta_.doc_count_; }
