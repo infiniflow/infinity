@@ -407,24 +407,24 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 }
 
 UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
-    auto catalog1 = MakeUnique<NewCatalog>(nullptr);
+    auto catalog = MakeUnique<NewCatalog>(nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", catalog_paths[0]));
-    catalog1 = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+    catalog = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     for (SizeT i = 1; i < catalog_paths.size(); i++) {
-        LOG_TRACE(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
-        NewCatalog::LoadFromEntry(catalog1.get(), catalog_paths[i], buffer_mgr);
+        LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
+        NewCatalog::LoadFromEntry(catalog.get(), catalog_paths[i], buffer_mgr);
     }
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
 
-    return catalog1;
+    return catalog;
 }
 
 void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
@@ -499,6 +499,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto table_entry_dir = add_table_entry_op->table_entry_dir();
                 auto column_defs = add_table_entry_op->column_defs();
                 auto entry_type = add_table_entry_op->table_entry_type();
+                auto row_count = add_table_entry_op->row_count();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -514,7 +515,8 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                                                                    txn_id,
                                                                    begin_ts,
                                                                    commit_ts,
-                                                                   is_delete);
+                                                                   is_delete,
+                                                                   row_count);
                 if (table_meta->entry_list_.empty()) {
                     UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
                     table_meta->entry_list_.emplace_front(std::move(dummy_entry));
@@ -528,6 +530,11 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto table_name = add_segment_entry_op->table_name();
                 auto segment_id = add_segment_entry_op->segment_id();
                 auto segment_dir = add_segment_entry_op->segment_dir();
+                auto column_count = add_segment_entry_op->column_count();
+                auto row_count = add_segment_entry_op->row_count();
+                auto row_capacity = add_segment_entry_op->row_capacity();
+                auto min_row_ts = add_segment_entry_op->min_row_ts();
+                auto max_row_ts = add_segment_entry_op->max_row_ts();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -539,7 +546,18 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
-                auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_id, MakeUnique<String>(segment_dir), commit_ts);
+                auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
+                                                                                segment_id,
+                                                                                MakeUnique<String>(segment_dir),
+                                                                                column_count,
+                                                                                row_count,
+                                                                                row_capacity,
+                                                                                min_row_ts,
+                                                                                max_row_ts,
+                                                                                commit_ts,
+                                                                                begin_ts,
+                                                                                txn_id);
+
                 table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
                 break;
             }
@@ -554,6 +572,8 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto row_capacity = add_block_entry_op->row_capacity();
                 auto min_row_ts = add_block_entry_op->min_row_ts();
                 auto max_row_ts = add_block_entry_op->max_row_ts();
+                auto check_point_ts = add_block_entry_op->checkpoint_ts();
+                auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -566,8 +586,15 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                     UnrecoverableError(tb_status.message());
                 }
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto block_entry =
-                    BlockEntry::NewReplayCatalogBlockEntry(segment_entry, block_id, row_count, row_capacity, min_row_ts, max_row_ts, buffer_mgr);
+                auto block_entry = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
+                                                                          block_id,
+                                                                          row_count,
+                                                                          row_capacity,
+                                                                          min_row_ts,
+                                                                          max_row_ts,
+                                                                          check_point_ts,
+                                                                          check_point_row_count,
+                                                                          buffer_mgr);
                 segment_entry->block_entries().push_back(std::move(block_entry));
                 break;
             }
@@ -835,7 +862,7 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
 
     // Assert catalog entry commit ts <= max_commit_ts
     auto global_entry_commit_ts = global_catalog_delta_entry->commit_ts();
-    LOG_WARN(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
+    LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
     if (global_entry_commit_ts > max_commit_ts) {
         UnrecoverableError(
             fmt::format("Global catalog delta entry commit ts {} not match checkpoint max commit ts {}", global_entry_commit_ts, max_commit_ts));
@@ -845,6 +872,11 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     auto &ops = global_catalog_delta_entry->operations();
     for (auto &op : ops) {
         switch (op->GetType()) {
+            case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+                auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
+                add_table_entry_op->SaveSate();
+                break;
+            }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
                 auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
                 LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
@@ -869,8 +901,7 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     global_catalog_delta_entry->WriteAdv(ptr);
     i32 act_size = ptr - buf.data();
     if (exp_size != act_size) {
-        LOG_ERROR(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size));
-        UnrecoverableError(fmt::format("Serialization size not match"));
+        UnrecoverableError(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size"));
     }
 
     std::ofstream outfile;

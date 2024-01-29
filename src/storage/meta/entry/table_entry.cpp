@@ -80,11 +80,14 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
                                                       TransactionID txn_id,
                                                       TxnTimeStamp begin_ts,
                                                       TxnTimeStamp commit_ts,
-                                                      bool is_delete) {
+                                                      bool is_delete,
+                                                      SizeT row_count) {
     auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
     table_entry->deleted_ = is_delete;
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
+    table_entry->row_count_.store(row_count);
+
     return table_entry;
 }
 
@@ -115,7 +118,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         { //
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(),begin_ts);
+                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }

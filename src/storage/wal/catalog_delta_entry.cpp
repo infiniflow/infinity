@@ -91,7 +91,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                 columns.push_back(cd);
             }
 
-            operation = MakeUnique<AddTableEntryOp>(begin_ts, is_delete, db_name, table_name, table_entry_dir, columns);
+            SizeT row_count = ReadBufAdv<SizeT>(ptr);
+            operation = MakeUnique<AddTableEntryOp>(begin_ts, is_delete, db_name, table_name, table_entry_dir, columns, row_count);
             operation->commit_ts_ = commit_ts;
             operation->txn_id_ = txn_id;
             break;
@@ -102,7 +103,22 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddSegmentEntryOp>(begin_ts, is_delete, db_name, table_name, segment_id, segment_dir);
+            u64 column_count = ReadBufAdv<u64>(ptr);
+            SizeT row_count = ReadBufAdv<SizeT>(ptr);
+            SizeT row_capacity = ReadBufAdv<SizeT>(ptr);
+            TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            operation = MakeUnique<AddSegmentEntryOp>(begin_ts,
+                                                      is_delete,
+                                                      db_name,
+                                                      table_name,
+                                                      segment_id,
+                                                      segment_dir,
+                                                      column_count,
+                                                      row_count,
+                                                      row_capacity,
+                                                      min_row_ts,
+                                                      max_row_ts);
             operation->commit_ts_ = commit_ts;
             operation->txn_id_ = txn_id;
             break;
@@ -118,6 +134,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             u16 row_capacity = ReadBufAdv<u16>(ptr);
             TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            TxnTimeStamp checkpoint_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            u16 checkpoint_row_count = ReadBufAdv<u16>(ptr);
             operation = MakeUnique<AddBlockEntryOp>(begin_ts,
                                                     is_delete,
                                                     db_name,
@@ -128,7 +146,9 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                     row_count,
                                                     row_capacity,
                                                     min_row_ts,
-                                                    max_row_ts);
+                                                    max_row_ts,
+                                                    checkpoint_ts,
+                                                    checkpoint_row_count);
             operation->commit_ts_ = commit_ts;
             operation->txn_id_ = txn_id;
             break;
@@ -257,6 +277,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
             WriteBufAdv(buf, cons);
         }
     }
+    WriteBufAdv(buf, this->row_count_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -265,6 +286,12 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->segment_dir_);
+
+    WriteBufAdv(buf, this->column_count_);
+    WriteBufAdv(buf, this->row_count_);
+    WriteBufAdv(buf, this->row_capacity_);
+    WriteBufAdv(buf, this->min_row_ts_);
+    WriteBufAdv(buf, this->max_row_ts_);
 }
 
 void AddBlockEntryOp::WriteAdv(char *&buf) const {
@@ -278,6 +305,8 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->row_capacity_);
     WriteBufAdv(buf, this->min_row_ts_);
     WriteBufAdv(buf, this->max_row_ts_);
+    WriteBufAdv(buf, this->checkpoint_ts_);
+    WriteBufAdv(buf, this->checkpoint_row_count_);
 }
 
 void AddColumnEntryOp::WriteAdv(char *&buf) const {
@@ -351,10 +380,8 @@ void AddTableMetaOp::SaveSate() {
 void AddDBEntryOp::SaveSate() {
     this->is_delete_ = db_entry_->deleted_;
     this->begin_ts_ = db_entry_->begin_ts_;
-    String db_name = db_entry_->db_name();
-    String db_entry_dir_ = db_entry_->db_entry_dir();
-    this->db_name_ = db_name;
-    this->db_entry_dir_ = db_entry_dir_;
+    this->db_name_ = db_entry_->db_name();
+    this->db_entry_dir_ = db_entry_->db_entry_dir();
     is_snapshotted_ = true;
 }
 
@@ -365,6 +392,7 @@ void AddTableEntryOp::SaveSate() {
     this->table_name_ = *this->table_entry_->GetTableName();
     this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
     this->column_defs_ = this->table_entry_->column_defs();
+    this->row_count_ = this->table_entry_->row_count();
     is_snapshotted_ = true;
 }
 
@@ -374,7 +402,12 @@ void AddSegmentEntryOp::SaveSate() {
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
-    this->segment_dir_ = this->segment_entry_->DirPath();
+    this->segment_dir_ = this->segment_entry_->segment_dir();
+    this->min_row_ts_ = this->segment_entry_->min_row_ts();
+    this->max_row_ts_ = this->segment_entry_->max_row_ts();
+    this->row_capacity_ = this->segment_entry_->row_capacity();
+    this->row_count_ = this->segment_entry_->row_count();
+    this->column_count_ = this->segment_entry_->column_count();
     is_snapshotted_ = true;
 }
 
@@ -388,6 +421,10 @@ void AddBlockEntryOp::SaveSate() {
     this->block_dir_ = this->block_entry_->DirPath();
     this->row_count_ = this->block_entry_->row_count();
     this->row_capacity_ = this->block_entry_->row_capacity();
+    this->min_row_ts_ = this->block_entry_->min_row_ts();
+    this->max_row_ts_ = this->block_entry_->max_row_ts();
+    this->checkpoint_ts_ = this->block_entry_->checkpoint_ts();
+    this->checkpoint_row_count_ = this->block_entry_->checkpoint_row_count();
     is_snapshotted_ = true;
 }
 
@@ -472,19 +509,30 @@ const String AddTableEntryOp::ToString() const {
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
+    sstream << fmt::format(" row_count: {}", row_count_);
     return sstream.str();
 }
 
 const String AddSegmentEntryOp::ToString() const {
-    return fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
-                       db_name_,
-                       table_name_,
-                       segment_id_,
-                       segment_dir_);
+    std::stringstream sstream;
+    sstream << fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
+                           db_name_,
+                           table_name_,
+                           segment_id_,
+                           segment_dir_);
+
+    sstream << fmt::format(" min_row_ts: {} max_row_ts: {} row_capacity: {} row_count: {} column_count: {}",
+                           min_row_ts_,
+                           max_row_ts_,
+                           row_capacity_,
+                           row_count_,
+                           column_count_);
+    return sstream.str();
 }
 
 const String AddBlockEntryOp::ToString() const {
-    return fmt::format(
+    std::stringstream sstream;
+    sstream << fmt::format(
         "AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} block_dir: {} row_count: {} row_capacity: {} min_row_ts: {} "
         "max_row_ts: {}",
         db_name_,
@@ -496,6 +544,10 @@ const String AddBlockEntryOp::ToString() const {
         row_capacity_,
         min_row_ts_,
         max_row_ts_);
+
+    sstream << fmt::format(" checkpoint_ts: {} checkpoint_row_count: {}", checkpoint_ts_, checkpoint_row_count_);
+
+    return sstream.str();
 }
 
 const String AddColumnEntryOp::ToString() const {
@@ -624,7 +676,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     SizeT operation_count = operations_.size();
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
-        LOG_TRACE(fmt::format("Write {}", operation->ToString()));
+        LOG_TRACE(fmt::format("!Write {}", operation->ToString()));
         char *const save_ptr = ptr;
         operation->WriteAdv(ptr);
         i32 act_size = ptr - save_ptr;

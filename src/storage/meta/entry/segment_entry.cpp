@@ -103,6 +103,32 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
     return segment_entry;
 }
 
+SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
+                                                                   SegmentID segment_id,
+                                                                   const SharedPtr<String> &segment_dir,
+                                                                   u64 column_count,
+                                                                   SizeT row_count,
+                                                                   SizeT row_capacity,
+                                                                   TxnTimeStamp min_row_ts,
+                                                                   TxnTimeStamp max_row_ts,
+                                                                   TxnTimeStamp commit_ts,
+                                                                   TxnTimeStamp begin_ts,
+                                                                   TransactionID txn_id) {
+
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry);
+    segment_entry->segment_id_ = segment_id;
+    segment_entry->min_row_ts_ = min_row_ts;
+    segment_entry->max_row_ts_ = max_row_ts;
+    segment_entry->commit_ts_ = commit_ts;
+    segment_entry->begin_ts_ = begin_ts;
+    segment_entry->row_count_ = row_count;
+    segment_entry->row_capacity_ = row_capacity;
+    segment_entry->column_count_ = column_count;
+    segment_entry->txn_id_ = txn_id;
+    segment_entry->segment_dir_ = segment_dir;
+    return segment_entry;
+}
+
 int SegmentEntry::Room() {
     std::shared_lock<std::shared_mutex> lck(rw_locker_);
     return this->row_capacity_ - this->row_count_;

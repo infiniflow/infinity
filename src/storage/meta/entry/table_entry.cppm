@@ -69,7 +69,8 @@ public:
                                                      TransactionID txn_id,
                                                      TxnTimeStamp begin_ts,
                                                      TxnTimeStamp commit_ts,
-                                                     bool is_delete);
+                                                     bool is_delete,
+                                                     SizeT row_count);
 
 private:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,

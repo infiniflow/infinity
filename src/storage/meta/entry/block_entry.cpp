@@ -164,6 +164,8 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry 
                                                              u16 row_capacity,
                                                              TxnTimeStamp min_row_ts,
                                                              TxnTimeStamp max_row_ts,
+                                                             TxnTimeStamp check_point_ts,
+                                                             u16 checkpoint_row_count,
                                                              BufferManager *buffer_mgr) {
 
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0);
@@ -174,6 +176,8 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
+    block_entry->checkpoint_ts_ = check_point_ts;
+    block_entry->checkpoint_row_count_ = checkpoint_row_count;
     return block_entry;
 }
 
@@ -378,19 +382,23 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
     auto min_row_ts = block_entry_json["min_row_ts"];
     auto max_row_ts = block_entry_json["max_row_ts"];
 
-    UniquePtr<BlockEntry> block_entry =
-        BlockEntry::NewReplayCatalogBlockEntry(segment_entry, block_id, row_count, row_capacity, min_row_ts, max_row_ts, buffer_mgr);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
+                                                                               block_id,
+                                                                               row_count,
+                                                                               row_capacity,
+                                                                               min_row_ts,
+                                                                               max_row_ts,
+                                                                               checkpoint_ts,
+                                                                               row_count,
+                                                                               buffer_mgr);
 
     block_entry->commit_ts_ = block_entry_json["commit_ts"];
     block_entry->begin_ts_ = block_entry_json["begin_ts"];
     block_entry->txn_id_ = block_entry_json["txn_id"];
 
     block_entry->block_version_->LoadFromFile(block_entry->VersionFilePath());
-    // if not found version file
     if (block_entry->block_version_->created_.empty()) {
         block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);
-        // FIXME Need to flush the version file?
-        // FlushVersion(block_entry.get(), *block_entry->block_version_);
     }
 
     for (const auto &block_column_json : block_entry_json["columns"]) {

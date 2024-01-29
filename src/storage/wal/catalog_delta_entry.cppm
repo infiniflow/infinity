@@ -219,6 +219,16 @@ public:
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, begin_ts, is_delete), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)), column_defs_(column_defs) {}
 
+    explicit AddTableEntryOp(TxnTimeStamp begin_ts,
+                             bool is_delete,
+                             String db_name,
+                             String table_name,
+                             String table_entry_dir,
+                             Vector<SharedPtr<ColumnDef>> column_defs,
+                             SizeT row_count)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, begin_ts, is_delete), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)), column_defs_(column_defs), row_count_(row_count) {}
+
     explicit AddTableEntryOp(SharedPtr<TableEntry> table_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY), table_entry_(table_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
@@ -239,6 +249,8 @@ public:
             total_size += sizeof(i32);
             total_size += cd.constraints_.size() * sizeof(ConstraintType);
         }
+
+        total_size += sizeof(SizeT);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -254,6 +266,7 @@ public:
     const String &table_entry_dir() const { return table_entry_dir_; }
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return column_defs_; }
     TableEntryType table_entry_type() const { return table_entry_type_; }
+    SizeT row_count() const { return row_count_; }
 
 public:
     SharedPtr<TableEntry> table_entry_{};
@@ -264,11 +277,28 @@ private:
     String table_entry_dir_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
+
+private:
+    SizeT row_count_{0};
 };
 
 /// class AddSegmentEntryOp
 export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
+    explicit AddSegmentEntryOp(TxnTimeStamp begin_ts,
+                               bool is_delete,
+                               String db_name,
+                               String table_name,
+                               SegmentID segment_id,
+                               String segment_dir,
+                               u64 column_count,
+                               SizeT row_count,
+                               SizeT row_capacity,
+                               TxnTimeStamp min_row_ts,
+                               TxnTimeStamp max_row_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), segment_dir_(std::move(segment_dir)), column_count_(column_count),
+          row_count_(row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
     explicit AddSegmentEntryOp(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, SegmentID segment_id, String segment_dir)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), segment_dir_(std::move(segment_dir)) {}
@@ -277,8 +307,16 @@ public:
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
-                          this->table_name_.size() + +sizeof(SegmentID) + sizeof(i32) + this->segment_dir_.size();
+        auto total_size = 0;
+        total_size += sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(SegmentID);
+        total_size += sizeof(i32) + this->segment_dir_.size();
+        total_size += sizeof(u64);
+        total_size += sizeof(SizeT);
+        total_size += sizeof(SizeT);
+        total_size += sizeof(TxnTimeStamp) * 2;
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -294,6 +332,11 @@ public:
     const String &table_name() const { return table_name_; }
     const String &segment_dir() const { return segment_dir_; }
     SegmentID segment_id() const { return segment_id_; }
+    u64 column_count() const { return column_count_; }
+    SizeT row_count() const { return row_count_; }
+    SizeT row_capacity() const { return row_capacity_; }
+    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
 
 public:
     SegmentEntry *segment_entry_{};
@@ -303,6 +346,13 @@ private:
     String table_name_{};
     SegmentID segment_id_{};
     String segment_dir_{};
+
+private:
+    u64 column_count_{0};
+    SizeT row_count_{0};
+    SizeT row_capacity_{0};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
 };
 
 /// class AddBlockEntryOp
@@ -329,17 +379,24 @@ public:
                              u16 row_count,
                              u16 row_capacity,
                              TxnTimeStamp min_row_ts,
-                             TxnTimeStamp max_row_ts)
+                             TxnTimeStamp max_row_ts,
+                             TxnTimeStamp checkpoint_ts,
+                             u16 checkpoint_row_count)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, begin_ts, is_delete), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), block_dir_(std::move(block_dir)),
-          row_capacity_(row_capacity), row_count_(row_count), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
+          row_capacity_(row_capacity), row_count_(row_count), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts), checkpoint_ts_(checkpoint_ts),
+          checkpoint_row_count_(checkpoint_row_count) {}
     explicit AddBlockEntryOp(BlockEntry *block_entry) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY), block_entry_(block_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_BLOCK_ENTRY; }
     String GetTypeStr() const final { return "ADD_BLOCK_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
-                          this->table_name_.size() + sizeof(SegmentID) + sizeof(BlockID) + sizeof(i32) + this->block_dir_.size() + sizeof(u16) +
-                          sizeof(u16) + sizeof(TxnTimeStamp) * 2;
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(SegmentID) + sizeof(BlockID);
+        total_size += sizeof(i32) + this->block_dir_.size();
+        total_size += sizeof(u16) + sizeof(u16) + sizeof(TxnTimeStamp) * 2;
+        total_size += sizeof(TxnTimeStamp) + sizeof(u16);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -362,6 +419,8 @@ public:
     u16 row_capacity() const { return row_capacity_; }
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+    TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
+    u16 checkpoint_row_count() const { return checkpoint_row_count_; }
 
 private:
     String db_name_{};
@@ -374,8 +433,10 @@ private:
     // For update
     u16 row_capacity_{0};
     u16 row_count_{0};
-    TxnTimeStamp min_row_ts_{};
-    TxnTimeStamp max_row_ts_{};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp checkpoint_ts_{0};
+    u16 checkpoint_row_count_{0};
 };
 
 /// class AddColumnEntryOp
