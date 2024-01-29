@@ -341,6 +341,14 @@ void PhysicalImport::CSVRowHandler(void *context) {
     auto txn_store = txn->GetTxnTableStore(table_entry);
     auto *buffer_mgr = txn->GetBufferMgr();
 
+    // if column count is larger than columns defined from schema, extra columns are abandoned
+    if (column_count != table_entry->ColumnCount()) {
+        UniquePtr<String> err_msg =
+            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
+        LOG_ERROR(*err_msg);
+        RecoverableError(Status::ColumnCountMismatch(*err_msg));
+    }
+
     auto segment_entry = parser_context->segment_entry_;
     // we have already used all space of the segment
 
@@ -371,13 +379,6 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
     }
 
-    // if column count is larger than columns defined from schema, extra columns are abandoned
-    if (column_count != table_entry->ColumnCount()) {
-        UniquePtr<String> err_msg =
-            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
-        LOG_ERROR(*err_msg);
-        RecoverableError(Status::ImportFileFormatError(*err_msg));
-    }
     // append data to segment entry
     // SizeT write_row = last_block_entry->row_count();
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {

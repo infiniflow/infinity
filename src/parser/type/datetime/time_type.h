@@ -28,10 +28,12 @@ struct TimeType {
 
     explicit TimeType(int32_t time_value) : value(time_value){};
 
+    inline int32_t GetValue() const { return value; }
+
     // keep compatible with iresearch
     operator int32_t() const { return value; }
 
-    inline void FromString(const std::string &time_str) { FromString(time_str.c_str(), time_str.length()); }
+    inline void FromString(const std::string_view &time_str) { FromString(time_str.data(), time_str.size()); }
 
     void FromString(const char *time_ptr, size_t length);
 

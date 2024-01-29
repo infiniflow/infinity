@@ -85,8 +85,17 @@ public:
 
     SizeT TaskletCount() override { return left_->TaskletCount(); }
 
-    // for OperatorState
+    // for OperatorState and Explain
     inline auto const &GetSortExpressions() const { return sort_expressions_; }
+
+    // for Explain
+    inline auto const &GetOrderbyTypes() const { return order_by_types_; }
+
+    // for Explain
+    inline auto GetLimit() const { return limit_; }
+
+    // for Explain
+    inline auto GetOffset() const { return offset_; }
 
     // for MergeTop
     inline auto const &GetInnerCompareFunction() const { return prefer_left_function_; }

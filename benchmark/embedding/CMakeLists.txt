@@ -24,4 +24,7 @@ target_link_libraries(
         sql_parser
         benchmark_profiler
         onnxruntime_mlas
+        iresearch
+        atomic.a
+        lz4.a
 )

@@ -1218,6 +1218,22 @@ void ColumnVector::AppendByStringView(StringView sv, char delimiter) {
             ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
             break;
         }
+        case kDate: {
+            ((DateT *)data_ptr_)[index].FromString(sv);
+            break;
+        }
+        case kTime: {
+            ((TimeT *)data_ptr_)[index].FromString(sv);
+            break;
+        }
+        case kDateTime: {
+            ((DateTimeT *)data_ptr_)[index].FromString(sv);
+            break;
+        }
+        case kTimestamp: {
+            ((TimestampT *)data_ptr_)[index].FromString(sv);
+            break;
+        }
         case kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             Vector<StringView> ele_str_views = SplitArrayElement(sv, delimiter);

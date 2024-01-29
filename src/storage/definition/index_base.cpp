@@ -24,6 +24,7 @@ import serialize;
 import index_ivfflat;
 import index_hnsw;
 import index_full_text;
+import index_secondary;
 import third_party;
 import parser;
 import infinity_exception;
@@ -118,6 +119,10 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexFullText>(file_name, column_names, analyzer);
             break;
         }
+        case IndexType::kSecondary: {
+            res = MakeShared<IndexSecondary>(std::move(file_name), std::move(column_names));
+            break;
+        }
         case IndexType::kInvalid: {
             UnrecoverableError("Error index method while reading");
         }
@@ -179,6 +184,11 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
         case IndexType::kIRSFullText: {
             String analyzer = index_def_json["analyzer"];
             auto ptr = MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
+            res = std::static_pointer_cast<IndexBase>(ptr);
+            break;
+        }
+        case IndexType::kSecondary: {
+            auto ptr = MakeShared<IndexSecondary>(std::move(file_name), std::move(column_names));
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

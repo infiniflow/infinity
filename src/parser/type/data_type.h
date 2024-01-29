@@ -16,9 +16,9 @@
 
 #include "type/complex/embedding_type.h"
 #include "type/complex/row_id.h"
+#include "type/complex/varchar.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
-#include "type/complex/varchar.h"
 
 #include <memory>
 #include <vector>
@@ -128,6 +128,27 @@ public:
             case kFloat:
             case kDouble:
             case kDecimal: {
+                return true;
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
+    [[nodiscard]] inline bool CanBuildSecondaryIndex() const {
+        switch (type_) {
+            case kTinyInt:
+            case kSmallInt:
+            case kInteger:
+            case kBigInt:
+            case kFloat:
+            case kDouble:
+            case kDate:
+            case kTime:
+            case kDateTime:  // need to be converted to uint64 and keep order
+            case kTimestamp: // need to be converted to uint64 and keep order
+            {
                 return true;
             }
             default: {
