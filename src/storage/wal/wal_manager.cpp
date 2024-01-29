@@ -539,7 +539,7 @@ void WalManager::RecycleWalFile(TxnTimeStamp full_ckp_ts) {
 }
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
     for (const auto &cmd : entry.cmds_) {
-        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalManager::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
+        LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
             case WalCommandType::CREATE_DATABASE:
                 WalCmdCreateDatabaseReplay(*dynamic_cast<const WalCmdCreateDatabase *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
@@ -572,6 +572,9 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::CHECKPOINT:
+                break;
+            case WalCommandType::COMPACT:
+                WalCmdCompactReplay(*static_cast<const WalCmdCompact *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             default: {
                 UnrecoverableError("WalManager::ReplayWalEntry unknown wal command type");
@@ -654,6 +657,28 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     table_index_entry->Commit(commit_ts);
 }
 
+void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
+    auto segment_dir_ptr = MakeShared<String>(segment_info.segment_dir_);
+    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_info.segment_id_, segment_dir_ptr, commit_ts);
+
+    for (i32 id = 0; id < segment_info.block_entries_size_; ++id) {
+        u16 row_count = (id == segment_info.block_entries_size_ - 1) ? segment_info.last_block_row_count_ : segment_info.block_capacity_;
+        auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
+                                                           id,
+                                                           0,
+                                                           table_entry->ColumnCount(),
+                                                           storage_->buffer_manager(),
+                                                           row_count,
+                                                           commit_ts,
+                                                           commit_ts);
+
+        segment_entry->AppendBlockEntry(std::move(block_entry));
+        segment_entry->IncreaseRowCount(row_count);
+    }
+
+    NewCatalog::ImportSegment(table_entry, segment_info.segment_id_, segment_entry);
+}
+
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
 
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
@@ -661,25 +686,9 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_i
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    auto segment_dir_ptr = MakeShared<String>(cmd.segment_dir_);
-    auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, cmd.segment_id_, segment_dir_ptr, commit_ts);
-
-    for (i32 id = 0; id < cmd.block_entries_size_; ++id) {
-        auto block_entry = BlockEntry::NewReplayBlockEntry(segment_entry.get(),
-                                                           id,
-                                                           0,
-                                                           table_entry->ColumnCount(),
-                                                           storage_->buffer_manager(),
-                                                           cmd.row_counts_[id],
-                                                           commit_ts,
-                                                           commit_ts);
-
-        segment_entry->AppendBlockEntry(std::move(block_entry));
-        segment_entry->IncreaseRowCount(cmd.row_counts_[id]);
-    }
-
-    NewCatalog::ImportSegment(table_entry, cmd.segment_id_, segment_entry);
+    ReplaySegment(table_entry, cmd.segment_info_, commit_ts);
 }
+
 void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
@@ -692,6 +701,22 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
     NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+}
+
+void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
+    }
+
+    for (const auto &new_segment_info : cmd.new_segment_infos_) {
+        ReplaySegment(table_entry, new_segment_info, commit_ts);
+    }
+
+    for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
+        auto *segment_entry = table_entry->segment_map().at(segment_id).get();
+        segment_entry->SetDeprecated(commit_ts);
+    }
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -711,52 +736,6 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     fake_txn->FakeCommit(commit_ts);
     NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
     NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
-}
-
-String WalManager::WalCommandTypeToString(WalCommandType type) {
-    String wal_cmd_type{};
-    switch (type) {
-        case WalCommandType::INVALID:
-            wal_cmd_type = "INVALID";
-            break;
-        case WalCommandType::CREATE_DATABASE:
-            wal_cmd_type = "CREATE_DATABASE";
-            break;
-        case WalCommandType::DROP_DATABASE:
-            wal_cmd_type = "DROP_DATABASE";
-            break;
-        case WalCommandType::CREATE_TABLE:
-            wal_cmd_type = "CREATE_TABLE";
-            break;
-        case WalCommandType::DROP_TABLE:
-            wal_cmd_type = "DROP_TABLE";
-            break;
-        case WalCommandType::ALTER_INFO:
-            wal_cmd_type = "ALTER_INFO";
-            break;
-        case WalCommandType::IMPORT:
-            wal_cmd_type = "IMPORT";
-            break;
-        case WalCommandType::APPEND:
-            wal_cmd_type = "APPEND";
-            break;
-        case WalCommandType::DELETE:
-            wal_cmd_type = "DELETE";
-            break;
-        case WalCommandType::CHECKPOINT:
-            wal_cmd_type = "CHECKPOINT";
-            break;
-        case WalCommandType::CREATE_INDEX:
-            wal_cmd_type = "CREATE_INDEX";
-            break;
-        case WalCommandType::DROP_INDEX:
-            wal_cmd_type = "DROP_INDEX";
-            break;
-        default: {
-            UnrecoverableError("Not supported wal command type");
-        }
-    }
-    return wal_cmd_type;
 }
 
 } // namespace infinity

@@ -60,7 +60,7 @@ export struct ImportState {
 export struct DeleteState {
     //    HashMap<u64, Vector<RowID>> rows_; // key is pair<segment_id, block_id>
     // HashMap<<segment, block_id>, block_offset>
-    HashMap<SegmentID, HashMap<BlockID, Vector<RowID>>> rows_; // use segment id, as the first level key, block id as the second level key
+    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> rows_; // use segment id, as the first level key, block id as the second level key
 };
 
 export struct GetState {};

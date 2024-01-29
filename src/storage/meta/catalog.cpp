@@ -313,13 +313,19 @@ Status NewCatalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id,
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
+Status NewCatalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
+}
+
+Status NewCatalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
+}
+
 Status NewCatalog::ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     return table_entry->ImportSegment(commit_ts, segment);
 }
 
-u32 NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return TableEntry::GetNextSegmentID(table_entry); }
-
-u32 NewCatalog::GetMaxSegmentID(const TableEntry *table_entry) { return TableEntry::GetMaxSegmentID(table_entry); }
+SegmentID NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
 void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
     table_entry->segment_map_.emplace(segment_id, std::move(segment_entry));

@@ -16,6 +16,7 @@ module backgroud_process;
 
 import stl;
 import bg_task;
+import compact_segments_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
@@ -65,6 +66,11 @@ void BGTaskProcessor::Process() {
                 auto &local_catalog_ops = task->local_catalog_delta_entry_;
                 auto *catalog = task->catalog_;
                 catalog->global_catalog_delta_entry_->Merge(std::move(local_catalog_ops));
+                break;
+            }
+            case BGTaskType::kCompactSegments: {
+                auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
+                task->Execute();
                 break;
             }
             case BGTaskType::kInvalid: {

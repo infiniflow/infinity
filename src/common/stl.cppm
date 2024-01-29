@@ -212,16 +212,17 @@ export {
     template <typename S, typename T>
     using Map = std::map<S, T>;
 
+    template <typename S, typename T>
+    using MultiMap = std::multimap<S, T>;
+
     template <typename T>
     using Set = std::set<T>;
 
-    template <typename T>
-    inline size_t Hash(T t) {
-        return std::hash<T>()(t);
-    }
+    template<typename T>
+    using Hash = std::hash<T>;
 
-    template <typename S, typename T, typename H = std::hash<S>>
-    using HashMap = std::unordered_map<S, T, H>;
+    template <typename S, typename T, typename H = std::hash<S>, typename Eq = std::equal_to<S>>
+    using HashMap = std::unordered_map<S, T, H, Eq>;
 
     template <typename S, typename T, typename H = std::hash<S>>
     using MultiHashMap = std::unordered_multimap<S, T, H>;
@@ -268,6 +269,18 @@ export {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
     }
 
+    template<class BidirIteratorType>
+    BidirIteratorType Prev(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
+        std::advance(it, -n);
+        return it;
+    }
+
+    template<class BidirIteratorType>
+    BidirIteratorType Next(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
+        std::advance(it, n);
+        return it;
+    }
+
     // Primitives
 
     using i8 = int8_t;
@@ -305,6 +318,7 @@ export {
 
     // Related to entry
     using BlockOffset = uint16_t;
+    using SegmentOffset = uint32_t;
 
     // Concurrency
     using ThreadPool = ctpl::thread_pool;

@@ -297,7 +297,7 @@ void AddSegmentEntryOperation::SaveSate() {
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
-    this->segment_dir_ = this->segment_entry_->DirPath();
+    this->segment_dir_ = *this->segment_entry_->segment_dir();
     is_snapshotted_ = true;
 }
 
