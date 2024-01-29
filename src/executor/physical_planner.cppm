@@ -38,7 +38,7 @@ private:
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateCollection(const SharedPtr<LogicalNode> &logical_operator) const;
 
-    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const;
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCreateDatabase(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildPreparedPlan(const SharedPtr<LogicalNode> &logical_operator) const;
 

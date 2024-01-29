@@ -40,6 +40,7 @@ public:
     [[nodiscard]] inline i32 time_zone_bias() const { return system_option_.time_zone_bias; }
 
     inline void set_worker_cpu_number(u64 new_cpu_limit) { system_option_.worker_cpu_limit = new_cpu_limit; }
+
     [[nodiscard]] inline u64 worker_cpu_limit() const { return system_option_.worker_cpu_limit; }
 
     [[nodiscard]] inline u64 total_memory_size() const { return system_option_.total_memory_size; }

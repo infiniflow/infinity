@@ -12,7 +12,7 @@ export class CommitTask : public TaskExecutor::Task {
 public:
     CommitTask(ColumnInverter *inverter);
 
-    ~CommitTask() = default;
+    ~CommitTask();
 
     void Run() override;
 

@@ -20,6 +20,7 @@ module status;
 
 import stl;
 import third_party;
+import default_values;
 
 namespace infinity {
 
@@ -213,8 +214,32 @@ Status Status::DataNotExist(const infinity::String &detailed_info) {
     return Status(ErrorCode::kImportFileFormatError, MakeUnique<String>(fmt::format("Data not exist: ", detailed_info)));
 }
 
-Status Status::EmptyDBNameIsGiven() {
-    return Status(ErrorCode::kEmptyDBNameIsGiven, MakeUnique<String>("Empty database name is given."));
+Status Status::EmptyDBName() { return Status(ErrorCode::kEmptyDbName, MakeUnique<String>("Empty database name.")); }
+
+Status Status::EmptyTableName() { return Status(ErrorCode::kEmptyTableName, MakeUnique<String>("Empty table name.")); }
+
+Status Status::EmptyColumnName() { return Status(ErrorCode::kEmptyColumnName, MakeUnique<String>("Empty column name.")); }
+
+Status Status::EmptyIndexName() { return Status(ErrorCode::kEmptyIndexName, MakeUnique<String>("Empty index name.")); }
+
+Status Status::ExceedDBNameLength(u64 db_name_length) {
+    return Status(ErrorCode::kExceedDBNameLength,
+                  MakeUnique<String>(fmt::format("Given database name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
+}
+
+Status Status::ExceedTableNameLength(u64 table_name_length) {
+    return Status(ErrorCode::kExceedTableNameLength,
+                  MakeUnique<String>(fmt::format("Given table name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
+}
+
+Status Status::ExceedColumnNameLength(u64 column_name_length) {
+    return Status(ErrorCode::kExceedColumnNameLength,
+                  MakeUnique<String>(fmt::format("Given column name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
+}
+
+Status Status::ExceedIndexNameLength(u64 index_name_length) {
+    return Status(ErrorCode::kExceedIndexNameLength,
+                  MakeUnique<String>(fmt::format("Given index name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
 }
 
 // 4. TXN fail
@@ -305,7 +330,7 @@ Status Status::UnexpectedError(const String &detailed_info) {
     return Status(ErrorCode::kUnexpectedError, MakeUnique<String>(fmt::format("Unexpected error: {}", detailed_info)));
 }
 
-Status Status::ColumnCountMismatch(const String& detailed_info) {
+Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
 

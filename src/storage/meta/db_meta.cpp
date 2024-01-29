@@ -306,7 +306,7 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
             if (begin_ts > db_entry->commit_ts_) {
                 if (db_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
-                    LOG_ERROR(*err_msg);
+                    LOG_TRACE(*err_msg);
                     return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
                 } else {
                     // check the tables meta

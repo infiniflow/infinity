@@ -70,7 +70,14 @@ export enum class ErrorCode : long {
     kImportFileFormatError = 3037,
     kDataNotExist = 3038,
     kColumnCountMismatch = 3039,
-    kEmptyDBNameIsGiven = 3040,
+    kEmptyDbName = 3040,
+    kEmptyTableName = 3041,
+    kEmptyColumnName = 3042,
+    kEmptyIndexName = 3043,
+    kExceedDBNameLength = 3044,
+    kExceedTableNameLength = 3045,
+    kExceedColumnNameLength = 3046,
+    kExceedIndexNameLength = 3047,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -148,7 +155,14 @@ public:
     static Status ImportFileFormatError(const String &detailed_info);
     static Status DataNotExist(const String &detailed_info);
     static Status ColumnCountMismatch(const String &detailed_info);
-    static Status EmptyDBNameIsGiven();
+    static Status EmptyDBName();
+    static Status EmptyTableName();
+    static Status EmptyColumnName();
+    static Status EmptyIndexName();
+    static Status ExceedDBNameLength(u64 db_name_length);
+    static Status ExceedTableNameLength(u64 table_name_length);
+    static Status ExceedColumnNameLength(u64 column_name_length);
+    static Status ExceedIndexNameLength(u64 index_name_length);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

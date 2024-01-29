@@ -85,3 +85,15 @@ class TestDelete:
         res = infinity_obj.disconnect()
 
         assert res.success
+
+    # delete empty table
+    # delete non-existent table
+    # delete table, no row is met the condition
+    # delete table, all rows are met the condition
+    # delete table with only one block
+    # delete table with multiple blocks, but only one segment
+    # select before delete, select after delete and check the change.
+    # delete just inserted data and select to check
+    # delete inserted long before and select to check
+    # delete dropped table
+    # various expression will be given in where clause, and check result correctness

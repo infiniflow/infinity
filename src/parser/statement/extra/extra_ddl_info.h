@@ -20,7 +20,7 @@ namespace infinity {
 
 enum class DDLType {
     kInvalid,
-    kSchema,
+    kDatabase,
     kTable,
     kCollection,
     kView,

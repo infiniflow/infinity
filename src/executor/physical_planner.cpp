@@ -141,7 +141,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
         case LogicalNodeType::kCreateSchema: {
-            result = BuildCreateSchema(logical_operator);
+            result = BuildCreateDatabase(logical_operator);
             break;
         }
         case LogicalNodeType::kDropTable: {
@@ -368,7 +368,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateCollection(const SharedP
                                                 logical_operator->load_metas());
 }
 
-UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateSchema(const SharedPtr<LogicalNode> &logical_operator) const {
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateDatabase(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalCreateSchema> logical_create_schema = static_pointer_cast<LogicalCreateSchema>(logical_operator);
     return MakeUnique<PhysicalCreateSchema>(logical_create_schema->schema_name(),
                                             logical_create_schema->conflict_type(),

@@ -36,8 +36,9 @@ void Logger::Initialize(const Config *config_ptr) {
     SizeT log_file_rotate_count = config_ptr->log_file_rotate_count();
 
     if (rotating_file_sinker.get() == nullptr) {
-        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(*config_ptr->log_file_path(), log_max_size,
-                                                                  log_file_rotate_count); // NOLINT
+        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(*config_ptr->log_file_path(),
+                                                                                log_max_size,
+                                                                                log_file_rotate_count); // NOLINT
     }
 
     Vector<spdlog::sink_ptr> sinks{stdout_sinker, rotating_file_sinker};
