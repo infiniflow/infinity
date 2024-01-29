@@ -198,7 +198,6 @@ public:
 
     static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);
 
-
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
@@ -220,7 +219,7 @@ public:
 
     String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    String FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_commit_);
+    String FlushGlobalCatalogDeltaEntry(String delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void MergeFrom(NewCatalog &other);
 

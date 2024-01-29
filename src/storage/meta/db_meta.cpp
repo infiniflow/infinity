@@ -333,67 +333,36 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
     return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
 }
 
-Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-    }
-
-    for (const auto &db_entry : this->entry_list_) {
-        if (db_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
+Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    if (!this->entry_list_.empty()) {
+        const auto &entry = entry_list_.front();
+        if (entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
         }
 
-        if (db_entry->Committed()) {
-            if (begin_ts > db_entry->commit_ts_) {
-                if (db_entry->deleted_) {
-                    UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-                } else {
-                    // check the tables meta
-                    DBEntry *db_entry_ptr = (DBEntry *)(db_entry.get());
-                    return {db_entry_ptr, Status::OK()};
-                }
+        TransactionID entry_txn_id = entry->txn_id_.load();
+        // committed
+        if (begin_ts > entry->commit_ts_) {
+            if (entry->deleted_) {
+                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                LOG_ERROR(*err_msg);
+                return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+            } else {
+                auto db_entry = static_cast<DBEntry *>(entry.get());
+                return {db_entry, Status::OK()};
             }
         } else {
-            // Only committed txn is visible. Committing txn isn't visble,
-            // except same txn is visible
-            if (txn_id == db_entry->txn_id_) {
-                if (db_entry->deleted_) {
-                    UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-                } else {
-                    return {(DBEntry *)(db_entry.get()), Status::OK()};
-                }
+            if (txn_id == entry_txn_id) {
+                auto db_entry = static_cast<DBEntry *>(entry.get());
+                return {db_entry, Status::OK()};
             }
         }
     }
-    UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No db entry {} found.", *this->db_name_));
+    UniquePtr<String> err_msg = MakeUnique<String>("No db entry found.");
     LOG_ERROR(*err_msg);
     return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-}
-
-Tuple<DBEntry *, Status> DBMeta::GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (this->entry_list_.empty()) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-    }
-    for (const auto &db_entry : this->entry_list_) {
-        if (db_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
-        }
-
-        return {(DBEntry *)(db_entry.get()), Status::OK()};
-    }
 }
 
 SharedPtr<String> DBMeta::ToString() {
@@ -413,7 +382,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         db_candidates.reserve(this->entry_list_.size());
         for (auto &db_entry : this->entry_list_) {
-            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
+            if (db_entry->entry_type_ == EntryType::kDatabase) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
             }

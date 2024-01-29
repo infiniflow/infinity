@@ -372,7 +372,7 @@ BlockEntry *SegmentEntry::GetBlockEntryByID(u16 block_id) const {
 
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
-    Vector<BlockEntry *> block_entries;
+
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["segment_dir"] = *this->segment_dir_;
@@ -389,28 +389,8 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["txn_id"] = TransactionID(this->txn_id_);
 
         for (auto &block_entry : this->block_entries_) {
-            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
-                block_entries.push_back((BlockEntry *)block_entry.get());
-            }
+            json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
         }
-    }
-    for (BlockEntry *block_entry : block_entries) {
-        //        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-        //                              block_entry->checkpoint_ts(),
-        //                              block_entry->min_row_ts(),
-        //                              block_entry->max_row_ts(),
-        //                              max_commit_ts));
-        block_entry->Flush(max_commit_ts);
-        //        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-        //                              block_entry->checkpoint_ts(),
-        //                              block_entry->min_row_ts(),
-        //                              block_entry->max_row_ts(),
-        //                              max_commit_ts));
-        // WARNING: this operation may influence data visibility
-        //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
-        //            continue;
-        //        }
-        json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }
@@ -444,6 +424,31 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     LOG_TRACE(fmt::format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
 
     return segment_entry;
+}
+
+void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    Vector<BlockEntry *> block_entries;
+    for (auto &block_entry : this->block_entries()) {
+        if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
+            block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+        }
+    }
+    if (block_entries.empty()) {
+        return;
+    }
+    for (BlockEntry *block_entry : block_entries) {
+        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
+        block_entry->Flush(max_commit_ts);
+        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
+    }
 }
 
 SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {

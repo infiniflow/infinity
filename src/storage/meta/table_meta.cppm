@@ -72,7 +72,7 @@ private:
 
     Tuple<TableEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<TableEntry *, Status> GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
     std::shared_mutex rw_locker_{};

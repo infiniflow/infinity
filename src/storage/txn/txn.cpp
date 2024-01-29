@@ -554,8 +554,7 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
     // only save the catalog delta entry
-    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts);
-    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, false);
+    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, false);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
 }
 
@@ -563,7 +562,7 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     LOG_INFO("FULL CKPT");
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.FULL.{}", dir_name, max_commit_ts));
-    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts);
+    String delta = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, true);
     String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, true);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, catalog_path));
 }

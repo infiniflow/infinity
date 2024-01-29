@@ -441,12 +441,19 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
         RecoverableError(Status::CatalogCorrupted(catalog_path));
     }
 
-    auto commit_ts = catalog_delta_entry->commit_ts();
-    auto global_entry_txn_id = catalog_delta_entry->txn_id();
+    auto global_commit_ts = catalog_delta_entry->commit_ts();
+    auto global_txn_id = catalog_delta_entry->txn_id();
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
         auto type = op->GetType();
         LOG_TRACE(fmt::format("Catalog Delta Op is {}", op->ToString()));
+        auto commit_ts = op->commit_ts();
+        auto txn_id = op->txn_id();
+        auto begin_ts = op->begin_ts();
+        if (txn_id < catalog->next_txn_id_) {
+            // Ignore the old txn
+            continue;
+        }
         switch (type) {
             case CatalogDeltaOpType::ADD_DATABASE_META: {
                 auto add_db_meta_op = static_cast<AddDBMetaOp *>(op.get());
@@ -481,7 +488,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_table_meta_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -501,7 +508,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_table_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -532,12 +539,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_segment_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -560,12 +567,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_block_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -593,12 +600,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 LOG_TRACE(fmt::format("txn_id: {}", txn_id));
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -619,12 +626,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_index_meta_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -644,12 +651,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_table_index_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -679,12 +686,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_irs_index_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -711,17 +718,17 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 TransactionID txn_id = add_column_index_entry_op->txn_id();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto *index_meta = table_entry->index_meta_map_.at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!index_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -753,17 +760,17 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 LOG_TRACE(fmt::format("at db {}", db_name));
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto table_meta = db_entry->tables_.at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError("!!!");
                 }
                 auto *index_meta = table_entry->index_meta_map_.at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!index_status.ok()) {
                     UnrecoverableError("!!!");
                 }
@@ -866,7 +873,7 @@ String NewCatalog::SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, boo
     return file_path;
 }
 
-String NewCatalog::FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_commit_ts) {
+String NewCatalog::FlushGlobalCatalogDeltaEntry(String delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
 
     auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
@@ -880,6 +887,17 @@ String NewCatalog::FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_com
             fmt::format("Global catalog delta entry commit ts {} not match checkpoint max commit ts {}", global_entry_commit_ts, max_commit_ts));
     }
 
+    // Check the SegmentEntry's for flush the data to disk.
+    auto &ops = global_catalog_delta_entry->operations();
+    for (auto &op : ops) {
+        if (op->GetType() == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+            auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
+            LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
+            add_segment_entry_op->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+        }
+    }
+
+    // Save the global catalog delta entry to disk.
     auto exp_size = global_catalog_delta_entry->GetSizeInBytes();
     Vector<char> buf(exp_size);
     char *ptr = buf.data();
@@ -891,10 +909,10 @@ String NewCatalog::FlushGlobalCatalogDeltaEntry(String dir, TxnTimeStamp max_com
     }
 
     std::ofstream outfile;
-    outfile.open(dir, std::ios::binary);
+    outfile.open(delta_catalog_path, std::ios::binary);
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
-    return dir;
+    return delta_catalog_path;
 }
 
 } // namespace infinity

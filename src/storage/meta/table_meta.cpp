@@ -369,21 +369,37 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
     return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
 }
 
-Tuple<TableEntry *, Status> TableMeta::GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (this->entry_list_.empty()) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
-    }
+Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
 
-    for (const auto &table_entry : this->entry_list_) {
-        if (table_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
+    if (!this->entry_list_.empty()) {
+        const auto &entry = entry_list_.front();
+        if (entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
         }
-        return {static_cast<TableEntry *>(table_entry.get()), Status::OK()};
+
+        TransactionID entry_txn_id = entry->txn_id_.load();
+        // committed
+        if (begin_ts > entry->commit_ts_) {
+            if (entry->deleted_) {
+                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                LOG_ERROR(*err_msg);
+                return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+            } else {
+                auto table_entry = static_cast<TableEntry *>(entry.get());
+                return {table_entry, Status::OK()};
+            }
+        } else {
+            if (txn_id == entry_txn_id) {
+                auto table_entry = static_cast<TableEntry *>(entry.get());
+                return {table_entry, Status::OK()};
+            }
+        }
     }
+    UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
+    LOG_ERROR(*err_msg);
+    return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
 }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
@@ -407,7 +423,7 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         table_candidates.reserve(this->entry_list_.size());
         for (auto &table_entry : this->entry_list_) {
-            if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
+            if (table_entry->entry_type_ == EntryType::kTable) {
                 // Put it to candidate list
                 table_candidates.push_back((TableEntry *)table_entry.get());
             }

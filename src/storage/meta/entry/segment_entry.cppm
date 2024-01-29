@@ -61,6 +61,9 @@ public:
                             const IndexBase *index_base,
                             SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
 
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+
 public:
     const String &DirPath() { return *segment_dir_; }
 

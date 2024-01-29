@@ -359,10 +359,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
 
-    TableIndexEntry *table_index_entry{nullptr};
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
-    if (!this->entry_list_.empty()){
-        const auto& entry = entry_list_.front();
+    if (!this->entry_list_.empty()) {
+        const auto &entry = entry_list_.front();
 
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
@@ -378,12 +376,12 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
                 LOG_ERROR(*err_msg);
                 return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
             } else {
-                table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+                auto table_index_entry = static_cast<TableIndexEntry *>(entry.get());
                 return {table_index_entry, Status::OK()};
             }
         } else {
             if (txn_id == entry_txn_id) {
-                table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+                auto table_index_entry = static_cast<TableIndexEntry *>(entry.get());
                 return {table_index_entry, Status::OK()};
             }
         }
@@ -392,20 +390,6 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
     return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
-}
-
-Tuple<TableIndexEntry *, Status> TableIndexMeta::GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-
-    for (const auto &entry : this->entry_list_) {
-        if (entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
-        }
-
-        auto table_index_entry = static_cast<TableIndexEntry *>(entry.get());
-        return {table_index_entry, Status::OK()};
-    }
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {

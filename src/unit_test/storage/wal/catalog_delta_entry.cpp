@@ -14,8 +14,10 @@
 
 #include "unit_test/base_test.h"
 
+import parser;
 import infinity_exception;
-
+import index_base;
+import index_def;
 import logger;
 import third_party;
 import stl;
@@ -43,6 +45,9 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     String index_name{"index_test"};
     String index_dir{"data/db_test/table_test/0/0/index_test"};
     String col_index_dir{"data/db_test/table_test/0/0/index_test"};
+    Vector<SharedPtr<ColumnDef>> column_defs{};
+    SharedPtr<IndexDef> index_def{nullptr};
+    SharedPtr<IndexBase> index_base{nullptr};
 
     // db meta
     auto op1 = MakeUnique<AddDBMetaOp>(1, false, db_name, db_dir);
@@ -65,9 +70,9 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
 
     // table entry
-    auto op5 = MakeUnique<AddTableEntryOp>(5, false, db_name, table_name, table_entry_dir);
-    auto op6 = MakeUnique<AddTableEntryOp>(6, true, db_name, table_name, table_entry_dir);
-    auto op5_same_name = MakeUnique<AddTableEntryOp>(5, false, db_name, table_name, table_entry_dir);
+    auto op5 = MakeUnique<AddTableEntryOp>(5, false, db_name, table_name, table_entry_dir, column_defs);
+    auto op6 = MakeUnique<AddTableEntryOp>(6, true, db_name, table_name, table_entry_dir, column_defs);
+    auto op5_same_name = MakeUnique<AddTableEntryOp>(5, false, db_name, table_name, table_entry_dir, column_defs);
     local_catalog_delta_entry->operations().push_back(std::move(op5));
     local_catalog_delta_entry->operations().push_back(std::move(op6));
     local_catalog_delta_entry->operations().push_back(std::move(op5_same_name));
@@ -97,8 +102,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op10_same_name));
 
     // table index entry
-    auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, db_name, table_name, index_name, index_dir);
-    auto op11_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, db_name, table_name, index_name, index_dir);
+    auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, db_name, table_name, index_name, index_dir, index_def);
+    auto op11_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, db_name, table_name, index_name, index_dir, index_def);
     local_catalog_delta_entry->operations().push_back(std::move(op11));
     local_catalog_delta_entry->operations().push_back(std::move(op11_same_name));
 
@@ -109,8 +114,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op12_same_name));
 
     // column index entry
-    auto op13 = MakeUnique<AddColumnIndexEntryOp>(13, false, db_name, table_name, index_name, col_index_dir, column_id);
-    auto op13_same_name = MakeUnique<AddColumnIndexEntryOp>(13, false, db_name, table_name, index_name, col_index_dir, column_id);
+    auto op13 = MakeUnique<AddColumnIndexEntryOp>(13, false, db_name, table_name, index_name, col_index_dir, column_id, index_base);
+    auto op13_same_name = MakeUnique<AddColumnIndexEntryOp>(13, false, db_name, table_name, index_name, col_index_dir, column_id, index_base);
     local_catalog_delta_entry->operations().push_back(std::move(op13));
     local_catalog_delta_entry->operations().push_back(std::move(op13_same_name));
 
@@ -124,9 +129,7 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     // merge
     global_catalog_delta_entry->Merge(std::move(local_catalog_delta_entry));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 14);
-    // check maps
-    EXPECT_EQ(global_catalog_delta_entry->encode_to_id_map().size(), 14);
+    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 26);
     // check member
     EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1);
     EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1);

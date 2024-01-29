@@ -409,11 +409,6 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     }
 }
 
-// DBEntry *TableEntry::GetDBEntry(const TableEntry *table_entry) {
-//     TableMeta *table_meta = (TableMeta *)table_entry->table_meta_;
-//     return (DBEntry *)table_meta->db_entry_;
-// }
-
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
 
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
@@ -462,9 +457,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
-            //            if(segment_entry->commit_ts_ <= max_commit_ts) {
             segment_candidates.emplace_back(segment_entry.get());
-            //            }
         }
 
         table_index_meta_candidates.reserve(this->index_meta_map_.size());

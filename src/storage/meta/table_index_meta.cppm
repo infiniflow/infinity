@@ -46,8 +46,6 @@ public:
 
     Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<TableIndexEntry *, Status> GetFirstEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
-
     Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:

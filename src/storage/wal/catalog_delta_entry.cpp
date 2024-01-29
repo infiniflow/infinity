@@ -336,18 +336,12 @@ void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
 }
 
 void AddDBMetaOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->db_name_ = *this->db_meta_->db_name();
     this->data_dir_ = *this->db_meta_->data_dir();
     is_snapshotted_ = true;
 }
 
 void AddTableMetaOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //
     this->db_name_ = this->table_meta_->db_name();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
@@ -355,9 +349,6 @@ void AddTableMetaOp::SaveSate() {
 }
 
 void AddDBEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = db_entry_->deleted_;
     this->begin_ts_ = db_entry_->begin_ts_;
     String db_name = db_entry_->db_name();
@@ -368,9 +359,6 @@ void AddDBEntryOp::SaveSate() {
 }
 
 void AddTableEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = this->table_entry_->deleted_;
     this->begin_ts_ = this->table_entry_->begin_ts_;
     this->db_name_ = *this->table_entry_->GetDBName();
@@ -381,9 +369,6 @@ void AddTableEntryOp::SaveSate() {
 }
 
 void AddSegmentEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = segment_entry_->deleted_;
     this->begin_ts_ = segment_entry_->begin_ts_;
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
@@ -394,9 +379,6 @@ void AddSegmentEntryOp::SaveSate() {
 }
 
 void AddBlockEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = block_entry_->deleted_;
     this->begin_ts_ = block_entry_->begin_ts_;
     this->db_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetDBName();
@@ -410,9 +392,6 @@ void AddBlockEntryOp::SaveSate() {
 }
 
 void AddColumnEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = column_entry_->deleted_;
     this->begin_ts_ = column_entry_->begin_ts_;
     this->db_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName();
@@ -426,9 +405,6 @@ void AddColumnEntryOp::SaveSate() {
 
 /// Related to index
 void AddIndexMetaOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->db_name_ = *this->index_meta_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->index_meta_->GetTableEntry()->GetTableName();
     this->index_name_ = this->index_meta_->index_name();
@@ -436,9 +412,6 @@ void AddIndexMetaOp::SaveSate() {
 }
 
 void AddTableIndexEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = table_index_entry_->deleted_;
     this->begin_ts_ = table_index_entry_->begin_ts_;
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
@@ -450,9 +423,6 @@ void AddTableIndexEntryOp::SaveSate() {
 }
 
 void AddIrsIndexEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = irs_index_entry_->deleted_;
     this->begin_ts_ = irs_index_entry_->begin_ts_;
     this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -463,9 +433,6 @@ void AddIrsIndexEntryOp::SaveSate() {
 }
 
 void AddColumnIndexEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = column_index_entry_->deleted_;
     this->begin_ts_ = column_index_entry_->begin_ts_;
     this->db_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -478,9 +445,6 @@ void AddColumnIndexEntryOp::SaveSate() {
 }
 
 void AddSegmentColumnIndexEntryOp::SaveSate() {
-    //    if (is_snapshotted_) {
-    //        return;
-    //    }
     this->is_delete_ = segment_column_index_entry_->deleted_;
     this->begin_ts_ = segment_column_index_entry_->begin_ts_;
     this->db_name_ = *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -494,8 +458,99 @@ void AddSegmentColumnIndexEntryOp::SaveSate() {
     is_snapshotted_ = true;
 }
 
-/// class CatalogDeltaEntry
+const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
 
+const String AddTableMetaOp::ToString() const {
+    return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", db_name_, table_name_, db_entry_dir_);
+}
+
+const String AddDBEntryOp::ToString() const { return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", db_name_, db_entry_dir_); }
+
+const String AddTableEntryOp::ToString() const {
+    std::stringstream sstream;
+    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}", db_name_, table_name_, table_entry_dir_);
+    for (const auto &column_def : column_defs_) {
+        sstream << fmt::format(" column_def: {}", column_def->ToString());
+    }
+    return sstream.str();
+}
+
+const String AddSegmentEntryOp::ToString() const {
+    return fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
+                       db_name_,
+                       table_name_,
+                       segment_id_,
+                       segment_dir_);
+}
+
+const String AddBlockEntryOp::ToString() const {
+    return fmt::format(
+        "AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} block_dir: {} row_count: {} row_capacity: {} min_row_ts: {} "
+        "max_row_ts: {}",
+        db_name_,
+        table_name_,
+        segment_id_,
+        block_id_,
+        block_dir_,
+        row_count_,
+        row_capacity_,
+        min_row_ts_,
+        max_row_ts_);
+}
+
+const String AddColumnEntryOp::ToString() const {
+    return fmt::format("AddColumnEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}",
+                       db_name_,
+                       table_name_,
+                       segment_id_,
+                       block_id_,
+                       column_id_,
+                       next_outline_idx_);
+}
+
+const String AddIndexMetaOp::ToString() const {
+    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", db_name_, table_name_, index_name_);
+}
+
+const String AddTableIndexEntryOp::ToString() const {
+    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_def: {}",
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       index_dir_,
+                       index_def_->ToString());
+}
+
+const String AddIrsIndexEntryOp::ToString() const {
+    return fmt::format("AddIrsIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}", db_name_, table_name_, index_name_, index_dir_);
+}
+
+const String AddColumnIndexEntryOp::ToString() const {
+    return fmt::format("AddColumnIndexEntryOp db_name: {} table_name: {} index_name: {} col_index_dir: {} column_id: {} index_base: {}",
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       col_index_dir_,
+                       column_id_,
+                       index_base_->ToString());
+}
+
+const String AddSegmentColumnIndexEntryOp::ToString() const {
+    return fmt::format("AddSegmentColumnIndexEntryOp db_name: {} table_name: {} index_name: {} column_id: {} segment_id: {} min_ts: {} max_ts: {}",
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       column_id_,
+                       segment_id_,
+                       min_ts_,
+                       max_ts_);
+}
+
+void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+}
+
+/// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
     i32 size = sizeof(CatalogDeltaEntryHeader) + sizeof(i32);
     SizeT operations_size = operations_.size();
@@ -567,7 +622,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     SizeT operation_count = operations_.size();
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
-        LOG_TRACE(fmt::format("!!!Write Adv {}", operation->ToString()));
+        LOG_TRACE(fmt::format("Write {}", operation->ToString()));
         char *const save_ptr = ptr;
         operation->WriteAdv(ptr);
         i32 act_size = ptr - save_ptr;
@@ -591,14 +646,14 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
-        LOG_TRACE(fmt::format("SaveState operation {}", operation->ToString()));
+        LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
         operation->SaveSate();
         operation->txn_id_ = txn_id;
         operation->commit_ts_ = commit_ts;
     }
 }
 
-std::string CatalogDeltaEntry::ToString() const {
+String CatalogDeltaEntry::ToString() const {
     std::stringstream sstream;
     for (const auto &operation : operations_) {
         sstream << operation->ToString() << '\n';
@@ -607,18 +662,13 @@ std::string CatalogDeltaEntry::ToString() const {
 }
 
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
-    auto &global_map = this->encode_to_id_map();
     auto &global_operations = this->operations();
     auto &local_operations = other->operations();
 
+    // TODO: optimize this merge process
+    // add the local operations to the global operations
     for (auto &local_operation : local_operations) {
-        //        auto it = global_map.find(local_operation->EncodeIndex());
-        //        if (it == global_map.end()) {
-        //            global_map[local_operation->EncodeIndex()] = global_operations.size();
         global_operations.push_back(std::move(local_operation));
-        //        } else {
-        //            global_operations[it->second] = std::move(local_operation);
-        //        }
     }
 
     local_operations.clear();
