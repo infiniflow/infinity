@@ -32,4 +32,6 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, docid_t base_
     return true;
 }
 
+docid_t DiskIndexSegmentReader::GetBaseDocId() const { return 0; }
+
 } // namespace infinity

@@ -28,4 +28,6 @@ bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
     return false;
 }
 
+docid_t InMemIndexSegmentReader::GetBaseDocId() const { return 0; }
+
 } // namespace infinity

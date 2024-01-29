@@ -20,7 +20,7 @@ public:
 
     void Open(const InvertedIndexConfig &index_config);
 
-    PostingIterator *Lookup(const String &term) { return nullptr; }
+    PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
 
     void GetSegments(const String &directory, Vector<Segment> &segments);
 
@@ -34,6 +34,8 @@ private:
 private:
     String root_dir_;
     InvertedIndexConfig index_config_;
+    Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
+    Vector<docid_t> base_doc_ids_;
 };
 
 } // namespace infinity

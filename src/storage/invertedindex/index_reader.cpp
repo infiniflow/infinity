@@ -22,14 +22,15 @@ void IndexReader::Open(const InvertedIndexConfig &index_config) {
     root_dir_ = index_config.GetIndexName();
     Vector<Segment> segments;
     GetSegments(index_config.GetIndexName(), segments);
-    Vector<SharedPtr<IndexSegmentReader>> segment_readers;
     for (auto &segment : segments) {
         if (segment.GetSegmentStatus() == Segment::BUILT) {
             SharedPtr<DiskIndexSegmentReader> segment_reader = CreateDiskSegmentReader(segment);
-            segment_readers.push_back(segment_reader);
+            segment_readers_.push_back(segment_reader);
+            base_doc_ids_.push_back(segment.GetBaseDocId());
         } else {
             SharedPtr<IndexSegmentReader> segment_reader = CreateInMemSegmentReader(segment);
-            segment_readers.push_back(segment_reader);
+            segment_readers_.push_back(segment_reader);
+            base_doc_ids_.push_back(segment.GetBaseDocId());
         }
     }
 }
@@ -47,4 +48,19 @@ SharedPtr<IndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &seg
     return index_writer->CreateInMemSegmentReader();
 }
 
+PostingIterator *IndexReader::Lookup(const String &term, MemoryPool *session_pool) {
+    SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+    for (u32 i = 0; i < segment_readers_.size(); ++i) {
+        SegmentPosting seg_posting;
+        auto ret = segment_readers_[i]->GetSegmentPosting(term, base_doc_ids_[i], seg_posting, session_pool);
+        if (ret) {
+            seg_postings->push_back(seg_posting);
+        }
+    }
+    PostingIterator *iter =
+        new ((session_pool)->Allocate(sizeof(PostingIterator))) PostingIterator(index_config_.GetPostingFormatOption(), session_pool);
+    u32 state_pool_size = 0; // TODO
+    iter->Init(seg_postings, state_pool_size);
+    return iter;
+}
 } // namespace infinity

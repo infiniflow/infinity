@@ -21,6 +21,8 @@ public:
                            const SharedPtr<DictionaryReader> &dict_reader);
     virtual ~DiskIndexSegmentReader();
 
+    docid_t GetBaseDocId() const override;
+
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:
