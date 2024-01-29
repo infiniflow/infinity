@@ -644,7 +644,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, index_name_, column_id_, segment_id_));
     }
-    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void Flush(TxnTimeStamp max_commit_ts);
 
 public:
     SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry_{};

@@ -550,6 +550,8 @@ void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full
     this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
 }
 
+void AddSegmentColumnIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_column_index_entry_->Flush(max_commit_ts); }
+
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
     i32 size = sizeof(CatalogDeltaEntryHeader) + sizeof(i32);

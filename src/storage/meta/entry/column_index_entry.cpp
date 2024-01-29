@@ -34,7 +34,6 @@ import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import logger;
 
-
 namespace infinity {
 
 ColumnIndexEntry::ColumnIndexEntry(SharedPtr<IndexBase> index_base,
@@ -107,7 +106,6 @@ nlohmann::json ColumnIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     }
 
     for (const auto &segment_column_index_entry : segment_column_index_entry_candidates) {
-        segment_column_index_entry->Flush(max_commit_ts);
         json["index_by_segment"].push_back(segment_column_index_entry->Serialize());
     }
 

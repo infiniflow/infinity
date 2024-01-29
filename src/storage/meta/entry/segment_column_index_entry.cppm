@@ -71,6 +71,8 @@ public:
 
     void MergeFrom(BaseEntry &other);
 
+    bool Flush(TxnTimeStamp checkpoint_ts);
+
 public:
     // Getter
     inline SegmentID segment_id() const { return segment_id_; }
@@ -80,11 +82,7 @@ public:
 
 private:
     explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer);
-
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
-
-    bool Flush(TxnTimeStamp checkpoint_ts);
-
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry>
     LoadIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);

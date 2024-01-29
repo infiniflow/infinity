@@ -579,13 +579,6 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto block_id = add_column_entry_op->block_id();
                 auto column_id = add_column_entry_op->column_id();
 
-                LOG_TRACE(fmt::format("db name: {}", db_name));
-                LOG_TRACE(fmt::format("table_name: {}", table_name));
-                LOG_TRACE(fmt::format("segment_id: {}", segment_id));
-                LOG_TRACE(fmt::format("block_id: {}", block_id));
-                LOG_TRACE(fmt::format("column_id: {}", column_id));
-                LOG_TRACE(fmt::format("txn_id: {}", txn_id));
-
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
@@ -759,6 +752,8 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 column_index_entry->index_by_segment().insert({segment_id, std::move(segment_column_index_entry)});
                 break;
             }
+            default:
+                UnrecoverableError(fmt::format("Unknown catalog delta op type: {}", op->GetTypeStr()));
         }
     }
 }
@@ -849,10 +844,21 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     // Check the SegmentEntry's for flush the data to disk.
     auto &ops = global_catalog_delta_entry->operations();
     for (auto &op : ops) {
-        if (op->GetType() == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
-            auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
-            LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
-            add_segment_entry_op->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+        switch (op->GetType()) {
+            case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+                auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
+                LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
+                add_segment_entry_op->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+                break;
+            }
+            case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
+                auto add_segment_column_index_entry_op = static_cast<AddSegmentColumnIndexEntryOp *>(op.get());
+                LOG_TRACE(fmt::format("Flush segment index entry: {}", add_segment_column_index_entry_op->ToString()));
+                add_segment_column_index_entry_op->Flush(max_commit_ts);
+                break;
+            }
+            default:
+                break;
         }
     }
 
