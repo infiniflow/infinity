@@ -35,12 +35,15 @@ namespace infinity {
 
 class TxnTableStore;
 struct TableEntry;
+class CompactSegmentsTask;
 
 struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:
     explicit SegmentEntry(const TableEntry *table_entry);
+
+    explicit SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count);
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
@@ -75,11 +78,17 @@ public:
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 public:
-    const String &DirPath() { return *segment_dir_; }
-
     inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
 
-    inline TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp min_row_ts() {
+        std::shared_lock lock(rw_locker_);
+        return min_row_ts_;
+    }
+
+    TxnTimeStamp deprecate_ts() {
+        std::shared_lock lock(rw_locker_);
+        return deprecate_ts_;
+    }
 
     inline SegmentID segment_id() const { return segment_id_; }
 
@@ -91,23 +100,48 @@ public:
 
     inline SizeT row_count() const { return row_count_; }
 
+    SizeT actual_row_count() const { return actual_row_count_; }
+
     int Room();
+
+    void FlushData();
+
+    void SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
+
+    void SetNoDelete(TxnTimeStamp no_delete_ts);
+
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
+
+    void RollbackCompact();
+
+    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn);
 
     Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
 
     inline SizeT column_count() const { return column_count_; }
 
-    inline TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+    inline TxnTimeStamp max_row_ts() const { return deprecate_ts_; }
 
     inline SizeT row_capacity() const { return row_capacity_; }
 
     const String &segment_dir() { return *segment_dir_; }
 
 public:
-    // Used in WAL replay & Physical Import
+    // Used in WAL replay & Physical Import & SegmentCompaction
     inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
 
-    inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
+    inline void IncreaseRowCount(SizeT increased_row_count) {
+        row_count_ += increased_row_count;
+        actual_row_count_ += increased_row_count;
+    }
+
+private:
+    inline void DecreaseRemainRow(SizeT decrease_row_count) {
+        if (decrease_row_count > actual_row_count_) {
+            UnrecoverableError("Decrease row count exceed remain row count");
+        }
+        actual_row_count_ -= decrease_row_count;
+    }
 
 public:
     // Used in PhysicalImport
@@ -121,8 +155,10 @@ public:
 protected:
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+public:
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
 
+protected:
     SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
                                                        SharedPtr<ColumnDef> column_def,
                                                        TxnTimeStamp create_ts,
@@ -133,7 +169,7 @@ protected:
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap);
+    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
@@ -142,18 +178,23 @@ protected:
     std::shared_mutex rw_locker_{};
 
     const TableEntry *table_entry_{};
-
-    SharedPtr<String> segment_dir_{};
-    SegmentID segment_id_{};
+    const SharedPtr<String> segment_dir_{};
+    const SegmentID segment_id_{};
+    const SizeT row_capacity_{};
+    const u64 column_count_{};
 
     SizeT row_count_{};
-    SizeT row_capacity_{};
-    u64 column_count_{};
+    SizeT actual_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{0}; // Indicate the commit_ts which create this SegmentEntry
-    TxnTimeStamp max_row_ts_{0}; // Indicate the max commit_ts which create/update/delete data inside this SegmentEntry
+    TxnTimeStamp min_row_ts_{0};              // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
+    TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which prehibit delete in this SegmentEntry
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
+
+private:
+    CompactSegmentsTask *compact_task_{};
 };
 
 } // namespace infinity

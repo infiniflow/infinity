@@ -69,7 +69,9 @@ public:
 
     class MockSegmentEntry : public SegmentEntry {
     public:
-        MockSegmentEntry(std::vector<std::shared_ptr<BlockEntry>> blocks) : SegmentEntry(nullptr) { block_entries_ = std::move(blocks); }
+        MockSegmentEntry(std::vector<std::shared_ptr<BlockEntry>> blocks) : SegmentEntry(nullptr, nullptr, 0, 0, 0) {
+            block_entries_ = std::move(blocks);
+        }
     };
 
     class MockTableEntry : public TableEntry {

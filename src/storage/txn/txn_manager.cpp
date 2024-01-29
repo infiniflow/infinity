@@ -56,7 +56,7 @@ Txn *TxnManager::CreateTxn() {
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
     rw_locker_.lock_shared();
-    Txn *res = txn_map_[txn_id].get();
+    Txn *res = txn_map_.at(txn_id).get();
     rw_locker_.unlock_shared();
     return res;
 }

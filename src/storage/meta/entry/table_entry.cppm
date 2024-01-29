@@ -111,11 +111,13 @@ private:
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
+    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
+
+    Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
+
     Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
-    static inline u32 GetNextSegmentID(TableEntry *table_entry) { return table_entry->next_segment_id_++; }
-
-    static inline u32 GetMaxSegmentID(const TableEntry *table_entry) { return table_entry->next_segment_id_; }
+    SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
     static SegmentEntry *GetSegmentByID(const TableEntry *table_entry, u32 seg_id);
 
@@ -153,6 +155,8 @@ public:
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
     virtual void MergeFrom(BaseEntry &other);
+
+    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *delete_txn);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

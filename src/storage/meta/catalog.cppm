@@ -188,11 +188,13 @@ public:
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
+    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
+
+    static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
+
     static Status ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
-    static u32 GetNextSegmentID(TableEntry *table_entry);
-
-    static u32 GetMaxSegmentID(const TableEntry *table_entry);
+    static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
     static void ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry);
 

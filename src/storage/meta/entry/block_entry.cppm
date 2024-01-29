@@ -24,6 +24,7 @@ import default_values;
 import third_party;
 import parser;
 import local_file_system;
+import column_vector;
 
 namespace infinity {
 
@@ -98,19 +99,18 @@ public:
     // Used in physical import
     void FlushData(i64 checkpoint_row_count);
 
-    // Used in block iterator
-    inline BlockColumnEntry *GetColumnDataByID(u64 column_id) const { return this->columns_[column_id].get(); }
-
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(BaseEntry &other) override;
 
+    void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
+
 protected:
     u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts);
 
@@ -182,7 +182,6 @@ protected:
     TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
-    BufferManager *buffer_{nullptr};
 
     // checkpoint state
     u16 checkpoint_row_count_{0};

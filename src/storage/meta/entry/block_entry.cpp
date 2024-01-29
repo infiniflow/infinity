@@ -29,6 +29,7 @@ import catalog_delta_entry;
 
 import infinity_exception;
 import parser;
+import column_vector;
 
 namespace infinity {
 
@@ -229,7 +230,7 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
     return actual_copied;
 }
 
-void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<RowID> &rows) {
+void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         UnrecoverableError(
@@ -242,8 +243,7 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
     u16 block_id = this->block_id_;
 
     auto &block_version = this->block_version_;
-    for (RowID row_id : rows) {
-        u16 block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+    for (BlockOffset block_offset : rows) {
         block_version->deleted_[block_offset] = commit_ts;
     }
 
@@ -462,6 +462,16 @@ void BlockEntry::MergeFrom(BaseEntry &other) {
     this->max_row_ts_ = block_entry2->max_row_ts_;
     this->checkpoint_ts_ = block_entry2->checkpoint_ts_;
     this->checkpoint_row_count_ = block_entry2->checkpoint_row_count_;
+}
+
+void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
+    if (read_size + row_count_ > row_capacity_) {
+        UnrecoverableError("BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_");
+    }
+    for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {
+        columns_[column_id]->Append(&column_vectors[column_id], row_begin, read_size, buffer_mgr);
+    }
+    IncreaseRowCount(read_size);
 }
 
 const SharedPtr<DataType> BlockEntry::GetColumnType(u64 column_id) const {

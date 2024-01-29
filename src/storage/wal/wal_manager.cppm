@@ -24,11 +24,9 @@ namespace infinity {
 
 class Storage;
 class BGTaskProcessor;
+class TableEntry;
 
 export class WalManager {
-public:
-    static String WalCommandTypeToString(WalCommandType type);
-
 public:
     WalManager(Storage *storage,
                String wal_path,
@@ -80,8 +78,12 @@ private:
     void WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+
+    void ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     u64 cfg_wal_size_threshold_{};
