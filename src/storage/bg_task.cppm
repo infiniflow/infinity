@@ -79,12 +79,15 @@ export struct TryCheckpointTask final : public BGTask {
 
 export struct ForceCheckpointTask final : public BGTask {
     explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
+    explicit ForceCheckpointTask(Txn *txn, bool is_full_checkpoint)
+        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(is_full_checkpoint) {}
 
     ~ForceCheckpointTask() = default;
 
     String ToString() const final { return "Force Checkpoint Task"; }
 
     Txn *txn_{};
+    bool is_full_checkpoint_{true};
 };
 
 export struct CatalogDeltaOpsMergeTask final : public BGTask {

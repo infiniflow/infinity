@@ -284,7 +284,7 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
 
     auto [max_commit_ts, wal_size] = GetWalState();
 
-    bool is_full_checkpoint = true;
+    bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
     LOG_INFO(fmt::format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
                          ckp_task->txn_->TxnID(),

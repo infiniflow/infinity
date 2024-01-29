@@ -59,7 +59,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor* bg_processor = storage->bg_processor();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
             auto *txn = txn_mgr->CreateTxn();
@@ -88,7 +88,7 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
@@ -176,7 +176,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor* bg_processor = storage->bg_processor();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
@@ -212,7 +212,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
@@ -262,7 +262,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BGTaskProcessor* bg_processor = storage->bg_processor();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -347,7 +347,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
@@ -456,7 +456,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
-        BGTaskProcessor* bg_processor = storage->bg_processor();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -504,7 +504,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);

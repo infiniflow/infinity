@@ -217,9 +217,9 @@ public:
     // Serialization and Deserialization
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts);
 
-    String FlushGlobalCatalogDeltaEntry(String delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void MergeFrom(NewCatalog &other);
 
