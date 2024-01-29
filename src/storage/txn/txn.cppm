@@ -51,12 +51,13 @@ struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
 struct TableIndexEntry;
+struct SegmentEntry;
 struct WalEntry;
 struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 
-export class Txn {
+export class Txn : public EnableSharedFromThis<Txn> {
 public:
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,
@@ -129,7 +130,9 @@ public:
     // DML
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
+    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
+
+    Status Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
 
     // Getter
     BufferManager *GetBufferMgr() const;

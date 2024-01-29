@@ -18,6 +18,7 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
+import parser;
 
 export module bg_task;
 
@@ -28,12 +29,15 @@ export enum class BGTaskType {
     kForceCheckpoint, // Manually triggered by PhysicalImport
     kStopProcessor,
     kCatalogDeltaOpsMerge, // Merge
+    kCompactSegments,
     kInvalid
 };
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
+
     virtual ~BGTask() = default;
+
     BGTaskType type_{BGTaskType::kInvalid};
     bool async_{false};
 

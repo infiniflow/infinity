@@ -753,7 +753,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         }
     } else {
         for (auto &[_, segment] : table_entry->segment_map()) {
-            auto dir_path = segment->DirPath();
+            const auto &dir_path = *segment->segment_dir();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
