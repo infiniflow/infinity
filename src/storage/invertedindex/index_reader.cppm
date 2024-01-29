@@ -33,6 +33,7 @@ private:
 
 private:
     String root_dir_;
+    InvertedIndexConfig index_config_;
 };
 
 } // namespace infinity

@@ -28,7 +28,8 @@ namespace infinity {
 export class ColumnIndexer {
 public:
     using TermKey = String;
-    using PostingPtr = MemoryPosting<false> *;
+    // using PostingPtr = MemoryPosting<false> *;
+    using PostingPtr = PostingWriter *;
     using RTPostingPtr = MemoryPosting<true> *;
     using PostingTable = Btree<TermKey, PostingPtr>;
     using RTPostingTable = Btree<TermKey, RTPostingPtr>;

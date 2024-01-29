@@ -149,7 +149,8 @@ ColumnIndexer::PostingPtr ColumnIndexer::GetOrAddPosting(const TermKey &term) {
     if (iter.valid())
         return iter.getData();
     else {
-        ColumnIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
+        // ColumnIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
+        ColumnIndexer::PostingPtr posting = new PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         posting_store_->insert(iter, term, posting);
         return posting;
     }

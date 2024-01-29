@@ -13,10 +13,12 @@ import segment;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
 import indexer;
+import dict_reader;
 module index_reader;
 
 namespace infinity {
 void IndexReader::Open(const InvertedIndexConfig &index_config) {
+    index_config_ = index_config;
     root_dir_ = index_config.GetIndexName();
     Vector<Segment> segments;
     GetSegments(index_config.GetIndexName(), segments);
@@ -35,7 +37,9 @@ void IndexReader::Open(const InvertedIndexConfig &index_config) {
 void IndexReader::GetSegments(const String &directory, Vector<Segment> &segments) {}
 
 SharedPtr<DiskIndexSegmentReader> IndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    return MakeShared<DiskIndexSegmentReader>(root_dir_, segment);
+    // dict_reader TODO
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(root_dir_);
+    return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
 SharedPtr<IndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &segment) {

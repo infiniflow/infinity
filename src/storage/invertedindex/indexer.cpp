@@ -62,7 +62,12 @@ void Indexer::Add(DataBlock *data_block) {
     }
 }
 
-void Indexer::Commit() {}
+void Indexer::Commit() {
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Commit();
+    }
+}
 
 SharedPtr<IndexSegmentReader> Indexer::CreateInMemSegmentReader() { return MakeShared<InMemIndexSegmentReader>(); }
 } // namespace infinity
