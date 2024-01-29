@@ -348,7 +348,6 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
 }
 
 Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
-    UnrecoverableError("TableEntry::RollbackCompact");
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
         std::unique_lock lock(this->rw_locker_);
         for (const auto &old_segment : old_segments) {

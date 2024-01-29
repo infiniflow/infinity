@@ -14,6 +14,7 @@
 
 #include "unit_test/base_test.h"
 #include <numeric>
+#include <random>
 
 import stl;
 import storage;
@@ -393,7 +394,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                 txn_mgr->CommitTxn(txn5);
             }
 
-            compact_task.CommitCompacts(std::move(state));
+            compact_task.SaveSegmentsData(std::move(state.segment_data_));
+            compact_task.ApplyDeletes(state.remapper_);
             txn_mgr->CommitTxn(txn4);
 
             int test_segment_n = segment_sizes.size();
@@ -474,66 +476,68 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
         }
 
         { // add compact
-            auto txn4 = txn_mgr->CreateTxn();
-            txn4->Begin();
+            auto compact_txn = txn_mgr->CreateTxn();
+            compact_txn->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = compact_txn->GetTableEntry("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
-            CompactSegmentsTask compact_task(table_entry, txn4);
+            CompactSegmentsTask compact_task(table_entry, compact_txn);
             auto state = compact_task.CompactSegments();
 
-            auto txn6 = txn_mgr->CreateTxn();
-            txn6->Begin();
-            {
-                auto txn5 = txn_mgr->CreateTxn();
-                txn5->Begin();
+            Vector<RowID> delete_row_ids;
+            Vector<RowID> delete_row_ids2;
 
-                Vector<RowID> delete_row_ids;
-                Vector<RowID> delete_row_ids2;
+            int delete_row_n1 = 0;
 
-                for (int i = 0; i < (int)segment_sizes.size(); ++i) {
-                    int delete_n2 = segment_sizes[i] / 6;
-
-                    Vector<SegmentOffset> offsets;
-                    Vector<SegmentOffset> offsets2;
-                    for (int j = 0; j < delete_n2; ++j) {
-                        offsets.push_back(rand() % (segment_sizes[i] / 3) + segment_sizes[i] / 3);
-                        offsets2.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 3 * 2) + segment_sizes[i] / 3 * 2);
-                    }
-                    std::sort(offsets.begin(), offsets.end());
-                    std::sort(offsets2.begin(), offsets2.end());
-                    offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
-                    offsets2.erase(std::unique(offsets2.begin(), offsets2.end()), offsets2.end());
-                    for (SegmentOffset offset : offsets) {
-                        delete_row_ids.emplace_back(i, offset);
-                        delete_row_ids2.emplace_back(i, offset);
-                    }
-
-                    delete_n += offsets.size();
+            for (int i = 0; i < (int)segment_sizes.size(); ++i) {
+                Vector<SegmentOffset> offsets;
+                Vector<SegmentOffset> offsets2;
+                for (int j = 0; j < (int)(segment_sizes[i] / 6); ++j) {
+                    offsets.push_back(rand() % (segment_sizes[i] / 3) + segment_sizes[i] / 3);
+                    offsets2.push_back(rand() % (segment_sizes[i] - segment_sizes[i] / 3 * 2) + segment_sizes[i] / 3 * 2);
+                }
+                std::sort(offsets.begin(), offsets.end());
+                std::sort(offsets2.begin(), offsets2.end());
+                offsets.erase(std::unique(offsets.begin(), offsets.end()), offsets.end());
+                offsets2.erase(std::unique(offsets2.begin(), offsets2.end()), offsets2.end());
+                for (SegmentOffset offset : offsets) {
+                    delete_row_ids.emplace_back(i, offset);
+                }
+                for (SegmentOffset offset2 : offsets2) {
+                    delete_row_ids2.emplace_back(i, offset2);
                 }
 
-                txn5->Delete("default", table_name, delete_row_ids);
-                txn_mgr->CommitTxn(txn5);
-
-                txn6->Delete("default", table_name, delete_row_ids2);
+                delete_row_n1 += offsets.size();
             }
 
-            compact_task.CommitCompacts(std::move(state));
+            auto delete_txn2 = txn_mgr->CreateTxn();
+            delete_txn2->Begin();
+            {
+                auto delete_txn1 = txn_mgr->CreateTxn();
+                delete_txn1->Begin();
 
-            try {
-                throw RecoverableException(Status::TxnRollback(0));
-            } catch (const RecoverableException &e) {
-                EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+                delete_txn1->Delete("default", table_name, delete_row_ids);
+                txn_mgr->CommitTxn(delete_txn1);
+
+                delete_n += delete_row_n1;
             }
 
-            // try {
-            //     txn_mgr->CommitTxn(txn6);
-            // } catch (const RecoverableException &e) {
-            //     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
-            // }
-
-            txn_mgr->CommitTxn(txn4);
+            compact_task.SaveSegmentsData(std::move(state.segment_data_));
+            {
+                // std::this_thread::sleep_for(std::chrono::seconds(1));
+                Thread t([&]() {
+                    try {
+                        delete_txn2->Delete("default", table_name, delete_row_ids2);
+                    } catch (const RecoverableException &e) {
+                        EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+                    }
+                    txn_mgr->RollBackTxn(delete_txn2);
+                });
+                t.join();
+            }
+            compact_task.ApplyDeletes(state.remapper_);
+            txn_mgr->CommitTxn(compact_txn);
 
             int test_segment_n = segment_sizes.size();
 

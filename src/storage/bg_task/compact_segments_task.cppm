@@ -58,9 +58,9 @@ private:
 struct ToDeleteInfo {
     const SegmentID segment_id_;
 
-    const Vector<SegmentOffset> delete_offsets;
+    const Vector<SegmentOffset> delete_offsets_;
 
-    const TransactionID delete_txn_id_;
+    const SharedPtr<Txn> delete_txn_;
 };
 
 export struct CompactSegmentsTaskState {
@@ -79,20 +79,22 @@ public:
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
-    void AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets, TransactionID delete_txn_id);
+    void AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets, SharedPtr<Txn> delete_txn);
 
 public:
     // these two are called by unit test. Do not use them directly.
     CompactSegmentsTaskState CompactSegments();
 
-    void CommitCompacts(CompactSegmentsTaskState &&state);
+    // Save new segment, set no_delete_ts, add compact wal cmd
+    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+
+    // Apply the delete op commit in process of compacting
+    void ApplyDeletes(const RowIDRemapper &remapper);
 
 private:
     Vector<SegmentEntry *> PickSegmentsToCompact();
 
     SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
-
-    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
 
     bool ApplyToDelete(const RowIDRemapper &remapper);
 

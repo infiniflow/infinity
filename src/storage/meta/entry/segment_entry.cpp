@@ -141,17 +141,17 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
             if (delete_begin_ts < segment_entry->no_delete_ts_) {
                 to_delete_idxes.emplace_back(idx);
             } else {
-                return false;
+                return true;
             }
         }
         ++idx;
     }
+    SharedPtr<Txn> txn = delete_txn->shared_from_this();
     for (SizeT idx : to_delete_idxes) {
         auto &[segment_entry, segment_offsets] = segments[idx];
-        segment_entry->compact_task_->AddToDelete(segment_entry->segment_id(), std::move(segment_offsets), delete_txn->TxnID());
+        segment_entry->compact_task_->AddToDelete(segment_entry->segment_id(), std::move(segment_offsets), txn);
     }
-
-    return true;
+    return false;
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {

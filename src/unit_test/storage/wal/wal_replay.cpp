@@ -681,7 +681,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             txn_mgr->CommitTxn(txn);
         }
 
-        for (int i = 0; i < test_segment_n; ++i) { // add 100 segments
+        for (int i = 0; i < test_segment_n; ++i) { // add 2 segments
             auto txn2 = txn_mgr->CreateTxn();
             txn2->Begin();
 
@@ -742,7 +742,6 @@ TEST_F(WalReplayTest, WalReplayCompact) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         {
             auto txn = txn_mgr->CreateTxn();
@@ -760,6 +759,8 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
             EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
         }
+        infinity::InfinityContext::instance().UnInit();
+        infinity::GlobalResourceUsage::UnInit();
     }
 }
 

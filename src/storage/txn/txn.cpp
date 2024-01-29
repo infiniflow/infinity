@@ -104,12 +104,12 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
     return append_status;
 }
 
-Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
+Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
     auto [table_entry, status] = GetTableEntry(db_name, table_name);
     if (!status.ok()) {
         return status;
     }
-    if (!table_entry->CheckDeleteConflict(row_ids, this)) {
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
