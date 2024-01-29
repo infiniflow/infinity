@@ -109,6 +109,9 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     if (!status.ok()) {
         return status;
     }
+    if (!table_entry->CheckDeleteConflict(row_ids, this)) {
+        RecoverableError(Status::TxnRollback(TxnID()));
+    }
 
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
@@ -119,6 +122,22 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
     return delete_status;
+}
+
+Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
+    auto [table_entry, status] = GetTableEntry(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    TxnTableStore *table_store{nullptr};
+    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
+    }
+    table_store = txn_tables_store_[table_name].get();
+
+    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data));
+    return compact_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {

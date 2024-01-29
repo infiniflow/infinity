@@ -65,9 +65,15 @@ public:
 public:
     inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
 
-    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp min_row_ts() {
+        std::shared_lock lock(rw_locker_);
+        return min_row_ts_;
+    }
 
-    TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
+    TxnTimeStamp deprecate_ts() {
+        std::shared_lock lock(rw_locker_);
+        return deprecate_ts_;
+    }
 
     inline SegmentID segment_id() const { return segment_id_; }
 
@@ -87,7 +93,13 @@ public:
 
     void SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
 
+    void SetNoDelete(TxnTimeStamp no_delete_ts);
+
     void SetDeprecated(TxnTimeStamp deprecate_ts);
+
+    void RollbackCompact();
+
+    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn);
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction
@@ -137,8 +149,6 @@ protected:
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
-    void AddDeleteToCompactTask(TransactionID txn_id, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, TxnTimeStamp commit_ts);
-
 protected:
     std::shared_mutex rw_locker_{};
 
@@ -153,7 +163,8 @@ protected:
 
     TxnTimeStamp min_row_ts_{0};              // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
-    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
+    TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which prehibit delete in this SegmentEntry
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 

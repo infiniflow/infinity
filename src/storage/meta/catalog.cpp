@@ -313,6 +313,14 @@ Status NewCatalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id,
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
+Status NewCatalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
+}
+
+Status NewCatalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
+}
+
 Status NewCatalog::ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     return table_entry->ImportSegment(commit_ts, segment);
 }

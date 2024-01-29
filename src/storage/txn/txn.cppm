@@ -51,6 +51,7 @@ struct TableEntry;
 struct DBEntry;
 struct BaseEntry;
 struct TableIndexEntry;
+struct SegmentEntry;
 struct WalEntry;
 struct WalCmd;
 class CatalogDeltaEntry;
@@ -131,7 +132,11 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
+    Status Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+
     // Getter
+    TxnManager *txn_mgr() const { return txn_mgr_; }
+
     BufferManager *GetBufferMgr() const;
 
     BufferManager *buffer_manager() const { return buffer_mgr_; }

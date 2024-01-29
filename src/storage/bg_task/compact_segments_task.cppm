@@ -58,15 +58,15 @@ private:
 struct ToDeleteInfo {
     const SegmentID segment_id_;
 
-    const HashMap<BlockID, Vector<BlockOffset>> block_row_hashmap_;
+    const Vector<SegmentOffset> delete_offsets;
 
-    const TxnTimeStamp commit_ts_;
+    const TransactionID delete_txn_id_;
 };
 
 export struct CompactSegmentsTaskState {
     RowIDRemapper remapper_;
 
-    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> segment_data_;
+    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
 };
 
 export class CompactSegmentsTask final : public BGTask {
@@ -79,7 +79,7 @@ public:
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
-    void AddToDelete(SegmentID segment_id, HashMap<BlockID, Vector<BlockOffset>> &&block_row_hashmap, TxnTimeStamp commit_ts);
+    void AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets, TransactionID delete_txn_id);
 
 public:
     // these two are called by unit test. Do not use them directly.
@@ -88,17 +88,20 @@ public:
     void CommitCompacts(CompactSegmentsTaskState &&state);
 
 private:
-    SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentID> &segment_ids);
+    Vector<SegmentEntry *> PickSegmentsToCompact();
 
-    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentID>>> &&segment_data);
+    SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
 
-    void ApplyToDelete(const RowIDRemapper &remapper);
+    void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+
+    bool ApplyToDelete(const RowIDRemapper &remapper);
 
 private:
     TableEntry *const table_entry_;
 
     Txn *const txn_;
 
+    std::mutex mutex_;
     Vector<ToDeleteInfo> to_deletes_;
 };
 } // namespace infinity

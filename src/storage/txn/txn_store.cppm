@@ -49,6 +49,10 @@ public:
     HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
 };
 
+export struct TxnCompactStore {
+    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+};
+
 export class TxnTableStore {
 public:
     explicit inline TxnTableStore(TableEntry *table_entry, Txn *txn) : table_entry_(table_entry), txn_(txn) {}
@@ -60,6 +64,8 @@ public:
     Tuple<UniquePtr<String>, Status> CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
+
+    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
 
     void Scan(SharedPtr<DataBlock> &output_block);
 
@@ -75,6 +81,7 @@ public:
     HashMap<String, TxnIndexStore> txn_indexes_store_{};
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
+    TxnCompactStore compact_state_{};
 
     SizeT current_block_id_{0};
 

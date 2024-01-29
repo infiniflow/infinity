@@ -106,7 +106,6 @@ TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id
 }
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
-    //    auto &rows = delete_state_.rows_;
     HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_.rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
@@ -119,6 +118,11 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
     return {nullptr, Status::OK()};
 }
 
+Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
+    compact_state_.segment_data_ = std::move(segment_data);
+    return {nullptr, Status::OK()};
+}
+
 void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 
 void TxnTableStore::Rollback() {
@@ -128,6 +132,7 @@ void TxnTableStore::Rollback() {
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
 
+    NewCatalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
 }
 
@@ -149,6 +154,8 @@ void TxnTableStore::PrepareCommit() {
 
     NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
     NewCatalog::CommitCreateIndex(txn_indexes_store_);
+
+    NewCatalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }

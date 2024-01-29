@@ -75,7 +75,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
     segment_entry->row_count_ = 0;
     segment_entry->actual_row_count_ = 0;
     segment_entry->min_row_ts_ = UNCOMMIT_TS;
-    segment_entry->deprecate_ts_ = UNCOMMIT_TS;
 
     auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
     segment_entry->block_entries_.emplace_back(std::move(block_entry));
@@ -88,7 +87,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
                                                             TxnTimeStamp commit_ts) {
     auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount());
     segment_entry->min_row_ts_ = commit_ts;
-    segment_entry->deprecate_ts_ = UNCOMMIT_TS;
     return segment_entry;
 }
 
@@ -104,15 +102,56 @@ void SegmentEntry::FlushData() {
 }
 
 void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
-    std::unique_lock<std::shared_mutex> lock(rw_locker_);
+    std::unique_lock lock(rw_locker_);
     compact_task_ = compact_task;
     compacting_ts_ = compacting_ts;
 }
 
-void SegmentEntry::SetDeprecated(TxnTimeStamp commit_ts) {
-    std::unique_lock<std::shared_mutex> lock(rw_locker_);
+void SegmentEntry::SetNoDelete(TxnTimeStamp no_delete_ts) {
+    std::unique_lock lock(rw_locker_);
+    no_delete_ts_ = no_delete_ts;
     compact_task_ = nullptr;
-    deprecate_ts_ = commit_ts;
+}
+
+void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
+    std::unique_lock lock(rw_locker_);
+    deprecate_ts_ = deprecate_ts;
+
+    // this is not necessary, but for safety
+    compact_task_ = nullptr;
+}
+
+void SegmentEntry::RollbackCompact() {
+    std::unique_lock lock(rw_locker_);
+    compacting_ts_ = UNCOMMIT_TS;
+    no_delete_ts_ = UNCOMMIT_TS;
+    deprecate_ts_ = UNCOMMIT_TS;
+
+    // this is not necessary, but for safety
+    compact_task_ = nullptr;
+}
+
+bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn) {
+    Vector<std::shared_lock<std::shared_mutex>> locks;
+    TxnTimeStamp delete_begin_ts = delete_txn->BeginTS();
+    Vector<SizeT> to_delete_idxes;
+    for (SizeT idx = 0; const auto &[segment_entry, delete_offsets] : segments) {
+        locks.emplace_back(segment_entry->rw_locker_);
+        if (delete_begin_ts > segment_entry->compacting_ts_) {
+            if (delete_begin_ts < segment_entry->no_delete_ts_) {
+                to_delete_idxes.emplace_back(idx);
+            } else {
+                return false;
+            }
+        }
+        ++idx;
+    }
+    for (SizeT idx : to_delete_idxes) {
+        auto &[segment_entry, segment_offsets] = segments[idx];
+        segment_entry->compact_task_->AddToDelete(segment_entry->segment_id(), std::move(segment_offsets), delete_txn->TxnID());
+    }
+
+    return true;
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
@@ -170,26 +209,6 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);
-    }
-
-    AddDeleteToCompactTask(txn_id, block_row_hashmap, commit_ts);
-}
-
-void SegmentEntry::AddDeleteToCompactTask(TransactionID txn_id,
-                                          const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
-                                          TxnTimeStamp commit_ts) {
-    if (commit_ts >= compacting_ts_) {
-        if (commit_ts < deprecate_ts_) {
-            // a task is compacting this segment. pass the deleted row_ids to the task.
-            // copy the hashmap here
-            auto hashmap_copy = block_row_hashmap;
-            compact_task_->AddToDelete(segment_id_, std::move(hashmap_copy), commit_ts);
-        } else {
-            // This segment is deprecated because of segment compaction
-            // Current function is called by `PrepareCommit`, throw exception will cause rollback.
-            // TODO: this function cannot throw exception, remove it.
-            RecoverableError(Status::TxnRollback(txn_id));
-        }
     }
 }
 

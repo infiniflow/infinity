@@ -31,6 +31,30 @@ import third_party;
 
 namespace infinity {
 
+bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
+    return segment_dir_ == other.segment_dir_ && segment_id_ == other.segment_id_ && block_entries_size_ == other.block_entries_size_ &&
+           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_;
+}
+
+i32 WalSegmentInfo::GetSizeInBytes() const { return sizeof(i32) + segment_dir_.size() + sizeof(SegmentID) + sizeof(u16) + sizeof(u32) + sizeof(u16); }
+
+void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, segment_dir_);
+    WriteBufAdv(buf, segment_id_);
+    WriteBufAdv(buf, block_entries_size_);
+    WriteBufAdv(buf, block_capacity_);
+    WriteBufAdv(buf, last_block_row_count_);
+}
+
+WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
+    String segment_dir = ReadBufAdv<String>(ptr);
+    SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+    u16 block_entries_size = ReadBufAdv<u16>(ptr);
+    u32 block_capacity = ReadBufAdv<u32>(ptr);
+    u16 last_block_row_count = ReadBufAdv<u16>(ptr);
+    return WalSegmentInfo(std::move(segment_dir), segment_id, block_entries_size, block_capacity, last_block_row_count);
+}
+
 SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
@@ -61,12 +85,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::IMPORT: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
-            String segment_dir = ReadBufAdv<String>(ptr);
-            u32 segment_id = ReadBufAdv<u32>(ptr);
-            u16 block_entries_size = ReadBufAdv<u16>(ptr);
-            u32 block_capacity = ReadBufAdv<u32>(ptr);
-            u16 last_block_row_count = ReadBufAdv<u16>(ptr);
-            cmd = MakeShared<WalCmdImport>(db_name, table_name, segment_dir, segment_id, block_entries_size, block_capacity, last_block_row_count);
+            WalSegmentInfo segment_info = WalSegmentInfo::ReadBufferAdv(ptr);
+            cmd = MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info));
             break;
         }
         case WalCommandType::APPEND: {
@@ -113,13 +133,19 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         case WalCommandType::COMPACT: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
+            i32 new_segment_n = ReadBufAdv<i32>(ptr);
+            Vector<WalSegmentInfo> new_segment_infos;
+            for (i32 i = 0; i < new_segment_n; ++i) {
+                new_segment_infos.push_back(WalSegmentInfo::ReadBufferAdv(ptr));
+            }
             i32 deprecated_n = ReadBufAdv<i32>(ptr);
             Vector<SegmentID> deprecated_segment_ids;
             for (i32 i = 0; i < deprecated_n; ++i) {
                 SegmentID deprecated_segment_id = ReadBufAdv<SegmentID>(ptr);
                 deprecated_segment_ids.push_back(deprecated_segment_id);
             }
-            cmd = MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(deprecated_segment_ids));
+            cmd =
+                MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(deprecated_segment_ids));
             break;
         }
         default:
@@ -152,8 +178,7 @@ bool WalCmdDropIndex::operator==(const WalCmd &other) const {
 bool WalCmdImport::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdImport *>(&other);
     if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
-        segment_dir_ != other_cmd->segment_dir_ || segment_id_ != other_cmd->segment_id_ || block_entries_size_ != other_cmd->block_entries_size_ ||
-        block_capacity_ != other_cmd->block_capacity_ || last_block_row_count_ != other_cmd->last_block_row_count_) {
+        segment_info_ != other_cmd->segment_info_) {
         return false;
     }
     return true;
@@ -222,8 +247,7 @@ i32 WalCmdDropIndex::GetSizeInBytes() const {
 }
 
 i32 WalCmdImport::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->segment_dir_.size() + sizeof(u32) + sizeof(u16) + sizeof(32) + sizeof(u16);
+    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + segment_info_.GetSizeInBytes();
 }
 
 i32 WalCmdAppend::GetSizeInBytes() const {
@@ -238,8 +262,11 @@ i32 WalCmdDelete::GetSizeInBytes() const {
 i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
 
 i32 WalCmdCompact::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->deprecated_segment_ids_.size() * sizeof(SegmentID);
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
+    for (const auto &segment_info : this->new_segment_infos_) {
+        size += segment_info.GetSizeInBytes();
+    }
+    return size + sizeof(i32) + this->deprecated_segment_ids_.size() * sizeof(SegmentID);
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
@@ -283,11 +310,7 @@ void WalCmdImport::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::IMPORT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->segment_dir_);
-    WriteBufAdv(buf, this->segment_id_);
-    WriteBufAdv(buf, this->block_entries_size_);
-    WriteBufAdv(buf, this->block_capacity_);
-    WriteBufAdv(buf, this->last_block_row_count_);
+    this->segment_info_.WriteBufferAdv(buf);
 }
 
 void WalCmdAppend::WriteAdv(char *&buf) const {
@@ -320,6 +343,11 @@ void WalCmdCompact::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, WalCommandType::COMPACT);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
+    i32 new_segment_n = static_cast<i32>(this->new_segment_infos_.size());
+    WriteBufAdv(buf, new_segment_n);
+    for (i32 i = 0; i < new_segment_n; ++i) {
+        this->new_segment_infos_[i].WriteBufferAdv(buf);
+    }
     i32 deprecated_n = static_cast<i32>(this->deprecated_segment_ids_.size());
     WriteBufAdv(buf, deprecated_n);
     for (i32 i = 0; i < deprecated_n; ++i) {
@@ -471,11 +499,12 @@ String WalEntry::ToString() const {
             auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
             ss << "db name: " << import_cmd->db_name_ << std::endl;
             ss << "table name: " << import_cmd->table_name_ << std::endl;
-            ss << "segment dir: " << import_cmd->segment_dir_ << std::endl;
-            ss << "segment id: " << import_cmd->segment_id_ << std::endl;
-            ss << "block entries size: " << import_cmd->block_entries_size_ << std::endl;
-            ss << "block capacity: " << import_cmd->block_capacity_ << std::endl;
-            ss << "last block row count" << import_cmd->last_block_row_count_ << std::endl;
+            auto &segment_info = import_cmd->segment_info_;
+            ss << "segment dir: " << segment_info.segment_dir_ << std::endl;
+            ss << "segment id: " << segment_info.segment_id_ << std::endl;
+            ss << "block entries size: " << segment_info.block_entries_size_ << std::endl;
+            ss << "block capacity: " << segment_info.block_capacity_ << std::endl;
+            ss << "last block row count" << segment_info.last_block_row_count_ << std::endl;
         } else if (cmd->GetType() == WalCommandType::APPEND) {
             auto append_cmd = dynamic_cast<const WalCmdAppend *>(cmd.get());
             ss << "db name: " << append_cmd->db_name_ << std::endl;
