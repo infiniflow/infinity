@@ -718,7 +718,7 @@ union yyalloc
 /* YYNNTS -- Number of nonterminals.  */
 #define YYNNTS  94
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  345
+#define YYNRULES  346
 /* YYNSTATES -- Number of states.  */
 #define YYNSTATES  673
 
@@ -819,7 +819,7 @@ static const yytype_int16 yyrline[] =
     2476,  2482,  2488,  2494,  2500,  2506,  2512,  2518,  2524,  2530,
     2536,  2542,  2553,  2557,  2562,  2584,  2594,  2600,  2604,  2605,
     2607,  2608,  2610,  2611,  2623,  2631,  2635,  2638,  2642,  2646,
-    2651,  2656,  2664,  2671,  2682,  2730
+    2651,  2656,  2664,  2671,  2682,  2730,  2779
 };
 #endif
 
@@ -1033,7 +1033,7 @@ static const yytype_int16 yydefact[] =
      176,   177,   173,   178,     0,   163,     0,   158,   238,   239,
      240,   241,   142,   149,   167,   268,     0,     0,   249,     0,
      129,     0,     0,     0,     0,     0,    83,    84,    39,    80,
-       0,     0,    35,     0,     0,   211,     0,   325,   324,   114,
+       0,     0,    35,   346,     0,   211,     0,   325,   324,   114,
        0,   113,   248,   282,     0,   278,     0,   277,     0,     0,
        0,   302,   303,     0,     0,     0,   165,   155,     0,     0,
      162,     0,     0,   147,     0,     0,   283,   272,   271,     0,
@@ -1379,7 +1379,7 @@ static const yytype_int16 yyr1[] =
      258,   258,   258,   258,   258,   258,   258,   258,   258,   258,
      258,   258,   259,   259,   260,   260,   260,   261,   262,   262,
      263,   263,   264,   264,   265,   265,   266,   266,   267,   267,
-     268,   268,   268,   268,   269,   269
+     268,   268,   268,   268,   269,   269,   269
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -1419,7 +1419,7 @@ static const yytype_int8 yyr2[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     1,     3,     2,     2,     1,     1,     2,     0,
        3,     0,     1,     0,     2,     0,     4,     0,     1,     3,
-       1,     3,     3,     3,     6,     7
+       1,     3,     3,     3,     6,     7,     3
 };
 
 
@@ -6633,8 +6633,26 @@ yyreduce:
 #line 6634 "parser.cpp"
     break;
 
+  case 346: /* index_info_list: '(' identifier_array ')'  */
+#line 2779 "parser.y"
+                           {
+    infinity::IndexType index_type = infinity::IndexType::kSecondary;
+    size_t index_count = (yyvsp[-1].identifier_array_t)->size();
+    (yyval.index_info_list_t) = new std::vector<infinity::IndexInfo*>();
+    (yyval.index_info_list_t)->reserve(index_count);
+    for(size_t idx = 0; idx < index_count; ++ idx) {
+        infinity::IndexInfo* index_info = new infinity::IndexInfo();
+        index_info->index_type_ = index_type;
+        index_info->column_name_ = (*(yyvsp[-1].identifier_array_t))[idx];
+        (yyval.index_info_list_t)->emplace_back(index_info);
+    }
+    delete (yyvsp[-1].identifier_array_t);
+}
+#line 6652 "parser.cpp"
+    break;
 
-#line 6638 "parser.cpp"
+
+#line 6656 "parser.cpp"
 
       default: break;
     }
@@ -6863,7 +6881,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 2780 "parser.y"
+#line 2793 "parser.y"
 
 
 void

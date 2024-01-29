@@ -36,8 +36,10 @@ import index_hnsw;
 import buffer_handle;
 import annivfflat_index_data;
 import annivfflat_index_file_worker;
+import secondary_index_data;
 import index_file_worker;
 import hnsw_file_worker;
+import secondary_index_file_worker;
 import logger;
 import local_file_system;
 import random;
@@ -348,6 +350,41 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
             LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
+        case IndexType::kSecondary: {
+            auto &data_type = column_def->type();
+            if (!(data_type->CanBuildSecondaryIndex())) {
+                UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+            }
+            // 1. build secondary index by merge sort
+            u32 input_block_max_row = DEFAULT_BLOCK_CAPACITY;
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, this->row_count_, input_block_max_row, part_capacity);
+            for (const auto &block_entry : this->block_entries_) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
+                auto block_column_data_ptr = reinterpret_cast<const void *>(block_column_buffer_handle.GetData());
+                u32 block_row_cnt = block_entry->row_count();
+                secondary_index_builder->AppendColumnVector(block_column_data_ptr, block_row_cnt);
+            }
+            secondary_index_builder->StartOutput();
+            // 2. output into SecondaryIndexDataPart
+            {
+                u32 part_num = segment_column_index_entry->GetIndexPartNum();
+                for (u32 part_id = 1; part_id <= part_num; ++part_id) {
+                    BufferHandle buffer_handle_part = segment_column_index_entry->GetIndexPartAt(part_id);
+                    auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
+                    secondary_index_builder->OutputToPart(secondary_index_part);
+                }
+            }
+            // 3. output into SecondaryIndexDataHead
+            {
+                BufferHandle buffer_handle_head = segment_column_index_entry->GetIndex();
+                auto secondary_index_head = static_cast<SecondaryIndexDataHead *>(buffer_handle_head.GetDataMut());
+                secondary_index_builder->OutputToHeader(secondary_index_head);
+            }
+            secondary_index_builder->EndOutput();
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -556,6 +593,10 @@ UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_coun
         }
         case IndexType::kIRSFullText: {
             return MakeUnique<CreateFullTextParam>(index_base, column_def);
+        }
+        case IndexType::kSecondary: {
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
         }
         default: {
             UniquePtr<String> err_msg =

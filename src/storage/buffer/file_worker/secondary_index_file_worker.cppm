@@ -1,0 +1,67 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+module;
+
+export module secondary_index_file_worker;
+
+import stl;
+import index_file_worker;
+import file_worker;
+import parser;
+import index_base;
+import infinity_exception;
+import default_values;
+
+namespace infinity {
+
+export struct CreateSecondaryIndexParam : public CreateIndexParam {
+    const u32 row_count_{};     // rows in the segment
+    const u32 part_capacity_{}; // split sorted index data into parts
+    CreateSecondaryIndexParam(const IndexBase *index_base, const ColumnDef *column_def, u32 row_count, u32 part_capacity)
+        : CreateIndexParam(index_base, column_def), row_count_(row_count), part_capacity_(part_capacity) {}
+};
+
+// SecondaryIndexFileWorker includes two types of data:
+// 1. SecondaryIndexDataHead (when worker_id_ == 0)
+// 2. SecondaryIndexDataPart (when worker_id_ > 0)
+export class SecondaryIndexFileWorker final : public IndexFileWorker {
+public:
+    explicit SecondaryIndexFileWorker(SharedPtr<String> file_dir,
+                                      SharedPtr<String> file_name,
+                                      const IndexBase *index_base,
+                                      const ColumnDef *column_def,
+                                      u32 worker_id,
+                                      u32 row_count,
+                                      u32 part_capacity)
+        : IndexFileWorker(file_dir, file_name, index_base, column_def), worker_id_(worker_id), row_count_(row_count), part_capacity_(part_capacity) {}
+
+    virtual ~SecondaryIndexFileWorker() override final;
+
+public:
+    void AllocateInMemory() override final;
+
+    void FreeInMemory() override final;
+
+protected:
+    void WriteToFileImpl(bool &prepare_success) override final;
+
+    void ReadFromFileImpl() override final;
+
+    const u32 worker_id_{};
+    const u32 row_count_{};
+    const u32 part_capacity_{};
+};
+
+} // namespace infinity

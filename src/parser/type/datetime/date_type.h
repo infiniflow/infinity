@@ -26,10 +26,12 @@ struct DateType {
 
     explicit DateType(int32_t date_value) : value(date_value){};
 
+    inline int32_t GetValue() const { return value; }
+
     // keep compatible with iresearch
     operator int32_t() const { return value; }
 
-    inline void FromString(const std::string &date_str) { FromString(date_str.c_str(), date_str.length()); }
+    inline void FromString(const std::string_view &date_str) { FromString(date_str.data(), date_str.size()); }
 
     void FromString(const char *date, size_t length);
 

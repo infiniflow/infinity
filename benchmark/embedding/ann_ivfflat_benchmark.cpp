@@ -9,16 +9,13 @@
 #include "base_profiler.h"
 #include "helper.h"
 #include <iostream>
-#include <memory>
-#include <unordered_set>
 
 import stl;
+import index_base;
 import ann_ivf_flat;
-import index_def;
 import annivfflat_index_data;
 import parser;
 import local_file_system;
-import index_base;
 
 static const char *sift1m_train = "/benchmark_dataset/sift1M/sift_learn.fvecs";
 static const char *sift1M_base = "/benchmark_dataset/sift1M/sift_base.fvecs";
@@ -322,11 +319,11 @@ int main() {
         };
         switch (metric) {
             case MetricType::kMerticL2: {
-                search_f.template operator()<AnnIVFFlatL2<f32>>();
+                search_f.operator()<AnnIVFFlatL2<f32>>();
                 break;
             }
             case MetricType::kMerticInnerProduct: {
-                search_f.template operator()<AnnIVFFlatIP<f32>>();
+                search_f.operator()<AnnIVFFlatIP<f32>>();
                 break;
             }
             default:
