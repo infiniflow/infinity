@@ -228,6 +228,9 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper 
 }
 
 bool CompactSegmentsTask::ApplyToDelete(const RowIDRemapper &remapper) {
+    if (to_deletes_.empty()) {
+        return true;
+    }
     bool all_delete_done = true;
     Vector<RowID> row_ids;
     for (const auto &delete_info : to_deletes_) {

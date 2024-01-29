@@ -368,6 +368,11 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MessageSinkState *message_
             message_sink_state->message_ = std::move(create_index_do_output_state->result_msg_);
             break;
         }
+        case PhysicalOperatorType::kCompact: {
+            auto *compact_output_state = static_cast<CompactOperatorState *>(task_operator_state);
+            message_sink_state->message_ = std::move(compact_output_state->result_msg_);
+            break;
+        }
         default: {
             RecoverableError(Status::NotSupport(fmt::format("{} isn't supported here.", PhysicalOperatorToString(task_operator_state->operator_type_))));
             break;

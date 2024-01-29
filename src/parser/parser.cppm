@@ -185,6 +185,7 @@ export using infinity::OptimizeStatement;
 export using infinity::AlterStatement;
 export using infinity::ExplainStatement;
 export using infinity::CommandStatement;
+export using infinity::CompactStatement;
 
 export using infinity::ParsedExprType;
 export using infinity::OrderType;

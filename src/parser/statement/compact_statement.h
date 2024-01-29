@@ -14,44 +14,20 @@
 
 #pragma once
 
-#include <string>
+#include "base_statement.h"
 
 namespace infinity {
 
-enum class StatementType {
-    kInvalidStmt, // unused
-    kSelect,
-    kCopy,
-    kInsert,
-    kUpdate,
-    kDelete,
-    kCreate,
-    kDrop,
-    kPrepare,
-    kExecute,
-    kAlter,
-    kShow,
-    kExplain,
-    kFlush,
-    kOptimize,
-    kCommand,
-    kCompact,
-};
-
-class BaseStatement {
+class CompactStatement : public BaseStatement {
 public:
-    explicit BaseStatement(StatementType type) : type_(type) {}
+    CompactStatement(std::string &&schema_name, std::string &&table_name)
+        : BaseStatement(StatementType::kCompact), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
 
-    virtual ~BaseStatement() = default;
+    CompactStatement(std::string &&table_name) : BaseStatement(StatementType::kCompact), table_name_(std::move(table_name)) {}
 
-    [[nodiscard]] virtual std::string ToString() const = 0;
+    [[nodiscard]] std::string ToString() const final;
 
-    [[nodiscard]] inline StatementType Type() const { return type_; }
-
-    StatementType type_{StatementType::kInvalidStmt};
-    size_t stmt_location_{0};
-    size_t stmt_length_ = {0};
-    std::string text_{};
+    const std::string schema_name_{"default"};
+    const std::string table_name_;
 };
-
 } // namespace infinity

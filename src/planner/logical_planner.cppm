@@ -134,6 +134,8 @@ public:
     // Explain
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:

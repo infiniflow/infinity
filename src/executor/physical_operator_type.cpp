@@ -138,6 +138,8 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "CreateIndexDo";
         case PhysicalOperatorType::kCreateIndexFinish:
             return "CreateIndexFinish";
+        case PhysicalOperatorType::kCompact:
+            return "Compact";
     }
 
     RecoverableError(Status::NotSupport("Unknown physical operator type"));

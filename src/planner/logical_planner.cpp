@@ -56,6 +56,7 @@ import logical_export;
 import logical_import;
 import logical_explain;
 import logical_command;
+import logical_compact;
 import explain_logical_plan;
 import explain_ast;
 
@@ -160,9 +161,11 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
         }
-        case StatementType::kInvalidStmt: {
+        case StatementType::kCompact: {
+            return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
+        }
+        default: {
             UnrecoverableError("Invalid statement type.");
-            break;
         }
     }
     return Status::OK();
@@ -1083,6 +1086,18 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     }
 
     this->logical_plan_ = explain_node;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    Txn *txn = query_context_ptr_->GetTxn();
+    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    SharedPtr<LogicalCompact> compact_node = MakeShared<LogicalCompact>(bind_context_ptr->GetNewLogicalNodeId(), table_entry);
+    this->logical_plan_ = compact_node;
     return Status::OK();
 }
 

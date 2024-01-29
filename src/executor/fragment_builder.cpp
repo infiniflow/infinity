@@ -110,7 +110,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kMatch: {
+        case PhysicalOperatorType::kMatch:
+        case PhysicalOperatorType::kCompact: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
@@ -302,7 +303,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             return;
         }
         default: {
-            LOG_ERROR(fmt::format("Invalid operator type: {} in Fragment Builder", phys_op->GetName()));
+            UnrecoverableError(fmt::format("Invalid operator type: {} in Fragment Builder", phys_op->GetName()));
             break;
         }
     }

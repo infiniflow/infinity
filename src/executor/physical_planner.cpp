@@ -76,6 +76,7 @@ import physical_fusion;
 import physical_create_index_prepare;
 import physical_create_index_do;
 import physical_create_index_finish;
+import physical_compact;
 
 import logical_node;
 import logical_node_type;
@@ -112,6 +113,7 @@ import logical_drop_index;
 import logical_command;
 import logical_match;
 import logical_fusion;
+import logical_compact;
 
 import parser;
 import value;
@@ -283,6 +285,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kExplain: {
             result = BuildExplain(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kCompact: {
+            result = BuildCompact(logical_operator);
             break;
         }
         default: {
@@ -921,6 +927,11 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     }
 
     return explain_node;
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto *logical_compact = static_cast<LogicalCompact *>(logical_operator.get());
+    return MakeUnique<PhysicalCompact>(logical_compact->node_id(), logical_compact->table_entry(), logical_operator->load_metas());
 }
 
 } // namespace infinity

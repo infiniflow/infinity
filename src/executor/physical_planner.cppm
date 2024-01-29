@@ -123,6 +123,9 @@ private:
 
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    // Compact
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const;
 };
 
 } // namespace infinity

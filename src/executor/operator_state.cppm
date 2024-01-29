@@ -356,6 +356,13 @@ export struct FusionOperatorState : public OperatorState {
     Map<u64, Vector<UniquePtr<DataBlock>>> input_data_blocks_{};
 };
 
+// Compact
+export struct CompactOperatorState : public OperatorState {
+    inline explicit CompactOperatorState() : OperatorState(PhysicalOperatorType::kCompact) {}
+
+    UniquePtr<String> result_msg_{};
+};
+
 // Source
 export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kKnnScan, kEmpty };
 
