@@ -245,6 +245,7 @@ class TestTable:
         db_obj.drop_table("my_table")
         c_count = 10000
 
+
         type = [
             "int","int8","int16","int32","int64","int128","float",
             "float32","double","float64","varchar","integer","bool",
