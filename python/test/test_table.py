@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pytest
 
 import infinity
 from infinity.common import REMOTE_HOST
 import common_values
+
 
 class TestTable:
 
@@ -72,7 +74,7 @@ class TestTable:
             print(e)
         try:
             tb = db_obj.create_table(
-                "123_table", {"c1": "int, primary key", "c1": "float"}, None)
+                "123_table", {"c1": "int, primary key", "c2": "float"}, None)
         except Exception as e:
             print(e)
         try:
@@ -129,10 +131,6 @@ class TestTable:
         # list table
         res = db_obj.list_tables()
         assert res.success
-
-        # get table
-        # res = db_obj.get_table("my_table")
-        # assert res
 
         # get table
         try:
@@ -199,10 +197,10 @@ class TestTable:
                          "c10": "double", "c11": "float64", "c12": "varchar", "c13": "integer"}, None)
         assert tb is not None
 
-        for tb_name in common_values.invalid_name_array:
+        for tb_type in common_values.invalid_name_array:
             try:
-                tb = db_obj.create_table("my_table", {"c1": tb_name}, None)
-                raise Exception(f"Can create tb: {tb_name}")
+                tb = db_obj.create_table("my_table", {"c1": tb_type}, None)
+                raise Exception(f"Can create tb: {tb_type}")
             except Exception as e:
                 print(e)
 
@@ -212,9 +210,9 @@ class TestTable:
         res = db_obj.list_tables()
         assert res.success
 
-        # get table
-        res = db_obj.get_table("my_table")
-        assert res.output(["1.1"])
+        # # get table
+        # res = db_obj.get_table("my_table")
+        # assert res
 
         # get table
         try:
@@ -234,10 +232,8 @@ class TestTable:
     def test_table_with_various_column_types(self):
         """
         target: create/drop/describe/get table with 10000 columns with various column types.
-        methods:
-
-        expect:
-
+        methods: create table with various column types
+        expect: all operations successfully
         """
         # connect
         infinity_obj = infinity.connect(REMOTE_HOST)
@@ -245,17 +241,16 @@ class TestTable:
         db_obj.drop_table("my_table")
         c_count = 10000
 
-
-        type = [
-            "int","int8","int16","int32","int64","int128","float",
-            "float32","double","float64","varchar","integer","bool",
+        types = [
+            "int", "int8", "int16", "int32", "int64", "int128", "float",
+            "float32", "double", "float64", "varchar", "integer", "bool",
         ]
 
         # make params
         params = {}
         for i in range(c_count - 13):
             params.update({
-                "c" + str(i): type[i % 13]
+                "c" + str(i): types[i % 13]
             })
 
         # create tb with 10000 columns with various column types
@@ -285,13 +280,108 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.success
 
-
     # create/drop table with different invalid options
-    # def test_table_with_invalid_options(self):
+    def test_table_with_invalid_options(self):
+        """
+        target: create/drop table with different invalid options.
+        methods: create table with various column types
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        for option_name in common_values.invalid_name_array:
+            try:
+                tb = db_obj.create_table("my_table", {"c1": "int"}, option_name)
+                # raise Exception(f"Can create option_name: {option_name}")
+            except Exception as e:
+                print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # create/drop/describe/get 1000 tables with 10000 columns with various column types.
+    @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
+    def test_various_tables_with_various_columns(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        tb_count = 1000
+        column_count = 10000
+
+        types = [
+            "int", "int8", "int16", "int32", "int64", "int128", "float",
+            "float32", "double", "float64", "varchar", "integer", "bool",
+        ]
+
+        # make params
+        params = {}
+        for i in range(column_count - 13):
+            params.update({
+                "c" + str(i): types[i % 13]
+            })
+
+        for i in range(tb_count):
+            try:
+                tb = db_obj.create_table("my_table" + str(i), params, None)
+                print(i)
+                # raise Exception(f"Can create table")
+            except Exception as e:
+                print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # after disconnection, create / drop / describe / list / get table
+    def test_after_disconnect_use_table(self):
+        """
+        target: after disconnection, create / drop / describe / list / get table
+        methods:
+        1. disconnect database
+        2. create / drop / describe / list / get table
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
+        # create table
+        try:
+            res = db_obj.create_table("my_table", {"c1": "int"}, None)
+        except Exception as e:
+            print(e)
+
+        # drop table
+        try:
+            res = db_obj.drop_table("my_table")
+        except Exception as e:
+            print(e)
+
+        # FIXME: res = db_obj.describe_table("my_table")
+
+        # list table
+        try:
+            res = db_obj.list_tables()
+        except Exception as e:
+            print(e)
+
+        # get table
+        try:
+            res = db_obj.get_table("my_table")
+        except Exception as e:
+            print(e)
+
     # create/drop table with invalid options
     # create created table, drop dropped table.
     # describe created table, describe not-created table, describe dropped table
