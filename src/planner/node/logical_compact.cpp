@@ -17,6 +17,7 @@ SharedPtr<Vector<String>> LogicalCompact::GetOutputNames() const { return MakeSh
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalCompact::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
 
 String LogicalCompact::ToString(i64 &space) const {
+    auto *table_entry = table_ref_->table_entry_ptr_;
     std::stringstream ss;
     String arrow_str;
     if (space > 3) {
@@ -24,7 +25,7 @@ String LogicalCompact::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << "-> "
-       << "Compact " << *table_entry_->GetDBName() << '.' << *table_entry_->GetTableName();
+       << "Compact " << *table_ref_->schema_name() << '.' << *table_ref_->table_name();
     return ss.str();
 }
 

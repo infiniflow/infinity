@@ -25,7 +25,9 @@ struct BlockEntry;
 struct SegmentEntry;
 
 export struct BlockIndex {
-    void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp);
+    BlockIndex() = default;
+
+    void Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts = true);
 
     void Reserve(SizeT n);
 

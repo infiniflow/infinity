@@ -17,7 +17,7 @@ module;
 import stl;
 import column_binding;
 import logical_node;
-import catalog;
+import base_table_ref;
 import parser;
 import logical_node_type;
 
@@ -27,7 +27,8 @@ namespace infinity {
 
 export class LogicalCompact : public LogicalNode {
 public:
-    explicit LogicalCompact(u64 node_id, TableEntry *table_entry) : LogicalNode(node_id, LogicalNodeType::kCompact), table_entry_(table_entry) {}
+    explicit LogicalCompact(u64 node_id, SharedPtr<BaseTableRef> table_ref)
+        : LogicalNode(node_id, LogicalNodeType::kCompact), table_ref_(table_ref) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -39,9 +40,9 @@ public:
 
     inline String name() final { return "LogicalCompact"; }
 
-    inline TableEntry *table_entry() { return table_entry_; }
+    inline SharedPtr<BaseTableRef> table_ref() { return table_ref_; }
 
 private:
-    TableEntry *const table_entry_;
+    const SharedPtr<BaseTableRef> table_ref_;
 };
 } // namespace infinity

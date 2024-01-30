@@ -931,7 +931,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCompact(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_compact = static_cast<LogicalCompact *>(logical_operator.get());
-    return MakeUnique<PhysicalCompact>(logical_compact->node_id(), logical_compact->table_entry(), logical_operator->load_metas());
+    return MakeUnique<PhysicalCompact>(logical_compact->node_id(), logical_compact->table_ref(), logical_operator->load_metas());
 }
 
 } // namespace infinity

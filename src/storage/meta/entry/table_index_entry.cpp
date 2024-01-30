@@ -232,7 +232,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
     return index_dir;
 }
 
-Status TableIndexEntry::CreateIndex(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay) {
+Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay) {
     IrsIndexEntry *irs_index_entry = this->irs_index_entry_.get();
     if (irs_index_entry != nullptr) {
         auto *buffer_mgr = txn->GetBufferMgr();

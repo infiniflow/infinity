@@ -24,6 +24,7 @@ import physical_operator_type;
 import operator_state;
 import status;
 import infinity_exception;
+import catalog;
 
 module physical_create_index;
 
@@ -33,9 +34,12 @@ void PhysicalCreateIndex::Init() {}
 
 bool PhysicalCreateIndex::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    Status status = txn->CreateIndex(base_table_ref_.get(), index_def_ptr_, conflict_type_, false);
-    if (!status.ok()) {
+    TableIndexEntry *table_index_entry = nullptr;
+    Status status = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_, table_index_entry);
+    if (!status.ok() || table_index_entry == nullptr) {
         operator_state->status_ = status;
+    } else {
+        txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), false);
     }
     operator_state->SetComplete();
     return true;

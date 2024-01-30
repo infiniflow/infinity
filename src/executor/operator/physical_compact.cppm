@@ -25,13 +25,14 @@ import parser;
 import physical_operator_type;
 import infinity_exception;
 import load_meta;
+import base_table_ref;
 
 namespace infinity {
 
 export class PhysicalCompact : public PhysicalOperator {
 public:
-    PhysicalCompact(u64 id, TableEntry *table_entry, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kCompact, nullptr, nullptr, id, load_metas), table_entry_(table_entry) {}
+    PhysicalCompact(u64 id, SharedPtr<BaseTableRef> table_ref, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kCompact, nullptr, nullptr, id, load_metas), table_ref_(table_ref) {}
 
     void Init() final;
 
@@ -50,7 +51,7 @@ private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
-    TableEntry *const table_entry_;
+    const SharedPtr<BaseTableRef> table_ref_;
 };
 
 } // namespace infinity

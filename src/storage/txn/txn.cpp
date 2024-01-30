@@ -296,8 +296,10 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status Txn::CreateIndex(BaseTableRef *table_ref, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare) {
-    auto *table_entry = table_ref->table_entry_ptr_;
+Status Txn::CreateIndexDef(TableEntry *table_entry,
+                           const SharedPtr<IndexDef> &index_def,
+                           ConflictType conflict_type,
+                           TableIndexEntry *&table_index_entry_ptr) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -309,17 +311,21 @@ Status Txn::CreateIndex(BaseTableRef *table_ref, const SharedPtr<IndexDef> &inde
     if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
         return index_status;
     }
-
     txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
+    table_index_entry_ptr = table_index_entry;
+    return index_status;
+}
 
-    // Create Index Synchronously
-    table_index_entry->CreateIndex(table_entry, table_ref->block_index_.get(), this, prepare, false);
+Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare) {
+    auto *table_entry = table_ref->table_entry_ptr_;
+    table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false);
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();
+        auto index_def = table_index_entry->table_index_def();
         wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_def));
     }
-    return index_status;
+    return Status::OK();
 }
 
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {

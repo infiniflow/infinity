@@ -28,7 +28,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     auto *compact_op_state = static_cast<CompactOperatorState *>(operator_state);
 
     auto *txn = query_context->GetTxn();
-    CompactSegmentsTask compact_task(table_entry_, txn);
+    CompactSegmentsTask compact_task(table_ref_.get(), txn);
     compact_task.Execute();
     compact_op_state->SetComplete();
 

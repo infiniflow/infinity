@@ -71,6 +71,7 @@ import index_hnsw;
 import index_secondary;
 import index_full_text;
 import base_table_ref;
+import table_ref;
 import catalog;
 
 namespace {
@@ -1090,13 +1091,12 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
 }
 
 Status LogicalPlanner::BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
+    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
 
-    SharedPtr<LogicalCompact> compact_node = MakeShared<LogicalCompact>(bind_context_ptr->GetNewLogicalNodeId(), table_entry);
+    SharedPtr<TableRef> table_ref = query_binder_ptr->GetTableRef(statement->schema_name_, statement->table_name_);
+
+    SharedPtr<LogicalCompact> compact_node =
+        MakeShared<LogicalCompact>(bind_context_ptr->GetNewLogicalNodeId(), static_pointer_cast<BaseTableRef>(table_ref));
     this->logical_plan_ = compact_node;
     return Status::OK();
 }

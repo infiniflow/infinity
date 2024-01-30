@@ -721,8 +721,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            CompactSegmentsTask compact_task(table_entry, txn4);
-            compact_task.Execute();
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
+                CompactSegmentsTask compact_task(&table_ref, txn4);
+                compact_task.Execute();
+            }
             txn_mgr->CommitTxn(txn4);
         }
         infinity::InfinityContext::instance().UnInit();
@@ -811,8 +814,12 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-            txn->CreateIndex(&table_ref, index_def, conflict_type, prepare);
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                TableIndexEntry *table_index_entry = nullptr;
+                txn->CreateIndexDef(table_entry, index_def, conflict_type, table_index_entry);
+                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+            }
             txn_mgr->CommitTxn(txn);
         }
 
@@ -912,8 +919,12 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-            txn->CreateIndex(&table_ref, index_def, conflict_type, prepare);
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                TableIndexEntry *table_index_entry = nullptr;
+                txn->CreateIndexDef(table_entry, index_def, conflict_type, table_index_entry);
+                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+            }
             txn_mgr->CommitTxn(txn);
         }
 
