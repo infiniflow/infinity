@@ -41,14 +41,30 @@ DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
     : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
       db_name_(db_name) {
+    //    atomic_u64 txn_id_{0};
+    //    TxnTimeStamp begin_ts_{0};
+    //    atomic_u64 commit_ts_{UNCOMMIT_TS};
+    //    bool deleted_{false};
     begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
+    txn_id_.store(txn_id);
 }
 
 SharedPtr<DBEntry>
 DBEntry::NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
 
     auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+    return db_entry;
+}
+
+SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(const SharedPtr<String> &data_dir,
+                                             const SharedPtr<String> &db_name,
+                                             TransactionID txn_id,
+                                             TxnTimeStamp begin_ts,
+                                             TxnTimeStamp commit_ts,
+                                             bool is_delete) {
+    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+    db_entry->commit_ts_ = commit_ts;
+    db_entry->deleted_ = is_delete;
     return db_entry;
 }
 
@@ -74,12 +90,11 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         this->rw_locker_.unlock_shared();
 
         LOG_TRACE(fmt::format("Create new table/collection: {}", table_name));
-        UniquePtr<TableMeta> new_table_meta =
-            TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this, txn_mgr, txn_id, begin_ts, false);
+        UniquePtr<TableMeta> new_table_meta = TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this);
         table_meta = new_table_meta.get();
 
         if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddTableMetaOperation>(table_meta);
+            auto operation = MakeUnique<AddTableMetaOp>(table_meta,begin_ts);
             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
         }
 
@@ -242,7 +257,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     u64 commit_ts = db_entry_json["commit_ts"];
     bool deleted = db_entry_json["deleted"];
     EntryType entry_type = db_entry_json["entry_type"];
-    res->commit_ts_ = commit_ts;
+    res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
     res->entry_type_ = entry_type;
     res->db_entry_dir_ = db_entry_dir;

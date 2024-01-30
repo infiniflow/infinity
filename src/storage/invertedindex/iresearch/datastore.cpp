@@ -20,15 +20,12 @@ module;
 #include <filesystem>
 
 #include "formats/formats.hpp"
-#include "index/index_reader.hpp"
-#include "index/norm.hpp"
+#include "index/segment_writer.hpp"
 #include "parser/type/datetime/date_type.h"
 #include "parser/type/datetime/datetime_type.h"
 #include "parser/type/datetime/time_type.h"
 #include "parser/type/datetime/timestamp_type.h"
 #include "store/fs_directory.hpp"
-#include "utils/index_utils.hpp"
-#include "utils/text_format.hpp"
 
 #include "analysis/analyzers.hpp"
 #include "analysis/token_attributes.hpp"
@@ -36,7 +33,6 @@ module;
 #include "search/bm25.hpp"
 #include "search/filter.hpp"
 #include "search/score.hpp"
-#include "utils/type_info.hpp"
 
 import stl;
 import parser;

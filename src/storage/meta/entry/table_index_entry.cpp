@@ -70,7 +70,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         TableIndexEntry *table_index_entry_ptr = table_index_entry.get();
 
         {
-            auto operation = MakeUnique<AddTableIndexEntryOperation>(table_index_entry);
+            auto operation = MakeUnique<AddTableIndexEntryOp>(table_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
 
@@ -104,6 +104,21 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
         return table_index_entry;
     }
+}
+
+SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                                     const SharedPtr<IndexDef> &index_def,
+                                                                     const SharedPtr<String> &index_dir,
+                                                                     TransactionID txn_id,
+                                                                     TxnTimeStamp begin_ts,
+                                                                     TxnTimeStamp commit_ts,
+                                                                     bool is_delete) {
+    auto table_index_entry = MakeShared<TableIndexEntry>(index_def, table_index_meta, index_dir, txn_id, begin_ts);
+    SizeT index_count = index_def->index_array_.size();
+    table_index_entry->column_index_map_.reserve(index_count);
+    table_index_entry->commit_ts_.store(commit_ts);
+    table_index_entry->deleted_ = is_delete;
+    return table_index_entry;
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {

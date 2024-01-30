@@ -57,7 +57,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
         // Physical log
         {
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
@@ -77,7 +77,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
             // Physical log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -96,7 +96,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     SharedPtr<DBEntry> db_entry = DBEntry::DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                            auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
@@ -138,7 +138,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
 
                             SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
                             if (txn_mgr != nullptr) {
-                                auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                                auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                             }
 
@@ -176,7 +176,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
                     {
                         if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                            auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                             txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                         }
                     }
@@ -202,7 +202,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, Status::EmptyEntryList()};
     }
 
     BaseEntry *header_base_entry = this->entry_list_.front().get();
@@ -210,7 +210,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, Status::InvalidEntry()};
     }
 
     DBEntry *header_db_entry = (DBEntry *)header_base_entry;
@@ -220,7 +220,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             if (header_db_entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
                 LOG_TRACE(*err_msg);
-                return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+                return {nullptr, Status::DBNotExist(*this->db_name_)};
             }
 
             SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
@@ -228,7 +228,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             // Physical log
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -253,7 +253,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
             auto db_entry = std::static_pointer_cast<DBEntry>(base_entry_ptr);
             {
                 if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOperation>(db_entry);
+                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
@@ -292,14 +292,14 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, Status::EmptyEntryList()};
     }
 
     for (const auto &db_entry : this->entry_list_) {
         if (db_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+            return {nullptr, Status::InvalidEntry()};
         }
 
         if (db_entry->Committed()) {
@@ -307,10 +307,10 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
                 if (db_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
                     LOG_TRACE(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+                    return {nullptr, Status::DBNotExist(*this->db_name_)};
                 } else {
                     // check the tables meta
-                    DBEntry* db_entry_ptr = (DBEntry *)(db_entry.get());
+                    auto db_entry_ptr = static_cast<DBEntry *>(db_entry.get());
                     return {db_entry_ptr, Status::OK()};
                 }
             }
@@ -321,16 +321,49 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
                 if (db_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+                    return {nullptr, Status::DBNotExist(*this->db_name_)};
                 } else {
-                    return {(DBEntry *)(db_entry.get()), Status::OK()};
+                    auto db_entry_ptr = static_cast<DBEntry *>(db_entry.get());
+                    return {db_entry_ptr, Status::OK()};
                 }
+            }
+        }
+    }
+    UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No db entry {} found.", *this->db_name_));
+    LOG_ERROR(*err_msg);
+    return {nullptr, Status::NotFoundEntry()};
+}
+
+Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    if (!this->entry_list_.empty()) {
+        const auto &entry = entry_list_.front();
+        if (entry->entry_type_ == EntryType::kDummy) {
+            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+            LOG_ERROR(*err_msg);
+            return {nullptr, Status::InvalidEntry()};
+        }
+
+        TransactionID entry_txn_id = entry->txn_id_.load();
+        // committed
+        if (begin_ts > entry->commit_ts_) {
+            if (entry->deleted_) {
+                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                LOG_ERROR(*err_msg);
+                return {nullptr, Status::InvalidEntry()};
+            } else {
+                auto db_entry = static_cast<DBEntry *>(entry.get());
+                return {db_entry, Status::OK()};
+            }
+        } else {
+            if (txn_id == entry_txn_id) {
+                auto db_entry = static_cast<DBEntry *>(entry.get());
+                return {db_entry, Status::OK()};
             }
         }
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No db entry found.");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+    return {nullptr, Status::NotFoundEntry()};
 }
 
 SharedPtr<String> DBMeta::ToString() {
@@ -350,7 +383,7 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
         db_candidates.reserve(this->entry_list_.size());
         for (auto &db_entry : this->entry_list_) {
-            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
+            if (db_entry->entry_type_ == EntryType::kDatabase) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
             }
@@ -373,6 +406,8 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
         }
     }
     res->entry_list_.sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    auto dummy_entry = MakeShared<BaseEntry>(EntryType::kDummy);
+    res->entry_list_.emplace_back(dummy_entry);
     return res;
 }
 

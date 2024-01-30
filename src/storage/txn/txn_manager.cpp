@@ -75,7 +75,7 @@ u64 TxnManager::GetNewTxnID() {
 
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
-    TxnTimeStamp ts = start_ts_++;
+    TxnTimeStamp ts = ++start_ts_;
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }

@@ -34,8 +34,8 @@ public:
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
-                        TransactionID start_txn_id = 0,
-                        TxnTimeStamp start_ts = 1);
+                        TransactionID start_txn_id,
+                        TxnTimeStamp start_ts);
 
     ~TxnManager() { Stop(); }
 

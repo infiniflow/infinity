@@ -107,6 +107,11 @@ export enum class ErrorCode : long {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
+
+    // meta
+    kInvalidEntry = 8001,
+    kNotFoundEntry = 8002,
+    kEmptyEntryList = 8003,
 };
 
 export class Status {
@@ -192,6 +197,11 @@ public:
     static Status DirNotFound(const String &path);
     static Status DataIOError(const String &detailed_info);
     static Status UnexpectedError(const String &detailed_info);
+
+    // meta
+    static Status InvalidEntry();
+    static Status NotFoundEntry();
+    static Status EmptyEntryList();
 
 public:
     Status() = default;

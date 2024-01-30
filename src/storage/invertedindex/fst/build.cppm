@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 #include <cassert>
 import stl;
@@ -44,7 +58,7 @@ struct UnfinishedNodes {
     Vector<UniquePtr<BuilderNodeUnfinished>> stack_;
 
     UnfinishedNodes() {
-        stack_.reserve(64);
+        stack_.reserve(256);
         PushEmpty(false);
     }
 
@@ -180,7 +194,7 @@ private:
     /// A finished node is one that has been compiled and written to `wtr`.
     /// After this point, the node is considered immutable and will never
     /// change.
-    Registry<BuilderNode> registry_;
+    Registry<BuilderNode, CompiledAddr> registry_;
     /// The last word added.
     ///
     /// This is used to enforce the invariant that words are added in sorted
@@ -197,7 +211,7 @@ private:
     SizeT len_;
 
 public:
-    FstBuilder(Writer &wtr, FstType ty = 0) : wtr_(wtr), registry_(10000), last_addr_(NONE_ADDRESS), len_(0) {
+    FstBuilder(Writer &wtr, FstType ty = 0) : wtr_(wtr), registry_(16), last_addr_(NONE_ADDRESS), len_(0) {
         IoWriteU64LE(VERSION, wtr_);
         IoWriteU64LE(ty, wtr_);
     }

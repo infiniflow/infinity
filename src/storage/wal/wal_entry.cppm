@@ -41,16 +41,6 @@ export enum class WalCommandType : i8 {
     DROP_INDEX = 7,
 
     // -----------------------------
-    // INDEX
-    // -----------------------------
-    ADD_TABLE_INDEX = 11,
-    DEL_TABLE_INDEX = 12,
-    ADD_INDEX_ENTRY = 13,
-    DEL_INDEX_ENTRY = 14,
-    ADD_COLUMN_INDEX = 15,
-    ADD_INDEX_BY_SEGMENT_ID = 16,
-
-    // -----------------------------
     // Data
     // -----------------------------
     IMPORT = 20,
