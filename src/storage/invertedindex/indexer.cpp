@@ -38,7 +38,7 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
     index_config_.GetColumnIDs(column_ids_);
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
-        column_indexers_[column_id] = MakeUnique<ColumnIndexer>(column_id, index_config_, byte_slice_pool_, buffer_pool_);
+        column_indexers_[column_id] = MakeUnique<ColumnIndexer>(this, column_id, index_config_, byte_slice_pool_, buffer_pool_);
     }
 }
 
@@ -62,7 +62,21 @@ void Indexer::Add(DataBlock *data_block) {
     }
 }
 
-void Indexer::Commit() {}
+void Indexer::Commit() {
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Commit();
+    }
+}
 
-SharedPtr<IndexSegmentReader> Indexer::CreateInMemSegmentReader() { return MakeShared<InMemIndexSegmentReader>(); }
+SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
+    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id].get());
+}
+
+void Indexer::Flush() {
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Flush();
+    }
+}
 } // namespace infinity
