@@ -8,6 +8,10 @@ export module index_config;
 namespace infinity {
 export class InvertedIndexConfig {
 public:
+    void SetMemoryQuora(u64 quota) { memory_quota_ = quota; }
+
+    u64 GetMemoryQuota() const { return memory_quota_; }
+
     void SetOptionFlag(optionflag_t flag) {
         flag_ = flag;
         posting_format_option_.InitOptionFlag(flag_);
@@ -38,6 +42,7 @@ public:
 
 private:
     String index_name_;
+    u64 memory_quota_;
     PostingFormatOption posting_format_option_;
     optionflag_t flag_;
     bool is_short_list_vbyte_compress_;

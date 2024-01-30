@@ -146,6 +146,9 @@ void ColumnInverter::Commit() {
     } else {
         DoInsert();
     }
+    if (column_indexer_->NeedDump()) {
+        column_indexer_->Dump();
+    }
 }
 
 void ColumnInverter::DoInsert() {

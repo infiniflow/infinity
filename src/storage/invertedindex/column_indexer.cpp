@@ -36,6 +36,7 @@ import invert_task;
 import commit_task;
 import task_executor;
 import memory_posting;
+import indexer;
 import third_party;
 
 module column_indexer;
@@ -59,12 +60,13 @@ bool ColumnIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 // bool ColumnIndexer::KeyComp::operator()(const TermKey &lhs, const TermKey &rhs) const { return lhs < rhs; }
 
-ColumnIndexer::ColumnIndexer(u64 column_id,
+ColumnIndexer::ColumnIndexer(Indexer *indexer,
+                             u64 column_id,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
                              SharedPtr<RecyclePool> buffer_pool)
-    : column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), num_inverters_(1),
-      max_inverters_(2) {
+    : indexer_(indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool),
+      num_inverters_(1), max_inverters_(2) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
     inverter_ = MakeUnique<ColumnInverter>(this);
@@ -143,6 +145,12 @@ void ColumnIndexer::Commit() {
     commit_executor_->Execute(0, std::move(task));
     SwitchActiveInverter();
 }
+
+bool ColumnIndexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
+
+void ColumnIndexer::Dump() { indexer_->Flush(); }
+
+void ColumnIndexer::Flush() {}
 
 ColumnIndexer::PostingPtr ColumnIndexer::GetOrAddPosting(const TermKey &term) {
     ColumnIndexer::PostingTable::Iterator iter = posting_store_->find(term);

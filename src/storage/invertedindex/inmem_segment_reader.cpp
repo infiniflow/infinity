@@ -30,7 +30,7 @@ bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
         return false;
     }
     seg_posting.Init(base_doc_id, 0, posting_writer);
-    return false;
+    return true;
 }
 
 docid_t InMemIndexSegmentReader::GetBaseDocId() const { return 0; }

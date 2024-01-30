@@ -35,6 +35,8 @@ public:
 
     void Commit();
 
+    void Flush();
+
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
 
 private:
