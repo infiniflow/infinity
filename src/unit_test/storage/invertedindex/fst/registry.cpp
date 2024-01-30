@@ -51,19 +51,28 @@ TEST_F(RegistryTest, InsertAndFind) {
 
     key.k_ = 3;
     ent = registry.Find(key);
-    EXPECT_TRUE(!ent.found_ && ent.slot_ == 0UL);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 3UL);
     registry.Insert(ent.slot_, key, 300UL);
     ent = registry.Find(key);
     EXPECT_TRUE(ent.found_ && ent.value_ == 300UL);
 
-    key.k_ = 4;
+    key.k_ = 8;
     ent = registry.Find(key);
-    EXPECT_TRUE(!ent.found_ && ent.slot_ == 1UL);
-    registry.Insert(ent.slot_, key, 400UL);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 0UL);
+    registry.Insert(ent.slot_, key, 800UL);
     ent = registry.Find(key);
-    EXPECT_TRUE(ent.found_ && ent.value_ == 400UL);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 800UL);
 
-    key.k_ = 1;
+    // Inserting a hash-conflicting key should overwrite the existing value.
+    key.k_ = 16;
     ent = registry.Find(key);
-    EXPECT_TRUE(!ent.found_ && ent.slot_ == 1UL);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 0UL);
+    registry.Insert(ent.slot_, key, 1600UL);
+    ent = registry.Find(key);
+    EXPECT_TRUE(ent.found_ && ent.value_ == 1600UL);
+
+    // Verify the existing value has been overwritten.
+    key.k_ = 8;
+    ent = registry.Find(key);
+    EXPECT_TRUE(!ent.found_ && ent.slot_ == 0UL);
 }
