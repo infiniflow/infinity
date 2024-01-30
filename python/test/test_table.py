@@ -281,10 +281,10 @@ class TestTable:
         assert res.success
 
     # create/drop table with different invalid options
-    def test_table_with_invalid_options(self):
+    def test_table_with_different_invalid_options(self):
         """
         target: create/drop table with different invalid options.
-        methods: create table with various column types
+        methods: create table with various options
         expect: all operations successfully
         """
         # connect
@@ -383,12 +383,94 @@ class TestTable:
             print(e)
 
     # create/drop table with invalid options
+    def test_table_with_invalid_options(self):
+        """
+        target: create/drop table with invalid options.
+        methods: create table with various options
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        for option_name in common_values.invalid_name_array:
+            try:
+                tb = db_obj.create_table("my_table", {"c1": "int"}, option_name)
+                # raise Exception(f"Can create option_name: {option_name}")
+            except Exception as e:
+                print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # create created table, drop dropped table.
+    def test_create_drop_table(self):
+        """
+        target: create created table, drop dropped table
+        methods: create table ,drop table
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # create
+        tb = db_obj.create_table(
+            "my_table", {"c1": "int, primary key", "c2": "float"}, None)
+        assert tb is not None
+
+        try:
+            tb = db_obj.create_table("my_table", {"c1": "int"}, None)
+        except Exception as e:
+            print(e)
+
+        # drop
+        db_obj.drop_table("my_table")
+
+        try:
+            tb = db_obj.drop_table("my_table")
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # describe created table, describe not-created table, describe dropped table
 
-    # create/drop same table in different thread to test conflict
+    @pytest.mark.skip(reason="Feature request")
+    def test_describe_various_table(self):
+        """
+
+        Returns:
+
+        """
+        pass
+
     # create/drop/list/get 1M table to reach the limit
-    # create/drop/list/get table with name in chinese.
-    # create/drop/list/get table with column name in chinese.
-    # create table with invalid column name, invalid column option.
+    @pytest.mark.skip(reason="Cost too much times")
+    def test_create_1M_table(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        tb_count = 1000000
+        for i in range(tb_count):
+            try:
+                tb = db_obj.create_table("my_table" + str(i), {"c1": "int"}, None)
+                print(i)
+                # raise Exception(f"Can create table")
+            except Exception as e:
+                print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
+    # create/drop same table in different thread to test conflict
+
     # create empty column table
