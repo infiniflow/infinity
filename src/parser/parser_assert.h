@@ -47,9 +47,10 @@ inline void ParserAssert(bool is_true,
     }
 }
 #else
-inline void ParserAssert(bool is_true, const String &message) {
+
+inline void ParserAssert(bool is_true, const std::string &message) {
     if (!(is_true)) {
-        throw ParserException(errmsg);
+        throw ParserException(message);
     }
 }
 #endif
