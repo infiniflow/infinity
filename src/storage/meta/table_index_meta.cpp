@@ -329,7 +329,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+            return {nullptr, Status::InvalidEntry()};
         }
 
         TransactionID entry_txn_id = entry->txn_id_.load();
@@ -339,7 +339,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
                 if (entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+                    return {nullptr, Status::InvalidEntry()};
                 } else {
                     table_index_entry = static_cast<TableIndexEntry *>(entry.get());
                     return {table_index_entry, Status::OK()};
@@ -354,7 +354,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
 
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+    return {nullptr, Status::InvalidEntry()};
 }
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -365,7 +365,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+            return {nullptr, Status::InvalidEntry()};
         }
 
         TransactionID entry_txn_id = entry->txn_id_.load();
@@ -374,7 +374,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
             if (entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+                return {nullptr, Status::InvalidEntry()};
             } else {
                 auto table_index_entry = static_cast<TableIndexEntry *>(entry.get());
                 return {table_index_entry, Status::OK()};
@@ -389,7 +389,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
 
     UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+    return {nullptr, Status::InvalidEntry()};
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {

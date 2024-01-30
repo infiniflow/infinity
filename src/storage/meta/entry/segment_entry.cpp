@@ -58,8 +58,6 @@ import compact_segments_task;
 
 namespace infinity {
 
-SegmentEntry::SegmentEntry(const TableEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
-
 SegmentEntry::SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count)
     : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
       column_count_(column_count) {}
@@ -99,22 +97,18 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
                                                                    SizeT row_count,
                                                                    SizeT row_capacity,
                                                                    TxnTimeStamp min_row_ts,
-                                                                   TxnTimeStamp max_row_ts,
+                                                                   TxnTimeStamp deprecate_ts,
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
 
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry);
-    segment_entry->segment_id_ = segment_id;
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count);
     segment_entry->min_row_ts_ = min_row_ts;
-    segment_entry->max_row_ts_ = max_row_ts;
+    segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->commit_ts_ = commit_ts;
     segment_entry->begin_ts_ = begin_ts;
     segment_entry->row_count_ = row_count;
-    segment_entry->row_capacity_ = row_capacity;
-    segment_entry->column_count_ = column_count;
     segment_entry->txn_id_ = txn_id;
-    segment_entry->segment_dir_ = segment_dir;
     return segment_entry;
 }
 

@@ -907,7 +907,7 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     global_catalog_delta_entry->WriteAdv(ptr);
     i32 act_size = ptr - buf.data();
     if (exp_size != act_size) {
-        UnrecoverableError(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size"));
+        UnrecoverableError(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size));
     }
 
     std::ofstream outfile;

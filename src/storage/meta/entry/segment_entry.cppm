@@ -41,8 +41,6 @@ struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:
-    explicit SegmentEntry(const TableEntry *table_entry);
-
     explicit SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count);
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);

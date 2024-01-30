@@ -334,14 +334,14 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
     if (this->entry_list_.empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        return {nullptr, Status::EmptyEntryList()};
     }
 
     for (const auto &table_entry : this->entry_list_) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+            return {nullptr, Status::InvalidEntry()};
         }
 
         u64 table_entry_commit_ts = table_entry->commit_ts_;
@@ -351,7 +351,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
                 if (table_entry->deleted_) {
                     UniquePtr<String> err_msg = MakeUnique<String>("Table was dropped.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+                    return {nullptr, Status::TableNotExist(this->table_name())};
                 } else {
                     return {static_cast<TableEntry *>(table_entry.get()), Status::OK()};
                 }
@@ -366,7 +366,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+    return {nullptr, Status::NotFoundEntry()};
 }
 
 Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -376,7 +376,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnT
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+            return {nullptr, Status::InvalidEntry()};
         }
 
         TransactionID entry_txn_id = entry->txn_id_.load();
@@ -385,7 +385,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnT
             if (entry->deleted_) {
                 UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
                 LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+                return {nullptr, Status::InvalidEntry()};
             } else {
                 auto table_entry = static_cast<TableEntry *>(entry.get());
                 return {table_entry, Status::OK()};
@@ -399,7 +399,7 @@ Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnT
     }
     UniquePtr<String> err_msg = MakeUnique<String>("No table entry found.");
     LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+    return {nullptr, Status::NotFoundEntry()};
 }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
