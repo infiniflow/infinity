@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
+
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
+from infinity.common import REMOTE_HOST
 
 
 class TestCreateTable:
@@ -28,7 +30,7 @@ class TestCreateTable:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_varchar_table", True)
         table_obj = db_obj.create_table("test_create_varchar_table", {
-                                  "c1": "varchar, primary key", "c2": "float"}, None)
+            "c1": "varchar, primary key", "c2": "float"}, None)
         assert table_obj
 
         db_obj.drop_table("test_create_varchar_table")
@@ -43,7 +45,73 @@ class TestCreateTable:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_embedding_table", True)
         table_obj = db_obj.create_table("test_create_embedding_table", {
-                                  "c1": "vector,128,float"}, None)
+            "c1": "vector,128,float"}, None)
         assert table_obj
 
         db_obj.drop_table("test_create_embedding_table")
+
+    def test_create_table_with_invalid_column_name(self):
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        with pytest.raises(Exception, match=r".*Empty column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                " ": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "12": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "[]": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "()": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "{}": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "1": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception, match=r".*invalid column name"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "1.1": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
