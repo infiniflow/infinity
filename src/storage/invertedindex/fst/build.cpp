@@ -61,7 +61,8 @@ void FstBuilder::InsertOutput(u8 *bs_ptr, SizeT bs_len, u64 val) {
 
 void FstBuilder::CompileFrom(SizeT istate) {
     SizeT addr = NONE_ADDRESS;
-    while (istate + 1 < unfinished_.Len()) {
+    SizeT remained = unfinished_.Len() - (istate + 1);
+    for (SizeT i = 0; i < remained; i++) {
         if (addr == NONE_ADDRESS) {
             UniquePtr<BuilderNode> node = unfinished_.PopEmpty();
             addr = Compile(*node);
