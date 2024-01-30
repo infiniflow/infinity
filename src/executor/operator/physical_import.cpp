@@ -496,7 +496,7 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
     const String &table_name = *txn_store->table_entry_->GetTableName();
     txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                         table_name,
-                                                        WalSegmentInfo{*segment_entry->segment_dir(),
+                                                        WalSegmentInfo{segment_entry->segment_dir(),
                                                                        segment_entry->segment_id(),
                                                                        static_cast<u16>(block_entries.size()),
                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry

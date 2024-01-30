@@ -42,9 +42,11 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
     if (txn != nullptr) {
-        auto operation = MakeUnique<AddColumnEntryOperation>(block_column_entry.get());
+        auto operation = MakeUnique<AddColumnEntryOp>(block_column_entry.get());
         txn->AddCatalogDeltaOperation(std::move(operation));
     }
+    auto begin_ts = txn->BeginTS();
+    block_column_entry->begin_ts_ = begin_ts;
 
     block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
@@ -66,18 +68,18 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
 
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, BufferManager *buffer_manager) {
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
-    block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
-    block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
+    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+    column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    column_entry->column_type_ = block_entry->GetColumnType(column_id);
 
-    DataType *column_type = block_column_entry->column_type_.get();
+    DataType *column_type = column_entry->column_type_.get();
     SizeT row_capacity = block_entry->row_capacity();
     SizeT total_data_size = row_capacity * column_type->Size();
-    auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
+    auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
-    block_column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
+    column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
 
-    return block_column_entry;
+    return column_entry;
 }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
@@ -171,6 +173,10 @@ nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;
     json_res["next_outline_idx"] = outline_buffers_.size();
+
+    json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
+    json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
+    json_res["txn_id"] = TransactionID(this->txn_id_);
     return json_res;
 }
 
@@ -179,6 +185,10 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
     ColumnID column_id = column_data_json["column_id"];
     UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr);
     block_column_entry->outline_buffers_.assign(SizeT(column_data_json["next_outline_idx"]), nullptr);
+
+    block_column_entry->commit_ts_ = column_data_json["commit_ts"];
+    block_column_entry->begin_ts_ = column_data_json["begin_ts"];
+    block_column_entry->txn_id_ = column_data_json["txn_id"];
 
     return block_column_entry;
 }

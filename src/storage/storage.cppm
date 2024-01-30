@@ -44,15 +44,9 @@ public:
 
     void UnInit();
 
-    static SharedPtr<DirEntry> GetLatestCatalog(const String &dir);
-
-    static bool CatalogDirExists(const String &dir);
-
     void AttachCatalog(const Vector<String> &catalog_files);
-    void InitNewCatalog();
 
-private:
-    static void InitCatalog(NewCatalog *catalog, TxnManager *txn_mgr);
+    void InitNewCatalog();
 
 private:
     const Config *config_ptr_{};

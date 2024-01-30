@@ -48,6 +48,17 @@ public:
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
 
+    static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
+                                                         SegmentID segment_id,
+                                                         const SharedPtr<String> &segment_dir,
+                                                         u64 column_count,
+                                                         SizeT row_count,
+                                                         SizeT row_capacity,
+                                                         TxnTimeStamp min_row_ts,
+                                                         TxnTimeStamp max_row_ts,
+                                                         TxnTimeStamp commit_ts,
+                                                         TxnTimeStamp begin_ts,
+                                                         TransactionID txn_id);
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT segment_row_count, const IndexBase *index_base, const ColumnDef *column_def);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -61,6 +72,8 @@ public:
                             ColumnID column_id,
                             const IndexBase *index_base,
                             SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
+
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 public:
     inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
@@ -100,6 +113,16 @@ public:
     void RollbackCompact();
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn);
+
+    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
+
+    inline SizeT column_count() const { return column_count_; }
+
+    inline TxnTimeStamp max_row_ts() const { return deprecate_ts_; }
+
+    inline SizeT row_capacity() const { return row_capacity_; }
+
+    const String &segment_dir() { return *segment_dir_; }
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction

@@ -38,6 +38,7 @@ import infinity_exception;
 import status;
 import backgroud_process;
 import status;
+import bg_task;
 
 namespace infinity {
 
@@ -60,8 +61,7 @@ void Storage::Init() {
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
-    i64 system_start_ts = wal_mgr_->ReplayWalFile();
-    ++system_start_ts;
+    TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile();
 
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get());
     // Construct txn manager
@@ -69,7 +69,7 @@ void Storage::Init() {
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
                                       std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
-                                      0,
+                                      new_catalog_->next_txn_id_,
                                       system_start_ts);
 
     txn_mgr_->Start();
@@ -80,6 +80,13 @@ void Storage::Init() {
 
     BuiltinFunctions builtin_functions(new_catalog_);
     builtin_functions.Init();
+
+    auto txn = txn_mgr_->CreateTxn();
+    txn->Begin();
+    SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn);
+    bg_processor_->Submit(force_ckp_task);
+    force_ckp_task->Wait();
+    txn_mgr_->CommitTxn(txn);
 }
 
 void Storage::UnInit() {
@@ -99,46 +106,6 @@ void Storage::UnInit() {
 
     config_ptr_ = nullptr;
     fmt::print("Shutdown storage successfully\n");
-}
-
-SharedPtr<DirEntry> Storage::GetLatestCatalog(const String &dir) {
-    LocalFileSystem fs;
-    if (!fs.Exists(dir)) {
-        fs.CreateDirectory(dir);
-        return nullptr;
-    }
-
-    Vector<SharedPtr<DirEntry>> dir_array = fs.ListDirectory(dir);
-    SharedPtr<DirEntry> latest;
-    int64_t latest_version_number = -1;
-    const std::regex catalog_file_regex("META_[0-9]+\\.full.json");
-    for (const auto &dir_entry_ptr : dir_array) {
-        LOG_TRACE(fmt::format("Candidate file name: {}", dir_entry_ptr->path().c_str()));
-        if (dir_entry_ptr->is_regular_file()) {
-            String current_file_name = dir_entry_ptr->path().filename();
-            if (std::regex_match(current_file_name, catalog_file_regex)) {
-                int64_t version_number = std::stoll(current_file_name.substr(5, current_file_name.size() - 10));
-                if (version_number > latest_version_number) {
-                    latest_version_number = version_number;
-                    latest = dir_entry_ptr;
-                }
-            }
-        }
-    }
-
-    return latest;
-}
-
-void Storage::InitCatalog(NewCatalog *, TxnManager *txn_mgr) {
-    Txn *new_txn = txn_mgr->CreateTxn();
-    new_txn->Begin();
-    Status status = new_txn->CreateDatabase("default", ConflictType::kError);
-    if (status.ok()) {
-        txn_mgr->CommitTxn(new_txn);
-    } else {
-        txn_mgr->RollBackTxn(new_txn);
-        UnrecoverableError(*status.msg_);
-    }
 }
 
 void Storage::AttachCatalog(const Vector<String> &catalog_files) {

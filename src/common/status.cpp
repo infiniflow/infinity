@@ -334,4 +334,10 @@ Status Status::ColumnCountMismatch(const String &detailed_info) {
     return Status(ErrorCode::kColumnCountMismatch, MakeUnique<String>(fmt::format("Column count mismatch: {}", detailed_info)));
 }
 
+Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
+
+Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
+
+Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
+
 } // namespace infinity

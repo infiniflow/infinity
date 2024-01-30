@@ -40,6 +40,8 @@ import index_hnsw;
 import index_base;
 import index_full_text;
 import index_def;
+import bg_task;
+import backgroud_process;
 import compact_segments_task;
 import default_values;
 
@@ -59,37 +61,46 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
-        txn->CreateDatabase("db1", ConflictType::kIgnore);
-        txn_mgr->CommitTxn(txn);
-
-        auto *txn2 = txn_mgr->CreateTxn();
-        txn2->Begin();
-        txn2->CreateDatabase("db2", ConflictType::kIgnore);
-        txn_mgr->CommitTxn(txn2);
-
-        auto *txn3 = txn_mgr->CreateTxn();
-        txn3->Begin();
-        txn3->CreateDatabase("db3", ConflictType::kIgnore);
-        TxnTimeStamp txn3_ts = txn_mgr->CommitTxn(txn3);
-
-        auto *txn4 = txn_mgr->CreateTxn();
-        txn4->Begin();
-        txn4->CreateDatabase("db4", ConflictType::kIgnore);
-        txn_mgr->CommitTxn(txn4);
-
-        auto *txn5 = txn_mgr->CreateTxn();
-        txn5->Begin();
-        txn5->Checkpoint(txn3_ts, true);
-        txn_mgr->CommitTxn(txn5);
-
-        auto *txn6 = txn_mgr->CreateTxn();
-        txn6->Begin();
-        txn6->CreateDatabase("db5", ConflictType::kIgnore);
-        txn_mgr->CommitTxn(txn6);
-
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->CreateDatabase("db1", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->CreateDatabase("db2", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->CreateDatabase("db3", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->CreateDatabase("db4", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
+            bg_processor->Submit(force_ckp_task);
+            force_ckp_task->Wait();
+            txn_mgr->CommitTxn(txn);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            txn->CreateDatabase("db5", ConflictType::kIgnore);
+            txn_mgr->CommitTxn(txn);
+        }
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
@@ -111,12 +122,13 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->CreateTxn();
-        txn->Begin();
-        Status status = txn->DropDatabase("db4", ConflictType::kError);
-        EXPECT_EQ(status.ok(), true);
-        txn_mgr->CommitTxn(txn);
-
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            Status status = txn->DropDatabase("db4", ConflictType::kError);
+            EXPECT_EQ(status.ok(), true);
+            txn_mgr->CommitTxn(txn);
+        }
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
@@ -166,6 +178,7 @@ TEST_F(WalReplayTest, WalReplayTables) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
@@ -175,39 +188,36 @@ TEST_F(WalReplayTest, WalReplayTables) {
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
-
-        auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-        auto *txn2 = txn_mgr->CreateTxn();
-        txn2->Begin();
-
-        Status status2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status2.ok());
-        TxnTimeStamp txn2_ts = txn_mgr->CommitTxn(txn2);
-
+        {
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+            auto *txn2 = txn_mgr->CreateTxn();
+            txn2->Begin();
+            Status status2 = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status2.ok());
+            txn_mgr->CommitTxn(txn2);
+        }
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
             Status status = txn->DropTableCollectionByName("default", "tbl2", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
         {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->Begin();
-
             Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn3);
         }
         {
-            auto *txn6 = txn_mgr->CreateTxn();
-            txn6->Begin();
-            txn6->Checkpoint(txn2_ts, true);
-            txn_mgr->CommitTxn(txn6);
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
+            bg_processor->Submit(force_ckp_task);
+            force_ckp_task->Wait();
+            txn_mgr->CommitTxn(txn);
         }
 
         infinity::InfinityContext::instance().UnInit();
@@ -227,19 +237,15 @@ TEST_F(WalReplayTest, WalReplayTables) {
             auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
             Status status = txn->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
         {
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
             Status status = txn->DropTableCollectionByName("default", "tbl3", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
 
@@ -258,6 +264,7 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -290,30 +297,24 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
             Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
         {
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
             auto *txn3 = txn_mgr->CreateTxn();
             txn3->Begin();
-
             Status status = txn3->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn3);
         }
         {
             auto tbl4_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl4"), columns);
             auto *txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
-
             Status status = txn4->CreateTable("default", std::move(tbl4_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn4);
         }
         {
@@ -346,10 +347,12 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             txn_mgr->CommitTxn(txn5);
         }
         {
-            auto *txn6 = txn_mgr->CreateTxn();
-            txn6->Begin();
-            txn6->Checkpoint(3, true);
-            txn_mgr->CommitTxn(txn6);
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
+            bg_processor->Submit(force_ckp_task);
+            force_ckp_task->Wait();
+            txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
@@ -455,6 +458,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_manager = storage->buffer_manager();
+        BGTaskProcessor *bg_processor = storage->bg_processor();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -487,41 +491,34 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl1"), columns);
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-
             Status status = txn->CreateTable("default", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
-
-        auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
-        auto *txn2 = txn_mgr->CreateTxn();
-        txn2->Begin();
-
-        Status status = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        TxnTimeStamp tx4_commit_ts = txn_mgr->CommitTxn(txn2);
-
         {
-            auto txn = txn_mgr->CreateTxn();
+            auto tbl2_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl2"), columns);
+            auto *txn2 = txn_mgr->CreateTxn();
+            txn2->Begin();
+            Status status = txn2->CreateTable("default", std::move(tbl2_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            txn_mgr->CommitTxn(txn2);
+        }
+        {
+            auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
-            txn->Checkpoint(tx4_commit_ts, true);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false);
+            bg_processor->Submit(force_ckp_task);
+            force_ckp_task->Wait();
             txn_mgr->CommitTxn(txn);
         }
-
         {
             auto *txn = txn_mgr->CreateTxn();
             auto tbl3_def = MakeUnique<TableDef>(MakeShared<String>("default"), MakeShared<String>("tbl3"), columns);
-
             txn->Begin();
-
             Status status = txn->CreateTable("default", std::move(tbl3_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
-
             txn_mgr->CommitTxn(txn);
         }
-
         {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();

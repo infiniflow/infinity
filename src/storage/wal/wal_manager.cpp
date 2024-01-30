@@ -46,9 +46,10 @@ WalManager::WalManager(Storage *storage,
                        u64 full_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_wal_bytes)
-    : wal_size_threshold_(wal_size_threshold), full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
-      delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec), delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes),
-      wal_path_(std::move(wal_path)), storage_(storage), running_(false) {}
+    : cfg_wal_size_threshold_(wal_size_threshold), cfg_full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
+      cfg_delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec),
+      cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_path_(std::move(wal_path)), storage_(storage),
+      running_(false) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -75,7 +76,6 @@ void WalManager::Start() {
     i64 now = seconds_since_epoch.count();
     full_ckp_when_ = now;
     delta_ckp_when_ = now;
-    max_commit_ts_ = 0;
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
@@ -202,10 +202,10 @@ void WalManager::Flush() {
         try {
             LocalFileSystem fs;
             auto file_size = fs.GetFileSizeByPath(wal_path_);
-            if (file_size > wal_size_threshold_) {
+            if (file_size > cfg_wal_size_threshold_) {
                 this->SwapWalFile(max_commit_ts);
             }
-        } catch (RecoverableException& e) {
+        } catch (RecoverableException &e) {
             LOG_ERROR(e.what());
         } catch (UnrecoverableException &e) {
             LOG_CRITICAL(e.what());
@@ -230,17 +230,18 @@ void WalManager::CheckpointTimer() {
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint() {
-
+    bool is_full_checkpoint;
     auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
     i64 now = seconds_since_epoch.count();
     auto [max_commit_ts, wal_size] = GetWalState();
-    bool is_full_checkpoint = false;
-    //        bool is_delta_checkpoint = false;
-    if (now - full_ckp_when_ > i64(full_checkpoint_interval_sec_) && wal_size != full_ckp_wal_size_) {
+    if (max_commit_ts == last_ckp_commit_ts_) {
+        return;
+    }
+    if (now - full_ckp_when_ > i64(cfg_full_checkpoint_interval_sec_) && wal_size != full_ckp_wal_size_) {
         is_full_checkpoint = true;
-    } else if ((now - delta_ckp_when_ > i64(delta_checkpoint_interval_sec_) && wal_size != delta_ckp_wal_size_) ||
-               wal_size - delta_ckp_wal_size_ > i64(delta_checkpoint_interval_wal_bytes_)) {
-        //            is_delta_checkpoint = true;
+    } else if ((now - delta_ckp_when_ > i64(cfg_delta_checkpoint_interval_sec_) && wal_size != delta_ckp_wal_size_) ||
+               wal_size - delta_ckp_wal_size_ > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
+        is_full_checkpoint = false;
     } else {
         return;
     }
@@ -251,18 +252,24 @@ void WalManager::Checkpoint() {
         txn_mgr = storage_->txn_manager();
         txn = txn_mgr->CreateTxn();
         txn->Begin();
-        LOG_INFO(fmt::format("Created txn for checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}", txn->TxnID(), txn->BeginTS(), max_commit_ts));
+        LOG_INFO(fmt::format("WalManager::Create txn for {} checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
+                             is_full_checkpoint ? "FULL" : "DELTA",
+                             txn->TxnID(),
+                             txn->BeginTS(),
+                             max_commit_ts));
 
         txn->Checkpoint(max_commit_ts, is_full_checkpoint);
         txn_mgr->CommitTxn(txn);
 
-        delta_ckp_when_ = now;
-        delta_ckp_wal_size_ = wal_size;
+        last_ckp_commit_ts_ = max_commit_ts;
         if (is_full_checkpoint) {
             full_ckp_when_ = now;
             full_ckp_wal_size_ = wal_size;
             full_ckp_commit_ts_ = max_commit_ts;
             RecycleWalFile(full_ckp_commit_ts_);
+        } else {
+            delta_ckp_when_ = now;
+            delta_ckp_wal_size_ = wal_size;
         }
         LOG_INFO(fmt::format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
     } catch (RecoverableException &e) {
@@ -276,11 +283,8 @@ void WalManager::Checkpoint() {
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
 
     auto [max_commit_ts, wal_size] = GetWalState();
-    if (wal_size == full_ckp_wal_size_) {
-        return;
-    }
 
-    bool is_full_checkpoint = true;
+    bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
     LOG_INFO(fmt::format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
                          ckp_task->txn_->TxnID(),
@@ -499,7 +503,7 @@ i64 WalManager::ReplayWalFile() {
         system_start_ts = replay_entries[replay_count]->commit_ts_;
         last_txn_id = replay_entries[replay_count]->txn_id_;
         if (replay_entries[replay_count]->IsCheckPoint()) {
-            LOG_TRACE(fmt::format("Replay Skip checkpoint entry: {}", replay_entries[replay_count]->ToString()));
+            LOG_TRACE(fmt::format("\nSKIP checkpoint entry: {}", replay_entries[replay_count]->ToString()));
             continue;
         }
         ReplayWalEntry(*replay_entries[replay_count]);
@@ -508,6 +512,7 @@ i64 WalManager::ReplayWalFile() {
 
     LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
+    this->max_commit_ts_ = system_start_ts;
     return system_start_ts;
 }
 /*****************************************************************************

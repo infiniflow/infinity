@@ -129,7 +129,7 @@ void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, 
         }
 
         u16 last_block_row_count = new_segment->block_entries().back()->row_count();
-        segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
+        segment_infos.emplace_back(WalSegmentInfo{new_segment->segment_dir(),
                                                   new_segment->segment_id(),
                                                   static_cast<u16>(new_segment->block_entries().size()),
                                                   DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
