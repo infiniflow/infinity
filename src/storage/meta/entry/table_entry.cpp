@@ -116,7 +116,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
 
-        { //
+        {
             if (txn_mgr != nullptr) {
                 auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
@@ -361,7 +361,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
         for (const auto &old_segment : old_segments) {
             old_segment->SetDeprecated(commit_ts);
         }
-        segment_map_.emplace(new_segment->segment_id(), new_segment);
+        ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
     return Status::OK();
 }
@@ -376,7 +376,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
-Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
+Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
         return Status(ErrorCode::kTableNotExist, std::move(err_msg));
@@ -394,7 +394,10 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count());
     }
 
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker;
+    if (!call_with_lock) {
+        rw_locker = std::unique_lock(this->rw_locker_);
+    }
     this->row_count_ = row_count;
     this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();

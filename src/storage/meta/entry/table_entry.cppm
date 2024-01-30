@@ -115,7 +115,8 @@ private:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
+    // the `call_with_lock` is set true if the caller has already hold the lock.
+    Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock = false);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 

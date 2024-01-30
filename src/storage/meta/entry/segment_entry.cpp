@@ -74,9 +74,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
     auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
-    segment_entry->row_count_ = 0;
-    segment_entry->actual_row_count_ = 0;
-    segment_entry->min_row_ts_ = UNCOMMIT_TS;
 
     auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
     segment_entry->block_entries_.emplace_back(std::move(block_entry));
@@ -455,6 +452,9 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
+        if (delete_rows.size() > block_entry->row_capacity()) {
+            UnrecoverableError("Delete rows exceed block capacity");
+        }
         if (block_entry == nullptr) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }

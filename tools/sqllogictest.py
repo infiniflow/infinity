@@ -11,6 +11,7 @@ from generate_limit import generate as generate4
 from generate_aggregate import generate as generate5
 from generate_top import generate as generate6
 from generate_top_varchar import generate as generate7
+from generate_compact import generate as generate8
 
 
 def python_skd_test(python_test_dir: str):
@@ -131,6 +132,7 @@ if __name__ == "__main__":
     generate5(args.generate_if_exists, args.copy)
     generate6(args.generate_if_exists, args.copy)
     generate7(args.generate_if_exists, args.copy)
+    generate8(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     # Install py sdk

@@ -136,7 +136,7 @@ public:
 private:
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
-            UnrecoverableError("Decrease row count exceed remain row count");
+            UnrecoverableError("Decrease row count exceed actual row count");
         }
         actual_row_count_ -= decrease_row_count;
     }
@@ -184,7 +184,7 @@ protected:
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{0};              // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};              // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
     TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which prehibit delete in this SegmentEntry
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which deprecate this SegmentEntry

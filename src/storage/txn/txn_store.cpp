@@ -113,6 +113,9 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
         auto &seg_map = row_hash_table[row_id.segment_id_];
         auto &block_vec = seg_map[block_id];
         block_vec.emplace_back(block_offset);
+        if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
+            UnrecoverableError("Delete row exceed block capacity");
+        }
     }
 
     return {nullptr, Status::OK()};
