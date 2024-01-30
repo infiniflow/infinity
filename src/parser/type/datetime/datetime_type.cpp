@@ -16,6 +16,18 @@
 
 namespace infinity {
 
+// epoch_time: seconds since 1970-01-01 00:00:00
+DateTimeType::DateTimeType(int64_t epoch_time) {
+    constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
+    auto seconds = static_cast<int32_t>(epoch_time % TotalSecondsInDay);
+    if (seconds < 0) {
+        seconds += TotalSecondsInDay;
+    }
+    auto days = static_cast<int32_t>((epoch_time - seconds) / TotalSecondsInDay);
+    date = DateType(days);
+    time = TimeType(seconds);
+}
+
 void DateTimeType::FromString(const char *datetime_ptr, size_t length) {
     // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS"
     size_t date_length;
@@ -84,9 +96,9 @@ int64_t DateTimeType::GetDateTimePart(DateTimeType input, TimeUnit unit) {
     return -1;
 }
 
-int64_t DateTimeType::GetEpochTime(const DateTimeType &dt) {
+int64_t DateTimeType::GetEpochTime() const {
     constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
-    return dt.date.value * TotalSecondsInDay + dt.time.value;
+    return date.GetValue() * TotalSecondsInDay + time.GetValue();
 }
 
 bool DateTimeType::YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime) {

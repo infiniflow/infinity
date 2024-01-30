@@ -81,7 +81,7 @@ public:
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment() { return index_by_segment_; }
 
     // Used in segment column index entry
-    UniquePtr<IndexFileWorker> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
+    Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
 private:
     Status CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes);

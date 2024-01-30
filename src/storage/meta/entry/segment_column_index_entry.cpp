@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module catalog;
 
 import stl;
@@ -37,8 +38,10 @@ import plain_store;
 import catalog_delta_entry;
 
 namespace infinity {
-SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer)
-    : BaseEntry(EntryType::kSegmentColumnIndex), column_index_entry_(column_index_entry), segment_id_(segment_id), buffer_(buffer){};
+
+SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
+    : BaseEntry(EntryType::kSegmentColumnIndex), column_index_entry_(column_index_entry), segment_id_(segment_id),
+      vector_buffer_(std::move(vector_buffer)){};
 
 SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry,
                                                                           SegmentID segment_id,
@@ -47,9 +50,13 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(Column
                                                                           BufferManager *buffer_manager,
                                                                           CreateIndexParam *param) {
     // FIXME: estimate index size.
-    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Allocate(std::move(file_worker));
-    auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
+    auto vector_file_worker = column_index_entry->CreateFileWorker(param, segment_id);
+    Vector<BufferObj *> vector_buffer(vector_file_worker.size());
+    for (u32 i = 0; i < vector_file_worker.size(); ++i) {
+        vector_buffer[i] = buffer_manager->Allocate(std::move(vector_file_worker[i]));
+    };
+    auto segment_column_index_entry =
+        SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
     segment_column_index_entry->min_ts_ = create_ts;
     segment_column_index_entry->max_ts_ = create_ts;
     auto begin_ts = txn->BeginTS();
@@ -98,12 +105,17 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
                                                                            u32 segment_id,
                                                                            BufferManager *buffer_manager,
                                                                            CreateIndexParam *param) {
-    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(param, segment_id);
-    auto buffer = buffer_manager->Get(std::move(file_worker));
-    return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
+    auto vector_file_worker = column_index_entry->CreateFileWorker(param, segment_id);
+    Vector<BufferObj *> vector_buffer(vector_file_worker.size());
+    for (u32 i = 0; i < vector_file_worker.size(); ++i) {
+        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+    }
+    return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
 }
 
-BufferHandle SegmentColumnIndexEntry::GetIndex() { return buffer_->Load(); }
+BufferHandle SegmentColumnIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
+
+BufferHandle SegmentColumnIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx]->Load(); }
 
 Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
     switch (index_base->index_type_) {
@@ -215,9 +227,11 @@ void SegmentColumnIndexEntry::SaveIndexFile() {
     String &index_name = *this->column_index_entry_->col_index_dir();
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
-    if (this->buffer_->Save()) {
-        this->buffer_->Sync();
-        this->buffer_->CloseFile();
+    for (auto &buffer_ptr : vector_buffer_) {
+        if (buffer_ptr->Save()) {
+            buffer_ptr->Sync();
+            buffer_ptr->CloseFile();
+        }
     }
 }
 

@@ -2776,6 +2776,19 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     }
     delete $3;
 }
+| '(' identifier_array ')' {
+    infinity::IndexType index_type = infinity::IndexType::kSecondary;
+    size_t index_count = $2->size();
+    $$ = new std::vector<infinity::IndexInfo*>();
+    $$->reserve(index_count);
+    for(size_t idx = 0; idx < index_count; ++ idx) {
+        infinity::IndexInfo* index_info = new infinity::IndexInfo();
+        index_info->index_type_ = index_type;
+        index_info->column_name_ = (*$2)[idx];
+        $$->emplace_back(index_info);
+    }
+    delete $2;
+}
 
 %%
 

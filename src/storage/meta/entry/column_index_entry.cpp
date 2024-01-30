@@ -32,6 +32,7 @@ import parser;
 import catalog_delta_entry;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
+import secondary_index_file_worker;
 import logger;
 
 namespace infinity {
@@ -153,8 +154,10 @@ SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, 
     return index_dir;
 }
 
-UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
-    UniquePtr<IndexFileWorker> file_worker = nullptr;
+Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
+    Vector<UniquePtr<IndexFileWorker>> vector_file_worker(1);
+    // reference file_worker will be invalidated when vector_file_worker is resized
+    auto &file_worker = vector_file_worker[0];
     const auto *index_base = param->index_base_;
     const auto *column_def = param->column_def_;
     auto file_name = MakeShared<String>(ColumnIndexEntry::IndexFileName(index_base->file_name_, segment_id));
@@ -190,6 +193,22 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
             UnrecoverableError(*err_msg);
             break;
         }
+        case IndexType::kSecondary: {
+            auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
+            auto const row_count = create_secondary_param->row_count_;
+            auto const part_capacity = create_secondary_param->part_capacity_;
+            u32 part_num = (row_count + part_capacity - 1) / part_capacity;
+            vector_file_worker.resize(part_num + 1);
+            // cannot use invalid file_worker
+            vector_file_worker[0] =
+                MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), file_name, index_base, column_def, 0, row_count, part_capacity);
+            for (u32 i = 1; i <= part_num; ++i) {
+                auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
+                vector_file_worker[i] =
+                    MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), part_file_name, index_base, column_def, i, row_count, part_capacity);
+            }
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -197,12 +216,13 @@ UniquePtr<IndexFileWorker> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *
             UnrecoverableError(*err_msg);
         }
     }
-    if (file_worker.get() == nullptr) {
+    // cannot use invalid file_worker
+    if (vector_file_worker[0].get() == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
         LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
     }
-    return file_worker;
+    return vector_file_worker;
 }
 
 String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return fmt::format("seg{}.idx", segment_id, index_name); }

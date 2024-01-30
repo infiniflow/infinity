@@ -738,6 +738,15 @@ String Value::ToString() const {
         case kDate: {
             return value_.date.ToString();
         }
+        case kTime: {
+            return value_.time.ToString();
+        }
+        case kDateTime: {
+            return value_.datetime.ToString();
+        }
+        case kTimestamp: {
+            return value_.timestamp.ToString();
+        }
         case kInterval: {
             return value_.interval.ToString();
         }

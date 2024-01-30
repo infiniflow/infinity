@@ -62,6 +62,11 @@ public:
 
     [[nodiscard]] BufferHandle GetIndex();
 
+    // load the idx part into memory
+    [[nodiscard]] BufferHandle GetIndexPartAt(u32 idx);
+
+    [[nodiscard]] inline u32 GetIndexPartNum() { return vector_buffer_.size() - 1; }
+
     nlohmann::json Serialize();
 
     void SaveIndexFile();
@@ -81,7 +86,7 @@ public:
     inline TxnTimeStamp max_ts() const { return max_ts_; }
 
 private:
-    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer);
+    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry>
@@ -93,7 +98,7 @@ private:
     const ColumnIndexEntry *column_index_entry_{};
     SegmentID segment_id_{};
 
-    BufferObj *const buffer_{};
+    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
     std::shared_mutex rw_locker_{};
 

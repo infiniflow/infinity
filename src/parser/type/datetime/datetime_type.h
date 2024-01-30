@@ -24,15 +24,19 @@ namespace infinity {
 struct DateTimeType {
     DateTimeType() = default;
 
-    // NOTICE: time_value is in seconds
+    // time_value: seconds since 00:00:00
+    // date_value: days since 1970-01-01
     explicit DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value){};
+
+    // epoch_time: seconds since 1970-01-01 00:00:00
+    explicit DateTimeType(int64_t epoch_time);
 
     inline void Reset() {
         date = {};
         time = {};
     }
 
-    inline void FromString(const std::string &datetime_str) { FromString(datetime_str.c_str(), datetime_str.length()); }
+    inline void FromString(const std::string_view &datetime_str) { FromString(datetime_str.data(), datetime_str.size()); }
 
     // NOTICE: datetime is in format "YYYY-MM-DD HH:MM:SS"
     void FromString(const char *datetime_ptr, size_t length);
@@ -63,7 +67,7 @@ struct DateTimeType {
 
     static int64_t GetDateTimePart(DateTimeType input, TimeUnit unit);
 
-    static int64_t GetEpochTime(const DateTimeType &dt);
+    int64_t GetEpochTime() const;
 
 private:
     static bool YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime);

@@ -67,6 +67,7 @@ import default_values;
 import index_base;
 import index_ivfflat;
 import index_hnsw;
+import index_secondary;
 import index_full_text;
 import base_table_ref;
 import catalog;
@@ -543,15 +544,23 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
                 break;
             }
             case IndexType::kHnsw: {
+                // The following check might affect performance
+                IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
                 base_index_ptr = IndexHnsw::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                  {index_info->column_name_},
                                                  *(index_info->index_param_list_));
                 break;
             }
             case IndexType::kIVFFlat: {
+                IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
                 base_index_ptr = IndexIVFFlat::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                     {index_info->column_name_},
                                                     *(index_info->index_param_list_));
+                break;
+            }
+            case IndexType::kSecondary: {
+                IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+                base_index_ptr = IndexSecondary::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
                 break;
             }
             case IndexType::kInvalid: {

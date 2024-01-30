@@ -1415,6 +1415,10 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                         other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
                         break;
                     }
+                    case IndexType::kSecondary: {
+                        // there is no other_parameters
+                        break;
+                    }
                     case IndexType::kInvalid: {
                         UnrecoverableError("Invalid index method type");
                     }

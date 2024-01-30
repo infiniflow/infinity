@@ -37,6 +37,7 @@ import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
+import logical_top;
 import logical_cross_product;
 import logical_join;
 import logical_show;
@@ -102,6 +103,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kSort: {
             Explain((LogicalSort *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kTop: {
+            Explain((LogicalTop *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kDelete:
@@ -1009,6 +1014,62 @@ void ExplainLogicalPlan::Explain(const LogicalLimit *limit_node, SharedPtr<Vecto
     }
 }
 
+void ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    {
+        String top_header;
+        if (intent_size != 0) {
+            top_header = String(intent_size - 2, ' ') + "-> TOP ";
+        } else {
+            top_header = "TOP ";
+        }
+
+        top_header += "(" + std::to_string(top_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(top_header));
+    }
+
+    {
+        String sort_expression_str = String(intent_size, ' ') + " - sort expressions: [";
+        auto &sort_expressions = top_node->sort_expressions_;
+        SizeT order_by_count = sort_expressions.size();
+        if (order_by_count == 0) {
+            UnrecoverableError("TOP without any sort expression.");
+        }
+
+        auto &order_by_types = top_node->order_by_types_;
+        for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
+            Explain(sort_expressions[idx].get(), sort_expression_str);
+            sort_expression_str += " " + SelectStatement::ToString(order_by_types[idx]) + ", ";
+        }
+        Explain(sort_expressions.back().get(), sort_expression_str);
+        sort_expression_str += " " + SelectStatement::ToString(order_by_types.back()) + "]";
+        result->emplace_back(MakeShared<String>(sort_expression_str));
+    }
+
+    {
+        String limit_value_str = String(intent_size, ' ') + " - limit: ";
+        Explain(top_node->limit_expression_.get(), limit_value_str);
+        result->emplace_back(MakeShared<String>(limit_value_str));
+    }
+
+    if (top_node->offset_expression_.get() != nullptr) {
+        String offset_value_str = String(intent_size, ' ') + " - offset: ";
+        Explain(top_node->offset_expression_.get(), offset_value_str);
+        result->emplace_back(MakeShared<String>(offset_value_str));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = top_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
 void ExplainLogicalPlan::Explain(const LogicalCrossProduct *cross_product_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String cross_product_header;
@@ -1317,7 +1378,7 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
     }
 }
 
-void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &expr_str) {
+void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &expr_str, bool consider_add_parentheses) {
     switch (base_expression->type()) {
         case ExpressionType::kAggregate: {
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
@@ -1392,11 +1453,17 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             }
             if (function_expression->arguments().size() == 2) {
                 // Binary function
-                Explain(function_expression->arguments()[0].get(), expr_str);
+                if (consider_add_parentheses) {
+                    expr_str += "(";
+                }
+                Explain(function_expression->arguments()[0].get(), expr_str, true);
                 expr_str += " ";
                 expr_str += function_expression->func_.name();
                 expr_str += " ";
-                Explain(function_expression->arguments()[1].get(), expr_str);
+                Explain(function_expression->arguments()[1].get(), expr_str, true);
+                if (consider_add_parentheses) {
+                    expr_str += ")";
+                }
                 break;
             }
 
