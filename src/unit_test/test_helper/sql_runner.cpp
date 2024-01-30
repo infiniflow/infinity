@@ -14,6 +14,7 @@
 
 module;
 
+#include <memory>
 import stl;
 import data_table;
 import logger;

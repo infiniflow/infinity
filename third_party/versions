@@ -1,5 +1,5 @@
 croaring v1.1.5
-cxxopts v3.0.0
+cli11 v2.3.2
 googletest v1.12.1
 magic_enum v0.8.1
 spdlog v1.10.0

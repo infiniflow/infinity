@@ -1,6 +1,4 @@
 add_compile_options(-Wno-everything)
-# Build cxxopts
-add_subdirectory(cxxopts)
 
 # Build doctest
 add_subdirectory(googletest)
