@@ -14,7 +14,7 @@
 
 import infinity
 from infinity.common import REMOTE_HOST
-
+import common_values
 
 class TestTable:
 
@@ -102,9 +102,193 @@ class TestTable:
 
         assert res.success
 
+    def test_table_with_different_column_name(self):
+        """
+        target: test create/drop/describe/get valid table name with different column names
+        methods:
+        1. create table
+        2. get table
+        3. list table
+        4. describe table
+        expect: all operations successfully
+
+        """
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        for column_name in common_values.invalid_name_array:
+            try:
+                tb = db_obj.create_table("my_table", {column_name: "int"}, None)
+                raise Exception(f"Can create column_name: {column_name}")
+            except Exception as e:
+                print(e)
+
+        # FIXME: res = db_obj.describe_table("my_table")
+
+        # list table
+        res = db_obj.list_tables()
+        assert res.success
+
+        # get table
+        # res = db_obj.get_table("my_table")
+        # assert res
+
+        # get table
+        try:
+            res = db_obj.get_table("my_table")
+        except Exception as e:
+            print(e)
+
+        # drop table
+        res = db_obj.drop_table("my_table")
+        assert res.success
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # create/drop/describe/get valid table name with different column types
+    def test_table_with_different_column_types(self):
+        """
+        target: test create/drop/describe/get valid table name with different column types
+        methods:
+        1. create table
+            - 'my_table'            √
+                - c1 bool primary key
+                - c2 int
+                - c3 int8
+                - c4 int16
+                - c5 int32
+                - c6 int64
+                - c7 int128
+                - c8 float
+                - c9 float32
+                - c10 double
+                - c11 float64
+                - c12 varchar
+                - c13 integer
+            - 'my_table'             ❌
+                - c1 int!@#
+             - 'my_table'            ❌
+                - c1 ''
+             - 'my_table'            ❌
+                - c1 123int
+             - 'my_table'            ❌
+                - c1 int-varchar
+             - 'my_table'            ❌
+                - c1 ['int']
+             - 'my_table'            ❌
+                - c1 {"int"}
+             - 'my_table'            ❌
+                - c1 ("int")
+        2. get table
+        3. list table
+        4. describe table
+        expect: all operations successfully
+
+        """
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # infinity
+        tb = db_obj.create_table(
+            "my_table", {"c1": "bool, primary key", "c2": "int", "c3": "int8", "c4": "int16",
+                         "c5": "int32", "c6": "int64", "c7": "int128", "c8": "float", "c9": "float32",
+                         "c10": "double", "c11": "float64", "c12": "varchar", "c13": "integer"}, None)
+        assert tb is not None
+
+        for tb_name in common_values.invalid_name_array:
+            try:
+                tb = db_obj.create_table("my_table", {"c1": tb_name}, None)
+                raise Exception(f"Can create tb: {tb_name}")
+            except Exception as e:
+                print(e)
+
+        # FIXME: res = db_obj.describe_table("my_table")
+
+        # list table
+        res = db_obj.list_tables()
+        assert res.success
+
+        # get table
+        res = db_obj.get_table("my_table")
+        assert res.output(["1.1"])
+
+        # get table
+        try:
+            res = db_obj.get_table("my_table")
+        except Exception as e:
+            print(e)
+
+        # drop table
+        res = db_obj.drop_table("my_table")
+        assert res.success
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # create/drop/describe/get table with 10000 columns with various column types.
+    def test_table_with_various_column_types(self):
+        """
+        target: create/drop/describe/get table with 10000 columns with various column types.
+        methods:
+
+        expect:
+
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+        c_count = 10000
+
+
+        type = [
+            "int","int8","int16","int32","int64","int128","float",
+            "float32","double","float64","varchar","integer","bool",
+        ]
+
+        # make params
+        params = {}
+        for i in range(c_count - 13):
+            params.update({
+                "c" + str(i): type[i % 13]
+            })
+
+        # create tb with 10000 columns with various column types
+        try:
+            tb = db_obj.create_table('my_table', params, None)
+        except Exception as e:
+            print(e)
+
+        # FIXME: res = db_obj.describe_table("my_table")
+
+        # list table
+        res = db_obj.list_tables()
+        assert res.success
+
+        # get table
+        try:
+            res = db_obj.get_table("my_table")
+            print(res.output(["c2"]))
+        except Exception as e:
+            print(e)
+
+        # drop table
+        res = db_obj.drop_table("my_table")
+        assert res.success
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
+
     # create/drop table with different invalid options
+    # def test_table_with_invalid_options(self):
+
     # create/drop/describe/get 1000 tables with 10000 columns with various column types.
 
     # after disconnection, create / drop / describe / list / get table
