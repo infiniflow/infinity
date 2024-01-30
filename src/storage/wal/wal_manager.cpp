@@ -617,7 +617,7 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
     auto [table_entry, table_status] =
         storage_->catalog()->DropTableByName(cmd.db_name_, cmd.table_name_, ConflictType::kIgnore, txn_id, commit_ts, storage_->txn_manager());
     if (!table_status.ok()) {
-        UnrecoverableError("Wal Replay: Drop table failed {}", table_status.message());
+        UnrecoverableError(fmt::format("Wal Replay: Drop table failed {}", table_status.message()));
     }
     table_entry->Commit(commit_ts);
 }
