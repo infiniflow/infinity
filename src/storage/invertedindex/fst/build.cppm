@@ -33,23 +33,23 @@ struct LastTransition {
 };
 
 struct BuilderNodeUnfinished {
-    UniquePtr<BuilderNode> node_;
+    BuilderNode node_;
     LastTransition last_;
 
     void LastCompiled(CompiledAddr addr) {
         if (last_.present_) {
-            node_->trans_.emplace_back(last_.inp_, last_.out_, addr);
+            node_.trans_.emplace_back(last_.inp_, last_.out_, addr);
             last_.present_ = false;
         }
     }
 
     void AddOutputPrefix(Output prefix) {
-        if (node_->is_final_) {
-            node_->final_output_ = prefix.Cat(node_->final_output_);
+        if (node_.is_final_) {
+            node_.final_output_ = prefix.Cat(node_.final_output_);
         }
-        SizeT ntrans = node_->trans_.size();
+        SizeT ntrans = node_.trans_.size();
         for (SizeT i = 0; i < ntrans; i++) {
-            Transition &t = node_->trans_[i];
+            Transition &t = node_.trans_[i];
             t.out_ = prefix.Cat(t.out_);
         }
         if (last_.present_)
@@ -68,35 +68,19 @@ struct UnfinishedNodes {
     SizeT Len() { return stack_.size(); }
 
     void PushEmpty(bool is_final) {
-        auto node = MakeUnique<BuilderNode>(is_final, Output::Zero(), Vector<Transition>{});
-        stack_.emplace_back(std::move(node), LastTransition());
-    }
-    UniquePtr<BuilderNode> PopRoot() {
-        assert(stack_.size() == 1);
-        return PopEmpty();
+        stack_.resize(stack_.size() + 1);
+        stack_.back().node_.is_final_ = is_final;
     }
 
-    UniquePtr<BuilderNode> PopFreeze(CompiledAddr addr) {
-        auto &unfinished = stack_.back();
-        unfinished.LastCompiled(addr);
-        UniquePtr<BuilderNode> node = std::move(unfinished.node_);
-        stack_.pop_back();
-        return node;
-    }
+    BuilderNode &TopNode() { return stack_.back().node_; }
 
-    UniquePtr<BuilderNode> PopEmpty() {
-        auto &unfinished = stack_.back();
-        assert(!unfinished.last_.present_);
-        UniquePtr<BuilderNode> node = std::move(unfinished.node_);
-        stack_.pop_back();
-        return node;
-    }
+    void Pop() { return stack_.pop_back(); }
 
     void SetRootOutput(Output out) {
         assert(stack_.size() >= 1);
         auto &unfinished = stack_[0];
-        unfinished.node_->is_final_ = true;
-        unfinished.node_->final_output_ = out;
+        unfinished.node_.is_final_ = true;
+        unfinished.node_.final_output_ = out;
     }
 
     void TopLastFreeze(CompiledAddr addr) {
@@ -111,8 +95,12 @@ struct UnfinishedNodes {
         auto &unfinished = stack_.back();
         assert(!unfinished.last_.present_);
         unfinished.last_ = LastTransition(bs_ptr[0], out);
+        SizeT len = Len();
+        stack_.resize(len + bs_len - 1);
         for (SizeT i = 1; i < bs_len; i++) {
-            stack_.emplace_back(MakeUnique<BuilderNode>(), LastTransition(bs_ptr[i], Output::Zero()));
+            LastTransition &t = stack_[len + i - 1].last_;
+            t.present_ = true;
+            t.inp_ = bs_ptr[i];
         }
         PushEmpty(true);
     }

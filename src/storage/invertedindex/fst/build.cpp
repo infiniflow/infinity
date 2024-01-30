@@ -26,8 +26,9 @@ namespace infinity {
 
 void FstBuilder::Finish() {
     CompileFrom(0);
-    UniquePtr<BuilderNode> root_node = unfinished_.PopRoot();
-    SizeT root_addr = Compile(*root_node);
+    BuilderNode &root_node = unfinished_.TopNode();
+    SizeT root_addr = Compile(root_node);
+    unfinished_.Pop();
     IoWriteU64LE(len_, wtr_);
     IoWriteU64LE(root_addr, wtr_);
     u32 sum = wtr_.MaskedChecksum();
@@ -63,14 +64,13 @@ void FstBuilder::CompileFrom(SizeT istate) {
     SizeT addr = NONE_ADDRESS;
     SizeT remained = unfinished_.Len() - (istate + 1);
     for (SizeT i = 0; i < remained; i++) {
-        if (addr == NONE_ADDRESS) {
-            UniquePtr<BuilderNode> node = unfinished_.PopEmpty();
-            addr = Compile(*node);
-        } else {
-            UniquePtr<BuilderNode> node = unfinished_.PopFreeze(addr);
-            addr = Compile(*node);
+        if (addr != NONE_ADDRESS) {
+            unfinished_.TopLastFreeze(addr);
         }
+        BuilderNode &node = unfinished_.TopNode();
+        addr = Compile(node);
         assert(addr != NONE_ADDRESS);
+        unfinished_.Pop();
     }
     unfinished_.TopLastFreeze(addr);
 }
