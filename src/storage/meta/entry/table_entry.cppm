@@ -88,13 +88,6 @@ private:
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr);
 
-    void CreateIndexFile(void *txn_store,
-                         TableIndexEntry *table_index_entry,
-                         TxnTimeStamp begin_ts,
-                         BufferManager *buffer_mgr,
-                         bool prepare,
-                         bool is_replay);
-
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }
@@ -120,8 +113,6 @@ private:
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
-    static SegmentEntry *GetSegmentByID(const TableEntry *table_entry, u32 seg_id);
-
 public:
     // Getter
 
@@ -129,7 +120,9 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
-    const BlockEntry *GetBlockEntryByID(SegmentID seg_id, BlockID block_id) const;
+    SegmentEntry *GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
+
+    const BlockEntry *GetBlockEntryByID(SegmentID seg_id, BlockID block_id, TxnTimeStamp ts) const;
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
@@ -143,7 +136,7 @@ public:
 
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
-    SharedPtr<BlockIndex> GetBlockIndex(TransactionID txn_id, TxnTimeStamp begin_ts);
+    SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
     void GetFullTextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,

@@ -17,18 +17,14 @@ module;
 export module catalog:segment_entry;
 
 import :block_entry;
-import :column_index_entry;
-import :segment_column_index_entry;
 import :base_entry;
 
 import stl;
 import default_values;
 import third_party;
 import buffer_manager;
-import index_base;
 import data_access_state;
 import parser;
-import index_file_worker;
 import infinity_exception;
 
 namespace infinity {
@@ -59,19 +55,12 @@ public:
                                                          TxnTimeStamp commit_ts,
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
-    static UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT segment_row_count, const IndexBase *index_base, const ColumnDef *column_def);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
     void MergeFrom(infinity::BaseEntry &other) override;
-
-    void WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
-                            bool prepare,
-                            ColumnID column_id,
-                            const IndexBase *index_base,
-                            SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry);
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -157,14 +146,6 @@ public:
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
 
 protected:
-    SharedPtr<SegmentColumnIndexEntry> CreateIndexFile(ColumnIndexEntry *column_index_entry,
-                                                       SharedPtr<ColumnDef> column_def,
-                                                       TxnTimeStamp create_ts,
-                                                       BufferManager *buffer_mgr,
-                                                       TxnTableStore *txn_store,
-                                                       bool prepare,
-                                                       bool is_replay);
-
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
@@ -184,7 +165,7 @@ protected:
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};              // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
     TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which prehibit delete in this SegmentEntry
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which deprecate this SegmentEntry

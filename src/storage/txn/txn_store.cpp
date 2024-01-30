@@ -90,13 +90,7 @@ TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id
     const String &index_name = *table_index_entry->index_def()->index_name_;
     if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
         TxnIndexStore *txn_index_store = &(column_index_iter->second);
-        if (auto segment_column_index_iter = txn_index_store->index_entry_map_.find(column_id);
-            segment_column_index_iter != txn_index_store->index_entry_map_.end()) {
-            segment_column_index_iter->second.emplace(segment_id, index);
-            column_index_iter->second.index_entry_map_[column_id].emplace(segment_id, index);
-        } else {
-            column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
-        }
+        column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
     } else {
         TxnIndexStore index_store(table_index_entry);
         index_store.index_entry_map_[column_id][segment_id] = index;

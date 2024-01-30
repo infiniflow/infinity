@@ -40,6 +40,11 @@ public:
         : TableRef(TableRefType::kTable, alias), table_entry_ptr_(table_entry_ptr), column_ids_(std::move(column_ids)),
           block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)), table_index_(table_index) {}
 
+    static BaseTableRef FakeTableRef(TableEntry *table_entry, TxnTimeStamp ts) {
+        SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(ts);
+        return BaseTableRef(table_entry, {}, block_index, "", 0, {}, {});
+    }
+
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
         replace_field<SizeT>(column_ids_, indices);
         replace_field<String>(*column_names_, indices);

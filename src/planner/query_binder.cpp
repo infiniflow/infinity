@@ -406,7 +406,7 @@ SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, con
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
-    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_id, begin_ts);
+    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, std::move(block_index), alias, table_index, names_ptr, types_ptr);

@@ -44,6 +44,7 @@ import bg_task;
 import backgroud_process;
 import compact_segments_task;
 import default_values;
+import base_table_ref;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
@@ -367,7 +368,6 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -622,12 +622,10 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             ColumnVector col0 = column0->GetColumnVector(buffer_manager);
             Value v0 = col0.GetValue(0);
-            DataType *col0_type = column0->column_type().get();
             EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
             ColumnVector col1 = column1->GetColumnVector(buffer_manager);
             Value v1 = col1.GetValue(0);
-            DataType *col1_type = column1->column_type().get();
             EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
             ColumnVector col2 = column2->GetColumnVector(buffer_manager);
@@ -813,7 +811,8 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            txn->CreateIndex(table_entry, index_def, conflict_type, prepare);
+            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+            txn->CreateIndex(&table_ref, index_def, conflict_type, prepare);
             txn_mgr->CommitTxn(txn);
         }
 
@@ -833,7 +832,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         {
             auto txn = txn_mgr->CreateTxn();
@@ -914,7 +912,8 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            txn->CreateIndex(table_entry, index_def, conflict_type, prepare);
+            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+            txn->CreateIndex(&table_ref, index_def, conflict_type, prepare);
             txn_mgr->CommitTxn(txn);
         }
 
@@ -934,7 +933,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         {
             auto txn = txn_mgr->CreateTxn();

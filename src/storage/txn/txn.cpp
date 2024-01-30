@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// phopyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import index_def;
 import catalog_delta_entry;
 import bg_task;
 import backgroud_process;
+import base_table_ref;
 
 namespace infinity {
 
@@ -295,7 +296,8 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare) {
+Status Txn::CreateIndex(BaseTableRef *table_ref, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare) {
+    auto *table_entry = table_ref->table_entry_ptr_;
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -304,25 +306,14 @@ Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &inde
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
-    if (!index_status.ok()) {
-        return index_status;
-    }
-
-    if (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore) {
+    if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
         return index_status;
     }
 
     txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
 
-    TxnTableStore *table_store{nullptr};
-    auto &&table_name = *table_entry->GetTableName();
-    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
-    }
-    table_store = txn_tables_store_[table_name].get();
-
     // Create Index Synchronously
-    NewCatalog::CreateIndexFile(table_entry, table_store, table_index_entry, begin_ts, GetBufferMgr(), prepare);
+    table_index_entry->CreateIndex(table_entry, table_ref->block_index_.get(), this, prepare, false);
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();
@@ -331,7 +322,9 @@ Status Txn::CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &inde
     return index_status;
 }
 
-Status Txn::CreateIndexDo(TableEntry *table_entry, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes) {
+Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
+    auto *table_entry = table_ref->table_entry_ptr_;
+
     auto *table_store = GetTxnTableStore(table_entry);
     auto iter = table_store->txn_indexes_store_.find(index_name);
     if (iter == table_store->txn_indexes_store_.end()) {

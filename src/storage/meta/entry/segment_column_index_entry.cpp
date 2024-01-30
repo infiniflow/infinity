@@ -36,6 +36,10 @@ import hnsw_alg;
 import lvq_store;
 import plain_store;
 import catalog_delta_entry;
+import column_vector;
+import annivfflat_index_data;
+import segment_iter;
+import secondary_index_data;
 
 namespace infinity {
 
@@ -43,23 +47,21 @@ SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_
     : BaseEntry(EntryType::kSegmentColumnIndex), column_index_entry_(column_index_entry), segment_id_(segment_id),
       vector_buffer_(std::move(vector_buffer)){};
 
-SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                                          SegmentID segment_id,
-                                                                          Txn *txn,
-                                                                          TxnTimeStamp create_ts,
-                                                                          BufferManager *buffer_manager,
-                                                                          CreateIndexParam *param) {
+SharedPtr<SegmentColumnIndexEntry>
+SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
+    auto *buffer_mgr = txn->GetBufferMgr();
+
     // FIXME: estimate index size.
     auto vector_file_worker = column_index_entry->CreateFileWorker(param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
-        vector_buffer[i] = buffer_manager->Allocate(std::move(vector_file_worker[i]));
+        vector_buffer[i] = buffer_mgr->Allocate(std::move(vector_file_worker[i]));
     };
     auto segment_column_index_entry =
         SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
-    segment_column_index_entry->min_ts_ = create_ts;
-    segment_column_index_entry->max_ts_ = create_ts;
     auto begin_ts = txn->BeginTS();
+    segment_column_index_entry->min_ts_ = begin_ts;
+    segment_column_index_entry->max_ts_ = begin_ts;
     segment_column_index_entry->begin_ts_ = begin_ts;
 
     {
@@ -120,7 +122,189 @@ BufferHandle SegmentColumnIndexEntry::GetIndex() { return vector_buffer_[0]->Loa
 
 BufferHandle SegmentColumnIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx]->Load(); }
 
-Status SegmentColumnIndexEntry::CreateIndexDo(IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
+Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
+                                                   ColumnID column_id,
+                                                   const ColumnDef *column_def,
+                                                   const SegmentEntry *segment_entry,
+                                                   Txn *txn,
+                                                   bool prepare) {
+    auto *buffer_mgr = txn->GetBufferMgr();
+    switch (index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                UnrecoverableError("AnnIVFFlat only supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+            SizeT dimension = embedding_info->Dimension();
+            BufferHandle buffer_handle = GetIndex();
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    auto annivfflat_index = reinterpret_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
+                    // TODO: How to select training data?
+                    Vector<f32> segment_column_data;
+                    segment_column_data.reserve(segment_entry->row_count() * dimension);
+                    for (const auto &block_entry : segment_entry->block_entries()) {
+                        BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+
+                        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                        auto *data_ptr = reinterpret_cast<float *>(column_vector.data());
+                        SizeT block_row_cnt = block_entry->row_count();
+                        segment_column_data.insert(segment_column_data.end(), data_ptr, data_ptr + block_row_cnt * dimension);
+                    }
+                    SizeT total_row_cnt = segment_column_data.size() / dimension;
+                    annivfflat_index->train_centroids(dimension, total_row_cnt, segment_column_data.data());
+                    annivfflat_index->insert_data(dimension, total_row_cnt, segment_column_data.data());
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                UnrecoverableError("HNSW supports embedding type.");
+            }
+            TypeInfo *type_info = column_def->type()->type_info().get();
+            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+
+            BufferHandle buffer_handle = GetIndex();
+
+            auto InsertHnsw = [&](auto &hnsw_index) {
+                u32 segment_offset = 0;
+                Vector<u64> row_ids;
+                for (const auto &block_entry : segment_entry->block_entries()) {
+                    SizeT block_row_cnt = block_entry->row_count();
+
+                    for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
+                        RowID row_id(this->segment_id_, segment_offset + block_offset);
+                        row_ids.push_back(row_id.ToUint64());
+                    }
+                    segment_offset += DEFAULT_BLOCK_CAPACITY;
+                }
+                OneColumnIterator<float> one_column_iter(segment_entry, column_id);
+                if (!prepare) {
+                    // Single thread insert
+                    hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
+                } else {
+                    // Multi thread insert data, write file in the physical create index finish stage.
+                    hnsw_index->StoreData(one_column_iter, row_ids.data(), row_ids.size());
+                }
+            };
+
+            switch (embedding_info->Type()) {
+                case kElemFloat: {
+                    switch (index_hnsw->encode_type_) {
+                        case HnswEncodeType::kPlain: {
+                            switch (index_hnsw->metric_type_) {
+                                case MetricType::kMerticInnerProduct: {
+                                    auto hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainIPDist<float>> *>(buffer_handle.GetDataMut());
+                                    InsertHnsw(hnsw_index);
+                                    break;
+                                }
+                                case MetricType::kMerticL2: {
+                                    auto hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainL2Dist<float>> *>(buffer_handle.GetDataMut());
+                                    InsertHnsw(hnsw_index);
+                                    break;
+                                }
+                                default: {
+                                    UnrecoverableError("Not implemented");
+                                }
+                            }
+                            break;
+                        }
+                        case HnswEncodeType::kLVQ: {
+                            switch (index_hnsw->metric_type_) {
+                                case MetricType::kMerticInnerProduct: {
+                                    // too long type. fix it.
+                                    auto hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQIPCache<float, i8>>, LVQIPDist<float, i8>> *>(
+                                            buffer_handle.GetDataMut());
+                                    InsertHnsw(hnsw_index);
+                                    break;
+                                }
+                                case MetricType::kMerticL2: {
+                                    auto hnsw_index =
+                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQL2Cache<float, i8>>, LVQL2Dist<float, i8>> *>(
+                                            buffer_handle.GetDataMut());
+                                    InsertHnsw(hnsw_index);
+                                    break;
+                                }
+                                default: {
+                                    UnrecoverableError("Not implemented");
+                                }
+                            }
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Not implemented");
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
+        case IndexType::kIRSFullText: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+        case IndexType::kSecondary: {
+            auto &data_type = column_def->type();
+            if (!(data_type->CanBuildSecondaryIndex())) {
+                UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+            }
+            // 1. build secondary index by merge sort
+            u32 input_block_max_row = DEFAULT_BLOCK_CAPACITY;
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), input_block_max_row, part_capacity);
+            for (const auto &block_entry : segment_entry->block_entries()) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
+                auto block_column_data_ptr = reinterpret_cast<const void *>(block_column_buffer_handle.GetData());
+                u32 block_row_cnt = block_entry->row_count();
+                secondary_index_builder->AppendColumnVector(block_column_data_ptr, block_row_cnt);
+            }
+            secondary_index_builder->StartOutput();
+            // 2. output into SecondaryIndexDataPart
+            {
+                u32 part_num = GetIndexPartNum();
+                for (u32 part_id = 1; part_id <= part_num; ++part_id) {
+                    BufferHandle buffer_handle_part = GetIndexPartAt(part_id);
+                    auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
+                    secondary_index_builder->OutputToPart(secondary_index_part);
+                }
+            }
+            // 3. output into SecondaryIndexDataHead
+            {
+                BufferHandle buffer_handle_head = GetIndex();
+                auto secondary_index_head = static_cast<SecondaryIndexDataHead *>(buffer_handle_head.GetDataMut());
+                secondary_index_builder->OutputToHeader(secondary_index_head);
+            }
+            secondary_index_builder->EndOutput();
+            break;
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+    return Status::OK();
+}
+
+Status SegmentColumnIndexEntry::CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
             auto InsertHnswDo = [&](auto *hnsw_index, atomic_u64 &create_index_idx) {
@@ -268,7 +452,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
     }
     u64 column_id = column_index_entry->column_id();
     UniquePtr<CreateIndexParam> create_index_param =
-        SegmentEntry::GetCreateIndexParam(segment_row_count, column_index_entry->index_base_ptr(), table_entry->GetColumnDefByID(column_id));
+        column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
     // TODO: need to get create index param;
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());

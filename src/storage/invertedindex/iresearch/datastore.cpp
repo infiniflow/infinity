@@ -231,7 +231,9 @@ IRSDataStore::IRSDataStore(const String &table_name, const String &directory) {
 
 IRSDataStore::~IRSDataStore() { StopSchedule(); }
 
-void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) { std::atomic_store_explicit(&snapshot_, std::move(snapshot), std::memory_order::release); }
+void IRSDataStore::StoreSnapshot(DataSnapshotPtr snapshot) {
+    std::atomic_store_explicit(&snapshot_, std::move(snapshot), std::memory_order::release);
+}
 
 IRSDataStore::DataSnapshotPtr IRSDataStore::LoadSnapshot() const { return std::atomic_load_explicit(&snapshot_, std::memory_order::acquire); }
 
@@ -280,7 +282,7 @@ void IRSDataStore::StopSchedule() {
     maintenance_state_->cancel_.store(true, std::memory_order::release);
 }
 
-void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_def, const SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
 
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
     constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};

@@ -42,12 +42,8 @@ export class SegmentColumnIndexEntry : public BaseEntry {
     friend ColumnIndexEntry;
 
 public:
-    static SharedPtr<SegmentColumnIndexEntry> NewIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                            SegmentID segment_id,
-                                                            Txn *txn,
-                                                            TxnTimeStamp create_ts,
-                                                            BufferManager *buffer_manager,
-                                                            CreateIndexParam *create_index_param);
+    static SharedPtr<SegmentColumnIndexEntry>
+    NewIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *create_index_param);
 
     static SharedPtr<SegmentColumnIndexEntry> NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
                                                                          TableEntry *table_entry,
@@ -92,7 +88,14 @@ private:
     static UniquePtr<SegmentColumnIndexEntry>
     LoadIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
 
-    Status CreateIndexDo(IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx);
+    Status CreateIndexPrepare(const IndexBase *index_base,
+                              ColumnID column_id,
+                              const ColumnDef *column_def,
+                              const SegmentEntry *segment_entry,
+                              Txn *txn,
+                              bool prepare);
+
+    Status CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx);
 
 private:
     const ColumnIndexEntry *column_index_entry_{};

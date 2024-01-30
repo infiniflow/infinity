@@ -14,6 +14,7 @@
 
 module;
 
+#include <stdexcept>
 #include <string>
 
 module catalog;
@@ -249,43 +250,6 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
     }
 }
 
-void TableEntry::CreateIndexFile(void *txn_store,
-                                 TableIndexEntry *table_index_entry,
-                                 TxnTimeStamp begin_ts,
-                                 BufferManager *buffer_mgr,
-                                 bool prepare,
-                                 bool is_replay) {
-    IrsIndexEntry *irs_index_entry = table_index_entry->irs_index_entry().get();
-    if (irs_index_entry != nullptr) {
-
-        for (const auto &[_segment_id, segment_entry] : this->segment_map_) {
-            irs_index_entry->irs_index_->BatchInsert(this, table_index_entry->index_def(), segment_entry.get(), buffer_mgr);
-        }
-        irs_index_entry->irs_index_->Commit();
-        irs_index_entry->irs_index_->StopSchedule();
-    }
-    auto txn_store_ptr = static_cast<TxnTableStore *>(txn_store);
-    for (const auto &base_index_pair : table_index_entry->column_index_map_) {
-        u64 column_id = base_index_pair.first;
-        BaseEntry *base_entry = base_index_pair.second.get();
-        if (base_entry->entry_type_ == EntryType::kColumnIndex) {
-            ColumnIndexEntry *column_index_entry = (ColumnIndexEntry *)(base_entry);
-            SharedPtr<ColumnDef> column_def = this->columns_[column_id];
-            for (const auto &[segment_id, segment_entry] : this->segment_map_) {
-                // TODO: Check the segment min/max_row_ts
-                SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
-                    segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr, prepare, is_replay);
-
-                column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
-            }
-        } else if (base_entry->entry_type_ == EntryType::kIRSIndex) {
-            continue;
-        } else {
-            UnrecoverableError("Invalid entry type");
-        }
-    }
-}
-
 void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
@@ -303,7 +267,7 @@ void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
 Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         SegmentID segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
+        SegmentEntry *segment_entry = GetSegmentByID(segment_id, commit_ts);
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
@@ -339,7 +303,7 @@ void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, cons
     SizeT row_count = 0;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment = TableEntry::GetSegmentByID(this, segment_id);
+        SegmentEntry *segment = GetSegmentByID(segment_id, commit_ts);
         if (segment == nullptr) {
             UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
@@ -403,17 +367,22 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     return Status::OK();
 }
 
-SegmentEntry *TableEntry::GetSegmentByID(const TableEntry *table_entry, u32 segment_id) {
-    auto iter = table_entry->segment_map_.find(segment_id);
-    if (iter != table_entry->segment_map_.end()) {
-        return iter->second.get();
-    } else {
+SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
+    try {
+        auto *segment = segment_map_.at(segment_id).get();
+        if (// TODO: read deprecate segment is allowed
+            // segment->deprecate_ts() < ts ||
+            segment->min_row_ts() > ts) {
+            return nullptr;
+        }
+        return segment;
+    } catch (const std::out_of_range &e) {
         return nullptr;
     }
 }
 
-const BlockEntry *TableEntry::GetBlockEntryByID(u32 seg_id, u16 block_id) const {
-    SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, seg_id);
+const BlockEntry *TableEntry::GetBlockEntryByID(SegmentID seg_id, BlockID block_id, TxnTimeStamp ts) const {
+    SegmentEntry *segment_entry = GetSegmentByID(seg_id, ts);
     if (segment_entry == nullptr) {
         UnrecoverableError(fmt::format("Cannot find segment, segment id: {}", seg_id));
     }
@@ -439,7 +408,7 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
 
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
 
-SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
+SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);

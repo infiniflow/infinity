@@ -56,6 +56,7 @@ struct WalEntry;
 struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
+class BaseTableRef;
 
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
@@ -108,9 +109,9 @@ public:
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
-    Status CreateIndex(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare);
+    Status CreateIndex(BaseTableRef *table_ref, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type, bool prepare);
 
-    Status CreateIndexDo(TableEntry *table_entry, const String &index_name, HashMap<u32, atomic_u64> &create_index_idxes);
+    Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
     // write wal
     Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &indef);
@@ -155,6 +156,7 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
+    // Create txn store if not exists
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);

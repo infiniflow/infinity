@@ -117,7 +117,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
         u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-        const BlockEntry *block_entry = base_table_ref_->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
+        const BlockEntry *block_entry = base_table_ref_->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id, begin_ts);
 
         SizeT column_id = 0;
         for (; column_id < column_n; ++column_id) {

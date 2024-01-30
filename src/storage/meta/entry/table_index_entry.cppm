@@ -33,6 +33,7 @@ class Txn;
 class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
+class BaseTableRef;
 
 struct TableIndexEntry : public BaseEntry {
 
@@ -80,7 +81,9 @@ public:
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
 
-    Status CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes);
+    Status CreateIndex(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay);
+
+    Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);

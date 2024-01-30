@@ -27,33 +27,16 @@ import default_values;
 import data_block;
 import txn;
 import data_access_state;
-import index_def;
 
 import infinity_exception;
 import defer_op;
-import index_ivfflat;
-import index_hnsw;
 import buffer_handle;
-import annivfflat_index_data;
-import annivfflat_index_file_worker;
-import secondary_index_data;
-import index_file_worker;
-import hnsw_file_worker;
-import secondary_index_file_worker;
 import logger;
 import local_file_system;
 import random;
 import parser;
 import txn_store;
-import index_base;
 
-import hnsw_common;
-import dist_func_l2;
-import dist_func_ip;
-import hnsw_alg;
-import lvq_store;
-import plain_store;
-import segment_iter;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
@@ -233,206 +216,6 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
     }
 }
 
-void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
-                                      bool prepare,
-                                      u64 column_id,
-                                      const IndexBase *index_base,
-                                      SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry) {
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                UnrecoverableError("AnnIVFFlat only supports embedding type.");
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-            SizeT dimension = embedding_info->Dimension();
-            BufferHandle buffer_handle = segment_column_index_entry->GetIndex();
-            switch (embedding_info->Type()) {
-                case kElemFloat: {
-                    auto annivfflat_index = static_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
-                    // TODO: How to select training data?
-                    Vector<f32> segment_column_data;
-                    segment_column_data.reserve(this->row_count_ * dimension);
-                    for (const auto &block_entry : this->block_entries_) {
-                        BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                        BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
-                        auto block_column_data_ptr = reinterpret_cast<const float *>(block_column_buffer_handle.GetData());
-                        SizeT block_row_cnt = block_entry->row_count();
-                        segment_column_data.insert(segment_column_data.end(),
-                                                   block_column_data_ptr,
-                                                   block_column_data_ptr + block_row_cnt * dimension);
-                    }
-                    SizeT total_row_cnt = segment_column_data.size() / dimension;
-                    annivfflat_index->train_centroids(dimension, total_row_cnt, segment_column_data.data());
-                    annivfflat_index->insert_data(dimension, total_row_cnt, segment_column_data.data());
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Not implemented");
-                }
-            }
-            break;
-        }
-        case IndexType::kHnsw: {
-            auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                UnrecoverableError("HNSW supports embedding type.");
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-
-            BufferHandle buffer_handle = segment_column_index_entry->GetIndex();
-
-            auto InsertHnsw = [&](auto &hnsw_index) {
-                u32 segment_offset = 0;
-                Vector<u64> row_ids;
-                for (const auto &block_entry : this->block_entries_) {
-                    SizeT block_row_cnt = block_entry->row_count();
-
-                    for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
-                        RowID row_id(this->segment_id_, segment_offset + block_offset);
-                        row_ids.push_back(row_id.ToUint64());
-                    }
-                    segment_offset += DEFAULT_BLOCK_CAPACITY;
-                }
-                OneColumnIterator<float> one_column_iter(this, column_id);
-                if (!prepare) {
-                    // Single thread insert
-                    hnsw_index->InsertVecs(one_column_iter, row_ids.data(), row_ids.size());
-                } else {
-                    // Multi thread insert data, write file in the physical create index finish stage.
-                    hnsw_index->StoreData(one_column_iter, row_ids.data(), row_ids.size());
-                }
-            };
-
-            switch (embedding_info->Type()) {
-                case kElemFloat: {
-                    switch (index_hnsw->encode_type_) {
-                        case HnswEncodeType::kPlain: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    auto hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainIPDist<float>> *>(buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainL2Dist<float>> *>(buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                default: {
-                                    UnrecoverableError("Not implemented");
-                                }
-                            }
-                            break;
-                        }
-                        case HnswEncodeType::kLVQ: {
-                            switch (index_hnsw->metric_type_) {
-                                case MetricType::kMerticInnerProduct: {
-                                    // too long type. fix it.
-                                    auto hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQIPCache<float, i8>>, LVQIPDist<float, i8>> *>(
-                                            buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                case MetricType::kMerticL2: {
-                                    auto hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQL2Cache<float, i8>>, LVQL2Dist<float, i8>> *>(
-                                            buffer_handle.GetDataMut());
-                                    InsertHnsw(hnsw_index);
-                                    break;
-                                }
-                                default: {
-                                    UnrecoverableError("Not implemented");
-                                }
-                            }
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Not implemented");
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Not implemented");
-                }
-            }
-            break;
-        }
-        case IndexType::kIRSFullText: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-        case IndexType::kSecondary: {
-            auto &data_type = column_def->type();
-            if (!(data_type->CanBuildSecondaryIndex())) {
-                UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
-            }
-            // 1. build secondary index by merge sort
-            u32 input_block_max_row = DEFAULT_BLOCK_CAPACITY;
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, this->row_count_, input_block_max_row, part_capacity);
-            for (const auto &block_entry : this->block_entries_) {
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
-                auto block_column_data_ptr = reinterpret_cast<const void *>(block_column_buffer_handle.GetData());
-                u32 block_row_cnt = block_entry->row_count();
-                secondary_index_builder->AppendColumnVector(block_column_data_ptr, block_row_cnt);
-            }
-            secondary_index_builder->StartOutput();
-            // 2. output into SecondaryIndexDataPart
-            {
-                u32 part_num = segment_column_index_entry->GetIndexPartNum();
-                for (u32 part_id = 1; part_id <= part_num; ++part_id) {
-                    BufferHandle buffer_handle_part = segment_column_index_entry->GetIndexPartAt(part_id);
-                    auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
-                    secondary_index_builder->OutputToPart(secondary_index_part);
-                }
-            }
-            // 3. output into SecondaryIndexDataHead
-            {
-                BufferHandle buffer_handle_head = segment_column_index_entry->GetIndex();
-                auto secondary_index_head = static_cast<SecondaryIndexDataHead *>(buffer_handle_head.GetDataMut());
-                secondary_index_builder->OutputToHeader(secondary_index_head);
-            }
-            secondary_index_builder->EndOutput();
-            break;
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-    }
-}
-
-SharedPtr<SegmentColumnIndexEntry> SegmentEntry::CreateIndexFile(ColumnIndexEntry *column_index_entry,
-                                                                 SharedPtr<ColumnDef> column_def,
-                                                                 TxnTimeStamp create_ts,
-                                                                 BufferManager *buffer_mgr,
-                                                                 TxnTableStore *txn_store,
-                                                                 bool prepare,
-                                                                 bool is_replay) {
-    Txn *txn = txn_store->txn_;
-    u64 column_id = column_def->id();
-    const IndexBase *index_base = column_index_entry->index_base_ptr();
-    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(this->row_count_, index_base, column_def.get());
-    auto segment_column_index_entry =
-        SegmentColumnIndexEntry::NewIndexEntry(column_index_entry, this->segment_id_, txn, create_ts, buffer_mgr, create_index_param.get());
-    if (!is_replay) {
-        WriteIndexToMemory(column_def, prepare, column_id, index_base, segment_column_index_entry);
-    }
-    txn_store->CreateIndexFile(column_index_entry->table_index_entry(), column_id, this->segment_id_, segment_column_index_entry);
-    return segment_column_index_entry;
-}
-
 void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
     SharedPtr<BlockEntry> block_entry;
     {
@@ -465,7 +248,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
     }
 }
 
-BlockEntry *SegmentEntry::GetBlockEntryByID(u16 block_id) const {
+BlockEntry *SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     if (block_id < block_entries_.size()) {
         return block_entries_[block_id].get();
     } else {
@@ -616,32 +399,6 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     //         this->index_entry_map_[index_name]->MergeFrom(*index_entry);
     //     }
     // }
-}
-
-UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_count, const IndexBase *index_base, const ColumnDef *column_def) {
-    switch (index_base->index_type_) {
-        case IndexType::kIVFFlat: {
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
-        }
-        case IndexType::kHnsw: {
-            SizeT max_element = seg_row_count;
-            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
-        }
-        case IndexType::kIRSFullText: {
-            return MakeUnique<CreateFullTextParam>(index_base, column_def);
-        }
-        case IndexType::kSecondary: {
-            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
-        }
-        default: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
-        }
-    }
-    return nullptr;
 }
 
 } // namespace infinity
