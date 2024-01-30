@@ -14,7 +14,7 @@
 
 module;
 
-#include <functional>
+export module ann_ivf_flat;
 
 import stl;
 import knn_distance;
@@ -27,8 +27,6 @@ import vector_distance;
 import search_top_k;
 import knn_result_handler;
 import bitmask;
-
-export module ann_ivf_flat;
 
 namespace infinity {
 

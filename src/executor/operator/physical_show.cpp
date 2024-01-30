@@ -753,7 +753,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         }
     } else {
         for (auto &[_, segment] : table_entry->segment_map()) {
-            auto dir_path = segment->DirPath();
+            const auto &dir_path = segment->segment_dir();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
@@ -1413,6 +1413,10 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                     case IndexType::kIRSFullText: {
                         const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
                         other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
+                        break;
+                    }
+                    case IndexType::kSecondary: {
+                        // there is no other_parameters
                         break;
                     }
                     case IndexType::kInvalid: {

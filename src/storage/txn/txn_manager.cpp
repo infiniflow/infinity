@@ -56,7 +56,7 @@ Txn *TxnManager::CreateTxn() {
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
     rw_locker_.lock_shared();
-    Txn *res = txn_map_[txn_id].get();
+    Txn *res = txn_map_.at(txn_id).get();
     rw_locker_.unlock_shared();
     return res;
 }
@@ -75,7 +75,7 @@ u64 TxnManager::GetNewTxnID() {
 
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
-    TxnTimeStamp ts = start_ts_++;
+    TxnTimeStamp ts = ++start_ts_;
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }

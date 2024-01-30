@@ -104,10 +104,13 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
     return append_status;
 }
 
-Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
+Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
     auto [table_entry, status] = GetTableEntry(db_name, table_name);
     if (!status.ok()) {
         return status;
+    }
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
+        RecoverableError(Status::TxnRollback(TxnID()));
     }
 
     TxnTableStore *table_store{nullptr};
@@ -119,6 +122,22 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
     return delete_status;
+}
+
+Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
+    auto [table_entry, status] = GetTableEntry(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    TxnTableStore *table_store{nullptr};
+    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
+        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
+    }
+    table_store = txn_tables_store_[table_name].get();
+
+    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data));
+    return compact_status;
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
@@ -409,7 +428,11 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented"};
 }
 
-void Txn::Begin() { txn_context_.BeginCommit(txn_mgr_->GetTimestamp()); }
+void Txn::Begin() {
+    TxnTimeStamp ts = txn_mgr_->GetTimestamp();
+    LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+    txn_context_.BeginCommit(ts);
+}
 
 TxnTimeStamp Txn::Commit() {
     TxnTimeStamp commit_ts = txn_mgr_->GetTimestamp(true);
@@ -472,16 +495,15 @@ void Txn::CommitBottom() {
         table_index_entry->Commit(commit_ts);
     }
 
-    // Snapshot the physical operations in one txn
-    local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
-
+    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+        // Snapshot the physical operations in one txn
+        local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
         auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
     }
 
-    LOG_INFO(fmt::format("Txn: {} is committed.", txn_id_));
+    LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);
@@ -538,8 +560,32 @@ void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
 }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
-    String catalog_path = catalog_->SaveAsFile(dir_name, max_commit_ts, is_full_checkpoint);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path));
+    if (is_full_checkpoint) {
+        FullCheckpoint(max_commit_ts);
+    } else {
+        DeltaCheckpoint(max_commit_ts);
+    }
 }
+
+// Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
+void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
+    LOG_INFO("DELTA CKPT");
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
+    // only save the catalog delta entry
+    catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, false);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
+}
+
+void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
+    LOG_INFO("FULL CKPT");
+    String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
+    String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.FULL.{}", dir_name, max_commit_ts));
+    String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));
+
+    catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, true);
+    catalog_->SaveAsFile(catalog_path, max_commit_ts);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, catalog_path));
+}
+
 } // namespace infinity

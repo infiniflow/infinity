@@ -438,7 +438,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
-    if (type_info->type() != TypeInfoType::kEmbedding) {
+    if (type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
         RecoverableError(Status::SyntaxError("Expect the column search is an embedding column"));
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;

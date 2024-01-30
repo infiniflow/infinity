@@ -30,6 +30,9 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kIRSFullText: {
             return "FULLTEXT";
         }
+        case IndexType::kSecondary: {
+            return "SECONDARY";
+        }
         case IndexType::kInvalid: {
             ParserError("Invalid conflict type.");
         }
@@ -37,13 +40,15 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
     return {};
 }
 
-IndexType IndexInfo::StringToIndexType(const std::string& index_type_str) {
+IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
     if (index_type_str == "IVFFlat") {
         return IndexType::kIVFFlat;
     } else if (index_type_str == "HNSW") {
         return IndexType::kHnsw;
     } else if (index_type_str == "FULLTEXT") {
         return IndexType::kIRSFullText;
+    } else if (index_type_str == "SECONDARY") {
+        return IndexType::kSecondary;
     } else {
         return IndexType::kInvalid;
     }

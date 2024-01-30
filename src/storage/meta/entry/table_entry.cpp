@@ -72,6 +72,25 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entr
     return table_entry;
 }
 
+SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
+                                                      SharedPtr<String> db_entry_dir,
+                                                      SharedPtr<String> table_name,
+                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                      TableEntryType table_entry_type,
+                                                      TransactionID txn_id,
+                                                      TxnTimeStamp begin_ts,
+                                                      TxnTimeStamp commit_ts,
+                                                      bool is_delete,
+                                                      SizeT row_count) {
+    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
+    table_entry->deleted_ = is_delete;
+    // TODO need to check if commit_ts influence replay catalog delta entry
+    table_entry->commit_ts_.store(commit_ts);
+    table_entry->row_count_.store(row_count);
+
+    return table_entry;
+}
+
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
@@ -97,9 +116,9 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
 
-        {   //
+        { //
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddIndexMetaOperation>(new_table_index_meta.get());
+                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
@@ -253,6 +272,7 @@ void TableEntry::CreateIndexFile(void *txn_store,
             ColumnIndexEntry *column_index_entry = (ColumnIndexEntry *)(base_entry);
             SharedPtr<ColumnDef> column_def = this->columns_[column_id];
             for (const auto &[segment_id, segment_entry] : this->segment_map_) {
+                // TODO: Check the segment min/max_row_ts
                 SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
                     segment_entry->CreateIndexFile(column_index_entry, column_def, begin_ts, buffer_mgr, txn_store_ptr, prepare, is_replay);
 
@@ -282,13 +302,13 @@ void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
 
 Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
-        u32 segment_id = to_delete_seg_rows.first;
+        SegmentID segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = TableEntry::GetSegmentByID(this, segment_id);
         if (segment_entry == nullptr) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
-        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
     }
     return Status::OK();
@@ -323,7 +343,7 @@ void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         if (segment == nullptr) {
             UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
-        const HashMap<u16, Vector<RowID>> &block_row_hashmap = to_delete_seg_rows.second;
+        const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
         segment->CommitDelete(txn_id, commit_ts, block_row_hashmap);
         row_count += block_row_hashmap.size();
     }
@@ -335,6 +355,27 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
     return Status::OK();
 }
 
+Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+        std::unique_lock lock(this->rw_locker_);
+        for (const auto &old_segment : old_segments) {
+            old_segment->SetDeprecated(commit_ts);
+        }
+        segment_map_.emplace(new_segment->segment_id(), new_segment);
+    }
+    return Status::OK();
+}
+
+Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+        std::unique_lock lock(this->rw_locker_);
+        for (const auto &old_segment : old_segments) {
+            old_segment->RollbackCompact();
+        }
+    }
+    return Status::OK();
+}
+
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
@@ -342,7 +383,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     }
 
     segment->min_row_ts_ = commit_ts;
-    segment->max_row_ts_ = commit_ts;
+    // FIXME: max_row_ts is set when the segment is deprecated
 
     SizeT row_count = 0;
     for (auto &block_entry : segment->block_entries_) {
@@ -393,11 +434,6 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     }
 }
 
-// DBEntry *TableEntry::GetDBEntry(const TableEntry *table_entry) {
-//     TableMeta *table_meta = (TableMeta *)table_entry->table_meta_;
-//     return (DBEntry *)table_meta->db_entry_;
-// }
-
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
 
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
@@ -406,6 +442,7 @@ SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
     std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     result->Reserve(this->segment_map_.size());
 
+    // Add segment that is not deprecated
     for (const auto &segment_pair : this->segment_map_) {
         result->Insert(segment_pair.second.get(), begin_ts);
     }
@@ -446,9 +483,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
-            //            if(segment_entry->commit_ts_ <= max_commit_ts) {
             segment_candidates.emplace_back(segment_entry.get());
-            //            }
         }
 
         table_index_meta_candidates.reserve(this->index_meta_map_.size());
@@ -603,6 +638,19 @@ void TableEntry::MergeFrom(BaseEntry &other) {
             it->second->MergeFrom(*table_index_meta.get());
         }
     }
+}
+
+bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *delete_txn) {
+    HashMap<SegmentID, Vector<SegmentOffset>> delete_row_map;
+    for (const auto row_id : delete_row_ids) {
+        delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
+    }
+    Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> check_segments;
+    for (const auto &[segment_id, segment_offsets] : delete_row_map) {
+        check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
+    }
+
+    return SegmentEntry::CheckDeleteConflict(std::move(check_segments), delete_txn);
 }
 
 } // namespace infinity

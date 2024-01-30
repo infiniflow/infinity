@@ -25,10 +25,12 @@ class MemoryPoolAllocator;
 }
 
 namespace infinity {
+class Indexer;
 export class ColumnIndexer {
 public:
     using TermKey = String;
-    using PostingPtr = MemoryPosting<false> *;
+    // using PostingPtr = MemoryPosting<false> *;
+    using PostingPtr = PostingWriter *;
     using RTPostingPtr = MemoryPosting<true> *;
     using PostingTable = Btree<TermKey, PostingPtr>;
     using RTPostingTable = Btree<TermKey, RTPostingPtr>;
@@ -44,7 +46,11 @@ public:
         OFFLINE,
     };
 
-    ColumnIndexer(u64 column_id, const InvertedIndexConfig &index_config, SharedPtr<MemoryPool> byte_slice_pool, SharedPtr<RecyclePool> buffer_pool);
+    ColumnIndexer(Indexer *indexer,
+                  u64 column_id,
+                  const InvertedIndexConfig &index_config,
+                  SharedPtr<MemoryPool> byte_slice_pool,
+                  SharedPtr<RecyclePool> buffer_pool);
 
     ~ColumnIndexer();
 
@@ -57,6 +63,12 @@ public:
     void Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
     void Commit();
+
+    void Flush();
+
+    bool NeedDump();
+
+    void Dump();
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
@@ -78,6 +90,7 @@ private:
     void SwitchActiveInverter();
 
 private:
+    Indexer *indexer_{nullptr};
     IndexMode index_mode_{NEAR_REAL_TIME};
     u64 column_id_;
     InvertedIndexConfig index_config_;

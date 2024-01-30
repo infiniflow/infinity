@@ -23,11 +23,14 @@ import stl;
 import parser;
 import infinity_exception;
 import catalog;
+import serialize;
 import third_party;
+import table_entry_type;
+import index_base;
 
 namespace infinity {
 
-export enum class CatalogDeltaOperationType : i8 {
+export enum class CatalogDeltaOpType : i8 {
     INVALID = 0,
     // -----------------------------
     // Meta
@@ -57,17 +60,39 @@ export enum class CatalogDeltaOperationType : i8 {
 export class CatalogDeltaOperation {
 public:
     CatalogDeltaOperation() = default;
-    CatalogDeltaOperation(CatalogDeltaOperationType type) : type_(type) {}
-    CatalogDeltaOperation(TxnTimeStamp begin_ts, bool is_delete) : begin_ts_(begin_ts), is_delete_(is_delete) {}
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type, TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts)
+        : begin_ts_(begin_ts), txn_id_(txn_id), commit_ts_(commit_ts), is_delete_(is_delete), type_(type) {}
     virtual ~CatalogDeltaOperation() = default;
-    virtual CatalogDeltaOperationType GetType() const = 0;
+    virtual CatalogDeltaOpType GetType() const = 0;
+    virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
     virtual void WriteAdv(char *&ptr) const = 0;
     static UniquePtr<CatalogDeltaOperation> ReadAdv(char *&ptr, i32 max_bytes);
-    SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(bool); }
+    SizeT GetBaseSizeInBytes() const { return sizeof(TxnTimeStamp) + sizeof(bool) + sizeof(TransactionID) + sizeof(TxnTimeStamp); }
+    void WriteAdvBase(char *&buf) const {
+        WriteBufAdv(buf, this->type_);
+        WriteBufAdv(buf, this->begin_ts_);
+        WriteBufAdv(buf, this->is_delete_);
+        WriteBufAdv(buf, this->txn_id_);
+        WriteBufAdv(buf, this->commit_ts_);
+    }
+    static Tuple<TxnTimeStamp, bool, TransactionID, TxnTimeStamp> ReadAdvBase(char *&ptr) {
+        TxnTimeStamp begin_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+        bool is_delete = ReadBufAdv<bool>(ptr);
+        TransactionID txn_id = ReadBufAdv<TransactionID>(ptr);
+        TxnTimeStamp commit_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+        return {begin_ts, is_delete, txn_id, commit_ts};
+    }
+
     virtual void SaveSate() = 0;
     virtual const String ToString() const = 0;
     virtual const String EncodeIndex() const = 0;
+
+    TxnTimeStamp begin_ts() { return begin_ts_; }
+    TransactionID txn_id() { return txn_id_; }
+    TxnTimeStamp commit_ts() { return commit_ts_; }
+    bool is_delete() { return is_delete_; }
 
 public:
     TxnTimeStamp begin_ts_{0};
@@ -75,27 +100,34 @@ public:
     TxnTimeStamp commit_ts_{0};
     bool is_delete_{false};
 
-    bool is_flushed_{false};
-    bool is_snapshotted_{false};
-    CatalogDeltaOperationType type_{CatalogDeltaOperationType::INVALID};
+public:
+    bool is_saved_sate_{false};
+    CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
 };
 
-/// class AddDBMetaOperation
-export class AddDBMetaOperation : public CatalogDeltaOperation {
+/// class AddDBMetaOp
+export class AddDBMetaOp : public CatalogDeltaOperation {
 public:
-    explicit AddDBMetaOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String data_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), data_dir_(std::move(data_dir)) {}
-    explicit AddDBMetaOperation(DBMeta *db_meta) : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_DATABASE_META), db_meta_(db_meta) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_DATABASE_META; }
+    explicit AddDBMetaOp(TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts, String db_name, String data_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_META, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          data_dir_(std::move(data_dir)) {}
+    explicit AddDBMetaOp(DBMeta *db_meta, TxnTimeStamp begin_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_META, begin_ts, false, 0, 0), db_meta_(db_meta) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_DATABASE_META; }
+    String GetTypeStr() const final { return "ADD_DATABASE_META"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size =
-            sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->data_dir_.size() + GetBaseSizeInBytes();
+            sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->data_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_DATABASE_META"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}", i32(GetType()), this->db_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}", i32(GetType()), txn_id_, this->db_name_)); }
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &data_dir() const { return data_dir_; }
 
 public:
     DBMeta *db_meta_{};
@@ -105,23 +137,36 @@ private:
     String data_dir_{};
 };
 
-/// class AddTableMetaOperation
-export class AddTableMetaOperation : public CatalogDeltaOperation {
+/// class AddTableMetaOp
+export class AddTableMetaOp : public CatalogDeltaOperation {
 public:
-    explicit AddTableMetaOperation(TxnTimeStamp begin_ts, bool is_delete, String table_name, String db_entry_dir_)
-        : CatalogDeltaOperation(begin_ts, is_delete), table_name_(std::move(table_name)), db_entry_dir_(std::move(db_entry_dir_)) {}
-    explicit AddTableMetaOperation(TableMeta *table_meta)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_META), table_meta_(table_meta) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_META; }
+    explicit AddTableMetaOp(TxnTimeStamp begin_ts,
+                            bool is_delete,
+                            TransactionID txn_id,
+                            TxnTimeStamp commit_ts,
+                            String db_name,
+                            String table_name,
+                            String db_entry_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_META, begin_ts, is_delete, txn_id, commit_ts), db_name_(db_name),
+          table_name_(std::move(table_name)), db_entry_dir_(std::move(db_entry_dir)) {}
+    explicit AddTableMetaOp(TableMeta *table_meta, TxnTimeStamp begin_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_META, begin_ts, false, 0, 0), table_meta_(table_meta) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_META; }
+    String GetTypeStr() const final { return "ADD_TABLE_META"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->table_name_.size() + sizeof(i32) + this->db_entry_dir_.size() +
-                          GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes() + sizeof(i32) + this->db_name_.size() + sizeof(i32) +
+                          this->table_name_.size() + sizeof(i32) + this->db_entry_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_TABLE_META"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}", i32(GetType()), db_name_, table_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_)); }
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &db_entry_dir() const { return db_entry_dir_; }
 
 public:
     TableMeta *table_meta_{};
@@ -132,23 +177,29 @@ private:
     String db_entry_dir_{};
 };
 
-/// class AddDBEntryOperation
-export class AddDBEntryOperation : public CatalogDeltaOperation {
+/// class AddDBEntryOp
+export class AddDBEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddDBEntryOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String db_entry_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), db_entry_dir_(std::move(db_entry_dir)) {}
-    explicit AddDBEntryOperation(SharedPtr<DBEntry> db_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_DATABASE_ENTRY), db_entry_(db_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_DATABASE_ENTRY; }
+    explicit AddDBEntryOp(TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts, String db_name, String db_entry_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          db_entry_dir_(std::move(db_entry_dir)) {}
+    explicit AddDBEntryOp(SharedPtr<DBEntry> db_entry) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY), db_entry_(db_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_DATABASE_ENTRY; }
+    String GetTypeStr() const final { return "ADD_DATABASE_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_entry_dir_.size() +
-                          sizeof(bool) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += +sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->db_entry_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_DATABASE_ENTRY"; };
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}", i32(GetType()), is_delete_, db_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, db_name_)); }
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &data_dir() const { return db_entry_dir_; }
 
 public:
     SharedPtr<DBEntry> db_entry_{};
@@ -158,24 +209,70 @@ private:
     String db_entry_dir_{};
 };
 
-/// class AddTableEntryOperation
-export class AddTableEntryOperation : public CatalogDeltaOperation {
+/// class AddTableEntryOp
+export class AddTableEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddTableEntryOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, String table_entry_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          table_entry_dir_(std::move(table_entry_dir)) {}
-    explicit AddTableEntryOperation(SharedPtr<TableEntry> table_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_ENTRY), table_entry_(table_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_ENTRY; }
+    explicit AddTableEntryOp(TxnTimeStamp begin_ts,
+                             bool is_delete,
+                             TransactionID txn_id,
+                             TxnTimeStamp commit_ts,
+                             String db_name,
+                             String table_name,
+                             String table_entry_dir,
+                             Vector<SharedPtr<ColumnDef>> column_defs)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)), column_defs_(column_defs) {}
+
+    explicit AddTableEntryOp(TxnTimeStamp begin_ts,
+                             bool is_delete,
+                             TransactionID txn_id,
+                             TxnTimeStamp commit_ts,
+                             String db_name,
+                             String table_name,
+                             String table_entry_dir,
+                             Vector<SharedPtr<ColumnDef>> column_defs,
+                             SizeT row_count)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)), column_defs_(column_defs), row_count_(row_count) {}
+
+    explicit AddTableEntryOp(SharedPtr<TableEntry> table_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY), table_entry_(table_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
+    String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->table_entry_dir_.size() + GetBaseSizeInBytes();
+        auto total_size = 0;
+        total_size += sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->table_entry_dir_.size();
+
+        total_size += sizeof(i32);
+        for (u32 i = 0; i < column_defs_.size(); i++) {
+            const ColumnDef &cd = *column_defs_[i];
+            total_size += sizeof(i64);
+            total_size += cd.column_type_->GetSizeInBytes();
+            total_size += sizeof(i32) + cd.name_.length();
+            total_size += sizeof(i32);
+            total_size += cd.constraints_.size() * sizeof(ConstraintType);
+        }
+
+        total_size += sizeof(SizeT);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_TABLE_ENTRY"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), is_delete_, db_name_, table_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, db_name_, table_name_));
+    }
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &table_entry_dir() const { return table_entry_dir_; }
+    const Vector<SharedPtr<ColumnDef>> &column_defs() const { return column_defs_; }
+    TableEntryType table_entry_type() const { return table_entry_type_; }
+    SizeT row_count() const { return row_count_; }
 
 public:
     SharedPtr<TableEntry> table_entry_{};
@@ -184,33 +281,67 @@ private:
     String db_name_{};
     String table_name_{};
     String table_entry_dir_{};
+    Vector<SharedPtr<ColumnDef>> column_defs_{};
+    TableEntryType table_entry_type_{TableEntryType::kTableEntry};
+
+private:
+    SizeT row_count_{0};
 };
 
-/// class AddSegmentEntryOperation
-export class AddSegmentEntryOperation : public CatalogDeltaOperation {
+/// class AddSegmentEntryOp
+export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddSegmentEntryOperation(TxnTimeStamp begin_ts,
-                                      bool is_delete,
-                                      String db_name,
-                                      String table_name,
-                                      SegmentID segment_id,
-                                      String segment_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          segment_dir_(std::move(segment_dir)) {}
-    explicit AddSegmentEntryOperation(SegmentEntry *segment_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_SEGMENT_ENTRY; }
+    explicit AddSegmentEntryOp(TxnTimeStamp begin_ts,
+                               bool is_delete,
+                               TransactionID txn_id,
+                               TxnTimeStamp commit_ts,
+                               String db_name,
+                               String table_name,
+                               SegmentID segment_id,
+                               String segment_dir,
+                               u64 column_count,
+                               SizeT row_count,
+                               SizeT row_capacity,
+                               TxnTimeStamp min_row_ts,
+                               TxnTimeStamp max_row_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), segment_dir_(std::move(segment_dir)), column_count_(column_count),
+          row_count_(row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
+    explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
+    String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->segment_dir_.size() + sizeof(u32) + GetBaseSizeInBytes();
+        auto total_size = 0;
+        total_size += sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(SegmentID);
+        total_size += sizeof(i32) + this->segment_dir_.size();
+        total_size += sizeof(u64);
+        total_size += sizeof(SizeT);
+        total_size += sizeof(SizeT);
+        total_size += sizeof(TxnTimeStamp) * 2;
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_SEGMENT_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}", i32(GetType()), this->db_name_, this->table_name_, this->segment_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, this->db_name_, this->table_name_, this->segment_id_));
     }
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &segment_dir() const { return segment_dir_; }
+    SegmentID segment_id() const { return segment_id_; }
+    u64 column_count() const { return column_count_; }
+    SizeT row_count() const { return row_count_; }
+    SizeT row_capacity() const { return row_capacity_; }
+    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
 
 public:
     SegmentEntry *segment_entry_{};
@@ -220,50 +351,85 @@ private:
     String table_name_{};
     SegmentID segment_id_{};
     String segment_dir_{};
+
+private:
+    u64 column_count_{0};
+    SizeT row_count_{0};
+    SizeT row_capacity_{0};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
 };
 
-/// class AddBlockEntryOperation
-export class AddBlockEntryOperation : public CatalogDeltaOperation {
+/// class AddBlockEntryOp
+export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
     // For create
-    AddBlockEntryOperation(TxnTimeStamp begin_ts,
-                           bool is_delete,
-                           String db_name,
-                           String table_name,
-                           SegmentID segment_id,
-                           BlockID block_id,
-                           String block_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          block_id_(block_id), block_dir_(std::move(block_dir)) {}
+    AddBlockEntryOp(TxnTimeStamp begin_ts,
+                    bool is_delete,
+                    TransactionID txn_id,
+                    TxnTimeStamp commit_ts,
+                    String db_name,
+                    String table_name,
+                    SegmentID segment_id,
+                    BlockID block_id,
+                    String block_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), block_dir_(std::move(block_dir)) {}
     // For update
-    AddBlockEntryOperation(TxnTimeStamp begin_ts,
-                           bool is_delete,
-                           String db_name,
-                           String table_name,
-                           SegmentID segment_id,
-                           BlockID block_id,
-                           String block_dir,
-                           u16 row_count,
-                           u16 row_capacity)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          block_id_(block_id), block_dir_(std::move(block_dir)), row_count_(row_count), row_capacity_(row_capacity) {}
-    explicit AddBlockEntryOperation(BlockEntry *block_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_BLOCK_ENTRY), block_entry_(block_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_BLOCK_ENTRY; }
+    explicit AddBlockEntryOp(TxnTimeStamp begin_ts,
+                             bool is_delete,
+                             TransactionID txn_id,
+                             TxnTimeStamp commit_ts,
+                             String db_name,
+                             String table_name,
+                             SegmentID segment_id,
+                             BlockID block_id,
+                             String block_dir,
+                             u16 row_count,
+                             u16 row_capacity,
+                             TxnTimeStamp min_row_ts,
+                             TxnTimeStamp max_row_ts,
+                             TxnTimeStamp checkpoint_ts,
+                             u16 checkpoint_row_count)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), block_dir_(std::move(block_dir)),
+          row_capacity_(row_capacity), row_count_(row_count), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts), checkpoint_ts_(checkpoint_ts),
+          checkpoint_row_count_(checkpoint_row_count) {}
+    explicit AddBlockEntryOp(BlockEntry *block_entry) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY), block_entry_(block_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_BLOCK_ENTRY; }
+    String GetTypeStr() const final { return "ADD_BLOCK_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          +sizeof(SegmentID) + sizeof(BlockID) + sizeof(i32) + this->block_dir_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(SegmentID) + sizeof(BlockID);
+        total_size += sizeof(i32) + this->block_dir_.size();
+        total_size += sizeof(u16) + sizeof(u16) + sizeof(TxnTimeStamp) * 2;
+        total_size += sizeof(TxnTimeStamp) + sizeof(u16);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_BLOCK_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, segment_id_, block_id_));
     }
 
 public:
     BlockEntry *block_entry_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    SegmentID segment_id() const { return segment_id_; }
+    BlockID block_id() const { return block_id_; }
+    const String &block_dir() const { return block_dir_; }
+    u16 row_count() const { return row_count_; }
+    u16 row_capacity() const { return row_capacity_; }
+    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+    TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
+    u16 checkpoint_row_count() const { return checkpoint_row_count_; }
 
 private:
     String db_name_{};
@@ -274,52 +440,71 @@ private:
 
 private:
     // For update
-    u16 row_count_{0};
     u16 row_capacity_{0};
+    u16 row_count_{0};
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp checkpoint_ts_{0};
+    u16 checkpoint_row_count_{0};
 };
 
-/// class AddColumnEntryOperation
-export class AddColumnEntryOperation : public CatalogDeltaOperation {
+/// class AddColumnEntryOp
+export class AddColumnEntryOp : public CatalogDeltaOperation {
 public:
     // For create
-    explicit AddColumnEntryOperation(TxnTimeStamp begin_ts,
-                                     bool is_delete,
-                                     String db_name,
-                                     String table_name,
-                                     u32 segment_id,
-                                     u16 block_id,
-                                     u64 column_id)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          block_id_(block_id), column_id_(column_id) {}
+    explicit AddColumnEntryOp(TxnTimeStamp begin_ts,
+                              bool is_delete,
+                              TransactionID txn_id,
+                              TxnTimeStamp commit_ts,
+                              String db_name,
+                              String table_name,
+                              u32 segment_id,
+                              u16 block_id,
+                              u64 column_id)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), column_id_(column_id) {}
     // For update
-    explicit AddColumnEntryOperation(TxnTimeStamp begin_ts,
-                                     bool is_delete,
-                                     String db_name,
-                                     String table_name,
-                                     u32 segment_id,
-                                     u16 block_id,
-                                     u64 column_id,
-                                     i32 next_line_idx)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          block_id_(block_id), column_id_(column_id), next_outline_idx_(next_line_idx) {}
-    explicit AddColumnEntryOperation(BlockColumnEntry *column_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_COLUMN_ENTRY), column_entry_(column_entry) {}
+    explicit AddColumnEntryOp(TxnTimeStamp begin_ts,
+                              bool is_delete,
+                              TransactionID txn_id,
+                              TxnTimeStamp commit_ts,
+                              String db_name,
+                              String table_name,
+                              SegmentID segment_id,
+                              BlockID block_id,
+                              ColumnID column_id,
+                              i32 next_line_idx)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), block_id_(block_id), column_id_(column_id), next_outline_idx_(next_line_idx) {}
+    explicit AddColumnEntryOp(BlockColumnEntry *column_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY), column_entry_(column_entry) {}
 
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_COLUMN_ENTRY; }
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_COLUMN_ENTRY; }
+    String GetTypeStr() const final { return "ADD_COLUMN_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          +sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(SegmentID) + sizeof(BlockID) + sizeof(ColumnID) + sizeof(i32);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_COLUMN_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, segment_id_, block_id_, column_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, segment_id_, block_id_, column_id_));
     }
 
 public:
     BlockColumnEntry *column_entry_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    SegmentID segment_id() const { return segment_id_; }
+    BlockID block_id() const { return block_id_; }
+    ColumnID column_id() const { return column_id_; }
+    i32 next_outline_idx() const { return next_outline_idx_; }
 
 private:
     String db_name_{};
@@ -327,31 +512,47 @@ private:
     SegmentID segment_id_{};
     BlockID block_id_{};
     ColumnID column_id_{};
-    i32 next_outline_idx_{-1}; // -1 for not having outline info
+    i32 next_outline_idx_{0};
 };
 
 class TableIndexMeta;
-/// class AddIndexMetaOperation
-export class AddIndexMetaOperation : public CatalogDeltaOperation {
+/// class AddIndexMetaOp
+export class AddIndexMetaOp : public CatalogDeltaOperation {
 public:
-    explicit AddIndexMetaOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, String index_name)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          index_name_(std::move(index_name)) {}
-    explicit AddIndexMetaOperation(TableIndexMeta *index_meta)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_INDEX_META), index_meta_(index_meta) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_INDEX_META; }
+    explicit AddIndexMetaOp(TxnTimeStamp begin_ts,
+                            bool is_delete,
+                            TransactionID txn_id,
+                            TxnTimeStamp commit_ts,
+                            String db_name,
+                            String table_name,
+                            String index_name)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_INDEX_META, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)) {}
+    explicit AddIndexMetaOp(TableIndexMeta *index_meta, TxnTimeStamp begin_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_INDEX_META, begin_ts, false, 0, 0), index_meta_(index_meta) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_INDEX_META; }
+    String GetTypeStr() const final { return "ADD_INDEX_META"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->index_name_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_INDEX_META"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, index_name_));
+    }
 
 public:
     TableIndexMeta *index_meta_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &index_name() const { return index_name_; }
 
 private:
     String db_name_{};
@@ -359,60 +560,100 @@ private:
     String index_name_{};
 };
 
-/// class AddTableIndexEntryOperation
-export class AddTableIndexEntryOperation : public CatalogDeltaOperation {
+/// class AddTableIndexEntryOp
+export class AddTableIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddTableIndexEntryOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, String index_name)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          index_name_(std::move(index_name)) {}
-    explicit AddTableIndexEntryOperation(SharedPtr<TableIndexEntry> table_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_TABLE_INDEX_ENTRY; }
+    explicit AddTableIndexEntryOp(TxnTimeStamp begin_ts,
+                                  bool is_delete,
+                                  TransactionID txn_id,
+                                  TxnTimeStamp commit_ts,
+                                  String db_name,
+                                  String table_name,
+                                  String index_name,
+                                  String index_dir,
+                                  SharedPtr<IndexDef> index_def)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)), index_def_(std::move(index_def)) {
+    }
+    explicit AddTableIndexEntryOp(SharedPtr<TableIndexEntry> table_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_TABLE_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->index_name_.size();
+        total_size += sizeof(i32) + this->index_dir_.size();
+        total_size += this->index_def_->GetSizeInBytes();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_TABLE_INDEX_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), is_delete_, db_name_, table_name_, index_name_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, db_name_, table_name_, index_name_));
     }
 
 public:
     SharedPtr<TableIndexEntry> table_index_entry_{};
 
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &index_name() const { return index_name_; }
+    const String &index_dir() const { return index_dir_; }
+    SharedPtr<IndexDef> index_def() const { return index_def_; }
+
 private:
     String db_name_{};
     String table_name_{};
     String index_name_{};
-    SharedPtr<IndexDef> index_def_{};
     String index_dir_{};
+    SharedPtr<IndexDef> index_def_{};
 };
 
-/// class AddIrsIndexEntryOperation
-export class AddIrsIndexEntryOperation : public CatalogDeltaOperation {
+/// class AddIrsIndexEntryOp
+export class AddIrsIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddIrsIndexEntryOperation(TxnTimeStamp begin_ts, bool is_delete, String db_name, String table_name, String index_name, String index_dir)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          index_name_(std::move(index_name)), index_dir_(std::move(index_dir)) {}
-    explicit AddIrsIndexEntryOperation(SharedPtr<IrsIndexEntry> irs_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_IRS_INDEX_ENTRY; }
+    explicit AddIrsIndexEntryOp(TxnTimeStamp begin_ts,
+                                bool is_delete,
+                                TransactionID txn_id,
+                                TxnTimeStamp commit_ts,
+                                String db_name,
+                                String table_name,
+                                String index_name,
+                                String index_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)) {}
+    explicit AddIrsIndexEntryOp(SharedPtr<IrsIndexEntry> irs_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_IRS_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->index_name_.size();
+        total_size += sizeof(i32) + this->index_dir_.size();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_IRS_INDEX_ENTRY"; }
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_)); }
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, index_name_));
+    }
 
 public:
     SharedPtr<IrsIndexEntry> irs_index_entry_{};
 
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &index_name() const { return index_name_; }
+    const String &index_dir() const { return index_dir_; }
+
 private:
     String db_name_{};
     String table_name_{};
@@ -420,34 +661,54 @@ private:
     String index_dir_{};
 };
 
-/// class AddColumnIndexEntryOperation
-export class AddColumnIndexEntryOperation : public CatalogDeltaOperation {
+/// class AddColumnIndexEntryOp
+export class AddColumnIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddColumnIndexEntryOperation(TxnTimeStamp begin_ts,
-                                          bool is_delete,
-                                          String db_name,
-                                          String table_name,
-                                          String index_name,
-                                          ColumnID column_id)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          index_name_(std::move(index_name)), column_id_(column_id) {}
-    explicit AddColumnIndexEntryOperation(SharedPtr<ColumnIndexEntry> column_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY), column_index_entry_(column_index_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_COLUMN_INDEX_ENTRY; }
+    explicit AddColumnIndexEntryOp(TxnTimeStamp begin_ts,
+                                   bool is_delete,
+                                   TransactionID txn_id,
+                                   TxnTimeStamp commit_ts,
+                                   String db_name,
+                                   String table_name,
+                                   String index_name,
+                                   String col_index_dir,
+                                   ColumnID column_id,
+                                   SharedPtr<IndexBase> index_base)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)), col_index_dir_(std::move(col_index_dir)), column_id_(column_id),
+          index_base_(index_base) {}
+    explicit AddColumnIndexEntryOp(SharedPtr<ColumnIndexEntry> column_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY), column_index_entry_(column_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_COLUMN_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + sizeof(ColumnID) + GetBaseSizeInBytes();
+        SizeT total_size = 0;
+        total_size += sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->index_name_.size();
+        total_size += sizeof(i32) + this->col_index_dir_.size();
+        total_size += sizeof(ColumnID);
+        total_size += index_base_->GetSizeInBytes();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_COLUMN_INDEX_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, index_name_, column_id_));
     }
 
 public:
     SharedPtr<ColumnIndexEntry> column_index_entry_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &index_name() const { return index_name_; }
+    const String &col_index_dir() const { return col_index_dir_; }
+    ColumnID column_id() const { return column_id_; }
+    SharedPtr<IndexBase> index_base() const { return index_base_; }
 
 private:
     String db_name_{};
@@ -455,44 +716,64 @@ private:
     String index_name_{};
     String col_index_dir_{};
     ColumnID column_id_{};
+    SharedPtr<IndexBase> index_base_{};
 };
 
 /// class AddSegmentColumnEntryOperation
-export class AddSegmentColumnIndexEntryOperation : public CatalogDeltaOperation {
+export class AddSegmentColumnIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddSegmentColumnIndexEntryOperation(TxnTimeStamp begin_ts,
-                                                 bool is_delete,
-                                                 String db_name,
-                                                 String table_name,
-                                                 String index_name,
-                                                 u64 column_id,
-                                                 u32 segment_id)
-        : CatalogDeltaOperation(begin_ts, is_delete), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
-          index_name_(std::move(index_name)), column_id_(column_id), segment_id_(segment_id) {}
-    explicit AddSegmentColumnIndexEntryOperation(SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY), segment_column_index_entry_(segment_column_index_entry) {}
-    CatalogDeltaOperationType GetType() const final { return CatalogDeltaOperationType::ADD_SEGMENT_COLUMN_INDEX_ENTRY; }
+    explicit AddSegmentColumnIndexEntryOp(TxnTimeStamp begin_ts,
+                                          bool is_delete,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp commit_ts,
+                                          String db_name,
+                                          String table_name,
+                                          String index_name,
+                                          ColumnID column_id,
+                                          SegmentID segment_id,
+                                          TxnTimeStamp min_ts,
+                                          TxnTimeStamp max_ts)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts),
+          db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), column_id_(column_id),
+          segment_id_(segment_id), min_ts_(min_ts), max_ts_(max_ts) {}
+    explicit AddSegmentColumnIndexEntryOp(SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY), segment_column_index_entry_(segment_column_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_SEGMENT_COLUMN_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
-        auto total_size = sizeof(CatalogDeltaOperationType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() +
-                          sizeof(i32) + this->index_name_.size() + sizeof(ColumnID) + sizeof(SegmentID) + GetBaseSizeInBytes();
+        auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += sizeof(i32) + this->db_name_.size();
+        total_size += sizeof(i32) + this->table_name_.size();
+        total_size += sizeof(i32) + this->index_name_.size();
+        total_size += sizeof(ColumnID) + sizeof(SegmentID) + sizeof(TxnTimeStamp) + sizeof(TxnTimeStamp);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
     void SaveSate() final;
-    const String ToString() const final { return "ADD_SEGMENT_COLUMN_INDEX_ENTRY"; }
+    const String ToString() const final;
     const String EncodeIndex() const final {
-        return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), db_name_, table_name_, index_name_, column_id_, segment_id_));
+        return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, index_name_, column_id_, segment_id_));
     }
+    void Flush(TxnTimeStamp max_commit_ts);
 
 public:
     SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    const String &index_name() const { return index_name_; }
+    ColumnID column_id() const { return column_id_; }
+    SegmentID segment_id() const { return segment_id_; }
+    TxnTimeStamp min_ts() const { return min_ts_; }
+    TxnTimeStamp max_ts() const { return max_ts_; }
 
 private:
     String db_name_{};
     String table_name_{};
     String index_name_{};
-    ColumnID column_id_{};
-    SegmentID segment_id_{};
+    ColumnID column_id_{0};
+    SegmentID segment_id_{0};
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
 };
@@ -502,13 +783,14 @@ private:
 // the same value to assist backward iterating.
 // payload. User shall populate it before writing to wal.
 /// class CatalogDeltaEntryHeader
-export class CatalogDeltaEntryHeader {
-public:
-    CatalogDeltaEntryHeader() = default;
-    i32 size_{};
-    u32 checksum_{};
-    TransactionID txn_id_{};
-    TxnTimeStamp commit_ts_{};
+export struct CatalogDeltaEntryHeader {
+    i32 size_{}; // size of payload, including the header, round to multi
+    // of 4. There's 4 bytes pad just after the payload storing
+    // the same value to assist backward iterating.
+    u32 checksum_{}; // crc32 of the entry, including the header and the
+    // payload. User shall populate it before writing to wal.
+    TransactionID txn_id_{};   // txn id of the entry
+    TxnTimeStamp commit_ts_{}; // commit timestamp of the txn
 };
 
 /// class CatalogDeltaEntry
@@ -524,22 +806,21 @@ public:
     void set_txn_id(TransactionID txn_id) { txn_id_ = txn_id; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { commit_ts_ = commit_ts; }
-    Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
+    Deque<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
 private:
-    Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
+    Deque<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
 export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
+    [[nodiscard]] String ToString() const;
     void Merge(UniquePtr<CatalogDeltaEntry> other);
-    Deque<UniquePtr<CatalogDeltaOperation>> &global_operations() { return global_operations_; }
-    HashMap<String, SizeT> &encode_op_to_id_map() { return encode_op_to_id_map_; }
+    HashMap<String, SizeT> &encode_to_id_map() { return encode_to_id_map_; }
 
 private:
-    Deque<UniquePtr<CatalogDeltaOperation>> global_operations_{};
-    HashMap<String, SizeT> encode_op_to_id_map_{};
+    HashMap<String, SizeT> encode_to_id_map_{};
 };
 
 } // namespace infinity

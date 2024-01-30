@@ -34,8 +34,8 @@ public:
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
-                        TransactionID start_txn_id = 0,
-                        TxnTimeStamp start_ts = 1);
+                        TransactionID start_txn_id,
+                        TxnTimeStamp start_ts);
 
     ~TxnManager() { Stop(); }
 
@@ -77,7 +77,7 @@ private:
     std::shared_mutex rw_locker_{};
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
-    HashMap<TransactionID, UniquePtr<Txn>> txn_map_{};
+    HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     // PutWalEntry function
     PutWalEntryFn put_wal_entry_{};
 

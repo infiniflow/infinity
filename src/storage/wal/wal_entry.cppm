@@ -41,16 +41,6 @@ export enum class WalCommandType : i8 {
     DROP_INDEX = 7,
 
     // -----------------------------
-    // INDEX
-    // -----------------------------
-    ADD_TABLE_INDEX = 11,
-    DEL_TABLE_INDEX = 12,
-    ADD_INDEX_ENTRY = 13,
-    DEL_INDEX_ENTRY = 14,
-    ADD_COLUMN_INDEX = 15,
-    ADD_INDEX_BY_SEGMENT_ID = 16,
-
-    // -----------------------------
     // Data
     // -----------------------------
     IMPORT = 20,
@@ -60,6 +50,23 @@ export enum class WalCommandType : i8 {
     // Flush
     // -----------------------------
     CHECKPOINT = 99,
+    COMPACT = 100,
+};
+
+export struct WalSegmentInfo {
+    String segment_dir_{};
+    SegmentID segment_id_{};
+    u16 block_entries_size_{};
+    u32 block_capacity_{};
+    u16 last_block_row_count_{};
+
+    bool operator==(const WalSegmentInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalSegmentInfo ReadBufferAdv(char *&ptr);
 };
 
 // WalCommandType -> String
@@ -172,9 +179,8 @@ export struct WalCmdDropIndex : public WalCmd {
 };
 
 export struct WalCmdImport : public WalCmd {
-    WalCmdImport(String db_name, String table_name, String segment_dir, u32 segment_id, u16 block_entries_size, Vector<u16> &row_counts)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_dir_(std::move(segment_dir)), segment_id_(segment_id),
-          block_entries_size_(block_entries_size), row_counts_(row_counts) {}
+    WalCmdImport(String db_name, String table_name, WalSegmentInfo &&segment_info)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_info_(std::move(segment_info)) {}
 
     WalCommandType GetType() override { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const override;
@@ -183,11 +189,7 @@ export struct WalCmdImport : public WalCmd {
 
     String db_name_{};
     String table_name_{};
-    String segment_dir_{};
-    u32 segment_id_{};
-    u16 block_entries_size_{};
-    // row_counts_[i] means the number of rows in the i-th block entry
-    Vector<u16> row_counts_{};
+    WalSegmentInfo segment_info_{};
 };
 
 export struct WalCmdAppend : public WalCmd {
@@ -232,6 +234,27 @@ export struct WalCmdCheckpoint : public WalCmd {
     i64 max_commit_ts_{};
     bool is_full_checkpoint_;
     String catalog_path_{};
+};
+
+export struct WalCmdCompact : public WalCmd {
+    WalCmdCompact(String &&db_name, String &&table_name, Vector<WalSegmentInfo> &&new_segment_infos, Vector<SegmentID> &&deprecated_segment_ids)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), new_segment_infos_(std::move(new_segment_infos)),
+          deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
+
+    WalCommandType GetType() override { return WalCommandType::COMPACT; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdCompact ReadBufferAdv(char *&ptr);
+
+    const String db_name_{};
+    const String table_name_{};
+    const Vector<WalSegmentInfo> new_segment_infos_{};
+    const Vector<SegmentID> deprecated_segment_ids_{};
 };
 
 export struct WalEntryHeader {

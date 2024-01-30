@@ -44,12 +44,28 @@ export class SegmentColumnIndexEntry : public BaseEntry {
 public:
     static SharedPtr<SegmentColumnIndexEntry> NewIndexEntry(ColumnIndexEntry *column_index_entry,
                                                             SegmentID segment_id,
-                                                            Txn * txn,
+                                                            Txn *txn,
                                                             TxnTimeStamp create_ts,
                                                             BufferManager *buffer_manager,
                                                             CreateIndexParam *create_index_param);
 
+    static SharedPtr<SegmentColumnIndexEntry> NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
+                                                                         TableEntry *table_entry,
+                                                                         SegmentID segment_id,
+                                                                         BufferManager *buffer_manager,
+                                                                         TxnTimeStamp min_ts,
+                                                                         TxnTimeStamp max_ts,
+                                                                         TransactionID txn_id,
+                                                                         TxnTimeStamp begin_ts,
+                                                                         TxnTimeStamp commit_ts,
+                                                                         bool is_delete);
+
     [[nodiscard]] BufferHandle GetIndex();
+
+    // load the idx part into memory
+    [[nodiscard]] BufferHandle GetIndexPartAt(u32 idx);
+
+    [[nodiscard]] inline u32 GetIndexPartNum() { return vector_buffer_.size() - 1; }
 
     nlohmann::json Serialize();
 
@@ -60,6 +76,8 @@ public:
 
     void MergeFrom(BaseEntry &other);
 
+    bool Flush(TxnTimeStamp checkpoint_ts);
+
 public:
     // Getter
     inline SegmentID segment_id() const { return segment_id_; }
@@ -68,12 +86,8 @@ public:
     inline TxnTimeStamp max_ts() const { return max_ts_; }
 
 private:
-    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, BufferObj *buffer);
-
+    explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
-
-    bool Flush(TxnTimeStamp checkpoint_ts);
-
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry>
     LoadIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);
@@ -84,7 +98,7 @@ private:
     const ColumnIndexEntry *column_index_entry_{};
     SegmentID segment_id_{};
 
-    BufferObj *const buffer_{};
+    Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 
     std::shared_mutex rw_locker_{};
 

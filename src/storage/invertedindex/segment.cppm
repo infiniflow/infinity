@@ -15,7 +15,9 @@ export struct SegmentMeta {
 
     void Store() {}
 
+    u64 column_id_;
     segmentid_t segment_id_;
+    docid_t base_doc_id_;
     u64 doc_count_{0};
     i64 timestamp_;
 };
@@ -29,8 +31,11 @@ public:
     ~Segment() = default;
 
 public:
+    u64 GetColumnID() const { return segment_meta_.column_id_; }
     segmentid_t GetSegmentID() const { return segment_meta_.segment_id_; }
-    void SegSegmentMeta(const SegmentMeta &segment_meta) { segment_meta_ = segment_meta; }
+    docid_t GetBaseDocId() const { return segment_meta_.base_doc_id_; }
+    u64 GetDocCount() const { return segment_meta_.doc_count_; }
+    void SetSegmentMeta(const SegmentMeta &segment_meta) { segment_meta_ = segment_meta; }
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }
     void SetTimestamp(i64 timestamp) { segment_meta_.timestamp_ = timestamp; }
     SegmentStatus GetSegmentStatus() const { return segment_status_; }

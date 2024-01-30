@@ -35,6 +35,7 @@ import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
+import logical_top;
 import logical_cross_product;
 import logical_join;
 import logical_show;
@@ -92,6 +93,8 @@ public:
 
     static void Explain(const LogicalLimit *limit_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
+    static void Explain(const LogicalTop *top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size);
+
     static void Explain(const LogicalCrossProduct *cross_product_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalJoin *join_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
@@ -110,7 +113,7 @@ public:
 
     static void Explain(const LogicalFusion *fusion_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-    static void Explain(const BaseExpression *base_expression, String &expr_str);
+    static void Explain(const BaseExpression *base_expression, String &expr_str, bool consider_add_parentheses = false);
 };
 
 } // namespace infinity

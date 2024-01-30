@@ -14,13 +14,14 @@
 
 module;
 
+export module index_hnsw;
+
 import stl;
 import index_def;
 import parser;
 import third_party;
 import index_base;
-
-export module index_hnsw;
+import base_table_ref;
 
 namespace infinity {
 
@@ -62,6 +63,9 @@ public:
     virtual String ToString() const override;
 
     virtual nlohmann::json Serialize() const override;
+
+public:
+    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};

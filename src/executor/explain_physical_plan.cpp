@@ -18,7 +18,6 @@ module;
 
 module explain_physical_plan;
 
-
 import stl;
 
 import physical_operator;
@@ -862,10 +861,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalSort *sort_node, SharedPtr<Vecto
 
         for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
             ExplainLogicalPlan::Explain(sort_node->expressions_[idx].get(), sort_expression_str);
-            sort_expression_str += " " + std::to_string(sort_node->order_by_types_[idx]) + ", ";
+            sort_expression_str += " " + SelectStatement::ToString(sort_node->order_by_types_[idx]) + ", ";
         }
         ExplainLogicalPlan::Explain(sort_node->expressions_.back().get(), sort_expression_str);
-        sort_expression_str += " " + std::to_string(sort_node->order_by_types_.back()) + "]";
+        sort_expression_str += " " + SelectStatement::ToString(sort_node->order_by_types_.back()) + "]";
         result->emplace_back(MakeShared<String>(sort_expression_str));
     }
 
@@ -911,6 +910,66 @@ void ExplainPhysicalPlan::Explain(const PhysicalLimit *limit_node, SharedPtr<Vec
     {
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = limit_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalTop *top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    {
+        String top_header;
+        if (intent_size != 0) {
+            top_header = String(intent_size - 2, ' ') + "-> TOP ";
+        } else {
+            top_header = "TOP ";
+        }
+
+        top_header += "(" + std::to_string(top_node->node_id()) + ")";
+        result->emplace_back(MakeShared<String>(top_header));
+    }
+
+    {
+        String sort_expression_str = String(intent_size, ' ') + " - sort expressions: [";
+        auto &sort_expressions = top_node->GetSortExpressions();
+        SizeT order_by_count = sort_expressions.size();
+        if (order_by_count == 0) {
+            UnrecoverableError("TOP without any sort expression.");
+        }
+        auto &order_by_types = top_node->GetOrderbyTypes();
+        for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(sort_expressions[idx].get(), sort_expression_str);
+            sort_expression_str += " " + SelectStatement::ToString(order_by_types[idx]) + ", ";
+        }
+        ExplainLogicalPlan::Explain(sort_expressions.back().get(), sort_expression_str);
+        sort_expression_str += " " + SelectStatement::ToString(order_by_types.back()) + "]";
+        result->emplace_back(MakeShared<String>(sort_expression_str));
+    }
+
+    {
+        auto limit = top_node->GetLimit();
+        static_assert(std::is_same_v<decltype(limit), u32>);
+        auto offset = top_node->GetOffset();
+        static_assert(std::is_same_v<decltype(offset), u32>);
+        auto limit_after_offset = limit - offset;
+        if (limit_after_offset < 0) {
+            UnrecoverableError("TOP with limit < 0.");
+        }
+        String limit_value_str = String(intent_size, ' ') + " - limit: " + std::to_string(limit_after_offset);
+        result->emplace_back(MakeShared<String>(limit_value_str));
+        if (offset) {
+            String offset_value_str = String(intent_size, ' ') + " - offset: " + std::to_string(offset);
+            result->emplace_back(MakeShared<String>(offset_value_str));
+        }
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = top_node->GetOutputNames();
         SizeT column_count = output_columns->size();
         for (SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";
@@ -1216,10 +1275,6 @@ void ExplainPhysicalPlan::Explain(const PhysicalSortMergeJoin *, SharedPtr<Vecto
 
 void ExplainPhysicalPlan::Explain(const PhysicalIndexJoin *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
     UnrecoverableError("Not implement: PhysicalIndexJoin");
-}
-
-void ExplainPhysicalPlan::Explain(const PhysicalTop *, SharedPtr<Vector<SharedPtr<String>>> &, i64) {
-    UnrecoverableError("Not implement: PhysicalTop");
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalDelete *delete_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

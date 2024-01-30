@@ -3,11 +3,11 @@ module;
 import stl;
 import memory_pool;
 import segment_posting;
-import index_segment_reader;
 import posting_iterator;
 import index_defines;
 import index_config;
 import index_segment_reader;
+import inmem_index_segment_reader;
 import posting_writer;
 import data_block;
 import column_indexer;
@@ -35,7 +35,9 @@ public:
 
     void Commit();
 
-    SharedPtr<IndexSegmentReader> CreateInMemSegmentReader();
+    void Flush();
+
+    SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
 
 private:
     InvertedIndexConfig index_config_;

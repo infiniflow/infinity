@@ -18,6 +18,7 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
+import parser;
 
 export module bg_task;
 
@@ -28,12 +29,15 @@ export enum class BGTaskType {
     kForceCheckpoint, // Manually triggered by PhysicalImport
     kStopProcessor,
     kCatalogDeltaOpsMerge, // Merge
+    kCompactSegments,
     kInvalid
 };
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
+
     virtual ~BGTask() = default;
+
     BGTaskType type_{BGTaskType::kInvalid};
     bool async_{false};
 
@@ -79,12 +83,15 @@ export struct TryCheckpointTask final : public BGTask {
 
 export struct ForceCheckpointTask final : public BGTask {
     explicit ForceCheckpointTask(Txn *txn) : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn) {}
+    explicit ForceCheckpointTask(Txn *txn, bool is_full_checkpoint)
+        : BGTask(BGTaskType::kForceCheckpoint, false), txn_(txn), is_full_checkpoint_(is_full_checkpoint) {}
 
     ~ForceCheckpointTask() = default;
 
     String ToString() const final { return "Force Checkpoint Task"; }
 
     Txn *txn_{};
+    bool is_full_checkpoint_{true};
 };
 
 export struct CatalogDeltaOpsMergeTask final : public BGTask {

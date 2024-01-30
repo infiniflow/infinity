@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 #include <cassert>
 import stl;
@@ -64,13 +78,13 @@ CompiledAddr FstBuilder::Compile(BuilderNode &node) {
     if (node.is_final_ && node.trans_.empty() && node.final_output_.IsZero()) {
         return EMPTY_ADDRESS;
     }
-    SizeT addr = registry_.Find(node);
-    if (addr != 0)
-        return addr;
+    RegistryEntry ent = registry_.Find(node);
+    if (ent.found_)
+        return ent.value_;
     CompiledAddr start_addr = wtr_.Count();
     Node::Compile(wtr_, last_addr_, start_addr, node);
     last_addr_ = wtr_.Count() - 1;
-    registry_.Insert(node, last_addr_);
+    registry_.Insert(ent.slot_, node, last_addr_);
     return last_addr_;
 }
 

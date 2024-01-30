@@ -36,8 +36,10 @@ import index_hnsw;
 import buffer_handle;
 import annivfflat_index_data;
 import annivfflat_index_file_worker;
+import secondary_index_data;
 import index_file_worker;
 import hnsw_file_worker;
+import secondary_index_file_worker;
 import logger;
 import local_file_system;
 import random;
@@ -53,32 +55,31 @@ import lvq_store;
 import plain_store;
 import segment_iter;
 import catalog_delta_entry;
+import status;
+import compact_segments_task;
 
 namespace infinity {
 
-SegmentEntry::SegmentEntry(const TableEntry *table_entry) : BaseEntry(EntryType::kSegment), table_entry_(table_entry) {}
+SegmentEntry::SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count)
+    : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
+      column_count_(column_count) {}
 
 SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
-    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddSegmentEntryOperation>(segment_entry.get());
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
+    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
+                                                                     SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
+                                                                     segment_id,
+                                                                     DEFAULT_SEGMENT_CAPACITY,
+                                                                     table_entry->ColumnCount());
+
+    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
+    txn->AddCatalogDeltaOperation(std::move(operation));
+    segment_entry->begin_ts_ = txn->BeginTS();
     segment_entry->row_count_ = 0;
-    segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
-    segment_entry->segment_id_ = segment_id;
-    segment_entry->min_row_ts_ = 0;
-    segment_entry->max_row_ts_ = 0;
+    segment_entry->actual_row_count_ = 0;
+    segment_entry->min_row_ts_ = UNCOMMIT_TS;
 
-    const auto *table_ptr = (const TableEntry *)table_entry;
-    segment_entry->column_count_ = table_ptr->ColumnCount();
-
-    segment_entry->segment_dir_ = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
-    if (segment_entry->block_entries_.empty()) {
-        auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
-        segment_entry->block_entries_.emplace_back(std::move(block_entry));
-    }
-
+    auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
+    segment_entry->block_entries_.emplace_back(std::move(block_entry));
     return segment_entry;
 }
 
@@ -86,22 +87,95 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
                                                             SegmentID segment_id,
                                                             const SharedPtr<String> &segment_dir,
                                                             TxnTimeStamp commit_ts) {
-
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry);
-    segment_entry->row_capacity_ = DEFAULT_SEGMENT_CAPACITY;
-    segment_entry->segment_id_ = segment_id;
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount());
     segment_entry->min_row_ts_ = commit_ts;
-    segment_entry->max_row_ts_ = commit_ts;
+    return segment_entry;
+}
 
-    const auto *table_ptr = (const TableEntry *)table_entry;
-    segment_entry->column_count_ = table_ptr->ColumnCount();
-    segment_entry->segment_dir_ = segment_dir;
+SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
+                                                                   SegmentID segment_id,
+                                                                   const SharedPtr<String> &segment_dir,
+                                                                   u64 column_count,
+                                                                   SizeT row_count,
+                                                                   SizeT row_capacity,
+                                                                   TxnTimeStamp min_row_ts,
+                                                                   TxnTimeStamp deprecate_ts,
+                                                                   TxnTimeStamp commit_ts,
+                                                                   TxnTimeStamp begin_ts,
+                                                                   TransactionID txn_id) {
+
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count);
+    segment_entry->min_row_ts_ = min_row_ts;
+    segment_entry->deprecate_ts_ = deprecate_ts;
+    segment_entry->commit_ts_ = commit_ts;
+    segment_entry->begin_ts_ = begin_ts;
+    segment_entry->row_count_ = row_count;
+    segment_entry->txn_id_ = txn_id;
     return segment_entry;
 }
 
 int SegmentEntry::Room() {
     std::shared_lock<std::shared_mutex> lck(rw_locker_);
     return this->row_capacity_ - this->row_count_;
+}
+
+void SegmentEntry::FlushData() {
+    for (const auto &block_entry : this->block_entries_) {
+        block_entry->FlushData(block_entry->row_count());
+    }
+}
+
+void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
+    std::unique_lock lock(rw_locker_);
+    compact_task_ = compact_task;
+    compacting_ts_ = compacting_ts;
+}
+
+void SegmentEntry::SetNoDelete(TxnTimeStamp no_delete_ts) {
+    std::unique_lock lock(rw_locker_);
+    no_delete_ts_ = no_delete_ts;
+    compact_task_ = nullptr;
+}
+
+void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
+    std::unique_lock lock(rw_locker_);
+    deprecate_ts_ = deprecate_ts;
+
+    // this is not necessary, but for safety
+    compact_task_ = nullptr;
+}
+
+void SegmentEntry::RollbackCompact() {
+    std::unique_lock lock(rw_locker_);
+    compacting_ts_ = UNCOMMIT_TS;
+    no_delete_ts_ = UNCOMMIT_TS;
+    deprecate_ts_ = UNCOMMIT_TS;
+
+    // this is not necessary, but for safety
+    compact_task_ = nullptr;
+}
+
+bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn) {
+    Vector<std::shared_lock<std::shared_mutex>> locks;
+    TxnTimeStamp delete_begin_ts = delete_txn->BeginTS();
+    Vector<SizeT> to_delete_idxes;
+    for (SizeT idx = 0; const auto &[segment_entry, delete_offsets] : segments) {
+        locks.emplace_back(segment_entry->rw_locker_);
+        if (delete_begin_ts > segment_entry->compacting_ts_) {
+            if (delete_begin_ts < segment_entry->no_delete_ts_) {
+                to_delete_idxes.emplace_back(idx);
+            } else {
+                return true;
+            }
+        }
+        ++idx;
+    }
+    SharedPtr<Txn> txn = delete_txn->shared_from_this();
+    for (SizeT idx : to_delete_idxes) {
+        auto &[segment_entry, segment_offsets] = segments[idx];
+        segment_entry->compact_task_->AddToDelete(segment_entry->segment_id(), std::move(segment_offsets), txn);
+    }
+    return false;
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
@@ -139,7 +213,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             total_copied += actual_appended;
             to_append_rows -= actual_appended;
             append_state_ptr->current_count_ += actual_appended;
-            this->row_count_ += actual_appended;
+            IncreaseRowCount(actual_appended);
         }
         if (to_append_rows == 0) {
             append_state_ptr->current_block_++;
@@ -149,18 +223,16 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
     return total_copied;
 }
 
-void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
-    for (const auto &row_hash_map : block_row_hashmap) {
-        u16 block_id = row_hash_map.first;
+    for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
-        const Vector<RowID> &rows = row_hash_map.second;
-        block_entry->DeleteData(txn_id, commit_ts, rows);
+        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
     }
 }
 
@@ -300,6 +372,41 @@ void SegmentEntry::WriteIndexToMemory(SharedPtr<ColumnDef> column_def,
             LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
+        case IndexType::kSecondary: {
+            auto &data_type = column_def->type();
+            if (!(data_type->CanBuildSecondaryIndex())) {
+                UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
+            }
+            // 1. build secondary index by merge sort
+            u32 input_block_max_row = DEFAULT_BLOCK_CAPACITY;
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, this->row_count_, input_block_max_row, part_capacity);
+            for (const auto &block_entry : this->block_entries_) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
+                auto block_column_data_ptr = reinterpret_cast<const void *>(block_column_buffer_handle.GetData());
+                u32 block_row_cnt = block_entry->row_count();
+                secondary_index_builder->AppendColumnVector(block_column_data_ptr, block_row_cnt);
+            }
+            secondary_index_builder->StartOutput();
+            // 2. output into SecondaryIndexDataPart
+            {
+                u32 part_num = segment_column_index_entry->GetIndexPartNum();
+                for (u32 part_id = 1; part_id <= part_num; ++part_id) {
+                    BufferHandle buffer_handle_part = segment_column_index_entry->GetIndexPartAt(part_id);
+                    auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
+                    secondary_index_builder->OutputToPart(secondary_index_part);
+                }
+            }
+            // 3. output into SecondaryIndexDataHead
+            {
+                BufferHandle buffer_handle_head = segment_column_index_entry->GetIndex();
+                auto secondary_index_head = static_cast<SecondaryIndexDataHead *>(buffer_handle_head.GetDataMut());
+                secondary_index_builder->OutputToHeader(secondary_index_head);
+            }
+            secondary_index_builder->EndOutput();
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -333,28 +440,28 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
     SharedPtr<BlockEntry> block_entry;
     {
         std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-        if (this->min_row_ts_ == 0) {
+        if (this->min_row_ts_ == UNCOMMIT_TS) {
             this->min_row_ts_ = commit_ts;
         }
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
         block_entry = this->block_entries_[block_id];
     }
     block_entry->CommitAppend(txn_id, commit_ts);
 }
 
-void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<RowID>> &block_row_hashmap) {
+void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
-    for (const auto &row_hash_map : block_row_hashmap) {
-        u16 block_id = row_hash_map.first;
+    for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
         BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
         if (block_entry == nullptr) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
 
+        DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
     }
 }
 
@@ -368,7 +475,7 @@ BlockEntry *SegmentEntry::GetBlockEntryByID(u16 block_id) const {
 
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
-    Vector<BlockEntry *> block_entries;
+
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json_res["segment_dir"] = *this->segment_dir_;
@@ -376,49 +483,38 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["segment_id"] = this->segment_id_;
         json_res["column_count"] = this->column_count_;
         json_res["min_row_ts"] = this->min_row_ts_;
-        json_res["max_row_ts"] = this->max_row_ts_;
+        json_res["max_row_ts"] = this->deprecate_ts_;
         json_res["deleted"] = this->deleted_;
         json_res["row_count"] = this->row_count_;
+        json_res["actual_row_count"] = this->actual_row_count_;
+
+        json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
+        json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
+        json_res["txn_id"] = TransactionID(this->txn_id_);
+
         for (auto &block_entry : this->block_entries_) {
-            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
-                block_entries.push_back((BlockEntry *)block_entry.get());
-            }
+            json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
         }
-    }
-    for (BlockEntry *block_entry : block_entries) {
-//        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
-        block_entry->Flush(max_commit_ts);
-//        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-//                              block_entry->checkpoint_ts(),
-//                              block_entry->min_row_ts(),
-//                              block_entry->max_row_ts(),
-//                              max_commit_ts));
-        // WARNING: this operation may influence data visibility
-        //        if (!is_full_checkpoint && block_entry->checkpoint_ts_ != max_commit_ts) {
-        //            continue;
-        //        }
-        json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
     }
     return json_res;
 }
 
 SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
-    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry);
-
-    segment_entry->segment_dir_ = MakeShared<String>(segment_entry_json["segment_dir"]);
-    segment_entry->row_capacity_ = segment_entry_json["row_capacity"];
-
-    segment_entry->segment_id_ = segment_entry_json["segment_id"];
-    segment_entry->column_count_ = segment_entry_json["column_count"];
+    SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
+                                                                     MakeShared<String>(segment_entry_json["segment_dir"]),
+                                                                     segment_entry_json["segment_id"],
+                                                                     segment_entry_json["row_capacity"],
+                                                                     segment_entry_json["column_count"]);
 
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
-    segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
+    segment_entry->deprecate_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
     segment_entry->row_count_ = segment_entry_json["row_count"];
+    segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
+
+    segment_entry->commit_ts_ = segment_entry_json["commit_ts"];
+    segment_entry->begin_ts_ = segment_entry_json["begin_ts"];
+    segment_entry->txn_id_ = segment_entry_json["txn_id"];
 
     if (segment_entry_json.contains("block_entries")) {
         for (const auto &block_json : segment_entry_json["block_entries"]) {
@@ -431,6 +527,31 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     LOG_TRACE(fmt::format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
 
     return segment_entry;
+}
+
+void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+    Vector<BlockEntry *> block_entries;
+    for (auto &block_entry : this->block_entries()) {
+        if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
+            block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+        }
+    }
+    if (block_entries.empty()) {
+        return;
+    }
+    for (BlockEntry *block_entry : block_entries) {
+        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
+        block_entry->Flush(max_commit_ts);
+        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                              block_entry->checkpoint_ts(),
+                              block_entry->min_row_ts(),
+                              block_entry->max_row_ts(),
+                              max_commit_ts));
+    }
 }
 
 SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {
@@ -468,8 +589,8 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     }
 
     this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
-    this->row_capacity_ = std::max(this->row_capacity_, segment_entry2->row_capacity_);
+    // TODO: actual_row_count
+    this->deprecate_ts_ = std::max(this->deprecate_ts_, segment_entry2->deprecate_ts_);
 
     SizeT block_count = this->block_entries_.size();
     SizeT idx = 0;
@@ -508,6 +629,10 @@ UniquePtr<CreateIndexParam> SegmentEntry::GetCreateIndexParam(SizeT seg_row_coun
         }
         case IndexType::kIRSFullText: {
             return MakeUnique<CreateFullTextParam>(index_base, column_def);
+        }
+        case IndexType::kSecondary: {
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
         }
         default: {
             UniquePtr<String> err_msg =

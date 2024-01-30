@@ -24,11 +24,9 @@ namespace infinity {
 
 class Storage;
 class BGTaskProcessor;
+class TableEntry;
 
 export class WalManager {
-public:
-    static String WalCommandTypeToString(WalCommandType type);
-
 public:
     WalManager(Storage *storage,
                String wal_path,
@@ -80,14 +78,18 @@ private:
     void WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+
+    void ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts);
+
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
-    u64 wal_size_threshold_{};
-    u64 full_checkpoint_interval_sec_{};
-    u64 delta_checkpoint_interval_sec_{};
-    u64 delta_checkpoint_interval_wal_bytes_{};
+    u64 cfg_wal_size_threshold_{};
+    u64 cfg_full_checkpoint_interval_sec_{};
+    u64 cfg_delta_checkpoint_interval_sec_{};
+    u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
@@ -119,6 +121,7 @@ private:
     i64 full_ckp_when_{};
     i64 delta_ckp_wal_size_{};
     i64 delta_ckp_when_{};
+    TxnTimeStamp last_ckp_commit_ts_{};
 
     Vector<String> wal_list_{};
 };

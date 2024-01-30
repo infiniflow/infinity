@@ -25,7 +25,7 @@ public:
 
     void Init(docid_t base_doc_id, u64 doc_count);
 
-    // for realtime segment posting
+    // for in memory segment posting
     void Init(docid_t base_doc_id, u32 doc_count, PostingWriter *posting_writer);
 
     docid_t GetBaseDocId() const { return base_doc_id_; }
@@ -38,9 +38,9 @@ public:
     void SetPostingFormatOption(const PostingFormatOption &option) { posting_option_ = option; }
 
     const PostingWriter *GetInMemPostingWriter() const { return posting_writer_; }
-    bool IsRealTimeSegment() const { return posting_writer_ != nullptr; }
+    bool IsInMemorySegment() const { return posting_writer_ != nullptr; }
 
-    void GetTermMetaForRealtime(TermMeta &tm) {
+    void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
         tf_t ttf = posting_writer_->GetTotalTF();
         // termpayload_t term_payload = posting_writer_->GetTermPayload();
@@ -49,7 +49,7 @@ public:
         // tm.SetPayload(term_payload);
     }
 
-    TermMeta GetCurrentTermMeta() const;
+    TermMeta GetSegmentTermMeta() const;
 
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 

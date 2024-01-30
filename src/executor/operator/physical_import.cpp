@@ -52,6 +52,7 @@ import infinity_exception;
 import zsv;
 import status;
 import column_vector;
+import default_values;
 
 namespace infinity {
 
@@ -127,7 +128,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     Txn *txn = query_context->GetTxn();
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
 
-    u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
+    SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
     BlockEntry *last_block_entry = segment_entry->GetLastEntry();
     BufferHandle buffer_handle = last_block_entry->GetColumnBlockEntry(0)->buffer()->Load();
@@ -340,6 +341,14 @@ void PhysicalImport::CSVRowHandler(void *context) {
     auto txn_store = txn->GetTxnTableStore(table_entry);
     auto *buffer_mgr = txn->GetBufferMgr();
 
+    // if column count is larger than columns defined from schema, extra columns are abandoned
+    if (column_count != table_entry->ColumnCount()) {
+        UniquePtr<String> err_msg =
+            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
+        LOG_ERROR(*err_msg);
+        RecoverableError(Status::ColumnCountMismatch(*err_msg));
+    }
+
     auto segment_entry = parser_context->segment_entry_;
     // we have already used all space of the segment
 
@@ -370,13 +379,6 @@ void PhysicalImport::CSVRowHandler(void *context) {
         }
     }
 
-    // if column count is larger than columns defined from schema, extra columns are abandoned
-    if (column_count != table_entry->ColumnCount()) {
-        UniquePtr<String> err_msg =
-            MakeUnique<String>(fmt::format("CSV file row count isn't match with table schema, row id: {}.", parser_context->row_count_));
-        LOG_ERROR(*err_msg);
-        RecoverableError(Status::ImportFileFormatError(*err_msg));
-    }
     // append data to segment entry
     // SizeT write_row = last_block_entry->row_count();
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
@@ -486,30 +488,19 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
-    Vector<u16> block_row_counts;
-
+    segment_entry->FlushData();
     const auto &block_entries = segment_entry->block_entries();
-    block_row_counts.reserve(block_entries.size());
-    for (auto &block_entry : block_entries) {
-        block_entry->FlushData(block_entry->row_count());
-        auto size = std::max(block_entries.size(), static_cast<SizeT>(block_entry->block_id() + 1));
-        block_row_counts.resize(size);
-        block_row_counts[block_entry->block_id()] = block_entry->row_count();
-    }
-
-    LOG_TRACE(fmt::format("Block rows count {}", block_row_counts.size()));
-    for (SizeT i = 0; i < block_row_counts.size(); ++i) {
-        LOG_TRACE(fmt::format("Block {} row count {}", i, block_row_counts[i]));
-    }
+    u16 last_block_row_count = block_entries.back()->row_count();
 
     const String &db_name = *txn_store->table_entry_->GetDBName();
     const String &table_name = *txn_store->table_entry_->GetTableName();
     txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                         table_name,
-                                                        *segment_entry->segment_dir(),
-                                                        segment_entry->segment_id(),
-                                                        block_entries.size(),
-                                                        block_row_counts));
+                                                        WalSegmentInfo{segment_entry->segment_dir(),
+                                                                       segment_entry->segment_id(),
+                                                                       static_cast<u16>(block_entries.size()),
+                                                                       DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
+                                                                       last_block_row_count}));
 
     txn_store->Import(segment_entry);
 }

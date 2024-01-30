@@ -19,63 +19,52 @@ import stl;
 namespace infinity {
 
 /**
-A registry that can be used to store the pairs of (Key, SizeT). The registry should be able to store a maximum number of pairs. If the maximum number
-is reached, the least recently used pair should be removed from the registry.
-
-The member function Find(Key) should be return the SizeT for a given Key, and moved the found pairT to the head of the lru list. If the Key is not in
-the registry, the registry should return zero.
-
-The member function Insert(Key, SizeT) should insert the pair (Key, SizeT) into the registry. If the Key is already in the registry, the SizeT should
-be updated. If the registry is full, the least recently used pair should be removed from the registry.
-
+A registry is fixed-capacity hash table that can be used to store the pairs of (Key, Val).
 */
 
-export template <typename Key>
+template <typename Key, typename Val>
+struct RegistryCell {
+    Key key_;
+    Val value_;
+};
+
+export template <typename Val>
+struct RegistryEntry {
+    bool found_{false};
+    union {
+        SizeT slot_; // valid iff found==false
+        Val value_;  // valid iff found==true
+    };
+    RegistryEntry() = default;
+};
+
+export template <typename Key, typename Val>
 class Registry {
 private:
-    using Entry = Pair<Key, SizeT>;
-    using ListIterator = List<Entry>::iterator;
-    HashMap<Key, ListIterator> map_;
-    List<Entry> lru_;
-    SizeT max_size_;
+    Vector<RegistryCell<Key, Val>> table_;
+    SizeT mask_;
 
 public:
-    explicit Registry(SizeT max_size = 10000) : map_(max_size), max_size_(max_size) {}
+    explicit Registry(SizeT table_size_shift) : mask_((1ULL << table_size_shift) - 1ULL) { table_.resize(1ULL << table_size_shift); }
 
-    SizeT Find(const Key &key) {
-        auto iter = map_.find(key);
-        if (iter == map_.end()) {
-            return 0;
+    // Find the entry with the given key.
+    RegistryEntry<Val> Find(const Key &key) {
+        RegistryEntry<Val> ent;
+        SizeT slot = key.Hash() & mask_;
+        if (table_[slot].key_ == key) {
+            ent.found_ = true;
+            ent.value_ = table_[slot].value_;
+        } else {
+            ent.slot_ = slot;
         }
-
-        Entry pair = *iter->second;
-        lru_.erase(iter->second);
-        lru_.push_front(pair);
-        map_[key] = lru_.begin();
-
-        return pair.second;
+        return ent;
     }
 
-    void Insert(const Key &key, SizeT value) {
-        auto iter = map_.find(key);
-        if (iter != map_.end()) {
-            lru_.erase(iter->second);
-        } else if (lru_.size() >= max_size_) {
-            auto last = lru_.back();
-            map_.erase(last.first);
-            lru_.pop_back();
-        }
-
-        lru_.push_front(Entry(key, value));
-        map_[key] = lru_.begin();
+    // Insert the pair into the given slot. Assume key.Hash()==slot. The existing one at the given slot is discared silently.
+    void Insert(SizeT slot, Key &key, Val value) {
+        table_[slot].key_ = std::move(key);
+        table_[slot].value_ = value;
     }
-
-    void Clear() {
-        map_.clear();
-        lru_.clear();
-    }
-
-    SizeT Size() { return map_.size(); }
 };
 
 } // namespace infinity
