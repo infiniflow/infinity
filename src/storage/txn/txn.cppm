@@ -163,6 +163,10 @@ public:
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
+    void FullCheckpoint(const TxnTimeStamp max_commit_ts);
+
+    void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
+
 private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal

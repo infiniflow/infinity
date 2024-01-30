@@ -72,6 +72,25 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entr
     return table_entry;
 }
 
+SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
+                                                      SharedPtr<String> db_entry_dir,
+                                                      SharedPtr<String> table_name,
+                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                      TableEntryType table_entry_type,
+                                                      TransactionID txn_id,
+                                                      TxnTimeStamp begin_ts,
+                                                      TxnTimeStamp commit_ts,
+                                                      bool is_delete,
+                                                      SizeT row_count) {
+    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
+    table_entry->deleted_ = is_delete;
+    // TODO need to check if commit_ts influence replay catalog delta entry
+    table_entry->commit_ts_.store(commit_ts);
+    table_entry->row_count_.store(row_count);
+
+    return table_entry;
+}
+
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
@@ -97,9 +116,9 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
 
-        {   //
+        { //
             if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddIndexMetaOperation>(new_table_index_meta.get());
+                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
                 txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
             }
         }
@@ -415,11 +434,6 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     }
 }
 
-// DBEntry *TableEntry::GetDBEntry(const TableEntry *table_entry) {
-//     TableMeta *table_meta = (TableMeta *)table_entry->table_meta_;
-//     return (DBEntry *)table_meta->db_entry_;
-// }
-
 const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_name_ptr(); }
 
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(u64, TxnTimeStamp begin_ts) {
@@ -469,9 +483,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
-            //            if(segment_entry->commit_ts_ <= max_commit_ts) {
             segment_candidates.emplace_back(segment_entry.get());
-            //            }
         }
 
         table_index_meta_candidates.reserve(this->index_meta_map_.size());

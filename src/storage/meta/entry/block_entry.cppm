@@ -77,13 +77,23 @@ public:
     NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn);
 
     static UniquePtr<BlockEntry> NewReplayBlockEntry(const SegmentEntry *segment_entry,
-                                                     u16 block_id,
+                                                     BlockID block_id,
                                                      TxnTimeStamp checkpoint_ts,
                                                      u64 column_count,
                                                      BufferManager *buffer_mgr,
                                                      u16 row_count,
                                                      TxnTimeStamp min_row_ts,
                                                      TxnTimeStamp max_row_ts);
+
+    static UniquePtr<BlockEntry> NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
+                                                            BlockID block_id,
+                                                            u16 row_count,
+                                                            u16 row_capacity,
+                                                            TxnTimeStamp min_row_ts,
+                                                            TxnTimeStamp max_row_ts,
+                                                            TxnTimeStamp check_point_ts,
+                                                            u16 checkpoint_row_count,
+                                                            BufferManager *buffer_mgr);
 
 public:
     // Used in physical import
@@ -126,6 +136,10 @@ public:
 
     inline TxnTimeStamp checkpoint_ts() const { return checkpoint_ts_; }
 
+    inline TransactionID using_txn_id() const { return using_txn_id_; }
+
+    inline u16 checkpoint_row_count() const { return checkpoint_row_count_; }
+
     inline u16 block_id() const { return block_id_; }
 
     u32 segment_id() const;
@@ -144,6 +158,8 @@ public:
     String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, BlockVersion::PATH); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
+
+    Vector<UniquePtr<BlockColumnEntry>> &columns() { return columns_; }
 
 public:
     // Setter
@@ -171,6 +187,6 @@ protected:
     u16 checkpoint_row_count_{0};
 
     // Column data
-    Vector<UniquePtr<BlockColumnEntry>> columns_;
+    Vector<UniquePtr<BlockColumnEntry>> columns_{};
 };
 } // namespace infinity

@@ -57,6 +57,7 @@ private:
 
     Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
     // Thread-unsafe
     List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
 

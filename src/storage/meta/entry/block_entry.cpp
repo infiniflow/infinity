@@ -117,10 +117,13 @@ UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddBlockEntryOperation>(block_entry.get());
+    {
+        auto operation = MakeUnique<AddBlockEntryOp>(block_entry.get());
         txn->AddCatalogDeltaOperation(std::move(operation));
     }
+
+    auto begin_ts = txn->BeginTS();
+    block_entry->begin_ts_ = begin_ts;
 
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
@@ -153,6 +156,29 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     }
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
+    return block_entry;
+}
+
+UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry *segment_entry,
+                                                             BlockID block_id,
+                                                             u16 row_count,
+                                                             u16 row_capacity,
+                                                             TxnTimeStamp min_row_ts,
+                                                             TxnTimeStamp max_row_ts,
+                                                             TxnTimeStamp check_point_ts,
+                                                             u16 checkpoint_row_count,
+                                                             BufferManager *buffer_mgr) {
+
+    auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, 0);
+
+    block_entry->row_count_ = row_count;
+    block_entry->min_row_ts_ = min_row_ts;
+    block_entry->max_row_ts_ = max_row_ts;
+    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
+    block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
+    block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
+    block_entry->checkpoint_ts_ = check_point_ts;
+    block_entry->checkpoint_row_count_ = checkpoint_row_count;
     return block_entry;
 }
 
@@ -338,30 +364,45 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
     }
     json_res["min_row_ts"] = this->min_row_ts_;
     json_res["max_row_ts"] = this->checkpoint_ts_;
+    json_res["version_file"] = this->VersionFilePath();
+
+    json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
+    json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
+    json_res["txn_id"] = TransactionID(this->txn_id_);
     return json_res;
 }
 
 UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_json, SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
     u64 block_id = block_entry_json["block_id"];
     TxnTimeStamp checkpoint_ts = block_entry_json["checkpoint_ts"];
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry, block_id, checkpoint_ts, 0, nullptr);
 
-    *block_entry->block_dir_ = block_entry_json["block_dir"];
-    block_entry->row_capacity_ = block_entry_json["row_capacity"];
-    block_entry->row_count_ = block_entry_json["row_count"];
-    block_entry->min_row_ts_ = block_entry_json["min_row_ts"];
-    block_entry->max_row_ts_ = block_entry_json["max_row_ts"];
-    block_entry->checkpoint_row_count_ = block_entry->row_count_;
+    auto block_dir = block_entry_json["block_dir"];
+    auto row_capacity = block_entry_json["row_capacity"];
+    auto row_count = block_entry_json["row_count"];
+    auto min_row_ts = block_entry_json["min_row_ts"];
+    auto max_row_ts = block_entry_json["max_row_ts"];
+
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
+                                                                               block_id,
+                                                                               row_count,
+                                                                               row_capacity,
+                                                                               min_row_ts,
+                                                                               max_row_ts,
+                                                                               checkpoint_ts,
+                                                                               row_count,
+                                                                               buffer_mgr);
+
+    block_entry->commit_ts_ = block_entry_json["commit_ts"];
+    block_entry->begin_ts_ = block_entry_json["begin_ts"];
+    block_entry->txn_id_ = block_entry_json["txn_id"];
+
+    block_entry->block_version_->LoadFromFile(block_entry->VersionFilePath());
+    if (block_entry->block_version_->created_.empty()) {
+        block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);
+    }
 
     for (const auto &block_column_json : block_entry_json["columns"]) {
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
-    }
-    block_entry->block_version_->LoadFromFile(block_entry->VersionFilePath());
-    // if not found version file
-    if (block_entry->block_version_->created_.empty()) {
-        block_entry->block_version_->created_.emplace_back(block_entry->max_row_ts_, block_entry->row_count_);
-        // FIXME Need to flush the version file?
-        // FlushVersion(block_entry.get(), *block_entry->block_version_);
     }
 
     return block_entry;

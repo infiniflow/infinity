@@ -219,7 +219,9 @@ public:
     // Serialization and Deserialization
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    String SaveAsFile(const String &dir, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts);
+
+    void FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void MergeFrom(NewCatalog &other);
 
@@ -228,6 +230,8 @@ public:
     static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
     static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+
+    static void LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -241,8 +245,8 @@ public:
 public:
     SharedPtr<String> current_dir_{nullptr};
     HashMap<String, UniquePtr<DBMeta>> databases_{};
-    u64 next_txn_id_{};
-    u64 catalog_version_{};
+    TransactionID next_txn_id_{};
+    u64 catalog_version_{}; // TODO seems useless
     std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.

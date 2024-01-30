@@ -49,6 +49,17 @@ public:
                                                             BufferManager *buffer_manager,
                                                             CreateIndexParam *create_index_param);
 
+    static SharedPtr<SegmentColumnIndexEntry> NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
+                                                                         TableEntry *table_entry,
+                                                                         SegmentID segment_id,
+                                                                         BufferManager *buffer_manager,
+                                                                         TxnTimeStamp min_ts,
+                                                                         TxnTimeStamp max_ts,
+                                                                         TransactionID txn_id,
+                                                                         TxnTimeStamp begin_ts,
+                                                                         TxnTimeStamp commit_ts,
+                                                                         bool is_delete);
+
     [[nodiscard]] BufferHandle GetIndex();
 
     // load the idx part into memory
@@ -65,6 +76,8 @@ public:
 
     void MergeFrom(BaseEntry &other);
 
+    bool Flush(TxnTimeStamp checkpoint_ts);
+
 public:
     // Getter
     inline SegmentID segment_id() const { return segment_id_; }
@@ -74,11 +87,7 @@ public:
 
 private:
     explicit SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
-
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
-
-    bool Flush(TxnTimeStamp checkpoint_ts);
-
     // Load from disk. Is called by SegmentColumnIndexEntry::Deserialize.
     static UniquePtr<SegmentColumnIndexEntry>
     LoadIndexEntry(ColumnIndexEntry *column_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *create_index_param);

@@ -483,10 +483,10 @@ bool WalEntry::IsFullCheckPoint() const {
 
 String WalEntry::ToString() const {
     std::stringstream ss;
-    ss << "wal entry" << std::endl;
-    ss << "wal entry header" << std::endl;
-    ss << "txn_id: " << txn_id_ << std::endl;
-    ss << "commit_ts: " << commit_ts_ << std::endl;
+    ss << "\n======= WAL ENTRY =======" << std::endl;
+    ss << "[HEADER]" << std::endl;
+    ss << "txn id: " << txn_id_ << std::endl;
+    ss << "commit ts: " << commit_ts_ << std::endl;
     ss << "size: " << size_ << std::endl;
     for (const auto &cmd : cmds_) {
         ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
@@ -527,6 +527,7 @@ String WalEntry::ToString() const {
             ss << "index def: " << create_index_cmd->index_def_->ToString() << std::endl;
         }
     }
+    ss << "========================" << std::endl;
     return ss.str();
 }
 

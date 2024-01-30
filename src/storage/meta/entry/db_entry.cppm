@@ -38,6 +38,13 @@ public:
     static SharedPtr<DBEntry>
     NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    static SharedPtr<DBEntry> NewReplayDBEntry(const SharedPtr<String> &data_dir,
+                                               const SharedPtr<String> &db_name,
+                                               TransactionID txn_id,
+                                               TxnTimeStamp begin_ts,
+                                               TxnTimeStamp commit_ts,
+                                               bool is_delete);
+
 public:
     SharedPtr<String> ToString();
 
@@ -54,6 +61,8 @@ public:
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
+
+    [[nodiscard]] HashMap<String, UniquePtr<TableMeta>> &tables() { return tables_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
@@ -78,7 +87,6 @@ private:
     std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableMeta>> tables_{}; // NOTE : can use SharedPtr<String> as key.
+    HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
-
 } // namespace infinity
