@@ -25,18 +25,21 @@ import :writer;
 namespace infinity {
 
 struct LastTransition {
-    u8 inp_;
-    Output out_;
+    bool present_{false};
+    u8 inp_{0};
+    Output out_{0};
+    LastTransition() = default;
+    LastTransition(u8 inp, Output out) : present_(true), inp_(inp), out_(out){};
 };
 
 struct BuilderNodeUnfinished {
     UniquePtr<BuilderNode> node_;
-    Optional<LastTransition> last_;
+    LastTransition last_;
 
     void LastCompiled(CompiledAddr addr) {
-        if (last_.has_value()) {
-            node_->trans_.push_back(Transition{last_->inp_, last_->out_, addr});
-            last_.reset();
+        if (last_.present_) {
+            node_->trans_.emplace_back(last_.inp_, last_.out_, addr);
+            last_.present_ = false;
         }
     }
 
@@ -49,8 +52,8 @@ struct BuilderNodeUnfinished {
             Transition &t = node_->trans_[i];
             t.out_ = prefix.Cat(t.out_);
         }
-        if (last_.has_value())
-            last_->out_ = prefix.Cat(last_->out_);
+        if (last_.present_)
+            last_.out_ = prefix.Cat(last_.out_);
     }
 };
 
@@ -66,14 +69,14 @@ struct UnfinishedNodes {
 
     void PushEmpty(bool is_final) {
         auto node = MakeUnique<BuilderNode>(is_final, Output::Zero(), Vector<Transition>{});
-        auto unfinished = MakeUnique<BuilderNodeUnfinished>(std::move(node), None);
+        auto unfinished = MakeUnique<BuilderNodeUnfinished>(std::move(node), LastTransition());
         stack_.push_back(std::move(unfinished));
     }
     UniquePtr<BuilderNode> PopRoot() {
         assert(stack_.size() == 1);
         auto unfinished = std::move(stack_.back());
         stack_.pop_back();
-        assert(!unfinished->last_.has_value());
+        assert(!unfinished->last_.present_);
         return std::move(unfinished->node_);
     }
 
@@ -87,7 +90,7 @@ struct UnfinishedNodes {
     UniquePtr<BuilderNode> PopEmpty() {
         auto unfinished = std::move(stack_.back());
         stack_.pop_back();
-        assert(!unfinished->last_.has_value());
+        assert(!unfinished->last_.present_);
         return std::move(unfinished->node_);
     }
 
@@ -108,10 +111,10 @@ struct UnfinishedNodes {
         if (bs_len == 0)
             return;
         auto &unfinished = stack_.back();
-        assert(!unfinished->last_.has_value());
-        unfinished->last_ = LastTransition{bs_ptr[0], out};
+        assert(!unfinished->last_.present_);
+        unfinished->last_ = LastTransition(bs_ptr[0], out);
         for (SizeT i = 1; i < bs_len; i++) {
-            auto unfinished = MakeUnique<BuilderNodeUnfinished>(MakeUnique<BuilderNode>(), LastTransition{bs_ptr[i], Output::Zero()});
+            auto unfinished = MakeUnique<BuilderNodeUnfinished>(MakeUnique<BuilderNode>(), LastTransition(bs_ptr[i], Output::Zero()));
             stack_.push_back(std::move(unfinished));
         }
         PushEmpty(true);
@@ -123,7 +126,7 @@ struct UnfinishedNodes {
             if (i >= stack_.size())
                 break;
             auto &t = stack_[i]->last_;
-            if (!t.has_value() || t->inp_ != bs_ptr[i])
+            if (!t.present_ || t.inp_ != bs_ptr[i])
                 break;
         }
         return i;
@@ -135,14 +138,14 @@ struct UnfinishedNodes {
         SizeT common_len = std::min(bs_len, stack_.size() - 1);
         for (; i < common_len; i++) {
             auto &t = stack_[i]->last_;
-            assert(t.has_value());
-            if (t->inp_ != bs_ptr[i])
+            assert(t.present_);
+            if (t.inp_ != bs_ptr[i])
                 break;
-            Output common_pre = t->out_.Prefix(out);
-            Output add_prefix = t->out_.Sub(common_pre);
+            Output common_pre = t.out_.Prefix(out);
+            Output add_prefix = t.out_.Sub(common_pre);
             out = out.Sub(common_pre);
             if (!add_prefix.IsZero()) {
-                t->out_ = common_pre;
+                t.out_ = common_pre;
                 stack_[i + 1]->AddOutputPrefix(add_prefix);
             }
         }
