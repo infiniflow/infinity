@@ -89,9 +89,12 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewReplaySegmentInde
     ColumnID column_id = column_index_entry->column_id();
     auto create_index_param =
         SegmentEntry::GetCreateIndexParam(segment_row_count, column_index_entry->index_base_ptr(), table_entry->GetColumnDefByID(column_id));
-    UniquePtr<IndexFileWorker> file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
-    auto buffer = buffer_manager->Get(std::move(file_worker));
-    auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, buffer));
+    auto vector_file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
+    Vector<BufferObj *> vector_buffer(vector_file_worker.size());
+    for (u32 i = 0; i < vector_file_worker.size(); ++i) {
+        vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
+    };
+    auto segment_column_index_entry = SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
     if (segment_column_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");
     }
