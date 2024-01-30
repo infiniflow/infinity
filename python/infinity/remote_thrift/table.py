@@ -173,7 +173,6 @@ class RemoteTable(Table, ABC):
             case _:
                 update_expr_array: list[ttypes.UpdateExpr] = []
                 for row in data:
-                    parse_exprs = []
                     for column_name, value in row.items():
 
                         if isinstance(value, str):

@@ -133,6 +133,10 @@ class TestTable:
         assert res.success
 
         # get table
+        # res = db_obj.get_table("my_table")
+        # assert res
+
+        # get table
         try:
             res = db_obj.get_table("my_table")
         except Exception as e:
@@ -210,10 +214,6 @@ class TestTable:
         res = db_obj.list_tables()
         assert res.success
 
-        # # get table
-        # res = db_obj.get_table("my_table")
-        # assert res
-
         # get table
         try:
             res = db_obj.get_table("my_table")
@@ -245,7 +245,6 @@ class TestTable:
             "int", "int8", "int16", "int32", "int64", "int128", "float",
             "float32", "double", "float64", "varchar", "integer", "bool",
         ]
-
         # make params
         params = {}
         for i in range(c_count - 13):
@@ -450,6 +449,26 @@ class TestTable:
         """
         pass
 
+    # create/drop/list/get 1K table to reach the limit
+    def test_create_1K_table(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        tb_count = 1000
+        for i in range(tb_count):
+            try:
+                tb = db_obj.create_table("my_table" + str(i), {"c1": "int"}, None)
+                print(i)
+                # raise Exception(f"Can create table")
+            except Exception as e:
+                print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_1M_table(self):
@@ -472,5 +491,4 @@ class TestTable:
         assert res.success
 
     # create/drop same table in different thread to test conflict
-
     # create empty column table

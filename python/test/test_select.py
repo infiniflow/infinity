@@ -408,3 +408,30 @@ class TestSelect:
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
             {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))
+
+
+    # insert primitive data type not aligned with table definition
+    # insert large varchar which exceeds the limit to table
+    # insert embedding data which type info isn't match with table definition
+    # insert data into non-existent table, dropped table
+    # insert empty into table
+    # insert data into index created table
+
+    # insert table with 10000 columns.
+    # insert table with columns isn't matched (more and less)
+    # insert table with column value exceeding invalid value range
+
+    # batch insert, within limit
+    # batch insert with 10000 columns
+    # batch insert, batch size limit? 8192?
+    # batch insert, with invalid data type inside.
+    # batch insert, with invalid column count
+    # create/drop/describe/get valid table name with different column types
+
+
+    # create a table with all types supported, each column can be output correctly.
+    # create a table, insert more than one data block, each column data is output correctly.
+    # create a table, one column data are all inline varchar, output correctly.
+    # create a table, one column data are all inline varchar, and more than one block, output correctly.
+    # create a table, one column data are all outline varchar, output correctly.
+    # create a table, one column data are all outline varchar, and more than one block, output correctly.
