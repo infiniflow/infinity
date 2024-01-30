@@ -148,11 +148,15 @@ struct BuilderNode {
     BuilderNode(bool is_final, Output final_output, Vector<Transition> &&trans)
         : is_final_(is_final), final_output_(final_output), trans_(std::move(trans)) {}
 
-    BuilderNode(const BuilderNode &source) {
+    BuilderNode(const BuilderNode &source) : is_final_(source.is_final_), final_output_(source.final_output_), trans_(source.trans_) {}
+
+    BuilderNode(BuilderNode &&source) : is_final_(source.is_final_), final_output_(source.final_output_), trans_(std::move(source.trans_)) {}
+
+    BuilderNode &operator=(BuilderNode &&source) noexcept {
         is_final_ = source.is_final_;
         final_output_ = source.final_output_;
-        trans_.clear();
-        Copy(source.trans_.begin(), source.trans_.end(), std::back_inserter(trans_));
+        trans_ = std::move(source.trans_);
+        return *this;
     }
 
     // Need to provide a hash function and operator== for BuilderNode so that it can be used as a key in a std::unordered_map.
@@ -795,10 +799,3 @@ CompiledAddr Node::TransAddr(SizeT i) { return state_->TransAddr(*this, i); }
 Optional<SizeT> Node::FindInput(u8 b) { return state_->FindInput(*this, b); }
 
 } // namespace infinity
-
-namespace std {
-template <>
-struct hash<infinity::BuilderNode> {
-    size_t operator()(const infinity::BuilderNode &node) const { return node.Hash(); }
-};
-} // namespace std

@@ -1,4 +1,4 @@
-A simplified C++ reimplementing of [BurntSushi/fst](https://github.com/BurntSushi/fst) library. The FST file format should be binary compatible with the original one. 
+A simplified C++ reimplementing of [BurntSushi/fst](https://github.com/BurntSushi/fst) library. The FST file format should be binary compatible with the original one.
 
 This library is for efficiently storing and searching ordered sets or maps where the keys are byte strings. A key design goal of this crate is to support storing and searching *very large* sets or maps (i.e., billions). This means that much effort has gone in to making sure that all operations are memory efficient.
 
