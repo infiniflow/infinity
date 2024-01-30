@@ -79,7 +79,7 @@ public:
     const IndexBase *index_base_ptr() const { return index_base_.get(); }
     const SharedPtr<IndexBase> index_base() const { return index_base_; }
     TableIndexEntry *table_index_entry() const { return table_index_entry_; }
-    const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment() const { return index_by_segment_; }
+    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment() { return index_by_segment_; }
 
     // Used in segment column index entry
     Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
