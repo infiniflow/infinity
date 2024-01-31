@@ -95,8 +95,7 @@ class TestDatabase:
         for db_name in common_values.invalid_name_array:
             try:
                 # print('db name: ', db_name)
-                db = infinity_obj.create_database(db_name)
-                assert False
+                infinity_obj.create_database(db_name)
             except Exception as e:
                 print(e)
 
