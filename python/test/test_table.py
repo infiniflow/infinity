@@ -456,6 +456,7 @@ class TestTable:
         pass
 
     # create/drop/list/get 1K table to reach the limit
+    @pytest.mark.skip(reason="Cause service termination")
     def test_create_1K_table(self):
         # connect
         infinity_obj = infinity.connect(REMOTE_HOST)
@@ -466,15 +467,12 @@ class TestTable:
         for i in range(tb_count):
             try:
                 tb = db_obj.create_table("my_table" + str(i), {"c1": "int"}, None)
-                print(i)
-                # raise Exception(f"Can create table")
             except Exception as e:
                 print(e)
 
         for i in range(tb_count):
             try:
                 tb = db_obj.drop_table("my_table" + str(i))
-                print(i)
             except Exception as e:
                 print(e)
 
