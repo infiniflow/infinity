@@ -101,32 +101,6 @@ void RegisterSignal() {
 
 } // namespace
 
-namespace infinity {
-
-void ParseArguments(int argc, char **argv, StartupParameter &parameters) {
-    cxxopts::Options options("./infinity_main", "");
-
-    options.add_options()("h,help", "Display this help and exit") // NOLINT
-        ("f,config",
-         "Specify the config file path. No default config file",
-         MakeShared<cxxopts::values::standard_value<String>>()->default_value("")) // NOLINT
-        ;
-
-    cxxopts::ParseResult result = options.parse(argc, argv);
-
-    if (result.count("help")) {
-        fmt::print("{}", options.help());
-        return;
-    }
-
-    String config_path = result["config"].as<String>();
-    if (!config_path.empty()) {
-        parameters.config_path = MakeShared<String>(config_path);
-    }
-}
-
-} // namespace infinity
-
 auto main(int argc, char **argv) -> int {
     using namespace infinity;
 
@@ -147,7 +121,17 @@ auto main(int argc, char **argv) -> int {
                git_commit_id());
 
     StartupParameter parameters;
-    ParseArguments(argc, argv, parameters);
+    CLI::App app{"infinity_main"};
+    String config_path = "";
+    app.add_option("-f,--config", config_path, "Specify the config file path. No default config file");
+    try {
+        app.parse(argc, argv);
+    } catch (const CLI::ParseError &e) {
+        return app.exit(e);
+    }
+    if (!config_path.empty()) {
+        parameters.config_path = MakeShared<String>(config_path);
+    }
 
     InfinityContext::instance().Init(parameters.config_path);
 
