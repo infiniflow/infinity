@@ -65,19 +65,14 @@ public:
             throw FstError::Format(data_len);
         }
         u64 version = ReadU64LE(data_ptr);
-        if (version == 0 || version > VERSION) {
+        if (version != VERSION) {
             throw FstError::Version(VERSION, version);
         }
         u64 ty = ReadU64LE(data_ptr + 8);
         SizeT end;
         Optional<u32> checksum;
-        if (version <= 2) {
-            end = data_len;
-            checksum = None;
-        } else {
-            end = data_len - 4;
-            checksum = ReadU32LE(data_ptr + data_len - 4);
-        }
+        end = data_len - 4;
+        checksum = ReadU32LE(data_ptr + data_len - 4);
         SizeT root_addr = ReadU64LE(data_ptr + end - 8);
         SizeT len = ReadU64LE(data_ptr + end - 16);
         // The root node is always the last node written, so its address should
@@ -103,13 +98,8 @@ public:
         // And finally, our calculation changes somewhat based on version.
         // If the FST version is less than 3, then it does not have a checksum.
         SizeT empty_total, addr_offset;
-        if (version <= 2) {
-            empty_total = 32;
-            addr_offset = 17;
-        } else {
-            empty_total = 36;
-            addr_offset = 21;
-        }
+        empty_total = 36;
+        addr_offset = 21;
         if ((root_addr == EMPTY_ADDRESS && data_len != empty_total) && root_addr + addr_offset != data_len) {
             throw FstError::Format(data_len);
         }
@@ -166,20 +156,20 @@ public:
     /// If the key does not exist, then `None` is returned.
     Optional<u64> Get(u8 *key_ptr, SizeT key_len) {
         Output out;
-        UniquePtr<Node> node = Root();
+        Node node = Root();
         for (SizeT i = 0; i < key_len; i++) {
-            Optional<SizeT> ti = node->FindInput(key_ptr[i]);
+            Optional<SizeT> ti = node.FindInput(key_ptr[i]);
             if (!ti.has_value()) {
                 return None;
             }
-            Transition t = node->TransAt(ti.value());
+            Transition t = node.TransAt(ti.value());
             node = NodeAt(t.addr_);
             out = out.Cat(t.out_);
         }
-        if (!node->IsFinal()) {
+        if (!node.IsFinal()) {
             return None;
         }
-        out = out.Cat(node->FinalOutput());
+        out = out.Cat(node.FinalOutput());
         return out.Value();
     }
 
@@ -188,12 +178,12 @@ public:
 
 private:
     /// Returns the root node of this fst.
-    UniquePtr<Node> Root() { return MakeUnique<Node>(meta_.version_, meta_.root_addr_, data_ptr_); }
+    Node Root() { return Node(meta_.root_addr_, data_ptr_); }
 
     /// Returns the node at the given address.
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
-    UniquePtr<Node> NodeAt(CompiledAddr addr) { return MakeUnique<Node>(meta_.version_, addr, data_ptr_); }
+    Node NodeAt(CompiledAddr addr) { return Node(addr, data_ptr_); }
 };
 
 export struct Bound {
@@ -225,11 +215,11 @@ export struct Bound {
 };
 
 struct StreamState {
-    UniquePtr<Node> node_;
+    Node node_;
     SizeT trans_;
     Output out_;
-    StreamState(UniquePtr<Node> node, SizeT trans, Output out) : node_(std::move(node)), trans_(trans), out_(out) {}
-    StreamState(StreamState &&other) : node_(std::move(other.node_)), trans_(other.trans_), out_(other.out_) {}
+    StreamState(const Node &node, SizeT trans, Output out) : node_(node), trans_(trans), out_(out) {}
+    StreamState(const StreamState &other) : node_(other.node_), trans_(other.trans_), out_(other.out_) {}
 };
 
 /// A lexicographically ordered stream of key-value pairs from an fst.
@@ -257,29 +247,29 @@ public:
     bool Next(Vector<u8> &key, u64 &val) {
         while (!stack_.empty()) {
             StreamState &state = stack_.back();
-            if (state.trans_ >= state.node_->Len()) {
-                if (state.node_->Addr() != fst_.RootAddr()) {
+            if (state.trans_ >= state.node_.Len()) {
+                if (state.node_.Addr() != fst_.RootAddr()) {
                     inp_.pop_back();
                 }
                 stack_.pop_back();
                 continue;
             }
-            Transition trans = state.node_->TransAt(state.trans_);
+            Transition trans = state.node_.TransAt(state.trans_);
             Output out = state.out_.Cat(trans.out_);
-            UniquePtr<Node> next_node = fst_.NodeAt(trans.addr_);
+            Node next_node = fst_.NodeAt(trans.addr_);
             inp_.push_back(trans.inp_);
             if (end_at_.ExceededBy(inp_.data(), inp_.size())) {
                 // We are done, forever.
                 stack_.clear();
                 return false;
             }
-            bool is_final = next_node->IsFinal();
+            bool is_final = next_node.IsFinal();
             if (is_final) {
                 key = inp_;
-                val = out.Cat(next_node->FinalOutput()).Value();
+                val = out.Cat(next_node.FinalOutput()).Value();
             }
             state.trans_++;
-            stack_.emplace_back(std::move(next_node), 0, out);
+            stack_.emplace_back(next_node, 0, out);
             if (is_final)
                 return true;
         }
@@ -307,15 +297,15 @@ private:
         // N.B. We do not necessarily need to stop in a final state, unlike
         // the one-off `find` method. For the example, the given bound might
         // not actually exist in the FST.
-        UniquePtr<Node> node = fst_.Root();
+        Node node = fst_.Root();
         Output out;
         for (SizeT i = 0; i < key.size(); i++) {
             u8 b = key[i];
-            Optional<SizeT> ti = node->FindInput(b);
+            Optional<SizeT> ti = node.FindInput(b);
             if (ti.has_value()) {
-                Transition t = node->TransAt(ti.value());
+                Transition t = node.TransAt(ti.value());
                 inp_.push_back(b);
-                stack_.emplace_back(std::move(node), ti.value() + 1, out);
+                stack_.emplace_back(node, ti.value() + 1, out);
                 out = out.Cat(t.out_);
                 node = fst_.NodeAt(t.addr_);
             } else {
@@ -325,13 +315,13 @@ private:
                 // first transition in this node that proceeds the current
                 // input byte.
                 SizeT j = 0;
-                for (; j < node->ntrans_; j++) {
-                    Transition t = node->TransAt(j);
+                for (; j < node.ntrans_; j++) {
+                    Transition t = node.TransAt(j);
                     if (t.inp_ > b) {
                         break;
                     }
                 }
-                stack_.emplace_back(std::move(node), j, out);
+                stack_.emplace_back(node, j, out);
                 return;
             }
         }
@@ -341,7 +331,7 @@ private:
                 last_state.trans_--;
                 inp_.pop_back();
             } else {
-                CompiledAddr addr = last_state.node_->TransAt(last_state.trans_ - 1).addr_;
+                CompiledAddr addr = last_state.node_.TransAt(last_state.trans_ - 1).addr_;
                 stack_.emplace_back(fst_.NodeAt(addr), 0, out);
             }
         }
