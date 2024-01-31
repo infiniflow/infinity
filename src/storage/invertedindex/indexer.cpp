@@ -73,10 +73,6 @@ SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id].get());
 }
 
-void Indexer::Flush() {
-    for (SizeT i = 0; i < column_ids_.size(); ++i) {
-        u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Flush();
-    }
-}
+bool Indexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
+
 } // namespace infinity

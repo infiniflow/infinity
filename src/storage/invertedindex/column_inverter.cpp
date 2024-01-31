@@ -147,7 +147,8 @@ void ColumnInverter::Commit() {
         DoInsert();
     }
     if (column_indexer_->NeedDump()) {
-        column_indexer_->Dump();
+        Flush();
+        column_indexer_->Reset();
     }
 }
 
@@ -201,4 +202,5 @@ void ColumnInverter::DoRTInsert() {
     }
 }
 
+void ColumnInverter::Flush() {}
 } // namespace infinity

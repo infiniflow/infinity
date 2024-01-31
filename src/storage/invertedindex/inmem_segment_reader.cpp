@@ -16,7 +16,7 @@ InMemIndexSegmentReader::InMemIndexSegmentReader(ColumnIndexer *column_indexer) 
 PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
     ColumnIndexer::PostingTable::Iterator iter = posting_table_->find(term);
     if (iter.valid())
-        return iter.getData();
+        return iter.getData().get();
     else
         return nullptr;
 }

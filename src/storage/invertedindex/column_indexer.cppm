@@ -17,7 +17,6 @@ import column_inverter;
 import task_executor;
 import memory_posting;
 import third_party;
-
 export module column_indexer;
 
 namespace vespalib::alloc {
@@ -30,8 +29,8 @@ export class ColumnIndexer {
 public:
     using TermKey = String;
     // using PostingPtr = MemoryPosting<false> *;
-    using PostingPtr = PostingWriter *;
-    using RTPostingPtr = MemoryPosting<true> *;
+    using PostingPtr = SharedPtr<PostingWriter>;
+    using RTPostingPtr = SharedPtr<MemoryPosting<true>>;
     using PostingTable = Btree<TermKey, PostingPtr>;
     using RTPostingTable = Btree<TermKey, RTPostingPtr>;
 
@@ -64,11 +63,7 @@ public:
 
     void Commit();
 
-    void Flush();
-
     bool NeedDump();
-
-    void Dump();
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
@@ -84,6 +79,10 @@ public:
 
     RTPostingPtr GetOrAddRTPosting(const TermKey &term);
 
+    void ReclaimMemory();
+
+    void Reset();
+
 private:
     void SetAnalyzer();
 
@@ -97,6 +96,7 @@ private:
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
     SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
+    GenerationHandler generation_handler_;
     UniquePtr<PostingTable> posting_store_;
     UniquePtr<RTPostingTable> rt_posting_store_;
     UniquePtr<Analyzer> analyzer_;

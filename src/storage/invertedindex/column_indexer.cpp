@@ -74,20 +74,7 @@ ColumnIndexer::ColumnIndexer(Indexer *indexer,
     commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
 }
 
-ColumnIndexer::~ColumnIndexer() {
-    if (posting_store_.get()) {
-        for (auto it = posting_store_->begin(); it.valid(); ++it) {
-            delete it.getData();
-        }
-        posting_store_->clear();
-    }
-    if (rt_posting_store_.get()) {
-        for (auto it = rt_posting_store_->begin(); it.valid(); ++it) {
-            delete it.getData();
-        }
-        rt_posting_store_->clear();
-    }
-}
+ColumnIndexer::~ColumnIndexer() { Reset(); }
 
 void ColumnIndexer::SetIndexMode(IndexMode index_mode) {
     index_mode_ = index_mode;
@@ -146,11 +133,7 @@ void ColumnIndexer::Commit() {
     SwitchActiveInverter();
 }
 
-bool ColumnIndexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
-
-void ColumnIndexer::Dump() { indexer_->Flush(); }
-
-void ColumnIndexer::Flush() {}
+bool ColumnIndexer::NeedDump() { return indexer_->NeedDump(); }
 
 ColumnIndexer::PostingPtr ColumnIndexer::GetOrAddPosting(const TermKey &term) {
     ColumnIndexer::PostingTable::Iterator iter = posting_store_->find(term);
@@ -158,7 +141,9 @@ ColumnIndexer::PostingPtr ColumnIndexer::GetOrAddPosting(const TermKey &term) {
         return iter.getData();
     else {
         // ColumnIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
-        ColumnIndexer::PostingPtr posting = new PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
+        // ColumnIndexer::PostingPtr posting = new PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
+        ColumnIndexer::PostingPtr posting =
+            MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         posting_store_->insert(iter, term, posting);
         return posting;
     }
@@ -169,9 +154,39 @@ ColumnIndexer::RTPostingPtr ColumnIndexer::GetOrAddRTPosting(const TermKey &term
     if (iter.valid())
         return iter.getData();
     else {
-        ColumnIndexer::RTPostingPtr posting = new MemoryPosting<true>(GetPool(), index_config_.GetPostingFormatOption());
+        // ColumnIndexer::RTPostingPtr posting = new MemoryPosting<true>(GetPool(), index_config_.GetPostingFormatOption());
+        ColumnIndexer::RTPostingPtr posting = MakeShared<MemoryPosting<true>>(GetPool(), index_config_.GetPostingFormatOption());
         rt_posting_store_->insert(iter, term, posting);
         return posting;
+    }
+}
+
+void ColumnIndexer::ReclaimMemory() {
+    if (posting_store_.get()) {
+        posting_store_->getAllocator().freeze();
+
+        GenerationHandler::generation_t generation = generation_handler_.getCurrentGeneration();
+        posting_store_->getAllocator().assign_generation(generation);
+
+        generation_handler_.incGeneration();
+        GenerationHandler::generation_t oldest_gen = generation_handler_.get_oldest_used_generation();
+
+        posting_store_->getAllocator().reclaim_memory(oldest_gen);
+    }
+}
+
+void ColumnIndexer::Reset() {
+    if (posting_store_.get()) {
+        for (auto it = posting_store_->begin(); it.valid(); ++it) {
+            // delete it.getData();
+        }
+        posting_store_->clear();
+    }
+    if (rt_posting_store_.get()) {
+        for (auto it = rt_posting_store_->begin(); it.valid(); ++it) {
+            // delete it.getData();
+        }
+        rt_posting_store_->clear();
     }
 }
 

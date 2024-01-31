@@ -68,6 +68,8 @@ public:
         }
     };
 
+    void Flush();
+
 private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;
     using PosInfoVec = Vector<PosInfo, PoolAllocator<PosInfo>>;

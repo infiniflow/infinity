@@ -55,6 +55,7 @@ module;
 #include "vespalib/btree/btreeroot.hpp"
 #include "vespalib/btree/btreestore.h"
 #include "vespalib/btree/btreestore.hpp"
+#include "vespalib/util/generationhandler.h"
 
 export module third_party;
 
@@ -249,5 +250,6 @@ export template <typename KeyT,
                  typename TraitsT = vespalib::btree::BTreeDefaultTraits,
                  typename AggrCalcT = vespalib::btree::NoAggrCalc>
 using BtreeStore = vespalib::btree::BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>;
+export using GenerationHandler = vespalib::GenerationHandler;
 
 } // namespace infinity
