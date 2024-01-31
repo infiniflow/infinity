@@ -36,6 +36,8 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
         return;
     }
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+
     auto load_metas = *load_metas_.get();
     // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
@@ -70,7 +72,7 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-            const BlockEntry *block_entry = table_ref->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id);
+            const BlockEntry *block_entry = table_ref->table_entry_ptr_->GetBlockEntryByID(segment_id, block_id, begin_ts);
             for (SizeT k = 0; k < load_column_count; ++k) {
                 auto binding = load_metas[k].binding_;
                 BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(binding.column_idx);

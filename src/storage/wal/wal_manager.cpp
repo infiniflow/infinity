@@ -638,16 +638,12 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
                                                                                         cmd.table_index_dir_);
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
-    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
 
-    NewCatalog::CreateIndexFile(table_entry,
-                                table_store.get(),
-                                table_index_entry,
-                                commit_ts,
-                                storage_->buffer_manager(),
-                                false /*prepare*/,
-                                true /*is_replay*/);
-    NewCatalog::CommitCreateIndex(table_store->txn_indexes_store_, true /*is_replay*/);
+    auto block_index = table_entry->GetBlockIndex(commit_ts);
+    table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
+
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    NewCatalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
     table_index_entry->Commit(commit_ts);
 }
 
@@ -719,7 +715,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     }
 
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
-        auto *segment_entry = table_entry->segment_map().at(segment_id).get();
+        auto *segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
         segment_entry->SetDeprecated(commit_ts);
     }
 }

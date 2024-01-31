@@ -29,6 +29,8 @@ import parser;
 import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;
+import base_table_ref;
+import iresearch_datastore;
 
 namespace infinity {
 
@@ -230,7 +232,23 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
     return index_dir;
 }
 
-Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<u32, atomic_u64> &create_index_idxes) {
+Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay) {
+    IrsIndexEntry *irs_index_entry = this->irs_index_entry_.get();
+    if (irs_index_entry != nullptr) {
+        auto *buffer_mgr = txn->GetBufferMgr();
+        for (const auto *segment_entry : block_index->segments_) {
+            irs_index_entry->irs_index_->BatchInsert(table_entry, index_def_.get(), segment_entry, buffer_mgr);
+        }
+        irs_index_entry->irs_index_->Commit();
+        irs_index_entry->irs_index_->StopSchedule();
+    }
+    for (const auto &[column_id, column_index_entry] : column_index_map_) {
+        column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay);
+    }
+    return Status::OK();
+}
+
+Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     if (column_index_map_.size() != 1) {
         // TODO
         UnrecoverableError("Not implemented");

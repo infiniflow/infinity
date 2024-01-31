@@ -163,14 +163,6 @@ public:
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr);
 
-    static void CreateIndexFile(TableEntry *table_entry,
-                                void *txn_store,
-                                TableIndexEntry *table_index_entry,
-                                TxnTimeStamp begin_ts,
-                                BufferManager *buffer_mgr,
-                                bool prepare,
-                                bool is_replay = false);
-
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr);
 
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay = false);

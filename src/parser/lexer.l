@@ -49,6 +49,7 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 COPY            { return COPY; }
 CREATE          { return CREATE; }

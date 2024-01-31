@@ -442,7 +442,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
             }
             case kEmbedding: {
                 auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                SizeT dim = embedding_info->Dimension();
+                // SizeT dim = embedding_info->Dimension();
                 switch (embedding_info->Type()) {
                     case kElemInt8: {
                         Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();

@@ -34,6 +34,7 @@ export struct TableIndexEntry;
 class BufferManager;
 struct TableEntry;
 class Txn;
+class BlockIndex;
 
 struct ColumnIndexEntry : public BaseEntry {
     friend struct TableEntry;
@@ -83,7 +84,11 @@ public:
     // Used in segment column index entry
     Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
+    UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def);
+
 private:
+    Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, ColumnID column_id, Txn *txn, bool prepare, bool is_replay);
+
     Status CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes);
 
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
@@ -97,6 +102,6 @@ private:
     ColumnID column_id_{};
     SharedPtr<String> col_index_dir_{};
     const SharedPtr<IndexBase> index_base_{};
-    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};
+    HashMap<SegmentID, SharedPtr<SegmentColumnIndexEntry>> index_by_segment_{};
 };
 } // namespace infinity

@@ -19,6 +19,7 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import base_table_ref;
 
 export module logical_command;
 
@@ -40,6 +41,9 @@ public:
     String ToString(i64 &space) const final;
 
     inline String name() final { return "LogicalCommand"; }
+
+public:
+    SharedPtr<BaseTableRef> table_ref_{}; // only used for compact command
 
 private:
     SharedPtr<CommandInfo> command_info_{};

@@ -251,10 +251,6 @@ export struct CreateTableOperatorState : public OperatorState {
     inline explicit CreateTableOperatorState() : OperatorState(PhysicalOperatorType::kCreateTable) {}
 };
 
-export struct CreateIndexOperatorState : public OperatorState {
-    inline explicit CreateIndexOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndex) {}
-};
-
 export struct CreateIndexPrepareOperatorState : public OperatorState {
     inline explicit CreateIndexPrepareOperatorState() : OperatorState(PhysicalOperatorType::kCreateIndexPrepare) {}
 

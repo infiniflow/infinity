@@ -24,6 +24,7 @@ import default_values;
 import infinity_exception;
 import txn;
 import global_block_id;
+import base_table_ref;
 
 namespace infinity {
 
@@ -64,14 +65,19 @@ struct ToDeleteInfo {
 };
 
 export struct CompactSegmentsTaskState {
+    // default copy construct of table ref
+    CompactSegmentsTaskState(BaseTableRef *table_ref) : new_table_ref_(MakeUnique<BaseTableRef>(*table_ref)) {}
+
     RowIDRemapper remapper_;
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+
+    UniquePtr<BaseTableRef> new_table_ref_;
 };
 
 export class CompactSegmentsTask final : public BGTask {
 public:
-    explicit CompactSegmentsTask(TableEntry *table_entry, Txn *txn);
+    explicit CompactSegmentsTask(BaseTableRef *table_ref, Txn *txn);
 
     String ToString() const override { return "Compact segments task"; }
 
@@ -84,6 +90,8 @@ public:
 public:
     // these two are called by unit test. Do not use them directly.
     CompactSegmentsTaskState CompactSegments();
+
+    void CreateNewIndex(BaseTableRef *table_ref);
 
     // Save new segment, set no_delete_ts, add compact wal cmd
     void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
@@ -99,7 +107,7 @@ private:
     bool ApplyToDelete(const RowIDRemapper &remapper);
 
 private:
-    TableEntry *const table_entry_;
+    BaseTableRef *const table_ref_;
 
     Txn *const txn_;
 

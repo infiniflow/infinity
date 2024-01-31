@@ -355,7 +355,7 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT COMPACT
 %token EXCEPT FLUSH USE OPTIMIZE
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
@@ -1686,7 +1686,18 @@ command_statement: USE IDENTIFIER {
     $$ = new infinity::CommandStatement();
     $$->command_info_ = std::make_unique<infinity::SetCmd>(infinity::SetScope::kGlobal, infinity::SetVarType::kDouble, $3, $4);
     free($3);
-};
+}
+| COMPACT TABLE table_name {
+    $$ = new infinity::CommandStatement();
+    if ($3->schema_name_ptr_ != nullptr) {
+        $$->command_info_ = std::make_unique<infinity::CompactTable>(std::string($3->schema_name_ptr_), std::string($3->table_name_ptr_));
+        free($3->schema_name_ptr_);
+        free($3->table_name_ptr_);
+    } else {
+        $$->command_info_ = std::make_unique<infinity::CompactTable>(std::string($3->table_name_ptr_));
+        free($3->table_name_ptr_);
+    }
+}
 
 /*
  * EXPRESSION

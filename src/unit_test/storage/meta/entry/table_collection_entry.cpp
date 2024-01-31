@@ -84,9 +84,9 @@ TEST_F(TableEntryTest, test1) {
         table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("t1"), columns);
 
         EXPECT_EQ(*table_def->table_name(), "t1");
-        EXPECT_EQ(table_def->column_count(), 2);
-        EXPECT_EQ(table_def->GetColIdByName("tiny_int_col"), 0);
-        EXPECT_EQ(table_def->GetColIdByName("big_int_col"), 1);
+        EXPECT_EQ(table_def->column_count(), 2ul);
+        EXPECT_EQ(table_def->GetColIdByName("tiny_int_col"), 0ul);
+        EXPECT_EQ(table_def->GetColIdByName("big_int_col"), 1ul);
     }
 
     SharedPtr<TableEntry> table_entry =
@@ -97,7 +97,6 @@ TEST_F(TableEntryTest, test2) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     // Txn1: Create, OK
     Txn *new_txn = txn_mgr->CreateTxn();
