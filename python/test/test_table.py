@@ -15,7 +15,6 @@ import pytest
 
 import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestTable:
@@ -53,7 +52,7 @@ class TestTable:
         4. list tables: empty
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -104,7 +103,7 @@ class TestTable:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -183,7 +182,7 @@ class TestTable:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -229,7 +228,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
         c_count = 10000
@@ -280,7 +279,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -304,7 +303,7 @@ class TestTable:
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
     def test_various_tables_with_various_columns(self):
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -345,7 +344,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -387,7 +386,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -413,7 +412,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -458,7 +457,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -502,7 +501,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -529,7 +528,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 

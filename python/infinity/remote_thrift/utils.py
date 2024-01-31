@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import sqlglot.expressions as exp
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -99,3 +101,17 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
             return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
+
+
+def check_valid_name(name):
+    is_valid = False
+    if name is None or not isinstance(name, str):
+        is_valid = False
+    pattern = r'^[a-zA-Z0-9_]+$'
+    if re.match(pattern, name):
+        is_valid = True
+    else:
+        is_valid = False
+
+    if is_valid is False:
+        raise Exception(f"Invalid name: {name}")

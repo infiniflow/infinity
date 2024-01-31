@@ -15,8 +15,8 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestUpdate:
@@ -55,7 +55,7 @@ class TestUpdate:
             - 'table_4'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table(table_name="table_4", if_exists=True)

@@ -16,8 +16,8 @@ import os
 import pandas as pd
 from numpy import dtype
 
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestSelect:
@@ -76,7 +76,7 @@ class TestSelect:
             - 'table_1'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         # infinity
@@ -198,7 +198,7 @@ class TestSelect:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_select_varchar", True)
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
@@ -229,7 +229,7 @@ class TestSelect:
         res = db_obj.drop_table("test_select_varchar")
 
     def test_select_big(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_select_big", True)
         db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
@@ -259,7 +259,7 @@ class TestSelect:
         test_obj.test_select_embedding()
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_embedding", True)
@@ -302,7 +302,7 @@ class TestSelect:
         test_select_embedding_float()
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_embedding_float", True)
@@ -354,7 +354,7 @@ class TestSelect:
         Example Usage:
         test_select_big_embedding()
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table("test_select_big_embedding", True)
@@ -374,7 +374,7 @@ class TestSelect:
 
     def test_select_same_output(self):
 
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_select_same_output", True)
         db_obj.create_table("test_select_same_output", {
@@ -391,7 +391,7 @@ class TestSelect:
         print(res)
 
     def test_empty_table(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_empty_table", True)
         db_obj.create_table("test_empty_table", {
@@ -408,7 +408,6 @@ class TestSelect:
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
             {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))
-
 
     # insert primitive data type not aligned with table definition
     # insert large varchar which exceeds the limit to table
@@ -427,7 +426,6 @@ class TestSelect:
     # batch insert, with invalid data type inside.
     # batch insert, with invalid column count
     # create/drop/describe/get valid table name with different column types
-
 
     # create a table with all types supported, each column can be output correctly.
     # create a table, insert more than one data block, each column data is output correctly.

@@ -22,7 +22,7 @@ from infinity.common import INSERT_DATA, VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions
+from infinity.remote_thrift.utils import traverse_conditions, check_valid_name
 from infinity.table import Table
 
 
@@ -35,7 +35,7 @@ class RemoteTable(Table, ABC):
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
     def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
-
+        check_valid_name(index_name)
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -60,6 +60,7 @@ class RemoteTable(Table, ABC):
             raise Exception(res.error_msg)
 
     def drop_index(self, index_name: str):
+        check_valid_name(index_name)
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name)
         if res.success:

@@ -1,10 +1,10 @@
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestCovert:
     def test_to_pl(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_to_pl", True)
         db_obj.create_table("test_to_pl", {
@@ -20,9 +20,8 @@ class TestCovert:
         res = table_obj.output(["c1", "c2", "c1"]).to_pl()
         print(res)
 
-
     def test_to_pa(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_to_pa", True)
         db_obj.create_table("test_to_pa", {

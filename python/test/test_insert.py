@@ -15,8 +15,8 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestInsert:
@@ -44,7 +44,7 @@ class TestInsert:
             - 'table_2'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
         db_obj.drop_table(table_name="table_2", if_exists=True)
@@ -83,7 +83,7 @@ class TestInsert:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_varchar", True)
         table_obj = db_obj.create_table("test_insert_varchar", {
@@ -108,7 +108,7 @@ class TestInsert:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_varchar", True)
         table_obj = db_obj.create_table("test_insert_big_varchar", {
@@ -130,7 +130,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_embedding", True)
         table_obj = db_obj.create_table("test_insert_embedding", {
@@ -180,7 +180,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_embedding", True)
         table_obj = db_obj.create_table("test_insert_big_embedding", {
@@ -201,7 +201,7 @@ class TestInsert:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_big_embedding_float", True)
         table_obj = db_obj.create_table("test_insert_big_embedding_float", {
@@ -219,7 +219,7 @@ class TestInsert:
         assert res.success
 
     def test_insert_exceed_block_size(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_exceed_block_size", True)
         table_obj = db_obj.create_table("test_insert_exceed_block_size", {

@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import infinity
-from infinity.common import REMOTE_HOST
 import pytest
+
+import common_values
+import infinity
 
 
 class TestKnn:
@@ -23,7 +24,7 @@ class TestKnn:
         print(infinity.__version__)
 
     def test_knn(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         # assert infinity_obj
         #
         # infinity
@@ -70,7 +71,7 @@ class TestKnn:
         # print(res)
 
     def test_insert_multi_column(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         with pytest.raises(Exception, match=r".*value count mismatch*"):
             db_obj = infinity_obj.get_database("default")
