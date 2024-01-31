@@ -11,11 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import concurrent.futures
+import functools
+import threading
+import traceback
 import pytest
 
 import infinity
 from infinity.common import REMOTE_HOST
 import common_values
+
+
+def trace_unhandled_exceptions(func):
+    @functools.wraps(func)
+    def wrapped_func(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except:
+            print('Exception in ' + func.__name__)
+            traceback.print_exc()
+
+    return wrapped_func
 
 
 class TestTable:
@@ -530,6 +546,35 @@ class TestTable:
         assert res.success
 
     # create/drop same table in different thread to test conflict
+    @trace_unhandled_exceptions
+    def test_create_or_drop_same_table_in_different_thread(self):
+        """
+        target: create/drop same table in different thread to test conflict
+        methods: create table at same time for 16 times
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # create table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into processpool
+            futures = [executor.submit(db_obj.create_table("my_table", {"c1": "int"}, None), i) for i in range(16)]
+            # wait all processes finished
+            concurrent.futures.wait(futures)
+
+        # drop table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into threadpool
+            futures = [executor.submit(db_obj.drop_table("my_table"), i) for i in range(16)]
+            # wait all threads finished
+            concurrent.futures.wait(futures)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # create empty column table
     def test_create_empty_column_table(self):
@@ -544,7 +589,7 @@ class TestTable:
         db_obj.drop_table("my_table")
 
         try:
-            tb = db_obj.create_table("my_table",None, None)
+            tb = db_obj.create_table("my_table", None, None)
         except Exception as e:
             print(e)
 
