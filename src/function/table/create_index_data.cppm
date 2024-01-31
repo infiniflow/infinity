@@ -18,13 +18,14 @@ export module create_index_data;
 
 import stl;
 import catalog;
+import block_index;
 
 namespace infinity {
 
 export struct CreateIndexSharedData {
-    CreateIndexSharedData(const Map<u32, SharedPtr<SegmentEntry>> &segment_map)  {
-        for (const auto &[segment_id, _] : segment_map) {
-            create_index_idxes_.emplace(segment_id, 0);
+    CreateIndexSharedData(BlockIndex *block_index)  {
+        for (int i = 0; i < block_index->segments_.size(); ++i) {
+            create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
         }
     }
 

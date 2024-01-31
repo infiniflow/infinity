@@ -207,17 +207,6 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
             }
             break;
         }
-        case PhysicalOperatorType::kCreateIndex: {
-            auto *output_state = static_cast<CreateIndexOperatorState *>(task_operator_state);
-            if (!output_state->Ok()) {
-                result_sink_state->status_ = std::move(output_state->status_);
-            } else {
-                result_sink_state->result_def_ = {
-                    MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
-                };
-            }
-            break;
-        }
         case PhysicalOperatorType::kCreateCollection: {
             auto *output_state = static_cast<CreateCollectionOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {
@@ -331,6 +320,17 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(ResultSinkState *result_si
         }
         case PhysicalOperatorType::kCreateIndexFinish: {
             auto *output_state = static_cast<CreateIndexFinishOperatorState *>(task_operator_state);
+            if (!output_state->Ok()) {
+                result_sink_state->status_ = std::move(output_state->status_);
+                break;
+            }
+            result_sink_state->result_def_ = {
+                MakeShared<ColumnDef>(0, MakeShared<DataType>(LogicalType::kInteger), "OK", HashSet<ConstraintType>()),
+            };
+            break;
+        }
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *output_state = static_cast<CreateIndexPrepareOperatorState *>(task_operator_state);
             if (!output_state->Ok()) {
                 result_sink_state->status_ = std::move(output_state->status_);
                 break;

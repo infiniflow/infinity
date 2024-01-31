@@ -156,6 +156,7 @@ export using infinity::UseCmd;
 export using infinity::CheckTable;
 export using infinity::SetCmd;
 export using infinity::ExportCmd;
+export using infinity::CompactTable;
 
 export using infinity::InitParameter;
 

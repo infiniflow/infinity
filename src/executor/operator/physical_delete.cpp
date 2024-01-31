@@ -60,6 +60,7 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
             delete_operator_state->sum_ += row_ids.size();
         }
     }
+    prev_op_state->data_block_array_.clear();
     if (prev_op_state->Complete()) {
         operator_state->SetComplete();
     }

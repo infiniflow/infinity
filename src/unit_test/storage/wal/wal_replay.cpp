@@ -44,6 +44,7 @@ import bg_task;
 import backgroud_process;
 import compact_segments_task;
 import default_values;
+import base_table_ref;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
@@ -367,7 +368,6 @@ TEST_F(WalReplayTest, WalReplayAppend) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -622,12 +622,10 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             ColumnVector col0 = column0->GetColumnVector(buffer_manager);
             Value v0 = col0.GetValue(0);
-            DataType *col0_type = column0->column_type().get();
             EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
             ColumnVector col1 = column1->GetColumnVector(buffer_manager);
             Value v1 = col1.GetValue(0);
-            DataType *col1_type = column1->column_type().get();
             EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
             ColumnVector col2 = column2->GetColumnVector(buffer_manager);
@@ -723,8 +721,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            CompactSegmentsTask compact_task(table_entry, txn4);
-            compact_task.Execute();
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
+                CompactSegmentsTask compact_task(&table_ref, txn4);
+                compact_task.Execute();
+            }
             txn_mgr->CommitTxn(txn4);
         }
         infinity::InfinityContext::instance().UnInit();
@@ -813,7 +814,14 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            txn->CreateIndex(table_entry, index_def, conflict_type, prepare);
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto *table_index_entry = std::get<0>(result);
+                auto status = std::get<1>(result);
+                EXPECT_EQ(status.ok(), true);
+                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+            }
             txn_mgr->CommitTxn(txn);
         }
 
@@ -833,7 +841,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         {
             auto txn = txn_mgr->CreateTxn();
@@ -914,7 +921,14 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
-            txn->CreateIndex(table_entry, index_def, conflict_type, prepare);
+            {
+                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
+                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto *table_index_entry = std::get<0>(result);
+                auto status = std::get<1>(result);
+                EXPECT_EQ(status.ok(), true);
+                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+            }
             txn_mgr->CommitTxn(txn);
         }
 
@@ -934,7 +948,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         {
             auto txn = txn_mgr->CreateTxn();

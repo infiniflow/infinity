@@ -14,6 +14,10 @@
 
 module;
 
+#include <tuple>
+
+module physical_create_index_prepare;
+
 import stl;
 import parser;
 import physical_operator_type;
@@ -41,8 +45,6 @@ import hnsw_alg;
 import lvq_store;
 import plain_store;
 
-module physical_create_index_prepare;
-
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
                                                        SharedPtr<BaseTableRef> base_table_ref,
@@ -50,17 +52,22 @@ PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
                                                        ConflictType conflict_type,
                                                        SharedPtr<Vector<String>> output_names,
                                                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                                                       SharedPtr<Vector<LoadMeta>> load_metas)
+                                                       SharedPtr<Vector<LoadMeta>> load_metas,
+                                                       bool prepare)
     : PhysicalOperator(PhysicalOperatorType::kCreateIndexPrepare, nullptr, nullptr, id, load_metas), base_table_ref_(base_table_ref),
-      index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types) {}
+      index_def_ptr_(index_definition), conflict_type_(conflict_type), output_names_(output_names), output_types_(output_types), prepare_(prepare) {}
 
 void PhysicalCreateIndexPrepare::Init() {}
 
 bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    Status status = txn->CreateIndex(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_, true);
-    if (!status.ok()) {
+    auto result = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_);
+    auto *table_index_entry = std::get<0>(result);
+    auto status = std::get<1>(result);
+    if (!status.ok() || table_index_entry == nullptr) {
         operator_state->status_ = status;
+    } else {
+        txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);
     }
     operator_state->SetComplete();
     return true;

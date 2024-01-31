@@ -32,7 +32,7 @@ import physical_create_view;
 import physical_drop_view;
 import physical_create_schema;
 import physical_create_table;
-import physical_create_index;
+import physical_create_index_prepare;
 import physical_create_collection;
 import physical_drop_schema;
 import physical_drop_table;
@@ -104,7 +104,7 @@ public:
 
     static void Explain(const PhysicalCreateTable *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
-    static void Explain(const PhysicalCreateIndex *create_index,
+    static void Explain(const PhysicalCreateIndexPrepare *create_index,
                         SharedPtr<Vector<SharedPtr<String>>> &result,
 
                         i64 intent_size = 0);

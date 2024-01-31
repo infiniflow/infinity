@@ -22,8 +22,8 @@ module block_index;
 
 namespace infinity {
 
-void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp) {
-    if (timestamp >= segment_entry->min_row_ts() && timestamp <= segment_entry->deprecate_ts()) {
+void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, bool check_ts) {
+    if (!check_ts || (timestamp >= segment_entry->min_row_ts() && timestamp <= segment_entry->deprecate_ts())) {
         u32 segment_id = segment_entry->segment_id();
         segments_.emplace_back(segment_entry);
         const auto &block_entries = segment_entry->block_entries();

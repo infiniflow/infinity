@@ -271,16 +271,6 @@ Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,
     return table_entry->DropIndex(index_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-void NewCatalog::CreateIndexFile(TableEntry *table_entry,
-                                 void *txn_store,
-                                 TableIndexEntry *table_index_entry,
-                                 TxnTimeStamp begin_ts,
-                                 BufferManager *buffer_mgr,
-                                 bool prepare,
-                                 bool is_replay) {
-    return table_entry->CreateIndexFile(txn_store, table_index_entry, begin_ts, buffer_mgr, prepare, is_replay);
-}
-
 Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();

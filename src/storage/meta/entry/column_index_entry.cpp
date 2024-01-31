@@ -227,6 +227,25 @@ Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateInde
 
 String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return fmt::format("seg{}.idx", segment_id, index_name); }
 
+Status
+ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, ColumnID column_id, Txn *txn, bool prepare, bool is_replay) {
+    const auto *column_def = table_entry->GetColumnDefByID(column_id);
+    auto *txn_store = txn->GetTxnTableStore(table_entry);
+
+    for (const auto *segment_entry : block_index->segments_) {
+        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), column_def);
+        SegmentID segment_id = segment_entry->segment_id();
+        SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
+            SegmentColumnIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        if (!is_replay) {
+            segment_column_index_entry->CreateIndexPrepare(index_base_.get(), column_id, column_def, segment_entry, txn, prepare);
+        }
+        txn_store->CreateIndexFile(table_index_entry_, column_id, segment_id, segment_column_index_entry);
+        index_by_segment_.emplace(segment_id, segment_column_index_entry);
+    }
+    return Status::OK();
+}
+
 Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes) {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
         atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
@@ -236,6 +255,32 @@ Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32,
         }
     }
     return Status::OK();
+}
+
+UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def) {
+    switch (index_base_->index_type_) {
+        case IndexType::kIVFFlat: {
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_row_count);
+        }
+        case IndexType::kHnsw: {
+            SizeT max_element = seg_row_count;
+            return MakeUnique<CreateHnswParam>(index_base_.get(), column_def, max_element);
+        }
+        case IndexType::kIRSFullText: {
+            return MakeUnique<CreateFullTextParam>(index_base_.get(), column_def);
+        }
+        case IndexType::kSecondary: {
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            return MakeUnique<CreateSecondaryIndexParam>(index_base_.get(), column_def, seg_row_count, part_capacity);
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base_->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+    return nullptr;
 }
 
 } // namespace infinity

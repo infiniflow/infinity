@@ -129,13 +129,13 @@ public:
 
     void StopSchedule();
 
-    void BatchInsert(TableEntry *table_entry, const IndexDef *index_def, SegmentEntry *segment_entry, BufferManager *buffer_mgr);
+    void BatchInsert(TableEntry *table_entry, const IndexDef *index_def, const SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
 
     ViewSnapshot *GetViewSnapshot();
 
-    int Search(IrsFilter* flt, const Map<String, String> &options, ScoredIds &result);
+    int Search(IrsFilter *flt, const Map<String, String> &options, ScoredIds &result);
 
 private:
     String directory_;
