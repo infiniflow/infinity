@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+import pytest
 from numpy import dtype
 
 import infinity
@@ -225,9 +226,10 @@ class TestInsert:
             "c1": "float"}, None)
         assert table_obj
         values = [{"c1": 1} for _ in range(8193)]
-        res = table_obj.insert(values)
-        assert res.success is False
 
+        with pytest.raises(Exception,
+                           match=".*Insert values row count 8193 is larger than default block capacity 8192*"):
+            table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
     # insert large varchar which exceeds the limit to table
@@ -245,5 +247,3 @@ class TestInsert:
     # batch insert, batch size limit? 8192?
     # batch insert, with invalid data type inside.
     # batch insert, with invalid column count
-
-

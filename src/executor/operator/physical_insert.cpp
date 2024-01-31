@@ -59,9 +59,13 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     // Prepare the output block
     Vector<SharedPtr<DataType>> output_types;
     output_types.reserve(column_count);
-    for (auto &expr : value_list_[0]) {
-        output_types.emplace_back(MakeShared<DataType>(expr->Type()));
+    auto field_list = value_list_[0];
+    SizeT field_count = field_list.size();
+    for (SizeT i = 0; i < field_count; ++i) {
+        auto data_type = field_list[i]->Type();
+        output_types.emplace_back(MakeShared<DataType>(data_type));
     }
+
     SharedPtr<DataBlock> output_block = DataBlock::Make();
     output_block->Init(output_types);
     SharedPtr<DataBlock> output_block_tmp = DataBlock::Make();

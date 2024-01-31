@@ -41,8 +41,6 @@ namespace infinity {
 
 void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
     switch (op.operator_type()) {
-        case LogicalNodeType::kInvalid:
-            return;
         case LogicalNodeType::kAggregate: {
             if (!all_referenced_) {
                 auto &aggr = op.Cast<LogicalAggregate>();
@@ -58,8 +56,6 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             remove.VisitNodeChildren(op);
             return;
         }
-        case LogicalNodeType::kExcept:
-            break;
         case LogicalNodeType::kUnion: {
             // TODO: Union is not supported yet
             break;
@@ -104,36 +100,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             remove.VisitNodeChildren(op);
             return;
         }
-        case LogicalNodeType::kUpdate:
-            // Need reading all columns
-            return;
-        case LogicalNodeType::kInsert:
-            break;
-        case LogicalNodeType::kImport:
-            break;
-        case LogicalNodeType::kExport:
-            break;
         case LogicalNodeType::kAlter:
-            break;
-        case LogicalNodeType::kCreateTable:
-            break;
-        case LogicalNodeType::kCreateIndex:
-            break;
-        case LogicalNodeType::kCreateCollection:
-            break;
-        case LogicalNodeType::kCreateSchema:
-            break;
-        case LogicalNodeType::kCreateView:
-            break;
-        case LogicalNodeType::kDropTable:
-            break;
-        case LogicalNodeType::kDropIndex:
-            break;
-        case LogicalNodeType::kDropCollection:
-            break;
-        case LogicalNodeType::kDropSchema:
-            break;
-        case LogicalNodeType::kDropView:
             break;
         case LogicalNodeType::kTableScan: {
             VisitNodeExpression(op);
@@ -175,13 +142,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kExplain:
             break;
-        case LogicalNodeType::kPrepare:
-            break;
-        case LogicalNodeType::kFlush:
-            break;
         case LogicalNodeType::kOptimize:
-            break;
-        case LogicalNodeType::kCommand:
             break;
         case LogicalNodeType::kFusion:
             break;

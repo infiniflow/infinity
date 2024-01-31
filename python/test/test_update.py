@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+import pytest
 from numpy import dtype
 
 import infinity
@@ -77,8 +78,8 @@ class TestUpdate:
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-        res = table_obj.update(None, [{"c2": 80, "c3": 800}])
-        assert res.success is False
+        with pytest.raises(Exception, match=r".*where_conditions_ shall not be empty*"):
+            table_obj.update(None, [{"c2": 90, "c3": 900}])
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -92,7 +93,6 @@ class TestUpdate:
         res = infinity_obj.disconnect()
 
         assert res.success
-
 
     # update empty table
     # update non-existent table
