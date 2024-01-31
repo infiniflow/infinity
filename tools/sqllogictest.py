@@ -16,14 +16,19 @@ from generate_top import generate as generate6
 from generate_top_varchar import generate as generate7
 
 
-def spinner_print(stop_event):
-    spinner = itertools.cycle(['-', '/', '|', '\\'])
-    while not stop_event.is_set():
-        sys.stdout.write(next(spinner))
-        sys.stdout.flush()
-        sys.stdout.write('\b')
-        time.sleep(0.1)
+class SpinnerThread(threading.Thread):
+    def __init__(self):
+        super(SpinnerThread, self).__init__()
+        self.stop = False
 
+    def run(self):
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
+        while not self.stop:
+            print(next(spinner), end='\r')
+            time.sleep(0.1)
+
+    def stop_spinner(self):
+        self.stop = True
 
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
@@ -35,12 +40,20 @@ def python_skd_test(python_test_dir: str):
     os.system("cd python && python setup.py install")
     # run test
     print("start pysdk test...")
-    process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-    output, error = process.stdout, process.stderr
-    print(output.decode())
+    process = subprocess.Popen(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, universal_newlines=True)
+
+    def reader(pipe, func):
+        for line in iter(pipe.readline, ''):
+            func(line.strip())
+
+    threading.Thread(target=reader, args=[process.stdout, print]).start()
+    threading.Thread(target=reader, args=[process.stderr, print]).start()
+    process.wait()
     if process.returncode != 0:
-        raise Exception(f"An error occurred: {error.decode()}")  # Raises an exception with the error message.
+        raise Exception(f"An error occurred: {process.stderr}")
+
+    print("pysdk test finished.")
 
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
@@ -141,9 +154,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    stop_event = threading.Event()
-    spinner = threading.Thread(target=spinner_print, args=(stop_event,))
-    spinner.start()
+    t = SpinnerThread()
+    t.start()
 
     print("Generating file...")
     generate1(args.generate_if_exists, args.copy)
@@ -158,7 +170,6 @@ if __name__ == "__main__":
     print("Start copying data...")
     if args.just_copy_all_data is True:
         copy_all(args.data, args.copy)
-        stop_event.set()
     else:
         copy_all(args.data, args.copy)
         print("Start testing...")
@@ -166,12 +177,14 @@ if __name__ == "__main__":
         try:
             python_skd_test(python_test_dir)
             test_process(args.path, args.test, args.data, args.copy)
-            stop_event.set()
         except Exception as e:
             print(e)
-            spinner.join()
+            t.stop_spinner()
+            t.join()
             sys.exit(-1)
         end = time.time()
         print("Test finished.")
         print("Time cost: {}s".format(end - start))
-    spinner.join()
+
+    t.stop_spinner()
+    t.join()

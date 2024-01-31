@@ -13,9 +13,9 @@
 # limitations under the License.
 import pytest
 
+import common_values
 import infinity
 from infinity.common import REMOTE_HOST
-import common_values
 
 
 class TestTable:
@@ -62,31 +62,21 @@ class TestTable:
             "my_table", {"c1": "int, primary key", "c2": "float"}, None)
         assert tb is not None
 
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "123_table", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "bad_column", {"123": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
 
         # FIXME: res = db_obj.describe_table("my_table")
 
@@ -544,7 +534,7 @@ class TestTable:
         db_obj.drop_table("my_table")
 
         try:
-            tb = db_obj.create_table("my_table",None, None)
+            db_obj.create_table("my_table", None, None)
         except Exception as e:
             print(e)
 
