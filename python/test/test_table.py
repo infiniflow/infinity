@@ -125,27 +125,29 @@ class TestTable:
             except Exception as e:
                 print(e)
 
+            # list table
+            try:
+                res = db_obj.list_tables()
+            except Exception as e:
+                print(e)
+
+            # get table
+            try:
+                res = db_obj.get_table("my_table")
+            except Exception as e:
+                print(e)
+
+            # drop table
+            try:
+                res = db_obj.drop_table("my_table")
+            except Exception as e:
+                print(e)
         # FIXME: res = db_obj.describe_table("my_table")
 
-        # list table
-        try:
-            res = db_obj.list_tables()
-        except Exception as e:
-            print(e)
-
-        # get table
-        try:
-            res = db_obj.get_table("my_table")
-        except Exception as e:
-            print(e)
-
-        # drop table
-        try:
-            res = db_obj.drop_table("my_table")
-        except Exception as e:
-            print(e)
-
         # disconnect
+        # res = infinity_obj.disconnect()
+        # assert res
+
         try:
             res = infinity_obj.disconnect()
         except Exception as e:
@@ -299,7 +301,10 @@ class TestTable:
             except Exception as e:
                 print(e)
 
-        # disconnect
+        # # disconnect
+        # res = infinity_obj.disconnect()
+        # assert res.success
+
         try:
             res = infinity_obj.disconnect()
         except Exception as e:
@@ -445,19 +450,23 @@ class TestTable:
         assert res.success
 
     # describe created table, describe not-created table, describe dropped table
-
     @pytest.mark.skip(reason="Feature request")
     def test_describe_various_table(self):
         """
-
-        Returns:
-
+        target: describe created table, describe not-created table, describe dropped table
+        methods: describe table
+        expect: all operations successfully
         """
         pass
 
     # create/drop/list/get 1K table to reach the limit
     @pytest.mark.skip(reason="Cause service termination")
     def test_create_1K_table(self):
+        """
+        target: create/drop/list/get 1K table
+        methods: describe table
+        expect: all operations successfully
+        """
         # connect
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -467,6 +476,20 @@ class TestTable:
         for i in range(tb_count):
             try:
                 tb = db_obj.create_table("my_table" + str(i), {"c1": "int"}, None)
+            except Exception as e:
+                print(e)
+
+        # list table
+        try:
+            res = db_obj.list_tables()
+            print(res)
+        except Exception as e:
+            print(e)
+
+        # get table
+        for i in range(tb_count):
+            try:
+                res = db_obj.get_table("my_table" + str(i))
             except Exception as e:
                 print(e)
 
@@ -483,6 +506,11 @@ class TestTable:
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_1M_table(self):
+        """
+        target: create/drop/list/get 1K table
+        methods: describe table
+        expect: all operations successfully
+        """
         # connect
         infinity_obj = infinity.connect(REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -504,4 +532,22 @@ class TestTable:
     # create/drop same table in different thread to test conflict
 
     # create empty column table
+    def test_create_empty_column_table(self):
+        """
+        target: create empty column table
+        methods: create empty column table
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
 
+        try:
+            tb = db_obj.create_table("my_table",None, None)
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success

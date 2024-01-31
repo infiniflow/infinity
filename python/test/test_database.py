@@ -17,6 +17,7 @@ from infinity.common import NetworkAddress, REMOTE_HOST
 import common_values
 import pytest
 
+
 class TestDatabase:
 
     def test_version(self):
@@ -93,7 +94,6 @@ class TestDatabase:
 
         assert res.success
 
-
     def test_create_database_invalid_name(self):
         """
         create database with invalid name
@@ -121,7 +121,6 @@ class TestDatabase:
         res = infinity_obj.disconnect()
 
         assert res.success
-
 
     def test_create_drop_show_1K_databases(self):
 
@@ -156,7 +155,7 @@ class TestDatabase:
         dbs = infinity_obj.list_databases()
         for db_name in dbs.db_names:
             print('db name: ' + db_name)
-        assert len( dbs.db_names) == (db_count + 1)
+        assert len(dbs.db_names) == (db_count + 1)
         # 4. drop 1m database
         for i in range(db_count):
             print('drop db_name' + str(i))
@@ -244,7 +243,7 @@ class TestDatabase:
             dbs = infinity_obj.list_databases()
             for db_name in dbs.db_names:
                 assert db_name in ['my_db', 'default']
-            assert len( dbs.db_names) == 2
+            assert len(dbs.db_names) == 2
 
             # 2.3 drop database
             infinity_obj.drop_database('my_db')
@@ -253,7 +252,6 @@ class TestDatabase:
         res = infinity_obj.disconnect()
 
         assert res.success
-
 
     def test_drop_database_with_invalid_name(self):
         """
@@ -452,7 +450,6 @@ class TestDatabase:
             db = infinity_obj.get_database("my_database")
         except Exception as e:
             print(f'Caught exception: {e}')
-
 
         # 6. get dummy-db
         try:
