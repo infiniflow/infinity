@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import concurrent.futures
 import functools
 import threading
@@ -20,7 +21,6 @@ import pytest
 import infinity
 from infinity.common import REMOTE_HOST
 import common_values
-
 
 def trace_unhandled_exceptions(func):
     @functools.wraps(func)
@@ -32,7 +32,6 @@ def trace_unhandled_exceptions(func):
             traceback.print_exc()
 
     return wrapped_func
-
 
 class TestTable:
 
@@ -589,7 +588,7 @@ class TestTable:
         db_obj.drop_table("my_table")
 
         try:
-            tb = db_obj.create_table("my_table", None, None)
+            tb = db_obj.create_table("my_table",None, None)
         except Exception as e:
             print(e)
 
