@@ -1,5 +1,8 @@
 import argparse
+import itertools
 import os
+import sys
+import threading
 import time
 from shutil import copyfile
 import subprocess
@@ -13,9 +16,24 @@ from generate_top import generate as generate6
 from generate_top_varchar import generate as generate7
 
 
+def spinner_print(stop_event):
+    spinner = itertools.cycle(['-', '/', '|', '\\'])
+    while not stop_event.is_set():
+        sys.stdout.write(next(spinner))
+        sys.stdout.flush()
+        sys.stdout.write('\b')
+        time.sleep(0.1)
+
+
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
+    # check if infinity_sdk is installed
+    # uninstall first
+    os.system("pip uninstall infinity-sdk -y")
+    # install
+    os.system("cd python && python setup.py install")
+    # run test
     print("start pysdk test...")
     process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
@@ -123,6 +141,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    stop_event = threading.Event()
+    spinner = threading.Thread(target=spinner_print, args=(stop_event,))
+    spinner.start()
+
     print("Generating file...")
     generate1(args.generate_if_exists, args.copy)
     generate2(args.generate_if_exists, args.copy)
@@ -133,21 +155,23 @@ if __name__ == "__main__":
     generate7(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
-    # Install py sdk
-    os.system(f"pip install infinity_sdk")
-
     print("Start copying data...")
     if args.just_copy_all_data is True:
         copy_all(args.data, args.copy)
+        stop_event.set()
     else:
         copy_all(args.data, args.copy)
         print("Start testing...")
         start = time.time()
-        python_skd_test(python_test_dir)
-        test_process(args.path, args.test, args.data, args.copy)
+        try:
+            python_skd_test(python_test_dir)
+            test_process(args.path, args.test, args.data, args.copy)
+            stop_event.set()
+        except Exception as e:
+            print(e)
+            spinner.join()
+            sys.exit(-1)
         end = time.time()
         print("Test finished.")
         print("Time cost: {}s".format(end - start))
-
-
-
+    spinner.join()

@@ -137,7 +137,11 @@ class RemoteDatabase(Database, ABC):
         return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
-        return self._conn.list_tables(self._db_name)
+        res = self._conn.list_tables(self._db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def describe_table(self, table_name):
         pass  # implement describe table logic here

@@ -38,13 +38,25 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise Exception(res.error_msg)
 
     def list_databases(self):
-        return self._client.list_databases()
+        res = self._client.list_databases()
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def describe_database(self, db_name: str):
-        return self._client.describe_database(db_name=db_name).result()
+        res = self._client.describe_database(db_name=db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def drop_database(self, db_name: str, options=None):
-        return self._client.drop_database(db_name=db_name)
+        res = self._client.drop_database(db_name=db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def get_database(self, db_name: str):
         res = self._client.get_database(db_name)
@@ -57,9 +69,9 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         res = self._client.disconnect()
         if res.success is True:
             self._is_connected = False
+            return res
         else:
             raise Exception("Disconnect error")
-        return res
 
     @property
     def client(self):

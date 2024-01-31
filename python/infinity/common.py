@@ -31,4 +31,5 @@ VEC = Union[list, np.ndarray]
 INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]]]
 
 REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
+# REMOTE_HOST = NetworkAddress("192.168.200.151", 23817)
 LOCAL_HOST = NetworkAddress("0.0.0.0", 23817)
