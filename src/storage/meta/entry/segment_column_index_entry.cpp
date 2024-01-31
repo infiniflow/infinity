@@ -158,7 +158,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not support data type for index ivf."));
                 }
             }
             break;
@@ -213,7 +213,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    UnrecoverableError("Invalid metric type.");
                                 }
                             }
                             break;
@@ -236,19 +236,19 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    UnrecoverableError("Invalid metric type.");
                                 }
                             }
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implemented");
+                            UnrecoverableError("Invalid HNSW encode type.");
                         }
                     }
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not support data type for index hnsw."));
                 }
             }
             break;

@@ -133,7 +133,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             }
             txn_mgr->CommitTxn(txn4);
 
-            int test_segment_n = segment_sizes.size();
+            size_t test_segment_n = segment_sizes.size();
             int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
             EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);

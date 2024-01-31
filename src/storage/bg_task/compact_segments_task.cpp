@@ -80,7 +80,7 @@ public:
                 result.push_back(segment_entry);
                 segment_size -= row_count;
             }
-        } while (result.size() == 1);
+        } while (result.size() == 1 && (result[0]->actual_row_count() == result[0]->row_count()));
         return result;
     }
 
@@ -102,8 +102,7 @@ void CompactSegmentsTask::Execute() {
 
 CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
     CompactSegmentsTaskState state(table_ref_);
-    auto &block_index = *state.new_table_ref_->block_index_;
-    block_index = BlockIndex(); // clear the block index
+    auto block_index = MakeShared<BlockIndex>();
 
     Vector<SegmentEntry *> segments = PickSegmentsToCompact();
     GreedyCompactableSegmentsGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
@@ -114,9 +113,18 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
             break;
         }
         auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
-        block_index.Insert(new_segment.get(), UNCOMMIT_TS, false);
+        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
     }
+
+    // TODO: BaseTableRef has no copy constructor
+    *state.new_table_ref_ = BaseTableRef(table_ref_->table_entry_ptr_,
+                                         table_ref_->column_ids_,
+                                         block_index,
+                                         table_ref_->alias_,
+                                         table_ref_->table_index_,
+                                         table_ref_->column_names_,
+                                         table_ref_->column_types_);
     return state;
 }
 
@@ -178,8 +186,7 @@ Vector<SegmentEntry *> CompactSegmentsTask::PickSegmentsToCompact() {
     Vector<SegmentEntry *> segments;
     TxnTimeStamp begin_ts = txn_->BeginTS();
     for (auto *segment_entry : table_ref_->block_index_->segments_) {
-        if (segment_entry->min_row_ts() <= begin_ts && segment_entry->deprecate_ts() >= begin_ts) {
-            segment_entry->SetCompacting(this, begin_ts);
+        if (segment_entry->TrySetCompacting(this, begin_ts)) {
             segments.push_back(segment_entry);
         }
     }

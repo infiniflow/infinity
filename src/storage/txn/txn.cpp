@@ -296,10 +296,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Status Txn::CreateIndexDef(TableEntry *table_entry,
-                           const SharedPtr<IndexDef> &index_def,
-                           ConflictType conflict_type,
-                           TableIndexEntry *&table_index_entry_ptr) {
+Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -309,11 +306,10 @@ Status Txn::CreateIndexDef(TableEntry *table_entry,
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
-        return index_status;
+        return {nullptr, index_status};
     }
     txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
-    table_index_entry_ptr = table_index_entry;
-    return index_status;
+    return {table_index_entry, index_status};
 }
 
 Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare) {

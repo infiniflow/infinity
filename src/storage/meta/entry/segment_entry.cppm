@@ -93,7 +93,7 @@ public:
 
     void FlushData();
 
-    void SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
+    bool TrySetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
 
     void SetNoDelete(TxnTimeStamp no_delete_ts);
 

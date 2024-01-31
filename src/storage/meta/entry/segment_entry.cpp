@@ -105,10 +105,14 @@ void SegmentEntry::FlushData() {
     }
 }
 
-void SegmentEntry::SetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
+bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
     std::unique_lock lock(rw_locker_);
+    if (min_row_ts_ > compacting_ts || deprecate_ts_ < compacting_ts) {
+        return false;
+    }
     compact_task_ = compact_task;
     compacting_ts_ = compacting_ts;
+    return true;
 }
 
 void SegmentEntry::SetNoDelete(TxnTimeStamp no_delete_ts) {

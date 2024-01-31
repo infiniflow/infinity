@@ -205,21 +205,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
             UnrecoverableError(fmt::format("Not support {}.", phys_op->GetName()));
         }
         case PhysicalOperatorType::kKnnScan: {
-            //            current_fragment_ptr->AddSourceNode(query_context_ptr_,
-            //                                                SourceType::kLocalQueue,
-            //                                                phys_op->GetOutputNames(),
-            //                                                phys_op->GetOutputTypes());
-            //            if(phys_op->left() == nullptr) {
-            //                ExecutorError(fmt::format("No input node of {}", phys_op->GetName()));
-            //            }
-            //            auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-            //            next_plan_fragment->AddSinkNode(query_context_ptr_,
-            //                                            SinkType::kLocalQueue,
-            //                                            phys_op->left()->GetOutputNames(),
-            //                                            phys_op->left()->GetOutputTypes());
-            //            BuildFragments(phys_op->left(), next_plan_fragment.get());
-            //            current_fragment_ptr->AddChild(std::move(next_plan_fragment));
-            //            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
                 UnrecoverableError(fmt::format("{} shouldn't have child.", phys_op->GetName()));
             }

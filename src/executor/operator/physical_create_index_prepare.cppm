@@ -35,7 +35,8 @@ public:
                                ConflictType conflict_type,
                                SharedPtr<Vector<String>> output_names,
                                SharedPtr<Vector<SharedPtr<DataType>>> output_types,
-                               SharedPtr<Vector<LoadMeta>> load_metas);
+                               SharedPtr<Vector<LoadMeta>> load_metas,
+                               bool prepare);
 
 public:
     void Init() override;
@@ -56,6 +57,9 @@ public:
 
     const SharedPtr<Vector<String>> output_names_{};
     const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+
+    // if prepare_ is true, then index is constructed with multiple threads
+    const bool prepare_;
 };
 
 } // namespace infinity

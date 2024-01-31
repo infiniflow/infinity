@@ -816,8 +816,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             EXPECT_EQ(table_status.ok(), true);
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-                TableIndexEntry *table_index_entry = nullptr;
-                txn->CreateIndexDef(table_entry, index_def, conflict_type, table_index_entry);
+                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto *table_index_entry = std::get<0>(result);
+                auto status = std::get<1>(result);
+                EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
             }
             txn_mgr->CommitTxn(txn);
@@ -921,8 +923,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             EXPECT_EQ(table_status.ok(), true);
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-                TableIndexEntry *table_index_entry = nullptr;
-                txn->CreateIndexDef(table_entry, index_def, conflict_type, table_index_entry);
+                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto *table_index_entry = std::get<0>(result);
+                auto status = std::get<1>(result);
+                EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
             }
             txn_mgr->CommitTxn(txn);

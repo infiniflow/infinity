@@ -37,7 +37,7 @@ import physical_create_view;
 import physical_drop_view;
 import physical_create_schema;
 import physical_create_table;
-import physical_create_index;
+import physical_create_index_prepare;
 import physical_create_collection;
 import physical_drop_schema;
 import physical_drop_table;
@@ -179,8 +179,8 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             Explain((PhysicalCreateTable *)op, result, intent_size);
             break;
         }
-        case PhysicalOperatorType::kCreateIndex: {
-            Explain((PhysicalCreateIndex *)op, result, intent_size);
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            Explain((PhysicalCreateIndexPrepare *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kCreateCollection: {
@@ -371,7 +371,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalCreateTable *create_node, Shared
     }
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalCreateIndex *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalCreateIndexPrepare *create_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     {
         String create_header_str;
         if (intent_size != 0) {

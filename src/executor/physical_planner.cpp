@@ -22,7 +22,6 @@ import physical_operator_type;
 import physical_aggregate;
 import physical_alter;
 import physical_create_collection;
-import physical_create_index;
 import physical_create_schema;
 import physical_create_table;
 import physical_create_view;
@@ -320,14 +319,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     if (false || index_def_ptr->index_array_.size() != 1 || index_def_ptr->index_array_[0]->index_type_ != IndexType::kHnsw) {
         // TODO: invalidate multiple index in one statement.
         // TODO: support other index types build in parallel.
-        // use old `PhysicalCreateIndex`
-        return PhysicalCreateIndex::Make(logical_create_index->base_table_ref(),
-                                         logical_create_index->index_definition(),
-                                         logical_create_index->conflict_type(),
-                                         logical_create_index->GetOutputNames(),
-                                         logical_create_index->GetOutputTypes(),
-                                         logical_create_index->node_id(),
-                                         logical_operator->load_metas());
+        return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
+                                                      logical_create_index->base_table_ref(),
+                                                      logical_create_index->index_definition(),
+                                                      logical_create_index->conflict_type(),
+                                                      logical_create_index->GetOutputNames(),
+                                                      logical_create_index->GetOutputTypes(),
+                                                      logical_create_index->load_metas(),
+                                                      false);
     }
 
     // use new `PhysicalCreateIndexPrepare` `PhysicalCreateIndexDo` `PhysicalCreateIndexFinish`
@@ -337,7 +336,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
                                                                        logical_create_index->conflict_type(),
                                                                        logical_create_index->GetOutputNames(),
                                                                        logical_create_index->GetOutputTypes(),
-                                                                       logical_create_index->load_metas());
+                                                                       logical_create_index->load_metas(),
+                                                                       true);
     auto create_index_do = MakeUnique<PhysicalCreateIndexDo>(logical_create_index->node_id(),
                                                              std::move(create_index_prepare),
                                                              logical_create_index->base_table_ref(),

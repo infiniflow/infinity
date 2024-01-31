@@ -14,8 +14,6 @@
 
 module;
 
-#include <vector>
-
 export module create_index_data;
 
 import stl;
@@ -26,8 +24,8 @@ namespace infinity {
 
 export struct CreateIndexSharedData {
     CreateIndexSharedData(BlockIndex *block_index)  {
-        for (auto *segment_entry : block_index->segments_) {
-            create_index_idxes_.emplace(segment_entry->segment_id(), 0);
+        for (int i = 0; i < block_index->segments_.size(); ++i) {
+            create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
         }
     }
 
