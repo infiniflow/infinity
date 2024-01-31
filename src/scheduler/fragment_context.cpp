@@ -33,6 +33,7 @@ import physical_table_scan;
 import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
+import physical_create_index_prepare;
 import physical_create_index_do;
 import physical_sort;
 import physical_top;
@@ -271,9 +272,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         }
         case PhysicalOperatorType::kCreateTable: {
             return MakeTaskStateTemplate<CreateTableOperatorState>(physical_ops[operator_id]);
-        }
-        case PhysicalOperatorType::kCreateIndex: {
-            return MakeTaskStateTemplate<CreateIndexOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kCreateIndexPrepare: {
             return MakeTaskStateTemplate<CreateIndexPrepareOperatorState>(physical_ops[operator_id]);
@@ -683,7 +681,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kExport:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
-        case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
@@ -904,7 +901,13 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
             break;
         }
-        case PhysicalOperatorType::kCreateIndexPrepare:
+        case PhysicalOperatorType::kCreateIndexPrepare: {
+            auto *create_index_prepare_operator = static_cast<const PhysicalCreateIndexPrepare *>(last_operator);
+            if (!create_index_prepare_operator->prepare_) {
+                tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
+                break;
+            }
+        }
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport: {
@@ -932,7 +935,6 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kCreateTable:
-        case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateIndexFinish:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:

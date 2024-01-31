@@ -94,7 +94,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCommand:
         case PhysicalOperatorType::kAlter:
         case PhysicalOperatorType::kCreateTable:
-        case PhysicalOperatorType::kCreateIndex:
         case PhysicalOperatorType::kCreateCollection:
         case PhysicalOperatorType::kCreateDatabase:
         case PhysicalOperatorType::kCreateView:
