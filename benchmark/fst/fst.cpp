@@ -123,11 +123,11 @@ int main(int argc, char *argv[]) {
         "headers. The first column should be the key and the second column should be a value that can be interpreted as an unsigned 64 bit integer. "
         "The input shall be already sorted in lexicographic order by the key. Otherwise this will return an error when it sees an out-of-order key.");
     bool force;
-    String delimiter, input, output;
+    String delimiter, fp_keys, fp_fst;
     app_map->add_flag("-f,--force", force, "Overwrites the output if the destination file already exists.");
     app_map->add_option("-d,--delimiter", delimiter, "The delimiter used in the CSV file to separate key and value in.")->default_val(",");
-    app_map->add_option("input", input, "A file containing a key per line.")->required();
-    app_map->add_option("output", output, "The destination file path to write the FST.")->required();
+    app_map->add_option("keys", fp_keys, "A file containing a key per line.")->required();
+    app_map->add_option("fst", fp_fst, "The destination file path to write the FST.")->required();
 
     CLI::App *app_range =
         app.add_subcommand("range",
@@ -138,13 +138,18 @@ int main(int argc, char *argv[]) {
     app_range->add_flag("-o,--outputs", show_outputs, "When set, output values are shown as CSV data.");
     app_range->add_option("-e,--end", end, "Only show results less than or equal to this.");
     app_range->add_option("-s,--start", start, "Only show results greater than or equal to this.");
-    app_range->add_option("input", input, "The FST to run a range query against.")->required();
+    app_range->add_option("fst", fp_fst, "The FST to run a range query against.")->required();
 
     CLI::App *app_verify = app.add_subcommand("verify",
                                               "Performs verification on the FST to check its integrity. This works by computing a checksum of the "
                                               "FST's underlying data and comparing it to an expected checksum. If the checksums do not match, then "
                                               "it's likely that the FST is corrupt in some fashion and must be re-generated.\n");
-    app_verify->add_option("input", input, "The FST to verify.")->required();
+    app_verify->add_option("fst", fp_fst, "The FST to verify.")->required();
+
+    CLI::App *app_bench = app.add_subcommand("benchmark", "Query benchmark with given keys against the given transducer.");
+    app_bench->add_option("-d,--delimiter", delimiter, "The delimiter used in the CSV file to separate key and value in.")->default_val(",");
+    app_bench->add_option("keys", fp_keys, "A file containing a key per line.")->required();
+    app_bench->add_option("fst", fp_fst, "The FST to run query benchmark against.")->required();
 
     try {
         app.parse(argc, argv);
@@ -153,7 +158,7 @@ int main(int argc, char *argv[]) {
     }
     if (app_map->parsed()) {
         profiler.Begin();
-        std::filesystem::path output_path(output);
+        std::filesystem::path output_path(fp_fst);
         output_path = std::filesystem::absolute(output_path);
         std::filesystem::path output_dir = output_path.parent_path();
         std::filesystem::create_directories(output_dir);
@@ -167,7 +172,7 @@ int main(int argc, char *argv[]) {
         OstreamWriter wtr(ofs);
         FstBuilder builder(wtr);
 
-        std::ifstream ifs(input);
+        std::ifstream ifs(fp_keys);
         String line;
         delimiter = unescape(delimiter);
         SizeT del_len = delimiter.length();
@@ -190,8 +195,8 @@ int main(int argc, char *argv[]) {
         profiler.Begin();
         u8 *data_ptr = nullptr;
         SizeT data_len = 0;
-        if (MmapFile(input, data_ptr, data_len) < 0) {
-            return app.exit(CLI::FileError("Failed to mmap file: " + input));
+        if (MmapFile(fp_fst, data_ptr, data_len) < 0) {
+            return app.exit(CLI::FileError("Failed to mmap file: " + fp_fst));
         }
         Fst f(data_ptr, data_len);
         Bound min, max;
@@ -219,15 +224,70 @@ int main(int argc, char *argv[]) {
         profiler.Begin();
         u8 *data_ptr = nullptr;
         SizeT data_len = 0;
-        if (MmapFile(input, data_ptr, data_len) < 0) {
-            return app.exit(CLI::FileError("Failed to mmap file: " + input));
+        if (MmapFile(fp_fst, data_ptr, data_len) < 0) {
+            return app.exit(CLI::FileError("Failed to mmap file: " + fp_fst));
         }
         Fst f(data_ptr, data_len);
         f.Verify();
         MunmapFile(data_ptr, data_len);
-        std::cout << "FST checksum is correct: " << input << std::endl;
+        std::cout << "FST checksum is correct: " << fp_fst << std::endl;
         profiler.End();
         std::cout << "time cost: " << profiler.Elapsed() / 1000000 << " ms" << std::endl;
+    } else if (app_bench->parsed()) {
+        Vector<Pair<String, SizeT>> queries;
+        std::ifstream ifs(fp_keys);
+        String line;
+        delimiter = unescape(delimiter);
+        SizeT del_len = delimiter.length();
+        while (std::getline(ifs, line)) {
+            auto pos = line.find(delimiter);
+            if (pos == String::npos) {
+                return app.exit(
+                    CLI::FileError("Delimiter [" + delimiter + "]" + FormatBytes((u8 *)delimiter.c_str(), del_len) + " not found in line: " + line));
+            }
+            String key = line.substr(0, pos);
+            String value = line.substr(pos + del_len);
+            queries.emplace_back(key, std::stoull(value));
+        }
+
+        profiler.Begin();
+        u8 *data_ptr = nullptr;
+        SizeT data_len = 0;
+        if (MmapFile(fp_fst, data_ptr, data_len) < 0) {
+            return app.exit(CLI::FileError("Failed to mmap file: " + fp_fst));
+        }
+        Fst f(data_ptr, data_len);
+        SizeT cnt = 0;
+        bool running = true;
+        while (running) {
+            for (auto &[key, val] : queries) {
+                Optional<u64> res = f.Get((u8 *)key.c_str(), key.length());
+                if (res.has_value()) {
+                    if (res.value() != val) {
+                        // -1 means expecting missing
+                        String exp = val == SizeT(-1) ? "missing" : std::to_string(val);
+                        return app.exit(CLI::FileError("Value of key " + key + " mismatch, expect " + exp + ", got " + std::to_string(res.value())));
+                    }
+                } else {
+                    if (val != SizeT(-1)) {
+                        return app.exit(CLI::FileError("Value of key " + key + " mismatch, expect " + std::to_string(val) + ", got missing"));
+                    }
+                }
+                cnt++;
+                if ((cnt & 0xFFFF) == 0) {
+                    if (profiler.Elapsed() >= 60LL * 1000000000LL) {
+                        // ensure benchmark last at least 60 seconds
+                        running = false;
+                        break;
+                    }
+                }
+            }
+        }
+        MunmapFile(data_ptr, data_len);
+        profiler.End();
+        std::cout << "query count: " << cnt << std::endl;
+        std::cout << "time cost: " << profiler.Elapsed() / 1000000 << " ms" << std::endl;
+        std::cout << "qps: " << cnt / (profiler.Elapsed() / 1000000000) << std::endl;
     } else {
         return app.exit(CLI::RequiresError("fst", "a subcommand of [map, range, verify]"));
     }
