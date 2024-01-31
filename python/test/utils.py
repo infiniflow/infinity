@@ -12,3 +12,4 @@ def trace_expected_exceptions(func):
             traceback.print_exc()
 
     return wrapped_func
+
