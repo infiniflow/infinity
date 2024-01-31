@@ -25,37 +25,40 @@ import :writer;
 namespace infinity {
 
 struct LastTransition {
-    u8 inp_;
-    Output out_;
+    bool present_{false};
+    u8 inp_{0};
+    Output out_{0};
+    LastTransition() = default;
+    LastTransition(u8 inp, Output out) : present_(true), inp_(inp), out_(out){};
 };
 
 struct BuilderNodeUnfinished {
-    UniquePtr<BuilderNode> node_;
-    Optional<LastTransition> last_;
+    BuilderNode node_;
+    LastTransition last_;
 
     void LastCompiled(CompiledAddr addr) {
-        if (last_.has_value()) {
-            node_->trans_.push_back(Transition{last_->inp_, last_->out_, addr});
-            last_.reset();
+        if (last_.present_) {
+            node_.trans_.emplace_back(last_.inp_, last_.out_, addr);
+            last_.present_ = false;
         }
     }
 
     void AddOutputPrefix(Output prefix) {
-        if (node_->is_final_) {
-            node_->final_output_ = prefix.Cat(node_->final_output_);
+        if (node_.is_final_) {
+            node_.final_output_ = prefix.Cat(node_.final_output_);
         }
-        SizeT ntrans = node_->trans_.size();
+        SizeT ntrans = node_.trans_.size();
         for (SizeT i = 0; i < ntrans; i++) {
-            Transition &t = node_->trans_[i];
+            Transition &t = node_.trans_[i];
             t.out_ = prefix.Cat(t.out_);
         }
-        if (last_.has_value())
-            last_->out_ = prefix.Cat(last_->out_);
+        if (last_.present_)
+            last_.out_ = prefix.Cat(last_.out_);
     }
 };
 
 struct UnfinishedNodes {
-    Vector<UniquePtr<BuilderNodeUnfinished>> stack_;
+    Vector<BuilderNodeUnfinished> stack_;
 
     UnfinishedNodes() {
         stack_.reserve(256);
@@ -65,54 +68,39 @@ struct UnfinishedNodes {
     SizeT Len() { return stack_.size(); }
 
     void PushEmpty(bool is_final) {
-        auto node = MakeUnique<BuilderNode>(is_final, Output::Zero(), Vector<Transition>{});
-        auto unfinished = MakeUnique<BuilderNodeUnfinished>(std::move(node), None);
-        stack_.push_back(std::move(unfinished));
-    }
-    UniquePtr<BuilderNode> PopRoot() {
-        assert(stack_.size() == 1);
-        auto unfinished = std::move(stack_.back());
-        stack_.pop_back();
-        assert(!unfinished->last_.has_value());
-        return std::move(unfinished->node_);
+        stack_.resize(stack_.size() + 1);
+        stack_.back().node_.is_final_ = is_final;
     }
 
-    UniquePtr<BuilderNode> PopFreeze(CompiledAddr addr) {
-        auto unfinished = std::move(stack_.back());
-        stack_.pop_back();
-        unfinished->LastCompiled(addr);
-        return std::move(unfinished->node_);
-    }
+    BuilderNode &TopNode() { return stack_.back().node_; }
 
-    UniquePtr<BuilderNode> PopEmpty() {
-        auto unfinished = std::move(stack_.back());
-        stack_.pop_back();
-        assert(!unfinished->last_.has_value());
-        return std::move(unfinished->node_);
-    }
+    void Pop() { return stack_.pop_back(); }
 
     void SetRootOutput(Output out) {
         assert(stack_.size() >= 1);
         auto &unfinished = stack_[0];
-        unfinished->node_->is_final_ = true;
-        unfinished->node_->final_output_ = out;
+        unfinished.node_.is_final_ = true;
+        unfinished.node_.final_output_ = out;
     }
 
     void TopLastFreeze(CompiledAddr addr) {
         assert(stack_.size() >= 1);
         auto &unfinished = stack_.back();
-        unfinished->LastCompiled(addr);
+        unfinished.LastCompiled(addr);
     }
 
     void AddSuffix(u8 *bs_ptr, SizeT bs_len, Output out) {
         if (bs_len == 0)
             return;
         auto &unfinished = stack_.back();
-        assert(!unfinished->last_.has_value());
-        unfinished->last_ = LastTransition{bs_ptr[0], out};
+        assert(!unfinished.last_.present_);
+        unfinished.last_ = LastTransition(bs_ptr[0], out);
+        SizeT len = Len();
+        stack_.resize(len + bs_len - 1);
         for (SizeT i = 1; i < bs_len; i++) {
-            auto unfinished = MakeUnique<BuilderNodeUnfinished>(MakeUnique<BuilderNode>(), LastTransition{bs_ptr[i], Output::Zero()});
-            stack_.push_back(std::move(unfinished));
+            LastTransition &t = stack_[len + i - 1].last_;
+            t.present_ = true;
+            t.inp_ = bs_ptr[i];
         }
         PushEmpty(true);
     }
@@ -122,8 +110,8 @@ struct UnfinishedNodes {
         for (; i < bs_len; i++) {
             if (i >= stack_.size())
                 break;
-            auto &t = stack_[i]->last_;
-            if (!t.has_value() || t->inp_ != bs_ptr[i])
+            auto &t = stack_[i].last_;
+            if (!t.present_ || t.inp_ != bs_ptr[i])
                 break;
         }
         return i;
@@ -134,16 +122,16 @@ struct UnfinishedNodes {
         SizeT i = 0;
         SizeT common_len = std::min(bs_len, stack_.size() - 1);
         for (; i < common_len; i++) {
-            auto &t = stack_[i]->last_;
-            assert(t.has_value());
-            if (t->inp_ != bs_ptr[i])
+            auto &t = stack_[i].last_;
+            assert(t.present_);
+            if (t.inp_ != bs_ptr[i])
                 break;
-            Output common_pre = t->out_.Prefix(out);
-            Output add_prefix = t->out_.Sub(common_pre);
+            Output common_pre = t.out_.Prefix(out);
+            Output add_prefix = t.out_.Sub(common_pre);
             out = out.Sub(common_pre);
             if (!add_prefix.IsZero()) {
-                t->out_ = common_pre;
-                stack_[i + 1]->AddOutputPrefix(add_prefix);
+                t.out_ = common_pre;
+                stack_[i + 1].AddOutputPrefix(add_prefix);
             }
         }
         return i;
