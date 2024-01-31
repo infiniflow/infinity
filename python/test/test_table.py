@@ -404,6 +404,7 @@ class TestTable:
                 print(e)
 
         # disconnect
+        # FIXME
         try:
             res = infinity_obj.disconnect()
         except Exception as e:
