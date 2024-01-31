@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import threading
+from utils import trace_expected_exceptions
 import infinity
 from infinity.common import NetworkAddress, REMOTE_HOST
 import common_values
@@ -459,11 +460,74 @@ class TestDatabase:
 
         assert res.success
 
-    # create db with ignore-if-existence option
-    # create db with ignore-if-existence option when conflict repeatedly
+    # TODO create_database("my_database", IF_NOT_EXISTS)
+    # TODO create db with ignore-if-existence option
+    # TODO create db with ignore-if-existence option when conflict repeatedly
+    # TODO drop non-existent db with ignore if non-existent option repeatedly
+
     # drop non-existent db
-    # drop non-existent db with ignore if non-existent option repeatedly
+    def test_drop_non_existent_db(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+
+        try:
+            res = infinity_obj.drop_database("my_database")
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # one thread get db, another thread drop this db
+    @trace_expected_exceptions
+    def test_get_drop_db_with_two_thread(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj.create_database("test_get_drop_db_with_two_thread")
+
+        thread1 = threading.Thread(target=infinity_obj.drop_database("test_get_drop_db_with_two_thread"), args=(1,))
+        thread2 = threading.Thread(target=infinity_obj.get_database("test_get_drop_db_with_two_thread"), args=(2,))
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        try:
+            res = infinity_obj.get_database("test_get_drop_db_with_two_thread")
+            print(res)
+        except Exception as e:
+            print(e)
+
+        try:
+            res = infinity_obj.drop_database("test_get_drop_db_with_two_thread")
+            print(res)
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # create same db in different thread to test conflict and show dbs
+    @trace_expected_exceptions
+    def test_create_same_db_in_different_threads(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+
+        thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                   args=(1,))
+        thread2 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                   args=(2,))
+
+        thread1.start()
+        thread2.start()
+
+        thread1.join()
+        thread2.join()
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success

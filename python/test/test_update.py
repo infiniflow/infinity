@@ -93,7 +93,6 @@ class TestUpdate:
 
         assert res.success
 
-
     # update empty table
     # update non-existent table
     # update table, no row is met the condition
