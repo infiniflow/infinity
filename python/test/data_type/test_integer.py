@@ -16,7 +16,6 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
 
 # test insert and output integer with upper bound and lower bound and zero value
 

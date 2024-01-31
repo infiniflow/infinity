@@ -14,8 +14,8 @@
 
 import os
 
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestImport:
@@ -30,7 +30,7 @@ class TestImport:
         expect: all operations successfully
         """
 
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         assert infinity_obj
 
         # infinity
@@ -71,4 +71,3 @@ class TestImport:
     # import table with 10000 columns.
     # import table with columns isn't matched (more and less)
     # import table with column value exceeding invalid value range
-
