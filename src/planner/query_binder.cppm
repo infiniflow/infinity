@@ -21,6 +21,7 @@ import query_context;
 import bound_select_statement;
 import bind_context;
 import table_ref;
+import base_table_ref;
 import binding;
 import bind_alias_proxy;
 import bound_delete_statement;
@@ -41,7 +42,7 @@ public:
 
     UniquePtr<BoundUpdateStatement> BindUpdate(const UpdateStatement &statement);
 
-    SharedPtr<TableRef> GetTableRef(const String &db_name, const String &table_name);
+    SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name);
 
     QueryContext *query_context_ptr_;
 
@@ -58,7 +59,7 @@ private:
 
     SharedPtr<TableRef> BuildCTE(QueryContext *query_context, const String &name);
 
-    SharedPtr<TableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference);
+    SharedPtr<BaseTableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference);
 
     SharedPtr<TableRef> BuildView(QueryContext *query_context, const TableReference *from_table);
 

@@ -370,7 +370,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     return cte_table_ref_ptr;
 }
 
-SharedPtr<TableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
+SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
     String schema_name;
     if (from_table->db_name_.empty()) {
         schema_name = DEFAULT_DB_NAME;
@@ -909,7 +909,7 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
     }
 }
 
-SharedPtr<TableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name) {
+SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name) {
     TableReference from_table;
     from_table.db_name_ = db_name;
     from_table.table_name_ = table_name;
@@ -919,7 +919,7 @@ SharedPtr<TableRef> QueryBinder::GetTableRef(const String &db_name, const String
 UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
     // refers to QueryBinder::BindSelect
     UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
-    SharedPtr<TableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
 
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
@@ -938,7 +938,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
     // refers to QueryBinder::BindSelect
     UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
-    SharedPtr<TableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
@@ -955,9 +955,9 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         RecoverableError(Status::SyntaxError(fmt::format("Update expr array is empty")));
     }
 
-    const Vector<String> &column_names = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_names_;
-    const Vector<SharedPtr<DataType>> &column_types = *std::static_pointer_cast<BaseTableRef>(base_table_ref)->column_types_;
-    //    const Vector<String> &column_names = *static_cast<BaseTableRef *>(base_table_ref.get())->column_names_;
+    const Vector<String> &column_names = *base_table_ref->column_names_;
+    const Vector<SharedPtr<DataType>> &column_types = *base_table_ref->column_types_;
+    //    const Vector<String> &column_names = *base_table_ref->column_names_;
     auto project_binder = MakeShared<ProjectBinder>(query_context_ptr_);
     for (UpdateExpr *upd_expr : *statement.update_expr_array_) {
         std::string &column_name = upd_expr->column_name;

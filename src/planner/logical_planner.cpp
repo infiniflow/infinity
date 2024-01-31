@@ -56,7 +56,6 @@ import logical_export;
 import logical_import;
 import logical_explain;
 import logical_command;
-import logical_compact;
 import explain_logical_plan;
 import explain_ast;
 
@@ -161,9 +160,6 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
         }
         case StatementType::kCommand: {
             return BuildCommand(static_cast<const CommandStatement *>(statement), bind_context_ptr);
-        }
-        case StatementType::kCompact: {
-            return BuildCompact(static_cast<const CompactStatement *>(statement), bind_context_ptr);
         }
         default: {
             UnrecoverableError("Invalid statement type.");
@@ -528,7 +524,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     }
 
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-    auto base_table_ref = std::static_pointer_cast<BaseTableRef>(query_binder_ptr->GetTableRef(*schema_name, *table_name));
+    auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
     auto &index_name_map = base_table_ref->table_entry_ptr_->index_meta_map();
 
@@ -837,6 +833,18 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             }
             break;
         }
+        case CommandType::kCompactTable: {
+            auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
+            UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
+
+            SharedPtr<BaseTableRef> table_ref = query_binder_ptr->GetTableRef(compact_table->schema_name(), compact_table->table_name());
+
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+            logical_command->table_ref_ = table_ref;
+
+            this->logical_plan_ = logical_command;
+            break;
+        }
         default: {
             UnrecoverableError("Invalid command type.");
         }
@@ -1087,17 +1095,6 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     }
 
     this->logical_plan_ = explain_node;
-    return Status::OK();
-}
-
-Status LogicalPlanner::BuildCompact(const CompactStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
-
-    SharedPtr<TableRef> table_ref = query_binder_ptr->GetTableRef(statement->schema_name_, statement->table_name_);
-
-    SharedPtr<LogicalCompact> compact_node =
-        MakeShared<LogicalCompact>(bind_context_ptr->GetNewLogicalNodeId(), static_pointer_cast<BaseTableRef>(table_ref));
-    this->logical_plan_ = compact_node;
     return Status::OK();
 }
 

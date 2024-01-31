@@ -35,7 +35,6 @@ enum class StatementType {
     kFlush,
     kOptimize,
     kCommand,
-    kCompact,
 };
 
 class BaseStatement {

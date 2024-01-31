@@ -156,6 +156,7 @@ export using infinity::UseCmd;
 export using infinity::CheckTable;
 export using infinity::SetCmd;
 export using infinity::ExportCmd;
+export using infinity::CompactTable;
 
 export using infinity::InitParameter;
 
@@ -185,7 +186,6 @@ export using infinity::OptimizeStatement;
 export using infinity::AlterStatement;
 export using infinity::ExplainStatement;
 export using infinity::CommandStatement;
-export using infinity::CompactStatement;
 
 export using infinity::ParsedExprType;
 export using infinity::OrderType;

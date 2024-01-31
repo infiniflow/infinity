@@ -74,7 +74,6 @@ extern int sqldebug;
 #include "statement/show_statement.h"
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
-#include "statement/compact_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -116,7 +115,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 120 "parser.h"
+#line 119 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -294,7 +293,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 96 "parser.y"
+#line 95 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -317,7 +316,6 @@ union SQLSTYPE
     infinity::FlushStatement*  flush_stmt;
     infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
-    infinity::CompactStatement* compact_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -368,7 +366,7 @@ union SQLSTYPE
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
 
-#line 372 "parser.h"
+#line 370 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

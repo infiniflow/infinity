@@ -16,6 +16,7 @@
 
 #include "base_statement.h"
 #include <memory>
+#include <string>
 #include <utility>
 
 namespace infinity {
@@ -26,6 +27,7 @@ enum class CommandType {
     kSet,
     kExport,
     kCheckTable,
+    kCompactTable,
 };
 
 class CommandInfo {
@@ -150,6 +152,26 @@ public:
     const std::string &table_name() const { return table_name_; }
 
 private:
+    std::string table_name_;
+};
+
+class CompactTable final : public CommandInfo {
+public:
+    explicit CompactTable(std::string &&schema_name, std::string &&table_name)
+        : CommandInfo(CommandType::kCompactTable), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+
+    explicit CompactTable(std::string &&table_name)
+        : CommandInfo(CommandType::kCompactTable), schema_name_("default"), table_name_(std::move(table_name)) {}
+
+    std::string ToString() const final;
+
+    const std::string &schema_name() const { return schema_name_; }
+
+    const std::string &table_name() const { return table_name_; }
+
+private:
+    std::string schema_name_;
+
     std::string table_name_;
 };
 

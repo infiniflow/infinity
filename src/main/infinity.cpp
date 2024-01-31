@@ -185,6 +185,4 @@ QueryResult Infinity::ShowVariable(const String& variable_name) {
     return result;
 }
 
-
-
 } // namespace infinity

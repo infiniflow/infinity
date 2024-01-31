@@ -34,6 +34,7 @@ import defer_op;
 import config;
 import status;
 import infinity_exception;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -136,7 +137,13 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kCheckTable: {
             break;
         }
-        case CommandType::kInvalid: {
+        case CommandType::kCompactTable: {
+            auto *txn = query_context->GetTxn();
+            CompactSegmentsTask compact_task(table_ref_.get(), txn);
+            compact_task.Execute();
+            break;
+        }
+        default: {
             UnrecoverableError("Invalid command type.");
         }
     }

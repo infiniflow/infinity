@@ -1,4 +1,4 @@
-// phopyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -328,6 +328,7 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
     return Status::OK();
 }
 
+// TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     auto *table_entry = table_ref->table_entry_ptr_;
 

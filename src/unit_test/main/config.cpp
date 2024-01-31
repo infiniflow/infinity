@@ -46,8 +46,8 @@ TEST_F(ConfigTest, test1) {
     // Network
     EXPECT_EQ(config.listen_address(), "0.0.0.0");
     EXPECT_EQ(config.pg_port(), 5432);
-    EXPECT_EQ(config.http_port(), 8088);
-    EXPECT_EQ(config.sdk_port(), 23817);
+    EXPECT_EQ(config.http_port(), 8088u);
+    EXPECT_EQ(config.sdk_port(), 23817u);
 
     // Log
     EXPECT_EQ(*config.log_filename(), "infinity.log");
@@ -55,7 +55,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(*config.log_file_path(), "/tmp/infinity/log/infinity.log");
     EXPECT_EQ(config.log_to_stdout(), false);
     EXPECT_EQ(config.log_max_size(), 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.log_file_rotate_count(), 10);
+    EXPECT_EQ(config.log_file_rotate_count(), 10ul);
     // EXPECT_EQ(config.log_level(), LogLevel::kTrace);
 
     EXPECT_EQ(*config.data_dir(), "/tmp/infinity/data");
@@ -76,22 +76,22 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.time_zone(), "UTC");
     EXPECT_EQ(config.time_zone_bias(), -9);
 
-    EXPECT_EQ(config.worker_cpu_limit(), 2);
+    EXPECT_EQ(config.worker_cpu_limit(), 2u);
     EXPECT_EQ(config.total_memory_size(), 8 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.query_cpu_limit(), 2);
+    EXPECT_EQ(config.query_cpu_limit(), 2ul);
     EXPECT_EQ(config.query_memory_limit(), 4 * 1024ul * 1024ul);
 
     EXPECT_EQ(config.listen_address(), "127.0.0.1");
     EXPECT_EQ(config.pg_port(), 25432);
-    EXPECT_EQ(config.http_port(), 8089);
-    EXPECT_EQ(config.sdk_port(), 24817);
+    EXPECT_EQ(config.http_port(), 8089u);
+    EXPECT_EQ(config.sdk_port(), 24817u);
 
     EXPECT_EQ(*config.log_filename(), "info.log");
     EXPECT_EQ(*config.log_dir(), "/var/infinity/log");
     EXPECT_EQ(*config.log_file_path(), "/var/infinity/log/info.log");
     EXPECT_EQ(config.log_to_stdout(), true);
     EXPECT_EQ(config.log_max_size(), 2 * 1024ul * 1024ul * 1024ul);
-    EXPECT_EQ(config.log_file_rotate_count(), 3);
+    EXPECT_EQ(config.log_file_rotate_count(), 3ul);
     EXPECT_EQ(config.log_level(), LogLevel::kTrace);
 
     EXPECT_EQ(*config.data_dir(), "/var/infinity/data");

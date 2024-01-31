@@ -324,9 +324,6 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kFusion: {
             return MakeTaskStateTemplate<FusionOperatorState>(physical_ops[operator_id]);
         }
-        case PhysicalOperatorType::kCompact: {
-            return MakeTaskStateTemplate<CompactOperatorState>(physical_ops[operator_id]);
-        }
         default: {
             UnrecoverableError(fmt::format("Not support {} now", PhysicalOperatorToString(physical_ops[operator_id]->operator_type())));
         }
@@ -701,8 +698,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kShow:
         case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kOptimize:
-        case PhysicalOperatorType::kFlush: 
-        case PhysicalOperatorType::kCompact: {
+        case PhysicalOperatorType::kFlush: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(first_operator->operator_type())));
@@ -911,8 +907,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kCreateIndexPrepare:
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
-        case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kCompact: {
+        case PhysicalOperatorType::kExport: {
             if (fragment_type_ != FragmentType::kSerialMaterialize) {
                 UnrecoverableError(
                     fmt::format("{} should in serial materialized fragment", PhysicalOperatorToString(last_operator->operator_type())));
