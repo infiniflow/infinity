@@ -43,3 +43,8 @@ res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
 print(res)
 
 ```
+
+# For developer
+```shell
+pip install -e .
+```

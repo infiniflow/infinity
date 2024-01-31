@@ -1,5 +1,8 @@
 import argparse
+import itertools
 import os
+import sys
+import threading
 import time
 from shutil import copyfile
 import subprocess
@@ -14,16 +17,44 @@ from generate_top_varchar import generate as generate7
 from generate_compact import generate as generate8
 
 
+class SpinnerThread(threading.Thread):
+    def __init__(self):
+        super(SpinnerThread, self).__init__()
+        self.stop = False
+
+    def run(self):
+        spinner = itertools.cycle(['-', '/', '|', '\\'])
+        while not self.stop:
+            print(next(spinner), end='\r')
+            time.sleep(0.1)
+
+    def stop_spinner(self):
+        self.stop = True
+
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
+    # check if infinity_sdk is installed
+    # uninstall first
+    os.system("pip uninstall infinity-sdk -y")
+    # install
+    os.system("cd python && python setup.py install")
+    # run test
     print("start pysdk test...")
-    process = subprocess.run(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-    output, error = process.stdout, process.stderr
-    print(output.decode())
+    process = subprocess.Popen(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, universal_newlines=True)
+
+    def reader(pipe, func):
+        for line in iter(pipe.readline, ''):
+            func(line.strip())
+
+    threading.Thread(target=reader, args=[process.stdout, print]).start()
+    threading.Thread(target=reader, args=[process.stderr, print]).start()
+    process.wait()
     if process.returncode != 0:
-        raise Exception(f"An error occurred: {error.decode()}")  # Raises an exception with the error message.
+        raise Exception(f"An error occurred: {process.stderr}")
+
+    print("pysdk test finished.")
 
 
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
@@ -124,6 +155,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    t = SpinnerThread()
+    t.start()
+
     print("Generating file...")
     generate1(args.generate_if_exists, args.copy)
     generate2(args.generate_if_exists, args.copy)
@@ -135,9 +169,6 @@ if __name__ == "__main__":
     generate8(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
-    # Install py sdk
-    os.system(f"pip install infinity_sdk")
-
     print("Start copying data...")
     if args.just_copy_all_data is True:
         copy_all(args.data, args.copy)
@@ -145,11 +176,17 @@ if __name__ == "__main__":
         copy_all(args.data, args.copy)
         print("Start testing...")
         start = time.time()
-        python_skd_test(python_test_dir)
-        test_process(args.path, args.test, args.data, args.copy)
+        try:
+            python_skd_test(python_test_dir)
+            test_process(args.path, args.test, args.data, args.copy)
+        except Exception as e:
+            print(e)
+            t.stop_spinner()
+            t.join()
+            sys.exit(-1)
         end = time.time()
         print("Test finished.")
         print("Time cost: {}s".format(end - start))
 
-
-
+    t.stop_spinner()
+    t.join()

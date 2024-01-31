@@ -16,9 +16,9 @@ import os
 import pandas as pd
 from numpy import dtype
 
+import common_values
 import infinity
 import infinity.index as index
-from infinity.common import REMOTE_HOST
 
 
 class TestCase:
@@ -34,7 +34,7 @@ class TestCase:
         """
         ports = [9090, 23817, 9070]
         for port in ports:
-            infinity_obj = infinity.connect(REMOTE_HOST)
+            infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
 
@@ -44,7 +44,7 @@ class TestCase:
         method: create db with empty name
         expect: create db fail with error message
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         assert infinity_obj
 
         try:
@@ -74,7 +74,7 @@ class TestCase:
         """
         ports = [23817]
         for port in ports:
-            infinity_obj = infinity.connect(REMOTE_HOST)
+            infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
 
             # infinity

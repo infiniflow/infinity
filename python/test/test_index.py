@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import common_values
 import infinity
 import infinity.index as index
-from infinity.common import REMOTE_HOST
 
 
 class TestIndex:
 
     def test_create_index_IVFFlat(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_ivfflat", True)
         assert res.success
@@ -40,7 +40,7 @@ class TestIndex:
 
     def test_create_index_HNSW(self):
         # CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_hnsw", True)
         assert res.success
@@ -65,7 +65,7 @@ class TestIndex:
 
     def test_create_index_fulltext(self):
         # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(ANALYZER=segmentation) (doctitle, docdate) USING FULLTEXT;
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_fulltext", if_exists=True)
         assert res.success

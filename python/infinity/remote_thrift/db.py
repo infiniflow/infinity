@@ -17,6 +17,7 @@ from abc import ABC
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.db import Database
 from infinity.remote_thrift.table import RemoteTable
+from infinity.remote_thrift.utils import check_valid_name
 
 
 def get_ordinary_info(column_big_info, column_defs, column_name, index):
@@ -114,6 +115,7 @@ class RemoteDatabase(Database, ABC):
         # {"c1":'int, primary key',"c2":'vector,1024,float32'}
         # db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "vector,1024,float32"}, None)
         # to column_defs
+        check_valid_name(table_name)
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             column_big_info = [item.strip() for item in column_info.split(",")]
@@ -134,15 +136,22 @@ class RemoteDatabase(Database, ABC):
             raise Exception(res.error_msg)
 
     def drop_table(self, table_name, if_exists=True):
+        check_valid_name(table_name)
         return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
-        return self._conn.list_tables(self._db_name)
+        res = self._conn.list_tables(self._db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def describe_table(self, table_name):
+        check_valid_name(table_name)
         pass  # implement describe table logic here
 
     def get_table(self, table_name):
+        check_valid_name(table_name)
         res = self._conn.get_table(
             db_name=self._db_name, table_name=table_name)
         if res.success is True:
