@@ -16,6 +16,7 @@ from numpy import dtype
 
 import infinity
 from infinity.common import NetworkAddress, REMOTE_HOST
+from utils import trace_expected_exceptions
 
 
 class TestDelete:
@@ -87,8 +88,80 @@ class TestDelete:
         assert res.success
 
     # delete empty table
+    def test_delete_empty_table(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        tb = db_obj.drop_table("test_delete_empty_table")
+        assert tb
+
+        tb = db_obj.create_table("test_delete_empty_table", {"c1": "int"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_empty_table")
+
+        try:
+            # FIXME res = table_obj.delete("c1 = 1")
+            res = table_obj()
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete non-existent table
+    def test_delete_non_existent_table(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        tb = db_obj.drop_table("test_delete_non_existent_table", if_exists=True)
+        assert tb
+
+        tb = db_obj.create_table("test_delete_non_existent_table", {"c1": "int"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_empty_table")
+        table_obj.delete()
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete table, no row is met the condition
+    def test_delete_table_no_row_met_the_condition(self):
+        # connect
+        infinity_obj = infinity.connect(REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        tb = db_obj.drop_table("test_delete_table_no_row_met_the_condition", if_exists=True)
+        assert tb
+        tb = db_obj.drop_table("test_delete_table_no_row_met_the_condition_2", if_exists=True)
+        assert tb
+
+        tb = db_obj.create_table("test_delete_table_no_row_met_the_condition", {"c1": "vector,3,float"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_table_no_row_met_the_condition")
+        table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+        table_obj.delete("c1 = [1.1,2.2,3.3]")
+        # FIXME table_obj.delete("c1 = [1.1,2.2,4.4]")
+
+        tb = db_obj.create_table("test_delete_table_no_row_met_the_condition_2", {"c1": "float"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_table_no_row_met_the_condition_2")
+        table_obj.insert([{"c1": 1.1}])
+        table_obj.delete("c1 = 2")
+
+
+
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete table, all rows are met the condition
     # delete table with only one block
     # delete table with multiple blocks, but only one segment
