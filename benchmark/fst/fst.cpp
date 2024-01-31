@@ -260,13 +260,14 @@ int main(int argc, char *argv[]) {
         SizeT cnt = 0;
         bool running = true;
         while (running) {
+            u64 res;
             for (auto &[key, val] : queries) {
-                Optional<u64> res = f.Get((u8 *)key.c_str(), key.length());
-                if (res.has_value()) {
-                    if (res.value() != val) {
+                bool found = f.Get((u8 *)key.c_str(), key.length(), res);
+                if (found) {
+                    if (res != val) {
                         // -1 means expecting missing
                         String exp = val == SizeT(-1) ? "missing" : std::to_string(val);
-                        return app.exit(CLI::FileError("Value of key " + key + " mismatch, expect " + exp + ", got " + std::to_string(res.value())));
+                        return app.exit(CLI::FileError("Value of key " + key + " mismatch, expect " + exp + ", got " + std::to_string(res)));
                     }
                 } else {
                     if (val != SizeT(-1)) {

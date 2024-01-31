@@ -228,9 +228,7 @@ struct Node {
     CompiledAddr TransAddr(SizeT i);
 
     /// Finds the `i`th transition corresponding to the given input byte.
-    ///
-    /// If no transition for this byte exists, then `None` is returned.
-    Optional<SizeT> FindInput(u8 b);
+    bool FindInput(u8 b, SizeT &ti);
 
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
@@ -277,7 +275,7 @@ public:
     CompiledAddr TransAddr(const Node &node, SizeT i) const;
 
     /// FindInput returns the index of the transition with the given input.
-    Optional<SizeT> FindInput(const Node &node, u8 b) const;
+    bool FindInput(const Node &node, u8 b, SizeT &ti) const;
 
     /// CommonIdx translate a byte to an index in the COMMON_INPUTS_INV array.
     static u8 CommonIdx(u8 input, u8 max) {
@@ -291,11 +289,12 @@ public:
 
     /// CommonInput translates a common input index stored in a serialized FST
     /// to the corresponding byte.
-    static Optional<u8> CommonInput(u8 idx) {
+    static bool CommonInput(u8 idx, u8 &common_input) {
         if (idx == 0) {
-            return {};
+            return false;
         } else {
-            return COMMON_INPUTS_INV[SizeT(idx - 1)];
+            common_input = COMMON_INPUTS_INV[SizeT(idx - 1)];
+            return true;
         }
     }
 
@@ -347,7 +346,7 @@ public:
     static void Compile(Writer &wtr, u8 input) {
         StateOneTransNext state;
         state.SetCommonInput(input);
-        if (!state.CommonInput().has_value()) {
+        if (state.InputLen()) {
             wtr.Write(&input, 1);
         }
         wtr.Write(&state.val_, 1);
@@ -355,10 +354,10 @@ public:
 
     void SetCommonInput(u8 input) { val_ = (val_ & 0b11000000) | State::CommonIdx(input, 0b111111); }
 
-    Optional<u8> CommonInput() const { return State::CommonInput(val_ & 0b00111111); }
+    bool CommonInput(u8 &common_input) const { return State::CommonInput(val_ & 0b00111111, common_input); }
 
     SizeT InputLen() const {
-        if (this->CommonInput().has_value())
+        if ((val_ & 0b00111111) != 0)
             return 0;
         else
             return 1;
@@ -367,9 +366,10 @@ public:
     SizeT EndAddr(SizeT data_len) const { return data_len - 1 - InputLen(); }
 
     u8 Input(const Node &node) const {
-        Optional<u8> inp = CommonInput();
-        if (inp.has_value()) {
-            return inp.value();
+        u8 inp;
+        bool found = CommonInput(inp);
+        if (found) {
+            return inp;
         } else {
             return node.data_ptr_[node.start_ - 1];
         }
@@ -390,11 +390,12 @@ public:
     }
 
     /// FindInput returns the index of the transition with the given input.
-    Optional<SizeT> FindInput(const Node &node, u8 b) const {
+    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
         if (Input(node) == b) {
-            return 0;
+            ti = 0;
+            return true;
         } else {
-            return {};
+            return false;
         }
     }
 };
@@ -422,7 +423,7 @@ public:
 
         StateOneTrans state;
         state.SetCommonInput(trans.inp_);
-        if (!state.CommonInput().has_value()) {
+        if (state.InputLen()) {
             wtr.Write(&trans.inp_, 1);
         }
         wtr.Write(&state.val_, 1);
@@ -430,10 +431,10 @@ public:
 
     void SetCommonInput(u8 input) { val_ = (val_ & 0b10000000) | State::CommonIdx(input, 0b111111); }
 
-    Optional<u8> CommonInput() const { return State::CommonInput(val_ & 0b00111111); }
+    bool CommonInput(u8 &common_input) const { return State::CommonInput(val_ & 0b00111111, common_input); }
 
     SizeT InputLen() const {
-        if (this->CommonInput().has_value())
+        if ((val_ & 0b00111111) != 0)
             return 0;
         else
             return 1;
@@ -450,9 +451,10 @@ public:
     }
 
     u8 Input(const Node &node) const {
-        Optional<u8> inp = CommonInput();
-        if (inp.has_value()) {
-            return inp.value();
+        u8 inp;
+        bool found = CommonInput(inp);
+        if (found) {
+            return inp;
         } else {
             return node.data_ptr_[node.start_ - 1];
         }
@@ -486,11 +488,12 @@ public:
     }
 
     /// FindInput returns the index of the transition with the given input.
-    Optional<SizeT> FindInput(const Node &node, u8 b) const {
+    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
         if (Input(node) == b) {
-            return 0;
+            ti = 0;
+            return true;
         } else {
-            return {};
+            return false;
         }
     }
 };
@@ -671,14 +674,15 @@ public:
     }
 
     /// FindInput returns the index of the transition with the given input.
-    Optional<SizeT> FindInput(const Node &node, u8 b) const {
+    bool FindInput(const Node &node, u8 b, SizeT &ti) const {
         if (node.ntrans_ > TRANS_INDEX_THRESHOLD) {
             SizeT start = node.start_ - NtransLen() - 1 - 256;
             SizeT i = node.data_ptr_[start + SizeT(b)];
             if (i > node.ntrans_) {
-                return {};
+                return false;
             } else {
-                return i;
+                ti = i;
+                return true;
             }
         } else {
             SizeT start = node.start_ - NtransLen() - 1 // pack size
@@ -686,10 +690,11 @@ public:
             SizeT end = start + node.ntrans_;
             for (SizeT i = start; i < end; i++) {
                 if (node.data_ptr_[i] == b) {
-                    return node.ntrans_ - (i - start) - 1;
+                    ti = node.ntrans_ - (i - start) - 1;
+                    return true;
                 }
             }
-            return {};
+            return false;
         }
     }
 
@@ -709,7 +714,7 @@ public:
     Transition TransAt(const Node &node, SizeT i) const { return Transition(InputAt(node, i), OutputAt(node, i), TransAddr(node, i)); }
 };
 
-    /// Returns the transition at index `i`.
+/// Returns the transition at index `i`.
 struct Transition State::TransAt(const Node &node, SizeT i) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
@@ -721,7 +726,7 @@ struct Transition State::TransAt(const Node &node, SizeT i) const {
     }
 }
 
-    /// Returns the transition address of the `i`th transition.
+/// Returns the transition address of the `i`th transition.
 CompiledAddr State::TransAddr(const Node &node, SizeT i) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
@@ -733,15 +738,15 @@ CompiledAddr State::TransAddr(const Node &node, SizeT i) const {
     }
 }
 
-    /// FindInput returns the index of the transition with the given input.
-Optional<SizeT> State::FindInput(const Node &node, u8 b) const {
+/// FindInput returns the index of the transition with the given input.
+bool State::FindInput(const Node &node, u8 b, SizeT &ti) const {
     switch (val_ & 0b11000000) {
         case 0b11000000:
-            return StateOneTransNext(val_).FindInput(node, b);
+            return StateOneTransNext(val_).FindInput(node, b, ti);
         case 0b10000000:
-            return StateOneTrans(val_).FindInput(node, b);
+            return StateOneTrans(val_).FindInput(node, b, ti);
         default:
-            return StateAnyTrans(val_).FindInput(node, b);
+            return StateAnyTrans(val_).FindInput(node, b, ti);
     }
 }
 
@@ -806,6 +811,6 @@ Transition Node::TransAt(SizeT i) { return State(state_).TransAt(*this, i); }
 
 CompiledAddr Node::TransAddr(SizeT i) { return State(state_).TransAddr(*this, i); }
 
-Optional<SizeT> Node::FindInput(u8 b) { return State(state_).FindInput(*this, b); }
+bool Node::FindInput(u8 b, SizeT &ti) { return State(state_).FindInput(*this, b, ti); }
 
 } // namespace infinity

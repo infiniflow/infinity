@@ -152,29 +152,32 @@ public:
     CompiledAddr RootAddr() { return meta_.root_addr_; }
 
     /// Retrieves the value associated with a key.
-    ///
-    /// If the key does not exist, then `None` is returned.
-    Optional<u64> Get(u8 *key_ptr, SizeT key_len) {
+    bool Get(u8 *key_ptr, SizeT key_len, u64 &val) {
         Output out;
+        SizeT ti;
         Node node = Root();
         for (SizeT i = 0; i < key_len; i++) {
-            Optional<SizeT> ti = node.FindInput(key_ptr[i]);
-            if (!ti.has_value()) {
-                return None;
+            bool found = node.FindInput(key_ptr[i], ti);
+            if (!found) {
+                return false;
             }
-            Transition t = node.TransAt(ti.value());
+            Transition t = node.TransAt(ti);
             node = NodeAt(t.addr_);
             out = out.Cat(t.out_);
         }
         if (!node.IsFinal()) {
-            return None;
+            return false;
         }
         out = out.Cat(node.FinalOutput());
-        return out.Value();
+        val = out.Value();
+        return true;
     }
 
     /// Returns true if and only if the given key is in this FST.
-    bool ContainsKey(u8 *key_ptr, SizeT key_len) { return Get(key_ptr, key_len).has_value(); }
+    bool ContainsKey(u8 *key_ptr, SizeT key_len) {
+        u64 val;
+        return Get(key_ptr, key_len, val);
+    }
 
 private:
     /// Returns the root node of this fst.
@@ -299,13 +302,14 @@ private:
         // not actually exist in the FST.
         Node node = fst_.Root();
         Output out;
+        SizeT ti;
         for (SizeT i = 0; i < key.size(); i++) {
             u8 b = key[i];
-            Optional<SizeT> ti = node.FindInput(b);
-            if (ti.has_value()) {
-                Transition t = node.TransAt(ti.value());
+            bool found = node.FindInput(b, ti);
+            if (found) {
+                Transition t = node.TransAt(ti);
                 inp_.push_back(b);
-                stack_.emplace_back(node, ti.value() + 1, out);
+                stack_.emplace_back(node, ti + 1, out);
                 out = out.Cat(t.out_);
                 node = fst_.NodeAt(t.addr_);
             } else {
