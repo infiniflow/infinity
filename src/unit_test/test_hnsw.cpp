@@ -76,7 +76,7 @@ int main() {
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            auto result = hnsw_index->KnnSearch1(query, 1);
+            auto result = hnsw_index->KnnSearchSorted(query, 1);
 //            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;
@@ -102,7 +102,7 @@ int main() {
         int correct = 0;
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
-            auto result = hnsw_index->KnnSearch1(query, 1);
+            auto result = hnsw_index->KnnSearchSorted(query, 1);
 //            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;

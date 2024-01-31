@@ -152,4 +152,43 @@ public:
     }
 };
 
+export template <typename LabelType>
+class LabelGetter {
+public:
+    LabelGetter(SizeT capacity, const LabelType *labels) : capacity_(capacity), labels_(labels) {}
+
+    LabelType operator()(VertexType vertex_i) const {
+        // String ss;
+        // for (int i = 0; i < capacity_; i++) {
+        //     ss += std::to_string(labels_[i]) + " ";
+        // }
+        // LOG_WARN(fmt::format("! {}, {}", ss, (u64)labels_));
+        return labels_[vertex_i];
+    }
+
+    LabelGetter(const LabelGetter &) = delete;
+    LabelGetter &operator=(const LabelGetter &) = delete;
+
+    LabelGetter(LabelGetter &&other) : capacity_(other.capacity_), labels_(std::exchange(other.labels_, nullptr)) {}
+    LabelGetter &operator=(LabelGetter &&) = default;
+
+private:
+    const SizeT capacity_;
+    const LabelType *labels_;
+};
+
+export template <typename LabelType>
+class FilterBase {
+public:
+    FilterBase(LabelGetter<LabelType> &&label_getter) : label_getter_(std::move(label_getter)) {}
+
+    virtual bool operator()(const VertexType &vertex_i) const = 0;
+
+protected:
+    const LabelGetter<LabelType> label_getter_;
+};
+
+export template <typename Filter, typename LabelType>
+concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, NoneType> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
+
 } // namespace infinity

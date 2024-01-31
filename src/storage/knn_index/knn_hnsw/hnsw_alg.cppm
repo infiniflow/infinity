@@ -86,7 +86,7 @@ private:
             SizeT ef,
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(std::max(M_, ef_construction)), //
-          mult_(1 / std::log(1.0 * M_)),                                                 //
+          mult_(1 / std::log(1.0 * M_)),                                                      //
           data_store_(std::move(data_store)),                                                 //
           graph_store_(std::move(graph_store)),                                               //
           distance_(std::move(distance)),                                                     //
@@ -131,9 +131,9 @@ private:
     }
 
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
-    template <bool WithLock = false>
+    template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>>
-    SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Optional<Bitmask> &bitmask) const {
+    SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
         auto d_ptr = MakeUniqueForOverwrite<DataType[]>(result_n);
         auto i_ptr = MakeUniqueForOverwrite<VertexType[]>(result_n);
         HeapResultHandler<CompareMax<DataType, VertexType>> result_handler(1, result_n, d_ptr.get(), i_ptr.get());
@@ -144,7 +144,11 @@ private:
         // enter_point will not be added to result_handler, the distance is not used
         auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
         candidate.emplace(-dist, enter_point);
-        if (!bitmask.has_value() || bitmask.value().IsTrue(enter_point)) {
+        if constexpr (!std::is_same_v<Filter, NoneType>) {
+            if (filter(enter_point)) {
+                result_handler.AddResult(0, dist, enter_point);
+            }
+        } else {
             result_handler.AddResult(0, dist, enter_point);
         }
 
@@ -181,7 +185,11 @@ private:
                 auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_);
                 if (result_handler.GetSize(0) < result_n || dist < result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
-                    if (!bitmask.has_value() || bitmask.value().IsTrue(n_idx)) {
+                    if constexpr (!std::is_same_v<Filter, NoneType>) {
+                        if (filter(n_idx)) {
+                            result_handler.AddResult(0, dist, n_idx);
+                        }
+                    } else {
                         result_handler.AddResult(0, dist, n_idx);
                     }
                 }
@@ -283,8 +291,19 @@ private:
         }
     }
 
+    LabelType GetLabel(VertexType vertex_i) const { return labels_[vertex_i]; }
+
+    template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
+        auto query = data_store_.MakeQuery(q);
+        VertexType ep = graph_store_.enterpoint();
+        for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
+            ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
+        }
+        return SearchLayer<WithLock, Filter>(ep, query, 0, std::max(k, ef_), filter);
+    }
+
 public:
-    // This function will be removed
     template <typename Iterator>
         requires DataIteratorConcept<Iterator, const DataType *>
     void InsertVecs(Iterator iter, const LabelType *labels, SizeT insert_n) {
@@ -316,8 +335,6 @@ public:
     VertexType StoreDataRaw(const DataType *query, const LabelType *labels, SizeT insert_n) {
         return StoreData(DenseVectorIter(query, data_store_.dim(), insert_n), labels, insert_n);
     }
-
-    VertexType StoreDataRaw(const DataType *query, LabelType label) { return StoreDataRaw(query, &label, 1); }
 
     template <bool WithLock = true>
     void Build(VertexType vertex_i) {
@@ -360,20 +377,25 @@ public:
         }
     }
 
-    template <bool WithLock = false>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearch(const DataType *q, SizeT k, const Optional<Bitmask> &bitmask = None) const {
-        auto query = data_store_.MakeQuery(q);
-        VertexType ep = graph_store_.enterpoint();
-        for (i32 cur_layer = graph_store_.max_layer(); cur_layer > 0; --cur_layer) {
-            ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
+    template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
+        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
+        auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
+        for (SizeT i = 0; i < result_n; ++i) {
+            labels[i] = labels_[v_ptr[i]];
         }
-        return SearchLayer<WithLock>(ep, query, 0, std::max(k, ef_), bitmask);
+        return {result_n, std::move(d_ptr), std::move(labels)};
     }
 
-    // function for test
     template <bool WithLock = false>
-    Vector<Pair<DataType, LabelType>> KnnSearch1(const DataType *q, SizeT k, const Optional<Bitmask> &bitmask = None) const {
-        auto [result_n, d_ptr, v_ptr] = KnnSearch<WithLock>(q, k, bitmask);
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
+        return KnnSearch<WithLock, NoneType>(q, k, None);
+    }
+
+    // function for test, add sort for convenience
+    template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
+    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k, const Filter &filter) const {
+        auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         Vector<Pair<DataType, LabelType>> result(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
             result[i] = {d_ptr[i], labels_[v_ptr[i]]};
@@ -382,7 +404,13 @@ public:
         return result;
     }
 
-    LabelType GetLabel(VertexType vertex_i) const { return labels_[vertex_i]; }
+    // function for test
+    template <bool WithLock = false>
+    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k) const {
+        return KnnSearchSorted<WithLock, NoneType>(q, k, None);
+    }
+
+    LabelGetter<LabelType> GetLabelGetter() const { return LabelGetter<LabelType>(data_store_.max_vec_num(), labels_.get()); }
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
@@ -409,7 +437,8 @@ public:
 
         auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
         file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
-        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), std::move(labels), 0, 0));
+        return UniquePtr<This>(
+            new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), std::move(labels), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

@@ -19,11 +19,13 @@ import lvq_store;
 import dist_func_l2;
 import dist_func_ip;
 import hnsw_alg;
+import knn_filter;
+import hnsw_common;
 
 using namespace infinity;
 
 #define EXPECT_VALUE_EQ(a, b)                                                                                                                        \
-    if (auto f = f64(a) - f64(b); std::max(f, -f) > 1e-4) {                                                                                               \
+    if (auto f = f64(a) - f64(b); std::max(f, -f) > 1e-4) {                                                                                          \
         std::cerr << "values aren't equal at line\t" << __LINE__ << "\tvalues: " << a << " != " << b << std::endl;                                   \
     }
 
@@ -83,7 +85,7 @@ int main() {
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
     {
-        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
 
         EXPECT_VALUE_EQ(result[0].first, 0);
         EXPECT_VALUE_EQ(result[0].second, 0);
@@ -102,7 +104,8 @@ int main() {
     p_bitmask->SetFalse(1);
     --top_k;
     {
-        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
+        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0);
         EXPECT_VALUE_EQ(result[0].second, 0);
@@ -117,7 +120,8 @@ int main() {
     p_bitmask->SetFalse(0);
     --top_k;
     {
-        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
+        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0.08);
         EXPECT_VALUE_EQ(result[0].second, 2);
@@ -129,7 +133,8 @@ int main() {
     p_bitmask->SetFalse(2);
     --top_k;
     {
-        auto result = hnsw_index->KnnSearch1(query_embedding.get(), top_k, *p_bitmask);
+        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0.2);
         EXPECT_VALUE_EQ(result[0].second, 3);
