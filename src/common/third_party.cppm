@@ -16,7 +16,6 @@ module;
 
 #include "CLI11.hpp"
 
-#include "cxxopts.hpp"
 #include "spdlog/details/registry.h"
 #include "spdlog/fmt/fmt.h"
 #include "spdlog/logger.h"
@@ -96,18 +95,6 @@ export using CLI::HorribleError;
 export using CLI::OptionNotFound;
 export using CLI::ArgumentMismatch;
 } // namespace CLI
-
-namespace cxxopts {
-    // cxxopts
-    export using cxxopts::Options;
-    export using cxxopts::Value;
-
-    namespace values {
-        export using cxxopts::values::standard_value;
-    }
-
-    export using cxxopts::ParseResult;
-}
 
 namespace toml {
     // Toml parser

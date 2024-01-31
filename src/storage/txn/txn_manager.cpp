@@ -15,6 +15,7 @@
 module;
 
 #include <functional>
+#include <memory>
 
 module txn_manager;
 
