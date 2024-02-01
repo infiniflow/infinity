@@ -71,7 +71,7 @@ void Indexer::Commit() {
 }
 
 SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
-    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id].get());
+    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
 bool Indexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }

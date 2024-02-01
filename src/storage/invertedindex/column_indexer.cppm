@@ -1,5 +1,6 @@
 module;
 
+export module column_indexer;
 import stl;
 import memory_pool;
 import index_defines;
@@ -9,10 +10,11 @@ import parser;
 import column_vector;
 import third_party;
 import index_builder;
-export module column_indexer;
+import memory_indexer;
 
 namespace infinity {
 
+class Indexer;
 export class ColumnIndexer {
 public:
     ColumnIndexer(Indexer *indexer,
@@ -22,6 +24,19 @@ public:
                   SharedPtr<RecyclePool> buffer_pool);
 
     ~ColumnIndexer();
+
+    MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
+    // realtime insert
+    void Insert(RowID row_id, String &data);
+
+    void Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+
+    void Commit();
+
+    void Dump(IndexBuilder &index_builder);
+
+private:
+    UniquePtr<MemoryIndexer> memory_indexer_;
 };
 
 } // namespace infinity
