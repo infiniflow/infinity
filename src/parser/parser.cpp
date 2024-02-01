@@ -5040,7 +5040,7 @@ yyreduce:
     } else {
         (yyval.command_stmt)->command_info_ = std::make_unique<infinity::CompactTable>(std::string((yyvsp[0].table_name_t)->table_name_ptr_));
         free((yyvsp[0].table_name_t)->table_name_ptr_);
-    }
+    } delete (yyvsp[0].table_name_t);
 }
 #line 5046 "parser.cpp"
     break;
