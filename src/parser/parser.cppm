@@ -14,11 +14,9 @@
 module;
 
 #include "query_driver.h"
-#include "search_options.h"
 #include "sql_parser.h"
 #include "type/info/array_info.h"
 #include "type/number/float16.h"
-#include "type/complex/embedding_type.h"
 
 export module parser;
 

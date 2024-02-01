@@ -11,14 +11,13 @@
  * QUERY('dune god', 'default_operator=and;default_field=name');
  */
 #include "expr.h"
+#include "search_options.h"
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace infinity {
-
-class SearchOptions;
 
 class FusionExpr : public ParsedExpr {
 public:

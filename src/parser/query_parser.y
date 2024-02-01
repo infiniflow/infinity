@@ -101,7 +101,7 @@
 // Modifier ::= <PLUS> | (<MINUS> | <NOT>)
 topLevelQuery
 : query END {
-    driver.result = std::move($1);
+    driver.result_ = std::move($1);
 };
 
 query
@@ -161,7 +161,7 @@ basic_filter_boost
 
 basic_filter
 : STRING {
-    std::string &field = driver.default_field;
+    std::string &field = driver.default_field_;
     if(field.empty()){
         error(@1, "driver.default_field is empty");
         YYERROR;

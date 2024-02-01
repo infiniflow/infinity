@@ -18,6 +18,8 @@ module;
 #include "search/filter.hpp"
 #include <string>
 
+module physical_match;
+
 import stl;
 import parser;
 import query_context;
@@ -42,8 +44,6 @@ import iresearch_analyzer;
 import base_table_ref;
 import load_meta;
 import catalog;
-
-module physical_match;
 
 namespace infinity {
 
@@ -88,7 +88,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     if (rc != 0) {
         UnrecoverableError("QueryDriver::ParseSingleWithFields failed");
     }
-    UniquePtr<irs::filter> flt = std::move(driver.result);
+    UniquePtr<irs::filter> flt = std::move(driver.result_);
 
     // 2 full text search
     ScoredIds result;
