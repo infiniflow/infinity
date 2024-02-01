@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import sqlglot.expressions as exp
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -99,3 +101,43 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
             return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
+
+
+# invalid_name_array = [
+#     [],
+#     (),
+#     {},
+#     1,
+#     1.1,
+#     '',
+#     ' ',
+#     '12',
+#     'name-12',
+#     '12name',
+#     '数据库名',
+#     ''.join('x' for i in range(identifier_limit + 1)),
+#     None,
+# ]
+identifier_limit = 65536
+
+
+def check_valid_name(name):
+    if not isinstance(name, str):
+        raise ValueError(f"Table name must be a string, got {type(name)}")
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+        raise ValueError(
+            f"Table name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+    if len(name) > identifier_limit:
+        raise ValueError(f"Table name '{name}' is not of appropriate length")
+    if name is None:
+        raise ValueError(f"invalid name: {name}")
+    if name.isspace():
+        raise ValueError(f"Table name cannot be composed of whitespace characters only")
+    if name == '':
+        raise ValueError(f"invalid name: {name}")
+    if name == ' ':
+        raise ValueError(f"invalid name: {name}")
+    if name.isdigit():
+        raise ValueError(f"invalid name: {name}")
+    else:
+        return True

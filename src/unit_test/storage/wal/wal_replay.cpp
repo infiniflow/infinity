@@ -47,9 +47,12 @@ import default_values;
 import base_table_ref;
 
 class WalReplayTest : public BaseTest {
-    void SetUp() override { system("rm -rf /tmp/infinity"); }
+    void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 
-    void TearDown() override { system("tree  /tmp/infinity"); }
+    void TearDown() override {
+        system("tree  /tmp/infinity");
+        system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+    }
 };
 
 using namespace infinity;

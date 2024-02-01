@@ -58,12 +58,27 @@ private:
 export class LazyLoad : public OptimizerRule {
 public:
     inline void ApplyToPlan(QueryContext *query_context_ptr, const SharedPtr<LogicalNode> &logical_plan) final {
-        if (logical_plan->operator_type() == LogicalNodeType::kUpdate) {
-            return;
+        auto logic_op_type = logical_plan->operator_type();
+        switch (logic_op_type) {
+            case LogicalNodeType::kDelete:
+            case LogicalNodeType::kUpdate:
+            case LogicalNodeType::kInsert:
+            case LogicalNodeType::kImport:
+            case LogicalNodeType::kExport:
+            case LogicalNodeType::kCreateTable:
+            case LogicalNodeType::kCreateIndex:
+            case LogicalNodeType::kDropTable:
+            case LogicalNodeType::kDropIndex:
+            case LogicalNodeType::kCreateSchema:
+            case LogicalNodeType::kDropSchema:
+            case LogicalNodeType::kShow:
+            case LogicalNodeType::kCommand:
+            case LogicalNodeType::kPrepare:
+                return;
+            default:
+                collector.VisitNode(*logical_plan);
+                cleaner_.VisitNode(*logical_plan);
         }
-
-        collector.VisitNode(*logical_plan);
-        cleaner_.VisitNode(*logical_plan);
     }
 
     [[nodiscard]] inline String name() const final { return "Lazy Load"; }
@@ -73,4 +88,4 @@ private:
     CleanScan cleaner_{};
 };
 
-}
+} // namespace infinity

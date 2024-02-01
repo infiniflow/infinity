@@ -244,6 +244,14 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count, nullptr);
 
             SizeT column_count = statement->columns_->size();
+
+            if (column_count != table_column_count) {
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Table column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 table_column_count,
+                                                                 column_count)));
+            }
+
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = statement->columns_->at(column_idx);
                 SizeT table_column_id = table_entry->GetColumnIdByName(column_name);

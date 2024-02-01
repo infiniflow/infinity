@@ -16,7 +16,6 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
 
 # create a table, one column data are all inline varchar, output correctly.
 # create a table, one column data are all inline varchar, and more than one block, output correctly.

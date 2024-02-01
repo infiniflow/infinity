@@ -17,6 +17,7 @@ from abc import ABC
 from infinity import InfinityConnection
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
+from infinity.remote_thrift.utils import check_valid_name
 
 
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
@@ -31,6 +32,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self.disconnect()
 
     def create_database(self, db_name: str, options=None):
+        check_valid_name(db_name)
         res = self._client.create_database(db_name=db_name)
         if res.success is True:
             return RemoteDatabase(self._client, db_name)
@@ -38,15 +40,30 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise Exception(res.error_msg)
 
     def list_databases(self):
-        return self._client.list_databases()
+        res = self._client.list_databases()
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def describe_database(self, db_name: str):
-        return self._client.describe_database(db_name=db_name).result()
+        check_valid_name(db_name)
+        res = self._client.describe_database(db_name=db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def drop_database(self, db_name: str, options=None):
-        return self._client.drop_database(db_name=db_name)
+        check_valid_name(db_name)
+        res = self._client.drop_database(db_name=db_name)
+        if res.success is True:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def get_database(self, db_name: str):
+        check_valid_name(db_name)
         res = self._client.get_database(db_name)
         if res.success is True:
             return RemoteDatabase(self._client, db_name)
@@ -57,9 +74,9 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         res = self._client.disconnect()
         if res.success is True:
             self._is_connected = False
+            return res
         else:
             raise Exception("Disconnect error")
-        return res
 
     @property
     def client(self):

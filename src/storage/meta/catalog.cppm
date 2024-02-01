@@ -212,7 +212,7 @@ public:
 
     void SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts);
 
-    void FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void MergeFrom(NewCatalog &other);
 
