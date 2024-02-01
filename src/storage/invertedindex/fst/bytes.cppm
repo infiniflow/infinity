@@ -22,11 +22,13 @@ import :writer;
 namespace infinity {
 
 /// Read a u32 in little endian format from the beginning of the given slice.
+/// Refers to https://www.kernel.org/doc/html/latest/core-api/unaligned-memory-access.html
 u32 ReadU32LE(const u8 *ptr) {
-    // Most architectures have alignment requirements, and violating those requirements may result in undefined behavior. Some architectures may raise
-    // alignment exceptions, while others may silently provide incorrect values. Keep in mind that this method may have some performance implications,
-    // and on architectures that support unaligned access, the compiler may optimize this code to take advantage of such support.
-    u32 result = ((u32)ptr[0]) | ((u32)ptr[1]<<8) | ((u32)ptr[2]<<16) | ((u32)ptr[3]<<24);
+#ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
+    u32 result = *(u32 *)ptr;
+#else
+    u32 result = ((u32)ptr[0]) | ((u32)ptr[1] << 8) | ((u32)ptr[2] << 16) | ((u32)ptr[3] << 24);
+#endif
 #ifdef __BIG_ENDIAN__
     return __builtin_bswap32(result);
 #else
@@ -36,7 +38,12 @@ u32 ReadU32LE(const u8 *ptr) {
 
 /// Read a u64 in little endian format from the beginning of the given slice.
 u64 ReadU64LE(const u8 *ptr) {
-    u64 result = ((u64)ptr[0]) | ((u64)ptr[1]<<8) | ((u64)ptr[2]<<16) | ((u64)ptr[3]<<24) | ((u64)ptr[4]<<32) | ((u64)ptr[5]<<40) | ((u64)ptr[6]<<48) | ((u64)ptr[7]<<56);
+#ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
+    u64 result = *(u64 *)ptr;
+#else
+    u64 result = ((u64)ptr[0]) | ((u64)ptr[1] << 8) | ((u64)ptr[2] << 16) | ((u64)ptr[3] << 24) | ((u64)ptr[4] << 32) | ((u64)ptr[5] << 40) |
+                 ((u64)ptr[6] << 48) | ((u64)ptr[7] << 56);
+#endif
 #ifdef __BIG_ENDIAN__
     return __builtin_bswap64(result);
 #else
@@ -49,10 +56,14 @@ void WriteU32LE(u32 n, u8 *ptr) {
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap32(n);
 #endif
+#ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
+    *(u32 *)ptr = n;
+#else
     ptr[0] = u8(n);
     ptr[1] = u8(n >> 8);
     ptr[2] = u8(n >> 16);
     ptr[3] = u8(n >> 24);
+#endif
 }
 
 /// Like WriteU32LE, but to an ostream implementation.
@@ -68,6 +79,9 @@ void WriteU64LE(u64 n, u8 *ptr) {
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap64(n);
 #endif
+#ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
+    *(u64 *)ptr = n;
+#else
     ptr[0] = u8(n);
     ptr[1] = u8(n >> 8);
     ptr[2] = u8(n >> 16);
@@ -76,6 +90,7 @@ void WriteU64LE(u64 n, u8 *ptr) {
     ptr[5] = u8(n >> 40);
     ptr[6] = u8(n >> 48);
     ptr[7] = u8(n >> 56);
+#endif
 }
 
 /// Like WriteU64LE, but to an ostream implementation.
@@ -137,10 +152,26 @@ u8 PackUint(Writer &wtr, u64 n) {
 /// `nbytes` must be >= 1 and <= 8.
 u64 UnpackUint(u8 *ptr, u8 nbytes) {
     assert(nbytes >= 1 && nbytes <= 8);
+#ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
+    static const u64 masks[] = {
+        0x0000000000000000,
+        0x00000000000000FF,
+        0x000000000000FFFF,
+        0x0000000000FFFFFF,
+        0x00000000FFFFFFFF,
+        0x000000FFFFFFFFFF,
+        0x0000FFFFFFFFFFFF,
+        0x00FFFFFFFFFFFFFF,
+        0xFFFFFFFFFFFFFFFF,
+    };
+    u64 n = *(u64 *)ptr;
+    n &= masks[nbytes];
+#else
     u64 n = 0;
-    for (u8 i = 0; i<nbytes; i++) {
+    for (u8 i = 0; i < nbytes; i++) {
         n = n | ((u64)ptr[i]) << (8 * i);
     }
+#endif
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap64(n);
 #endif
