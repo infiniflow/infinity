@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module and_func;
+
+import stl;
 
 namespace infinity {
 

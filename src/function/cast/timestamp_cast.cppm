@@ -14,6 +14,8 @@
 
 module;
 
+export module timestamp_cast;
+
 import stl;
 import parser;
 import column_vector_cast;
@@ -22,8 +24,6 @@ import infinity_exception;
 import bound_cast_func;
 import column_vector;
 import third_party;
-
-export module timestamp_cast;
 
 namespace infinity {
 

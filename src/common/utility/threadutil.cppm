@@ -1,9 +1,9 @@
 
 module;
 
-import stl;
-
 export module threadutil;
+
+import stl;
 
 namespace infinity {
 

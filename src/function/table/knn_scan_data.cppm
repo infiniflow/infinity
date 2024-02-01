@@ -14,6 +14,8 @@
 
 module;
 
+export module knn_scan_data;
+
 import stl;
 import table_function;
 import parser;
@@ -29,8 +31,6 @@ import base_expression;
 import expression_state;
 
 import base_table_ref;
-
-export module knn_scan_data;
 
 namespace infinity {
 

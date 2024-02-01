@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_command;
+
 import stl;
 
 import physical_operator;
@@ -24,8 +26,6 @@ import operator_state;
 import load_meta;
 import infinity_exception;
 import base_table_ref;
-
-export module physical_command;
 
 namespace infinity {
 

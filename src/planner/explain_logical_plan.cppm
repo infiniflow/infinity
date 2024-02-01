@@ -14,6 +14,8 @@
 
 module;
 
+export module explain_logical_plan;
+
 import stl;
 import logical_node;
 import logical_create_schema;
@@ -46,8 +48,6 @@ import logical_optimize;
 import logical_match;
 import logical_fusion;
 import base_expression;
-
-export module explain_logical_plan;
 
 namespace infinity {
 

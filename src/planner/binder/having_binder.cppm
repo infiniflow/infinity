@@ -14,6 +14,8 @@
 
 module;
 
+export module having_binder;
+
 import stl;
 import parser;
 import base_expression;
@@ -21,8 +23,6 @@ import bind_context;
 import expression_binder;
 import query_context;
 import bind_alias_proxy;
-
-export module having_binder;
 
 namespace infinity {
 

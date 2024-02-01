@@ -14,13 +14,13 @@
 
 module;
 
+export module var_heap;
+
 import global_resource_usage;
 import stl;
 import allocator;
 import default_values;
 import vector_heap_chunk;
-
-export module var_heap;
 
 namespace infinity {
 #if 0

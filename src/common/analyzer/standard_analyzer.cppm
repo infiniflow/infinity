@@ -14,13 +14,14 @@
 
 module;
 
+export module standard_analyzer;
+
 import stl;
 import term;
 import stemmer;
 import analyzer;
 import tokenizer;
 import common_analyzer;
-export module standard_analyzer;
 
 namespace infinity {
 export class StandardAnalyzer : public CommonLanguageAnalyzer {

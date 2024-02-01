@@ -14,6 +14,8 @@
 
 module;
 
+export module geography_cast;
+
 import stl;
 import column_vector;
 import vector_buffer;
@@ -23,8 +25,6 @@ import column_vector_cast;
 
 import infinity_exception;
 import third_party;
-
-export module geography_cast;
 
 namespace infinity {
 

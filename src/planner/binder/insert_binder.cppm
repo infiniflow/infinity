@@ -14,14 +14,14 @@
 
 module;
 
+export module insert_binder;
+
 import stl;
 import parser;
 import base_expression;
 import bind_context;
 import expression_binder;
 import query_context;
-
-export module insert_binder;
 
 namespace infinity {
 

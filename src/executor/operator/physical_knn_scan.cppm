@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_knn_scan;
+
 import stl;
 import parser;
 import query_context;
@@ -28,8 +30,6 @@ import block_index;
 import load_meta;
 import knn_expression;
 import infinity_exception;
-
-export module physical_knn_scan;
 
 namespace infinity {
 

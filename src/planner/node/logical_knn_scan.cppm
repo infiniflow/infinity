@@ -14,6 +14,8 @@
 
 module;
 
+export module logical_knn_scan;
+
 import stl;
 import logical_node_type;
 import column_binding;
@@ -23,8 +25,6 @@ import base_expression;
 import knn_expression;
 import base_table_ref;
 import catalog;
-
-export module logical_knn_scan;
 
 namespace infinity {
 

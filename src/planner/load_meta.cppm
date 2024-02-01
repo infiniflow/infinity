@@ -14,11 +14,11 @@
 
 module;
 
+export module load_meta;
+
 import stl;
 import parser;
 import column_binding;
-
-export module load_meta;
 
 namespace infinity {
 

@@ -14,14 +14,14 @@
 
 module;
 
+export module function_set;
+
 import stl;
 
 import parser;
 import function;
 import base_expression;
 //import catalog;
-
-export module function_set;
 
 namespace infinity {
 

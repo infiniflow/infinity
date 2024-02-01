@@ -1,5 +1,7 @@
 module;
 
+export module posting_writer;
+
 import stl;
 import memory_pool;
 import file_writer;
@@ -8,7 +10,6 @@ import inmem_posting_decoder;
 import pos_list_encoder;
 import posting_list_format;
 import index_defines;
-export module posting_writer;
 
 namespace infinity {
 export class PostingWriter {

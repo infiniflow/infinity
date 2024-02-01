@@ -14,13 +14,13 @@
 
 module;
 
+export module logical_cross_product;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
-
-export module logical_cross_product;
 
 namespace infinity {
 

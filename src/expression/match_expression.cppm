@@ -14,11 +14,11 @@
 
 module;
 
+export module match_expression;
+
 import stl;
 import parser;
 import base_expression;
-
-export module match_expression;
 
 namespace infinity {
 

@@ -11,7 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
+
+export module data_block;
 
 import stl;
 import default_values;
@@ -21,8 +24,6 @@ import column_vector;
 import value;
 
 import infinity_exception;
-
-export module data_block;
 
 namespace infinity {
 

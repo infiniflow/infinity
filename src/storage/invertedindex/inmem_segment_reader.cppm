@@ -1,5 +1,7 @@
 module;
 
+export module inmem_index_segment_reader;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -7,7 +9,6 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import column_indexer;
-export module inmem_index_segment_reader;
 
 namespace infinity {
 export class InMemIndexSegmentReader : public IndexSegmentReader {

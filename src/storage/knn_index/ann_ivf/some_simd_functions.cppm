@@ -15,8 +15,10 @@
 module;
 
 #include <immintrin.h>
-import stl;
+
 export module some_simd_functions;
+
+import stl;
 
 namespace infinity {
 

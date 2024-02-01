@@ -14,6 +14,8 @@
 
 module;
 
+export module bind_context;
+
 import stl;
 import parser;
 import column_binding;
@@ -26,8 +28,6 @@ import binding;
 import base_expression;
 import block_index;
 import catalog;
-
-export module bind_context;
 
 namespace infinity {
 

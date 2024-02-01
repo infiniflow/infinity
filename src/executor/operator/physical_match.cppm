@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_match;
+
 import stl;
 import parser;
 import query_context;
@@ -26,8 +28,6 @@ import match_expression;
 import base_table_ref;
 import load_meta;
 import infinity_exception;
-
-export module physical_match;
 
 namespace infinity {
 

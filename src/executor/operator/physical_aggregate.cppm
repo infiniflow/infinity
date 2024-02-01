@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_aggregate;
+
 import stl;
 import parser;
 import query_context;
@@ -26,8 +28,6 @@ import base_expression;
 import load_meta;
 import infinity_exception;
 import data_block;
-
-export module physical_aggregate;
 
 namespace infinity {
 

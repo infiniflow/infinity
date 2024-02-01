@@ -14,11 +14,11 @@
 
 module;
 
+export module case_expression;
+
 import stl;
 import base_expression;
 import parser;
-
-export module case_expression;
 
 namespace infinity {
 
