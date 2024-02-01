@@ -1,5 +1,5 @@
+import common_values
 import infinity.index as index
-from infinity.common import REMOTE_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
@@ -8,7 +8,7 @@ from infinity.remote_thrift.table import RemoteTable
 
 class TestQuery:
     def test_query(self):
-        conn = ThriftInfinityClient(REMOTE_HOST)
+        conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         db = RemoteDatabase(conn, "default")
         db.drop_table("my_table")
         db.create_table(

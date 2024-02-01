@@ -114,14 +114,14 @@ private:
     std::mutex mutex2_{};
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
+    atomic_u64 last_ckp_commit_ts_{};
 
     // Only Checkpoint thread access following members
-    TxnTimeStamp full_ckp_commit_ts_{};
-    i64 full_ckp_wal_size_{};
-    i64 full_ckp_when_{};
-    i64 delta_ckp_wal_size_{};
-    i64 delta_ckp_when_{};
-    TxnTimeStamp last_ckp_commit_ts_{};
+    i64 last_full_ckp_wal_size_{};
+    i64 last_delta_ckp_wal_size_{};
+    i64 last_full_ckp_time_{};
+    i64 last_delta_ckp_time_{};
+
 
     Vector<String> wal_list_{};
 };

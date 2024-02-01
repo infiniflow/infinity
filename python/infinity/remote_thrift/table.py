@@ -22,7 +22,7 @@ from infinity.common import INSERT_DATA, VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions
+from infinity.remote_thrift.utils import traverse_conditions, check_valid_name
 from infinity.table import Table
 
 
@@ -35,7 +35,7 @@ class RemoteTable(Table, ABC):
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
     def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
-
+        check_valid_name(index_name)
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -48,15 +48,25 @@ class RemoteTable(Table, ABC):
 
             index_info_list_to_use.append(index_info_to_use)
 
-        return self._conn.create_index(db_name=self._db_name,
-                                       table_name=self._table_name,
-                                       index_name=index_name,
-                                       index_info_list=index_info_list_to_use,
-                                       option=options)
+        res = self._conn.create_index(db_name=self._db_name,
+                                      table_name=self._table_name,
+                                      index_name=index_name,
+                                      index_info_list=index_info_list_to_use,
+                                      option=options)
+
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def drop_index(self, index_name: str):
-        return self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
-                                     index_name=index_name)
+        check_valid_name(index_name)
+        res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
+                                    index_name=index_name)
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -102,8 +112,12 @@ class RemoteTable(Table, ABC):
             field = ttypes.Field(parse_exprs=parse_exprs)
             fields.append(field)
 
-        return self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
-                                 fields=fields)
+        res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
+                                fields=fields)
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def import_data(self, file_path: str, options=None):
 
@@ -147,10 +161,14 @@ class RemoteTable(Table, ABC):
                         if res.can_skip:
                             break
 
-        return self._conn.import_data(db_name=self._db_name,
-                                      table_name=self._table_name,
-                                      file_name=file_name,
-                                      import_options=options)
+        res = self._conn.import_data(db_name=self._db_name,
+                                     table_name=self._table_name,
+                                     file_name=file_name,
+                                     import_options=options)
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -158,7 +176,11 @@ class RemoteTable(Table, ABC):
                 where_expr = None
             case _:
                 where_expr = traverse_conditions(condition(cond))
-        return self._conn.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
+        res = self._conn.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         # {"c1": 1, "c2": 1.1}
@@ -193,8 +215,12 @@ class RemoteTable(Table, ABC):
 
                         update_expr_array.append(update_expr)
 
-        return self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
-                                 update_expr_array=update_expr_array)
+        res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
+                                update_expr_array=update_expr_array)
+        if res.success:
+            return res
+        else:
+            raise Exception(res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int):
@@ -240,63 +266,34 @@ class RemoteTable(Table, ABC):
     def to_arrow(self):
         return self.query_builder.to_arrow()
 
-
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
-        # process select_list
-        select_list: List[ttypes.ParsedExpr] = []
-        for column in query.columns:
-            match column:
-                case "*":
-                    column_expr = ttypes.ColumnExpr(star=True, column_name=[])
-                    expr_type = ttypes.ParsedExprType(column_expr=column_expr)
-                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
-                    select_list.append(parsed_expr)
-                case "_row_id":
-                    func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
-                    expr_type = ttypes.ParsedExprType(function_expr=func_expr)
-                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
-                    select_list.append(parsed_expr)
-
-                case _:
-                    select_list.append(traverse_conditions(condition(column)))
-
-        # process where_expr
-        match query.filter:
-            case None:
-                where_expr = None
-            case _:
-                where_expr = traverse_conditions(condition(query.filter))
-
-        # process limit_expr
-        match query.limit:
-            case None:
-                limit_expr = None
-            case _:
-                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.limit)
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
-                limit_expr = ttypes.ParsedExpr(type=expr_type)
-
-        # process offset_expr
-        match query.offset:
-            case None:
-                offset_expr = None
-            case _:
-                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.offset)
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
-                offset_expr = ttypes.ParsedExpr(type=expr_type)
 
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
-                                select_list=select_list,
+                                select_list=query.columns,
                                 search_expr=query.search,
-                                where_expr=where_expr,
+                                where_expr=query.filter,
                                 group_by_list=None,
-                                limit_expr=limit_expr,
-                                offset_expr=offset_expr)
+                                limit_expr=query.limit,
+                                offset_expr=query.offset)
 
         # process the results
         if res.success:
             return build_result(res)
         else:
             raise Exception(res.error_msg)
+
+    # def _explain_query(self, query: Query) -> str:
+    #     res = self._conn.explain(db_name=self._db_name,
+    #                              table_name=self._table_name,
+    #                              select_list=query.columns,
+    #                              search_expr=query.search,
+    #                              where_expr=query.filter,
+    #                              group_by_list=None,
+    #                              limit_expr=query.limit,
+    #                              offset_expr=query.offset)
+    #     if res.success:
+    #         return build_result(res)
+    #     else:
+    #         raise Exception(res.error_msg)

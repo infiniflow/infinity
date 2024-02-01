@@ -74,8 +74,8 @@ void WalManager::Start() {
     }
     auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
     i64 now = seconds_since_epoch.count();
-    full_ckp_when_ = now;
-    delta_ckp_when_ = now;
+    last_full_ckp_time_ = now;
+    last_delta_ckp_time_ = now;
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
@@ -165,6 +165,7 @@ void WalManager::Flush() {
             continue;
         }
         auto [max_commit_ts, wal_size] = GetWalState();
+        u64 ckp_commit_ts;
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry->cmds_.empty()) {
@@ -180,10 +181,10 @@ void WalManager::Flush() {
             }
             ofs_.write(buf.data(), ptr - buf.data());
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
-
-            if (entry->cmds_[0]->GetType() != WalCommandType::CHECKPOINT) {
-                max_commit_ts = entry->commit_ts_;
-                wal_size += act_size;
+            max_commit_ts = entry->commit_ts_;
+            wal_size += act_size;
+            if (entry->IsCheckPoint()) {
+                ckp_commit_ts = entry->commit_ts_;
             }
         }
         ofs_.flush();
@@ -211,7 +212,8 @@ void WalManager::Flush() {
             LOG_CRITICAL(e.what());
             throw e;
         }
-        SetWalState(max_commit_ts, wal_size);
+        this->SetWalState(max_commit_ts, wal_size);
+        last_ckp_commit_ts_.store(ckp_commit_ts);
     }
     LOG_TRACE("WalManager::Flush mainloop end");
 }
@@ -230,48 +232,54 @@ void WalManager::CheckpointTimer() {
 
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint() {
-    bool is_full_checkpoint;
-    auto seconds_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch());
-    i64 now = seconds_since_epoch.count();
-    auto [max_commit_ts, wal_size] = GetWalState();
-    if (max_commit_ts == last_ckp_commit_ts_) {
+    bool is_full_checkpoint = false;
+    i64 current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    i64 full_duration = current_time - last_full_ckp_time_;
+    i64 delta_duration = current_time - last_delta_ckp_time_;
+
+    auto [current_max_commit_ts, current_wal_size] = GetWalState();
+    auto ckp_commit_ts = last_ckp_commit_ts_.load();
+    if (ckp_commit_ts == current_max_commit_ts) {
+        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
+                             current_max_commit_ts,
+                             ckp_commit_ts));
         return;
     }
-    if (now - full_ckp_when_ > i64(cfg_full_checkpoint_interval_sec_) && wal_size != full_ckp_wal_size_) {
+
+    auto case1 = (full_duration > i64(cfg_full_checkpoint_interval_sec_)) && (current_wal_size != last_full_ckp_wal_size_);
+    auto case2 = (delta_duration > i64(cfg_delta_checkpoint_interval_sec_)) && (current_wal_size != last_delta_ckp_wal_size_);
+    auto case3 = (current_wal_size - last_delta_ckp_wal_size_ > i64(cfg_delta_checkpoint_interval_wal_bytes_));
+
+    if (case1) {
         is_full_checkpoint = true;
-    } else if ((now - delta_ckp_when_ > i64(cfg_delta_checkpoint_interval_sec_) && wal_size != delta_ckp_wal_size_) ||
-               wal_size - delta_ckp_wal_size_ > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
+    } else if (case2 || case3) {
         is_full_checkpoint = false;
     } else {
         return;
     }
 
-    TxnManager *txn_mgr = nullptr;
-    Txn *txn = nullptr;
     try {
-        txn_mgr = storage_->txn_manager();
-        txn = txn_mgr->CreateTxn();
+        TxnManager *txn_mgr = storage_->txn_manager();
+        Txn *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        LOG_INFO(fmt::format("WalManager::Create txn for {} checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
+        LOG_INFO(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                              is_full_checkpoint ? "FULL" : "DELTA",
                              txn->TxnID(),
                              txn->BeginTS(),
-                             max_commit_ts));
+                             current_max_commit_ts));
 
-        txn->Checkpoint(max_commit_ts, is_full_checkpoint);
+        txn->Checkpoint(current_max_commit_ts, is_full_checkpoint);
         txn_mgr->CommitTxn(txn);
 
-        last_ckp_commit_ts_ = max_commit_ts;
         if (is_full_checkpoint) {
-            full_ckp_when_ = now;
-            full_ckp_wal_size_ = wal_size;
-            full_ckp_commit_ts_ = max_commit_ts;
-            RecycleWalFile(full_ckp_commit_ts_);
+            last_full_ckp_time_ = current_time;
+            last_full_ckp_wal_size_ = current_wal_size;
+            RecycleWalFile(current_max_commit_ts);
         } else {
-            delta_ckp_when_ = now;
-            delta_ckp_wal_size_ = wal_size;
+            last_delta_ckp_time_ = current_time;
+            last_delta_ckp_wal_size_ = current_wal_size;
         }
-        LOG_INFO(fmt::format("WalManager::Checkpoint {} done for commit_ts <= {}", is_full_checkpoint ? "full" : "delta", max_commit_ts));
+
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {
@@ -286,7 +294,7 @@ void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
 
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
-    LOG_INFO(fmt::format("Start to full checkpoint, txn_id: {}, begin_ts: {}, max_commit_ts {}",
+    LOG_INFO(fmt::format("Force Checkpoint Task, txn_id: {}, begin_ts: {}, max_commit_ts {}",
                          ckp_task->txn_->TxnID(),
                          ckp_task->txn_->BeginTS(),
                          max_commit_ts));

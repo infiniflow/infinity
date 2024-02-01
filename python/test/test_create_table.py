@@ -14,8 +14,8 @@
 
 import pytest
 
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 
 
 class TestCreateTable:
@@ -26,7 +26,7 @@ class TestCreateTable:
         method: create table with varchar column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_varchar_table", True)
         table_obj = db_obj.create_table("test_create_varchar_table", {
@@ -41,7 +41,7 @@ class TestCreateTable:
         method: create table with embedding column
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_create_embedding_table", True)
         table_obj = db_obj.create_table("test_create_embedding_table", {
@@ -51,7 +51,7 @@ class TestCreateTable:
         db_obj.drop_table("test_create_embedding_table")
 
     def test_create_table_with_invalid_column_name(self):
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         with pytest.raises(Exception, match=r".*Empty column name"):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
