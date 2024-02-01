@@ -182,6 +182,7 @@ using std::back_inserter;
 using std::hash;
 
 using std::string_view;
+using std::streamsize;
 } // namespace std
 
 namespace infinity {
@@ -306,8 +307,6 @@ export {
     using const_ptr_t = const char *;
     using char_t = char;
     using SizeT = u64;
-
-    using StreamSize = std::streamsize;
 
     // Transactions
     using TxnTimeStamp = uint64_t;
