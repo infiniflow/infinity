@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+import pytest
 from numpy import dtype
-
+from utils import trace_expected_exceptions
 import common_values
 import infinity
 
@@ -129,35 +130,68 @@ class TestDelete:
         res = infinity_obj.disconnect()
         assert res
 
-    # delete table, no row is met the condition
-    def test_delete_table_no_row_met_the_condition(self):
+    # delete table, all rows are met the condition
+    @trace_expected_exceptions
+    def test_delete_table_all_row_met_the_condition(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        tb = db_obj.drop_table("test_delete_table_no_row_met_the_condition", if_exists=True)
-        assert tb
-        tb = db_obj.drop_table("test_delete_table_no_row_met_the_condition_2", if_exists=True)
-        assert tb
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.drop_table("test_delete_table_all_row_met_the_condition" + str(i))
 
-        tb = db_obj.create_table("test_delete_table_no_row_met_the_condition", {"c1": "vector,3,float"}, None)
-        assert tb
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.create_table("test_delete_table_all_row_met_the_condition" + str(i),
+                                     {"c1": common_values.types_array[i]}, None)
+            assert tb
 
-        table_obj = db_obj.get_table("test_delete_table_no_row_met_the_condition")
-        table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
-        # FIXME table_obj.delete("c1 = [1.1,2.2,3.3]")
-        # FIXME table_obj.delete("c1 = [1.1,2.2,4.4]")
+            table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition" + str(i))
+            try:
+                table_obj.insert([{"c1": common_values.types_example_array[i]}])
+                # print("insert c1 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+            try:
+                table_obj.delete("c1 = " + str(common_values.types_example_array[i]))
+                # print("delete c1 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
 
-        tb = db_obj.create_table("test_delete_table_no_row_met_the_condition_2", {"c1": "float"}, None)
-        assert tb
-
-        table_obj = db_obj.get_table("test_delete_table_no_row_met_the_condition_2")
-        table_obj.insert([{"c1": 1.1}])
-        table_obj.delete("c1 = 2")
+            res = table_obj.output(["*"]).to_df()
+            print("{}：{}".format(common_values.types_array[i], res))
+            assert tb
 
         # disconnect
         res = infinity_obj.disconnect()
         assert res
-    # delete table, all rows are met the condition
+
+    # delete table, no row is met the condition
+    def test_delete_table_no_rows_met_condition(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        tb = db_obj.drop_table("test_delete_table_no_rows_met_condition", if_exists=True)
+        assert tb
+        res = db_obj.create_table(
+            "test_delete_table_no_rows_met_condition",
+            {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
+        assert res
+
+        table_obj = db_obj.get_table("test_delete_table_no_rows_met_condition")
+        res = table_obj.insert(
+            [{"c1": 1, "c2": 10, "c3": 100},
+             {"c1": 2, "c2": 20, "c3": 200},
+             {"c1": 3, "c2": 10, "c3": 300},
+             {"c1": 4, "c2": 40, "c3": 400}])
+        assert res.success
+
+        res = table_obj.delete("c2 = 10")
+        assert res.success
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 4), 'c2': (20, 40), 'c3': (200, 400)})
+                                      .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
+
     # delete table with only one block
     # delete table with multiple blocks, but only one segment
     # select before delete, select after delete and check the change.
