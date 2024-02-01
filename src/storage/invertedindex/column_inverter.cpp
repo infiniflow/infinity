@@ -13,7 +13,7 @@ import string_ref;
 import term;
 import radix_sort;
 import index_defines;
-import column_indexer;
+import memory_indexer;
 namespace infinity {
 
 RefCount::RefCount() : lock_(), cv_(), ref_count_(0u) {}
@@ -48,9 +48,9 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(ColumnIndexer *column_indexer)
-    : column_indexer_(column_indexer), analyzer_(column_indexer->GetAnalyzer()), jieba_specialize_(column_indexer->IsJiebaSpecialize()),
-      alloc_(column_indexer->GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
+ColumnInverter::ColumnInverter(MemoryIndexer *memory_indexer)
+    : column_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
+      alloc_(memory_indexer->GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
 
 ColumnInverter::~ColumnInverter() {}
 
@@ -157,7 +157,7 @@ void ColumnInverter::DoInsert() {
     u32 last_term_pos = 0;
     u32 last_doc_id = 0;
     StringRef term;
-    ColumnIndexer::PostingPtr posting = nullptr;
+    MemoryIndexer::PostingPtr posting = nullptr;
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
             if (last_term_num != i.term_num_) {
@@ -182,7 +182,7 @@ void ColumnInverter::DoRTInsert() {
     u32 last_term_pos = 0;
     u32 last_doc_id = 0;
     StringRef term;
-    ColumnIndexer::RTPostingPtr posting = nullptr;
+    MemoryIndexer::RTPostingPtr posting = nullptr;
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
             if (last_term_num != i.term_num_) {

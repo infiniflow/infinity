@@ -6,15 +6,15 @@ import segment_posting;
 import index_segment_reader;
 import index_defines;
 import posting_writer;
-import column_indexer;
+import memory_indexer;
 
 module inmem_index_segment_reader;
 
 namespace infinity {
-InMemIndexSegmentReader::InMemIndexSegmentReader(ColumnIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
+InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
 
 PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
-    ColumnIndexer::PostingTable::Iterator iter = posting_table_->find(term);
+    MemoryIndexer::PostingTable::Iterator iter = posting_table_->find(term);
     if (iter.valid())
         return iter.getData().get();
     else

@@ -26,10 +26,10 @@ public:
     bool ZeroRefCount();
 };
 
-class ColumnIndexer;
+class MemoryIndexer;
 export class ColumnInverter {
 public:
-    ColumnInverter(ColumnIndexer *column_indexer);
+    ColumnInverter(MemoryIndexer *memory_indexer);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
@@ -107,7 +107,7 @@ private:
 
     void DoRTInsert();
 
-    ColumnIndexer *column_indexer_{nullptr};
+    MemoryIndexer *column_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;

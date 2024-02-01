@@ -12,6 +12,7 @@ import posting_writer;
 import data_block;
 import column_indexer;
 import third_party;
+import index_builder;
 export module indexer;
 
 namespace infinity {
@@ -36,6 +37,8 @@ public:
     void Commit();
 
     bool NeedDump();
+
+    void Dump(IndexBuilder &builder);
 
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
 
