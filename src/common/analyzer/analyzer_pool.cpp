@@ -27,16 +27,16 @@ module analyzer_pool;
 
 namespace infinity {
 
-constexpr StringView CHINESE = "chinese";
-constexpr StringView STANDARD = "standard";
-constexpr StringView NGRAM = "ngram";
+constexpr std::string_view CHINESE = "chinese";
+constexpr std::string_view STANDARD = "standard";
+constexpr std::string_view NGRAM = "ngram";
 
 constexpr u64 basis = 0xCBF29CE484222325ull;
 constexpr u64 prime = 0x100000001B3ull;
 
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
-void AnalyzerPool::Set(const StringView &name) {
+void AnalyzerPool::Set(const std::string_view &name) {
     Analyzer *try_analyzer = cache_[name].get();
     if (!try_analyzer) {
         switch (Str2Int(name.data())) {
@@ -61,7 +61,7 @@ void AnalyzerPool::Set(const StringView &name) {
     }
 }
 
-UniquePtr<Analyzer> AnalyzerPool::Get(const StringView &name) {
+UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
     Analyzer *analyzer = cache_[name].get();
     if (!analyzer)
         return nullptr;

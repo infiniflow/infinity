@@ -266,7 +266,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         if (end_pos == String::npos) {
             end_pos = file_size;
         }
-        StringView json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
+        std::string_view json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
         if (end_pos == file_size) {
             segment_entry->AppendBlockEntry(std::move(block_entry));
             SaveSegmentData(txn_store, segment_entry);
@@ -359,9 +359,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // append data to segment entry
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
-        StringView str_view{};
+        std::string_view str_view{};
         if (cell.len) {
-            str_view = StringView((char *)cell.str, cell.len);
+            str_view = std::string_view((char *)cell.str, cell.len);
         }
         auto &column_vector = parser_context->column_vectors_[column_idx];
         column_vector.AppendByStringView(str_view, parser_context->delimiter_);
@@ -432,7 +432,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 break;
             }
             case kVarchar: {
-                StringView str_view = line_json[column_def->name_].get<StringView>();
+                std::string_view str_view = line_json[column_def->name_].get<std::string_view>();
                 column_vector.AppendByStringView(str_view, ',');
                 break;
             }

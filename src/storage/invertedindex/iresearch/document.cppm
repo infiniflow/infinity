@@ -30,7 +30,7 @@ export struct IndexField {
     IndexField(const String &name, IndexFeatures index_features, const Features &flags)
         : name_(name), features_(flags), index_features_(index_features) {}
 
-    StringView name() const noexcept { return name_.c_str(); }
+    std::string_view name() const noexcept { return name_.c_str(); }
 
     const Features &features() const noexcept { return features_; }
 

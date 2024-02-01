@@ -180,6 +180,8 @@ using std::unordered_set;
 
 using std::back_inserter;
 using std::hash;
+
+using std::string_view;
 } // namespace std
 
 namespace infinity {
@@ -247,8 +249,6 @@ export {
     // String
 
     using String = std::basic_string<char>;
-
-    using StringView = std::string_view;
 
     inline bool IsEqual(const String &s1, const String &s2) { return s1 == s2; }
 

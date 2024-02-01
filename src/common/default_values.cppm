@@ -30,11 +30,11 @@ export {
     constexpr ColumnID COLUMN_IDENTIFIER_DELETE = (ColumnID)(std::numeric_limits<u64>::max() - 3);
     constexpr ColumnID COLUMN_IDENTIFIER_SCORE = (ColumnID)(std::numeric_limits<u64>::max() - 4);
     constexpr ColumnID COLUMN_IDENTIFIER_DISTANCE = (ColumnID)(std::numeric_limits<u64>::max() - 5);
-    constexpr StringView COLUMN_NAME_ROW_ID = "__rowid";
-    constexpr StringView COLUMN_NAME_CREATE = "__create";
-    constexpr StringView COLUMN_NAME_DELETE = "__delete";
-    constexpr StringView COLUMN_NAME_SCORE = "__score";
-    constexpr StringView COLUMN_NAME_DISTANCE = "__distance";
+    constexpr std::string_view COLUMN_NAME_ROW_ID = "__rowid";
+    constexpr std::string_view COLUMN_NAME_CREATE = "__create";
+    constexpr std::string_view COLUMN_NAME_DELETE = "__delete";
+    constexpr std::string_view COLUMN_NAME_SCORE = "__score";
+    constexpr std::string_view COLUMN_NAME_DISTANCE = "__distance";
 
     // type related constants
     constexpr i64 MAX_VARCHAR_SIZE = 65536;
@@ -92,13 +92,13 @@ export {
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
-    constexpr StringView WAL_FILE_TEMP_FILE = "wal.log";
-    constexpr StringView WAL_FILE_PREFIX = "wal.log.";
-    constexpr StringView CATALOG_FILE_DIR = "catalog";
+    constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
+    constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
+    constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
-    constexpr StringView SYSTEM_DB_NAME = "system";
-    constexpr StringView DEFAULT_DB_NAME = "default";
-    constexpr StringView SYSTEM_CONFIG_TABLE_NAME = "config";
+    constexpr std::string_view SYSTEM_DB_NAME = "system";
+    constexpr std::string_view DEFAULT_DB_NAME = "default";
+    constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
     // default hnsw parameter
