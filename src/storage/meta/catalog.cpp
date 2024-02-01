@@ -314,14 +314,14 @@ Status NewCatalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id
     return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
 }
 
-Status NewCatalog::ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
-    return table_entry->ImportSegment(commit_ts, segment);
+Status NewCatalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
+    return table_entry->CommitImport(commit_ts, segment);
 }
 
 SegmentID NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
-void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
-    table_entry->segment_map_.emplace(segment_id, std::move(segment_entry));
+void NewCatalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry) {
+    table_entry->segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }

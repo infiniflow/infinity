@@ -676,7 +676,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
 
-    NewCatalog::ImportSegment(table_entry, segment_info.segment_id_, segment_entry);
+    NewCatalog::AddSegment(table_entry, segment_entry);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

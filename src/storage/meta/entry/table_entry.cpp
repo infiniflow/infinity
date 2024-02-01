@@ -340,6 +340,12 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
+Status TableEntry::CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
+    ImportSegment(commit_ts, segment, call_with_lock);
+    row_count_ += segment->row_count();
+    return Status::OK();
+}
+
 Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
@@ -349,12 +355,10 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     segment->min_row_ts_ = commit_ts;
     // FIXME: max_row_ts is set when the segment is deprecated
 
-    SizeT row_count = 0;
     for (auto &block_entry : segment->block_entries_) {
         block_entry->min_row_ts_ = commit_ts;
         block_entry->max_row_ts_ = commit_ts;
         // ATTENTION: Do not modify the block_entry checkpoint_ts_
-        row_count += block_entry->row_count();
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count());
     }
 
@@ -362,7 +366,6 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     if (!call_with_lock) {
         rw_locker = std::unique_lock(this->rw_locker_);
     }
-    this->row_count_ = row_count; // BUG
     this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
 }
@@ -370,8 +373,8 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
     try {
         auto *segment = segment_map_.at(segment_id).get();
-        if (// TODO: read deprecate segment is allowed
-            // segment->deprecate_ts() < ts ||
+        if ( // TODO: read deprecate segment is allowed
+             // segment->deprecate_ts() < ts ||
             segment->min_row_ts() > ts) {
             return nullptr;
         }

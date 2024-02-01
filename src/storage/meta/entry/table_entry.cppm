@@ -109,7 +109,10 @@ private:
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
     // the `call_with_lock` is set true if the caller has already hold the lock.
-    Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock = false);
+    Status CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock = false);
+
+    // This is private, **DO NOT** use by catalog
+    Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 
@@ -177,7 +180,7 @@ protected:
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
     // From data table
-    Atomic<SizeT> row_count_{};
+    Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};

@@ -184,11 +184,12 @@ public:
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
-    static Status ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
+    static Status CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
     static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
-    static void ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry);
+    // This not add row count
+    static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
 
     static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);
 
