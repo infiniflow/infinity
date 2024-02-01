@@ -267,61 +267,33 @@ class RemoteTable(Table, ABC):
         return self.query_builder.to_arrow()
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
-        # process select_list
-        select_list: List[ttypes.ParsedExpr] = []
-        for column in query.columns:
-            match column:
-                case "*":
-                    column_expr = ttypes.ColumnExpr(star=True, column_name=[])
-                    expr_type = ttypes.ParsedExprType(column_expr=column_expr)
-                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
-                    select_list.append(parsed_expr)
-                case "_row_id":
-                    func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
-                    expr_type = ttypes.ParsedExprType(function_expr=func_expr)
-                    parsed_expr = ttypes.ParsedExpr(type=expr_type)
-                    select_list.append(parsed_expr)
-
-                case _:
-                    select_list.append(traverse_conditions(condition(column)))
-
-        # process where_expr
-        match query.filter:
-            case None:
-                where_expr = None
-            case _:
-                where_expr = traverse_conditions(condition(query.filter))
-
-        # process limit_expr
-        match query.limit:
-            case None:
-                limit_expr = None
-            case _:
-                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.limit)
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
-                limit_expr = ttypes.ParsedExpr(type=expr_type)
-
-        # process offset_expr
-        match query.offset:
-            case None:
-                offset_expr = None
-            case _:
-                constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=query.offset)
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_exp)
-                offset_expr = ttypes.ParsedExpr(type=expr_type)
 
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
-                                select_list=select_list,
+                                select_list=query.columns,
                                 search_expr=query.search,
-                                where_expr=where_expr,
+                                where_expr=query.filter,
                                 group_by_list=None,
-                                limit_expr=limit_expr,
-                                offset_expr=offset_expr)
+                                limit_expr=query.limit,
+                                offset_expr=query.offset)
 
         # process the results
         if res.success:
             return build_result(res)
         else:
             raise Exception(res.error_msg)
+
+    # def _explain_query(self, query: Query) -> str:
+    #     res = self._conn.explain(db_name=self._db_name,
+    #                              table_name=self._table_name,
+    #                              select_list=query.columns,
+    #                              search_expr=query.search,
+    #                              where_expr=query.filter,
+    #                              group_by_list=None,
+    #                              limit_expr=query.limit,
+    #                              offset_expr=query.offset)
+    #     if res.success:
+    #         return build_result(res)
+    #     else:
+    #         raise Exception(res.error_msg)
