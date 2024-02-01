@@ -855,18 +855,21 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
 
     auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
     this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
+    this->global_catalog_delta_entry_->set_txn_id(global_catalog_delta_entry->txn_id());
+    this->global_catalog_delta_entry_->set_commit_ts(max_commit_ts);
 
-    // Assert catalog entry commit ts <= max_commit_ts
     auto global_entry_commit_ts = global_catalog_delta_entry->commit_ts();
     LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
-    if (global_entry_commit_ts > max_commit_ts) {
-        UnrecoverableError(
-            fmt::format("Global catalog delta entry commit ts {} not match checkpoint max commit ts {}", global_entry_commit_ts, max_commit_ts));
-    }
 
     // Check the SegmentEntry's for flush the data to disk.
     auto &ops = global_catalog_delta_entry->operations();
     for (auto &op : ops) {
+        auto op_commit_ts = op->commit_ts();
+        if (op_commit_ts > max_commit_ts) {
+            this->global_catalog_delta_entry_->operations().emplace_back(std::move(op));
+            global_catalog_delta_entry->operations().pop_front();
+            continue;
+        }
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
