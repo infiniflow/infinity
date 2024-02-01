@@ -120,10 +120,7 @@ public:
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction
-    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
-        IncreaseRowCount(block_entry->row_count());
-        block_entries_.emplace_back(std::move(block_entry));
-    }
+    void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
 private:
     inline void IncreaseRowCount(SizeT increased_row_count) {

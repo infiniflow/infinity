@@ -174,6 +174,12 @@ bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) {
     return first_delete_ts_ < check_ts;
 }
 
+void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
+    std::unique_lock lock(this->rw_locker_);
+    IncreaseRowCount(block_entry->row_count());
+    block_entries_.emplace_back(std::move(block_entry));
+}
+
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
@@ -332,9 +338,12 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 
 void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Vector<BlockEntry *> block_entries;
-    for (auto &block_entry : this->block_entries()) {
-        if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
-            block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+    {
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        for (auto &block_entry : this->block_entries()) {
+            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
+                block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+            }
         }
     }
     if (block_entries.empty()) {
