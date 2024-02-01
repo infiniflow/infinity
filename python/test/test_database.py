@@ -24,6 +24,7 @@ class TestDatabase:
     def test_version(self):
         print(infinity.__version__)
 
+    @trace_expected_exceptions
     def test_database(self):
         """
         target: test table apis
@@ -105,6 +106,7 @@ class TestDatabase:
         res = infinity_obj.disconnect()
         assert res.success
 
+    @trace_expected_exceptions
     def test_create_drop_show_1K_databases(self):
         """
         create 1K dbs, show these dbs, drop these dbs
@@ -194,6 +196,7 @@ class TestDatabase:
 
         assert res.success
 
+    @trace_expected_exceptions
     def test_repeatedly_create_drop_show_databases(self):
         """
         create db, show db and drop db, repeat above ops 100 times

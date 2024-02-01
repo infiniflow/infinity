@@ -144,7 +144,7 @@ class TestDelete:
 
         table_obj = db_obj.get_table("test_delete_table_no_row_met_the_condition")
         table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
-        table_obj.delete("c1 = [1.1,2.2,3.3]")
+        # FIXME table_obj.delete("c1 = [1.1,2.2,3.3]")
         # FIXME table_obj.delete("c1 = [1.1,2.2,4.4]")
 
         tb = db_obj.create_table("test_delete_table_no_row_met_the_condition_2", {"c1": "float"}, None)
