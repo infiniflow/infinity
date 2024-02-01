@@ -77,10 +77,11 @@ TEST_F(FstTest, Get) {
 
     Fst f(buffer.data(), buffer.size());
     f.Verify();
+    u64 val;
     for (auto &month : months) {
-        Optional<u64> val = f.Get((u8 *)month.first.c_str(), month.first.length());
-        EXPECT_TRUE(val.has_value());
-        EXPECT_EQ(val.value(), month.second);
+        bool found = f.Get((u8 *)month.first.c_str(), month.first.length(), val);
+        EXPECT_TRUE(found);
+        EXPECT_EQ(val, month.second);
     }
 }
 

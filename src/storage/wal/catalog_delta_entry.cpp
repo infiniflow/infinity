@@ -93,6 +93,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String segment_dir = ReadBufAdv<String>(ptr);
             u64 column_count = ReadBufAdv<u64>(ptr);
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
+            SizeT actual_row_count = ReadBufAdv<SizeT>(ptr);
             SizeT row_capacity = ReadBufAdv<SizeT>(ptr);
             TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
@@ -106,6 +107,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                       segment_dir,
                                                       column_count,
                                                       row_count,
+                                                      actual_row_count,
                                                       row_capacity,
                                                       min_row_ts,
                                                       max_row_ts);
@@ -270,6 +272,7 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
 
     WriteBufAdv(buf, this->column_count_);
     WriteBufAdv(buf, this->row_count_);
+    WriteBufAdv(buf, this->actual_row_count_);
     WriteBufAdv(buf, this->row_capacity_);
     WriteBufAdv(buf, this->min_row_ts_);
     WriteBufAdv(buf, this->max_row_ts_);
@@ -388,6 +391,7 @@ void AddSegmentEntryOp::SaveSate() {
     this->max_row_ts_ = this->segment_entry_->max_row_ts();
     this->row_capacity_ = this->segment_entry_->row_capacity();
     this->row_count_ = this->segment_entry_->row_count();
+    this->actual_row_count_ = this->segment_entry_->actual_row_count();
     this->column_count_ = this->segment_entry_->column_count();
     is_saved_sate_ = true;
 }
@@ -502,11 +506,12 @@ const String AddSegmentEntryOp::ToString() const {
                            segment_id_,
                            segment_dir_);
 
-    sstream << fmt::format(" min_row_ts: {} max_row_ts: {} row_capacity: {} row_count: {} column_count: {}",
+    sstream << fmt::format(" min_row_ts: {} max_row_ts: {} row_capacity: {} row_count: {} actual_row_count: {} column_count: {}",
                            min_row_ts_,
                            max_row_ts_,
                            row_capacity_,
                            row_count_,
+                           actual_row_count_,
                            column_count_);
     return sstream.str();
 }

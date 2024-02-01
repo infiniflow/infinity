@@ -45,16 +45,17 @@ public:
     NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
 
     static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
-                                                         SegmentID segment_id,
-                                                         const SharedPtr<String> &segment_dir,
-                                                         u64 column_count,
-                                                         SizeT row_count,
-                                                         SizeT row_capacity,
-                                                         TxnTimeStamp min_row_ts,
-                                                         TxnTimeStamp max_row_ts,
-                                                         TxnTimeStamp commit_ts,
-                                                         TxnTimeStamp begin_ts,
-                                                         TransactionID txn_id);
+                                                                SegmentID segment_id,
+                                                                const SharedPtr<String> &segment_dir,
+                                                                u64 column_count,
+                                                                SizeT row_count,
+                                                                SizeT row_capacity,
+                                                                SizeT actual_row_count,
+                                                                TxnTimeStamp min_row_ts,
+                                                                TxnTimeStamp max_row_ts,
+                                                                TxnTimeStamp commit_ts,
+                                                                TxnTimeStamp begin_ts,
+                                                                TransactionID txn_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -103,6 +104,10 @@ public:
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn);
 
+    bool CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
+
+    bool CheckAnyDelete(TxnTimeStamp check_ts);
+
     Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
 
     inline SizeT column_count() const { return column_count_; }
@@ -115,28 +120,19 @@ public:
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction
-    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
+    void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
+private:
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
         actual_row_count_ += increased_row_count;
     }
 
-private:
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             UnrecoverableError("Decrease row count exceed actual row count");
         }
         actual_row_count_ -= decrease_row_count;
-    }
-
-public:
-    // Used in PhysicalImport
-    inline BlockEntry *GetLastEntry() const {
-        if (block_entries_.empty()) {
-            UnrecoverableError("No any block entries");
-        }
-        return block_entries_.back().get();
     }
 
 protected:
@@ -165,10 +161,11 @@ protected:
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which create this SegmentEntry
-    TxnTimeStamp compacting_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which start compacting this SegmentEntry
-    TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which prehibit delete in this SegmentEntry
-    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};  // Indicate the commit_ts which deprecate this SegmentEntry
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};      // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
+    TxnTimeStamp compacting_ts_{UNCOMMIT_TS};   // Indicate the commit_ts which start compacting this SegmentEntry
+    TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which prehibit delete in this SegmentEntry
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 

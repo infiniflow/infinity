@@ -384,5 +384,21 @@ target_link_libraries(test_hnsw
 add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
 
 target_link_libraries(test_hnsw_bitmask
-        infinity_core
+    infinity_core
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    roaring
+    newpfor
+    openfst
+    #        iresearch
+
+    thrift.a
+    thriftnb.a
+    iresearch
+    lz4.a
+    atomic.a
+    event.a
+    vespalib
+    #        profiler
 )
