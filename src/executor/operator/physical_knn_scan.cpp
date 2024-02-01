@@ -233,6 +233,8 @@ SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_i
 
 template <typename DataType, template <typename, typename> typename C>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+
     auto knn_scan_function_data = operator_state->knn_scan_function_data_.get();
     auto knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
 
@@ -269,6 +271,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             MergeIntoBitmask(bool_column_buffer, null_mask, row_count, bitmask, true);
             bool_column->Reset();
         }
+        block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
         ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
 
@@ -386,11 +389,20 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         UniquePtr<DataType[]> d_ptr = nullptr;
                         UniquePtr<SegmentOffset[]> l_ptr = nullptr;
                         if (use_bitmask) {
-                            BitmaskFilter filter(index->GetLabelGetter(), bitmask);
-                            std::tie(result_n1, d_ptr, l_ptr) =
-                                index->template KnnSearch<false, BitmaskFilter<SegmentOffset>>(query, knn_scan_shared_data->topk_, filter);
+                            if (segment_entry->CheckAnyDelete(begin_ts)) {
+                                DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
+                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                            } else {
+                                BitmaskFilter<SegmentOffset> filter(bitmask);
+                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                            }
                         } else {
-                            std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                            if (segment_entry->CheckAnyDelete(begin_ts)) {
+                                DeleteFilter filter(segment_entry, begin_ts);
+                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, filter);
+                            } else {
+                                std::tie(result_n1, d_ptr, l_ptr) = index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                            }
                         }
 
                         if (result_n < 0) {

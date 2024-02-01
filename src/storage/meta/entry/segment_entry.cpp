@@ -75,19 +75,20 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
                                                                    const SharedPtr<String> &segment_dir,
                                                                    u64 column_count,
                                                                    SizeT row_count,
+                                                                   SizeT actual_row_count,
                                                                    SizeT row_capacity,
                                                                    TxnTimeStamp min_row_ts,
                                                                    TxnTimeStamp deprecate_ts,
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
-
     auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count);
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->commit_ts_ = commit_ts;
     segment_entry->begin_ts_ = begin_ts;
     segment_entry->row_count_ = row_count;
+    segment_entry->actual_row_count_ = actual_row_count;
     segment_entry->txn_id_ = txn_id;
     return segment_entry;
 }
@@ -160,6 +161,19 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     return false;
 }
 
+bool SegmentEntry::CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const {
+    BlockID block_id = segment_offset / row_capacity();
+    BlockOffset block_offset = segment_offset % row_capacity();
+
+    auto *block_entry = GetBlockEntryByID(block_id);
+    return block_entry->CheckVisible(block_offset, check_ts);
+}
+
+bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) {
+    std::shared_lock lock(rw_locker_);
+    return first_delete_ts_ < check_ts;
+}
+
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
@@ -174,7 +188,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
         u16 to_append_rows = input_block->row_count();
         while (to_append_rows > 0) {
             // Append to_append_rows into block
-            if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0){
+            if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0) {
                 this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, 0, 0, this->column_count_, txn));
             }
             BlockEntry *last_block_entry = this->block_entries_.back().get();
@@ -248,7 +262,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
 
         DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
+        this->first_delete_ts_ = std::min(this->first_delete_ts_, commit_ts);
     }
 }
 

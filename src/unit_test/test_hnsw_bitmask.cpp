@@ -104,7 +104,7 @@ int main() {
     p_bitmask->SetFalse(1);
     --top_k;
     {
-        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0);
@@ -120,7 +120,7 @@ int main() {
     p_bitmask->SetFalse(0);
     --top_k;
     {
-        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0.08);
@@ -133,7 +133,7 @@ int main() {
     p_bitmask->SetFalse(2);
     --top_k;
     {
-        BitmaskFilter filter(hnsw_index->GetLabelGetter(), *p_bitmask);
+        BitmaskFilter<LabelT> filter(*p_bitmask);
         auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
 
         EXPECT_VALUE_EQ(result[0].first, 0.2);

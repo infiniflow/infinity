@@ -326,8 +326,6 @@ void NewCatalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &se
     table_entry->next_segment_id_++;
 }
 
-void NewCatalog::IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count) { table_entry->row_count_ += increased_row_count; }
-
 SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);
@@ -528,6 +526,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto segment_dir = add_segment_entry_op->segment_dir();
                 auto column_count = add_segment_entry_op->column_count();
                 auto row_count = add_segment_entry_op->row_count();
+                auto actual_row_count = add_segment_entry_op->actual_row_count();
                 auto row_capacity = add_segment_entry_op->row_capacity();
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
@@ -547,6 +546,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                                                                                 MakeUnique<String>(segment_dir),
                                                                                 column_count,
                                                                                 row_count,
+                                                                                actual_row_count,
                                                                                 row_capacity,
                                                                                 min_row_ts,
                                                                                 max_row_ts,

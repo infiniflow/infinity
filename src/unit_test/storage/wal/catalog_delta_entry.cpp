@@ -78,8 +78,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op5_same_name));
 
     // segment entry
-    auto op7 = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0);
-    auto op7_same_name = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0);
+    auto op7 = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0, 0);
+    auto op7_same_name = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, segment_dir, 0, 0, 0, 0, 0, 0);
     local_catalog_delta_entry->operations().push_back(std::move(op7));
     local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
 

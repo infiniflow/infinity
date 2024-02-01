@@ -14,7 +14,6 @@
 
 module;
 
-
 import stl;
 import hnsw_common;
 import bitmask;
@@ -25,15 +24,38 @@ export module knn_filter;
 namespace infinity {
 
 export template <typename LabelType>
-class BitmaskFilter : public FilterBase<LabelType> {
+class BitmaskFilter final : public FilterBase<LabelType> {
 public:
-    BitmaskFilter(LabelGetter<LabelType> &&label_getter, const Bitmask &bitmask)
-        : FilterBase<LabelType>(std::move(label_getter)), bitmask_(bitmask) {}
+    explicit BitmaskFilter(const Bitmask &bitmask) : bitmask_(bitmask) {}
 
-    bool operator()(const VertexType &vertex_i) const final { return bitmask_.IsTrue(this->label_getter_(vertex_i)); }
+    bool operator()(const LabelType &label) const final { return bitmask_.IsTrue(label); }
 
 private:
     const Bitmask &bitmask_;
+};
+
+export class DeleteFilter final : public FilterBase<SegmentOffset> {
+public:
+    explicit DeleteFilter(const SegmentEntry *segment, TxnTimeStamp query_ts) : segment_(segment), query_ts_(query_ts) {}
+
+    bool operator()(const SegmentOffset &segment_offset) const final { return segment_->CheckVisible(segment_offset, query_ts_); }
+
+private:
+    const SegmentEntry *const segment_;
+
+    const TxnTimeStamp query_ts_;
+};
+
+export class DeleteWithBitmaskFilter final : public FilterBase<SegmentOffset> {
+public:
+    explicit DeleteWithBitmaskFilter(const Bitmask &bitmask, const SegmentEntry *segment, TxnTimeStamp query_ts)
+        : bitmask_filter_(bitmask), delete_filter_(segment, query_ts) {}
+
+    bool operator()(const SegmentOffset &segment_offset) const final { return bitmask_filter_(segment_offset) && delete_filter_(segment_offset); }
+
+private:
+    BitmaskFilter<SegmentOffset> bitmask_filter_;
+    DeleteFilter delete_filter_;
 };
 
 } // namespace infinity

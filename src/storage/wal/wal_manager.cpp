@@ -658,6 +658,7 @@ void WalManager::WalCmdDropIndexReplay(const WalCmdDropIndex &cmd, TransactionID
     table_index_entry->Commit(commit_ts);
 }
 
+// use by import and compact, add a new segment
 void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment_info, TxnTimeStamp commit_ts) {
     auto segment_dir_ptr = MakeShared<String>(segment_info.segment_dir_);
     auto segment_entry = SegmentEntry::NewReplaySegmentEntry(table_entry, segment_info.segment_id_, segment_dir_ptr, commit_ts);

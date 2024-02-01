@@ -16,6 +16,8 @@ module;
 
 #include <random>
 
+export module hnsw_alg;
+
 import stl;
 import file_system;
 import file_system_type;
@@ -27,8 +29,6 @@ import hnsw_common;
 import plain_store;
 import graph_store;
 import lvq_store;
-
-export module hnsw_alg;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -145,7 +145,7 @@ private:
         auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_);
         candidate.emplace(-dist, enter_point);
         if constexpr (!std::is_same_v<Filter, NoneType>) {
-            if (filter(enter_point)) {
+            if (filter(GetLabel(enter_point))) {
                 result_handler.AddResult(0, dist, enter_point);
             }
         } else {
@@ -186,7 +186,7 @@ private:
                 if (result_handler.GetSize(0) < result_n || dist < result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
                     if constexpr (!std::is_same_v<Filter, NoneType>) {
-                        if (filter(n_idx)) {
+                        if (filter(GetLabel(n_idx))) {
                             result_handler.AddResult(0, dist, n_idx);
                         }
                     } else {
@@ -409,8 +409,6 @@ public:
     Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k) const {
         return KnnSearchSorted<WithLock, NoneType>(q, k, None);
     }
-
-    LabelGetter<LabelType> GetLabelGetter() const { return LabelGetter<LabelType>(data_store_.max_vec_num(), labels_.get()); }
 
     void SetEf(SizeT ef) { ef_ = ef; }
 

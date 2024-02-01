@@ -191,8 +191,6 @@ public:
     // This not add row count
     static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
 
-    static void IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count);
-
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
