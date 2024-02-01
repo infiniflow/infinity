@@ -26,8 +26,7 @@ u32 ReadU32LE(const u8 *ptr) {
     // Most architectures have alignment requirements, and violating those requirements may result in undefined behavior. Some architectures may raise
     // alignment exceptions, while others may silently provide incorrect values. Keep in mind that this method may have some performance implications,
     // and on architectures that support unaligned access, the compiler may optimize this code to take advantage of such support.
-    u32 result;
-    std::memcpy(&result, ptr, sizeof(u32));
+    u32 result = ((u32)ptr[0]) | ((u32)ptr[1]<<8) | ((u32)ptr[2]<<16) | ((u32)ptr[3]<<24);
 #ifdef __BIG_ENDIAN__
     return __builtin_bswap32(result);
 #else
@@ -37,12 +36,11 @@ u32 ReadU32LE(const u8 *ptr) {
 
 /// Read a u64 in little endian format from the beginning of the given slice.
 u64 ReadU64LE(const u8 *ptr) {
-    u64 result;
-    std::memcpy(&result, ptr, sizeof(u64));
+    u64 result = ((u64)ptr[0]) | ((u64)ptr[1]<<8) | ((u64)ptr[2]<<16) | ((u64)ptr[3]<<24) | ((u64)ptr[4]<<32) | ((u64)ptr[5]<<40) | ((u64)ptr[6]<<48) | ((u64)ptr[7]<<56);
 #ifdef __BIG_ENDIAN__
-    return __builtin_bswap64(*(u64 *)(ptr));
+    return __builtin_bswap64(result);
 #else
-    return *(u64 *)(ptr);
+    return result;
 #endif
 }
 
@@ -51,7 +49,10 @@ void WriteU32LE(u32 n, u8 *ptr) {
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap32(n);
 #endif
-    std::memcpy(ptr, &n, sizeof(u32));
+    ptr[0] = u8(n);
+    ptr[1] = u8(n >> 8);
+    ptr[2] = u8(n >> 16);
+    ptr[3] = u8(n >> 24);
 }
 
 /// Like WriteU32LE, but to an ostream implementation.
@@ -67,7 +68,14 @@ void WriteU64LE(u64 n, u8 *ptr) {
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap64(n);
 #endif
-    std::memcpy(ptr, &n, sizeof(u64));
+    ptr[0] = u8(n);
+    ptr[1] = u8(n >> 8);
+    ptr[2] = u8(n >> 16);
+    ptr[3] = u8(n >> 24);
+    ptr[4] = u8(n >> 32);
+    ptr[5] = u8(n >> 40);
+    ptr[6] = u8(n >> 48);
+    ptr[7] = u8(n >> 56);
 }
 
 /// Like WriteU64LE, but to an ostream implementation.
@@ -80,6 +88,8 @@ void IoWriteU64LE(u64 n, Writer &wtr) {
 
 /// PackSize returns the smallest number of bytes that can encode `n`.
 u8 PackSize(u64 n) {
+    // __builtin_clzl is a bit slower than cascaded if:
+    // return n==0 ? 1 : 8 - (__builtin_clzl(n) >> 3);
     if (n < 1ULL << 8) {
         return 1;
     } else if (n < 1ULL << 16) {
@@ -128,7 +138,9 @@ u8 PackUint(Writer &wtr, u64 n) {
 u64 UnpackUint(u8 *ptr, u8 nbytes) {
     assert(nbytes >= 1 && nbytes <= 8);
     u64 n = 0;
-    std::memcpy(&n, ptr, nbytes);
+    for (u8 i = 0; i<nbytes; i++) {
+        n = n | ((u64)ptr[i]) << (8 * i);
+    }
 #ifdef __BIG_ENDIAN__
     n = __builtin_bswap64(n);
 #endif
