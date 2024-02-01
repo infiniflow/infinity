@@ -34,6 +34,7 @@ import parser;
 import logical_node_type;
 import query_result;
 import session_manager;
+import type_info;
 
 namespace infinity {
 

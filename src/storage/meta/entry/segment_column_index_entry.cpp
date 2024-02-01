@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+
 module catalog;
 
 import stl;
@@ -40,6 +41,7 @@ import column_vector;
 import annivfflat_index_data;
 import segment_iter;
 import secondary_index_data;
+import type_info;
 
 namespace infinity {
 

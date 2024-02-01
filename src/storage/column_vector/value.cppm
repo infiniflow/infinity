@@ -15,6 +15,7 @@ module;
 
 import parser;
 import stl;
+import type_info;
 
 import infinity_exception;
 

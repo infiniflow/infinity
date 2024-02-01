@@ -30,6 +30,7 @@ import cast_function;
 import column_vector;
 import default_values;
 import status;
+import type_info;
 
 namespace infinity {
 

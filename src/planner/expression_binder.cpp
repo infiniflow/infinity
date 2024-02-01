@@ -20,7 +20,7 @@ module expression_binder;
 
 import stl;
 import parser;
-
+import type_info;
 import infinity_exception;
 import bind_context;
 import third_party;

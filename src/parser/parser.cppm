@@ -100,14 +100,11 @@ export using infinity::MixedType;
 export using infinity::MixedValueType;
 export using infinity::TupleMixedType;
 
-export using infinity::TypeInfo;
 export using infinity::EmbeddingDataType;
 export using infinity::EmbeddingInfo;
 export using infinity::DecimalInfo;
 export using infinity::BitmapInfo;
 export using infinity::ArrayInfo;
-
-export using TypeInfoType = TypeInfoType;
 
 export template <typename T>
 int32_t GetSizeInBytes(const T &value);
