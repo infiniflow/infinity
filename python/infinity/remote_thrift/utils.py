@@ -103,15 +103,41 @@ def traverse_conditions(cons) -> ttypes.ParsedExpr:
         raise Exception(f"unknown condition type: {cons}")
 
 
-def check_valid_name(name):
-    is_valid = False
-    if name is None or not isinstance(name, str):
-        is_valid = False
-    pattern = r'^[a-zA-Z0-9_]+$'
-    if re.match(pattern, name):
-        is_valid = True
-    else:
-        is_valid = False
+# invalid_name_array = [
+#     [],
+#     (),
+#     {},
+#     1,
+#     1.1,
+#     '',
+#     ' ',
+#     '12',
+#     'name-12',
+#     '12name',
+#     '数据库名',
+#     ''.join('x' for i in range(identifier_limit + 1)),
+#     None,
+# ]
+identifier_limit = 65536
 
-    if is_valid is False:
-        raise Exception(f"Invalid name: {name}")
+
+def check_valid_name(name):
+    if not isinstance(name, str):
+        raise ValueError(f"Table name must be a string, got {type(name)}")
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+        raise ValueError(
+            f"Table name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+    if len(name) > identifier_limit:
+        raise ValueError(f"Table name '{name}' is not of appropriate length")
+    if name is None:
+        raise ValueError(f"invalid name: {name}")
+    if name.isspace():
+        raise ValueError(f"Table name cannot be composed of whitespace characters only")
+    if name == '':
+        raise ValueError(f"invalid name: {name}")
+    if name == ' ':
+        raise ValueError(f"invalid name: {name}")
+    if name.isdigit():
+        raise ValueError(f"invalid name: {name}")
+    else:
+        return True
