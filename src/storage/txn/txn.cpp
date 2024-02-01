@@ -565,16 +565,17 @@ void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
-    LOG_INFO("DELTA CKPT");
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
     // only save the catalog delta entry
-    catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, false);
+    bool skip = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, false);
+    if (skip) {
+        return;
+    }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
-    LOG_INFO("FULL CKPT");
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.FULL.{}", dir_name, max_commit_ts));
     String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));

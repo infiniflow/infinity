@@ -155,9 +155,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    t = SpinnerThread()
-    t.start()
-
     print("Generating file...")
     generate1(args.generate_if_exists, args.copy)
     generate2(args.generate_if_exists, args.copy)
@@ -181,12 +178,7 @@ if __name__ == "__main__":
             test_process(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)
-            t.stop_spinner()
-            t.join()
             sys.exit(-1)
         end = time.time()
         print("Test finished.")
         print("Time cost: {}s".format(end - start))
-
-    t.stop_spinner()
-    t.join()
