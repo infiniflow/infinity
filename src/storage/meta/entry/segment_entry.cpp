@@ -58,8 +58,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
 
-    auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries_.size(), 0, segment_entry->column_count_, txn);
-    segment_entry->block_entries_.emplace_back(std::move(block_entry));
     return segment_entry;
 }
 
@@ -77,19 +75,20 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
                                                                    const SharedPtr<String> &segment_dir,
                                                                    u64 column_count,
                                                                    SizeT row_count,
+                                                                   SizeT actual_row_count,
                                                                    SizeT row_capacity,
                                                                    TxnTimeStamp min_row_ts,
                                                                    TxnTimeStamp deprecate_ts,
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
-
     auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count);
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->commit_ts_ = commit_ts;
     segment_entry->begin_ts_ = begin_ts;
     segment_entry->row_count_ = row_count;
+    segment_entry->actual_row_count_ = actual_row_count;
     segment_entry->txn_id_ = txn_id;
     return segment_entry;
 }
@@ -162,6 +161,25 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     return false;
 }
 
+bool SegmentEntry::CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const {
+    BlockID block_id = segment_offset / row_capacity();
+    BlockOffset block_offset = segment_offset % row_capacity();
+
+    auto *block_entry = GetBlockEntryByID(block_id);
+    return block_entry->CheckVisible(block_offset, check_ts);
+}
+
+bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) {
+    std::shared_lock lock(rw_locker_);
+    return first_delete_ts_ < check_ts;
+}
+
+void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
+    std::unique_lock lock(this->rw_locker_);
+    IncreaseRowCount(block_entry->row_count());
+    block_entries_.emplace_back(std::move(block_entry));
+}
+
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->row_capacity_ - this->row_count_ <= 0)
@@ -174,13 +192,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
         DataBlock *input_block = append_state_ptr->blocks_[append_state_ptr->current_block_].get();
 
         u16 to_append_rows = input_block->row_count();
-        while (to_append_rows > 0 && this->row_count_ < this->row_capacity_) {
+        while (to_append_rows > 0) {
             // Append to_append_rows into block
-            BlockEntry *last_block_entry = this->block_entries_.back().get();
-            if (last_block_entry->GetAvailableCapacity() <= 0) {
-                this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, this->block_entries_.size(), 0, this->column_count_, txn));
-                last_block_entry = this->block_entries_.back().get();
+            if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0) {
+                this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, 0, 0, this->column_count_, txn));
             }
+            BlockEntry *last_block_entry = this->block_entries_.back().get();
 
             SegmentID range_segment_id = this->segment_id_;
             BlockID range_block_id = last_block_entry->block_id();
@@ -198,6 +215,9 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             to_append_rows -= actual_appended;
             append_state_ptr->current_count_ += actual_appended;
             IncreaseRowCount(actual_appended);
+            if (this->row_count_ > this->row_capacity_) {
+                UnrecoverableError("Not implemented: append data exceed segment row capacity");
+            }
         }
         if (to_append_rows == 0) {
             append_state_ptr->current_block_++;
@@ -248,7 +268,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
 
         DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
+        this->first_delete_ts_ = std::min(this->first_delete_ts_, commit_ts);
     }
 }
 
@@ -318,9 +338,12 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 
 void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     Vector<BlockEntry *> block_entries;
-    for (auto &block_entry : this->block_entries()) {
-        if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
-            block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+    {
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        for (auto &block_entry : this->block_entries()) {
+            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
+                block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
+            }
         }
     }
     if (block_entries.empty()) {

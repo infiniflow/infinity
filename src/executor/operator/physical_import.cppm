@@ -41,13 +41,19 @@ public:
     TableEntry *const table_entry_{};
     Txn *const txn_{};
     SharedPtr<SegmentEntry> segment_entry_{};
+    UniquePtr<BlockEntry> block_entry_{};
     Vector<ColumnVector> column_vectors_{};
     const char delimiter_{};
 
 public:
-    ZxvParserCtx(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> &segment_entry, char delimiter)
-        : row_count_(0), err_msg_(nullptr), table_entry_(table_entry), txn_(txn), segment_entry_(segment_entry),
-          delimiter_(delimiter) {}
+    ZxvParserCtx(TableEntry *table_entry,
+                 Txn *txn,
+                 SharedPtr<SegmentEntry> segment_entry,
+                 UniquePtr<BlockEntry> block_entry,
+                 Vector<ColumnVector> &&column_vectors,
+                 char delimiter)
+        : row_count_(0), err_msg_(nullptr), table_entry_(table_entry), txn_(txn), segment_entry_(segment_entry), block_entry_(std::move(block_entry)),
+          column_vectors_(std::move(column_vectors)), delimiter_(delimiter) {}
 };
 
 export class PhysicalImport : public PhysicalOperator {
@@ -59,8 +65,8 @@ public:
                             char delimiter,
                             CopyFileType type,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_entry_(table_entry),
-          file_type_(type), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
+        : PhysicalOperator(PhysicalOperatorType::kImport, nullptr, nullptr, id, load_metas), table_entry_(table_entry), file_type_(type),
+          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
 
     ~PhysicalImport() override = default;
 

@@ -1696,7 +1696,7 @@ command_statement: USE IDENTIFIER {
     } else {
         $$->command_info_ = std::make_unique<infinity::CompactTable>(std::string($3->table_name_ptr_));
         free($3->table_name_ptr_);
-    }
+    } delete $3;
 }
 
 /*

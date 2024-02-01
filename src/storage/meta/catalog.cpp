@@ -314,19 +314,17 @@ Status NewCatalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id
     return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
 }
 
-Status NewCatalog::ImportSegment(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
-    return table_entry->ImportSegment(commit_ts, segment);
+Status NewCatalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
+    return table_entry->CommitImport(commit_ts, segment);
 }
 
 SegmentID NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
-void NewCatalog::ImportSegment(TableEntry *table_entry, u32 segment_id, SharedPtr<SegmentEntry> &segment_entry) {
-    table_entry->segment_map_.emplace(segment_id, std::move(segment_entry));
+void NewCatalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry) {
+    table_entry->segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }
-
-void NewCatalog::IncreaseTableRowCount(TableEntry *table_entry, u64 increased_row_count) { table_entry->row_count_ += increased_row_count; }
 
 SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
     // Transfer the function to upper case.
@@ -528,6 +526,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto segment_dir = add_segment_entry_op->segment_dir();
                 auto column_count = add_segment_entry_op->column_count();
                 auto row_count = add_segment_entry_op->row_count();
+                auto actual_row_count = add_segment_entry_op->actual_row_count();
                 auto row_capacity = add_segment_entry_op->row_capacity();
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
@@ -547,6 +546,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                                                                                 MakeUnique<String>(segment_dir),
                                                                                 column_count,
                                                                                 row_count,
+                                                                                actual_row_count,
                                                                                 row_capacity,
                                                                                 min_row_ts,
                                                                                 max_row_ts,

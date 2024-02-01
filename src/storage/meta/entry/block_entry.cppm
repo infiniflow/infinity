@@ -25,6 +25,7 @@ import third_party;
 import parser;
 import local_file_system;
 import column_vector;
+import bitmask;
 
 namespace infinity {
 
@@ -149,7 +150,11 @@ public:
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
     // Get visible range of the BlockEntry since the given row number for a txn
-    Pair<u16, u16> GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin = 0) const;
+    Pair<u16, u16> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
+
+    bool CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
+
+    void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
 

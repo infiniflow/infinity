@@ -201,54 +201,45 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper 
     SizeT column_count = table_entry->ColumnCount();
     BufferManager *buffer_mgr = txn_->buffer_manager();
 
-    auto *current_block_ptr = new_segment->GetLastEntry(); // why segment has at least one block? TODO: remove it
-    UniquePtr<BlockEntry> current_block_entry = nullptr;
-    for (auto *segment_entry : segments) {
-        for (auto &block_entry : segment_entry->block_entries()) {
+    auto new_block = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn_);
+    for (auto *old_segment : segments) {
+        for (auto &old_block : old_segment->block_entries()) {
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
-                auto *column_block_entry = block_entry->GetColumnBlockEntry(column_id);
+                auto *column_block_entry = old_block->GetColumnBlockEntry(column_id);
                 input_column_vectors.emplace_back(column_block_entry->GetColumnVector(buffer_mgr));
             }
             SizeT read_offset = 0;
             while (true) {
-                auto [row_begin, row_end] = block_entry->GetVisibleRange(begin_ts, read_offset);
+                auto [row_begin, row_end] = old_block->GetVisibleRange(begin_ts, read_offset);
                 SizeT read_size = row_end - row_begin;
                 if (read_size == 0) {
                     break;
                 }
 
                 auto block_entry_append = [&](SizeT row_begin, SizeT read_size) {
-                    current_block_ptr->AppendBlock(input_column_vectors, row_begin, read_size, buffer_mgr);
-                    RowID new_row_id(new_segment->segment_id(),
-                                     current_block_ptr->block_id() * DEFAULT_BLOCK_CAPACITY + current_block_ptr->row_count());
-                    remapper.AddMap(segment_entry->segment_id(), block_entry->block_id(), row_begin, new_row_id);
+                    new_block->AppendBlock(input_column_vectors, row_begin, read_size, buffer_mgr);
+                    RowID new_row_id(new_segment->segment_id(), new_block->block_id() * DEFAULT_BLOCK_CAPACITY + new_block->row_count());
+                    remapper.AddMap(old_segment->segment_id(), old_block->block_id(), row_begin, new_row_id);
                     read_offset = row_begin + read_size;
                 };
 
-                if (read_size + current_block_ptr->row_count() > current_block_ptr->row_capacity()) {
-                    SizeT read_size1 = current_block_ptr->row_capacity() - current_block_ptr->row_count();
+                if (read_size + new_block->row_count() > new_block->row_capacity()) {
+                    SizeT read_size1 = new_block->row_capacity() - new_block->row_count();
                     block_entry_append(row_begin, read_size1);
                     row_begin += read_size1;
                     read_size -= read_size1;
-                    if (current_block_entry.get() != nullptr) {
-                        new_segment->AppendBlockEntry(std::move(current_block_entry));
-                    }
+                    new_segment->AppendBlockEntry(std::move(new_block));
+
                     BlockID next_block_id = new_segment->block_entries().size();
-                    current_block_entry = BlockEntry::NewBlockEntry(new_segment.get(), next_block_id, 0, column_count, txn_);
-                    current_block_ptr = current_block_entry.get();
+                    new_block = BlockEntry::NewBlockEntry(new_segment.get(), next_block_id, 0, column_count, txn_);
                 }
                 block_entry_append(row_begin, read_size);
             }
         }
     }
-    if (current_block_entry.get() != nullptr && current_block_entry->row_count() > 0) {
-        new_segment->AppendBlockEntry(std::move(current_block_entry));
-    }
-
-    // TODO: Increase row count here is not good
-    for (auto &block_entry : new_segment->block_entries()) {
-        new_segment->IncreaseRowCount(block_entry->row_count());
+    if (new_block->row_count() > 0) {
+        new_segment->AppendBlockEntry(std::move(new_block));
     }
 
     return new_segment;
