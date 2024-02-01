@@ -674,7 +674,6 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
                                                            commit_ts);
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
-        segment_entry->IncreaseRowCount(row_count);
     }
 
     NewCatalog::ImportSegment(table_entry, segment_info.segment_id_, segment_entry);

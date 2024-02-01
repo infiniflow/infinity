@@ -362,7 +362,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     if (!call_with_lock) {
         rw_locker = std::unique_lock(this->rw_locker_);
     }
-    this->row_count_ = row_count;
+    this->row_count_ = row_count; // BUG
     this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
 }

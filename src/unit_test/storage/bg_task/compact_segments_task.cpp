@@ -49,13 +49,11 @@ protected:
             txn->Begin();
 
             auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
-            auto *current_block_entry = segment_entry->GetLastEntry();
-            UniquePtr<BlockEntry> block_entry = nullptr;
-
-            BlockID block_id = 1;
+            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
                 SizeT write_size = std::min(SizeT(DEFAULT_BLOCK_CAPACITY), segment_size);
@@ -70,13 +68,9 @@ protected:
                     }
                     column_vectors.push_back(std::move(column_vector));
                 }
-                current_block_entry->AppendBlock(column_vectors, 0, write_size, buffer_mgr);
-                if (block_entry) {
-                    segment_entry->AppendBlockEntry(std::move(block_entry));
-                }
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), block_id++, 0, 1, txn);
-                current_block_entry = block_entry.get();
-                segment_entry->IncreaseRowCount(write_size);
+                block_entry->AppendBlock(column_vectors, 0, write_size, buffer_mgr);
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, 1, txn);
             }
             auto txn_store = txn->GetTxnTableStore(table_entry);
             PhysicalImport::SaveSegmentData(txn_store, segment_entry);

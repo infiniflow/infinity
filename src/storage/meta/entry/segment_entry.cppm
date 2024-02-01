@@ -115,28 +115,22 @@ public:
 
 public:
     // Used in WAL replay & Physical Import & SegmentCompaction
-    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) { block_entries_.emplace_back(std::move(block_entry)); }
+    inline void AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
+        IncreaseRowCount(block_entry->row_count());
+        block_entries_.emplace_back(std::move(block_entry));
+    }
 
+private:
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
         actual_row_count_ += increased_row_count;
     }
 
-private:
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             UnrecoverableError("Decrease row count exceed actual row count");
         }
         actual_row_count_ -= decrease_row_count;
-    }
-
-public:
-    // Used in PhysicalImport
-    inline BlockEntry *GetLastEntry() const {
-        if (block_entries_.empty()) {
-            UnrecoverableError("No any block entries");
-        }
-        return block_entries_.back().get();
     }
 
 protected:
