@@ -13,7 +13,11 @@
 // limitations under the License.
 
 module;
+
 #include <type_traits>
+
+export module aggregate_function;
+
 import stl;
 import function;
 import function_data;
@@ -22,8 +26,7 @@ import vector_buffer;
 import infinity_exception;
 import base_expression;
 import parser;
-
-export module aggregate_function;
+import logical_type;
 
 namespace infinity {
 

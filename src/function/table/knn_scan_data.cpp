@@ -29,7 +29,7 @@ import knn_flat_l2_blas_reservoir;
 import knn_flat_l2_reservoir;
 import knn_flat_l2_top1;
 import knn_flat_l2_top1_blas;
-
+import logical_type;
 import merge_knn;
 import knn_result_handler;
 import vector_distance;
@@ -37,7 +37,6 @@ import data_block;
 import column_vector;
 import base_expression;
 import expression_state;
-
 
 module knn_scan_data;
 

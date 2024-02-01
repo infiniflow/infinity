@@ -25,7 +25,7 @@ import physical_operator_type;
 import query_context;
 // import data_table;
 import operator_state;
-
+import logical_type;
 import data_block;
 import column_vector;
 

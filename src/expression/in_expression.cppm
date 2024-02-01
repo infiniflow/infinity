@@ -14,12 +14,14 @@
 
 module;
 
+export module in_expression;
+
 import column_binding;
 import base_expression;
 import parser;
 import stl;
+import logical_type;
 
-export module in_expression;
 namespace infinity {
 
 export enum class InType {

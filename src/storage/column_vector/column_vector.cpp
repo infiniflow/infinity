@@ -35,6 +35,7 @@ import value;
 import catalog;
 import buffer_manager;
 import status;
+import logical_type;
 
 namespace infinity {
 

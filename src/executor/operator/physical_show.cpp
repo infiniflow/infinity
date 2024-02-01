@@ -53,6 +53,7 @@ import utility;
 import buffer_manager;
 import session_manager;
 import compilation_config;
+import logical_type;
 
 namespace infinity {
 

@@ -39,6 +39,7 @@ import expression_state;
 import expression_evaluator;
 import aggregate_expression;
 import status;
+import logical_type;
 
 namespace infinity {
 

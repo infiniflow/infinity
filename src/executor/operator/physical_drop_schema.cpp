@@ -14,6 +14,8 @@
 
 module;
 
+module physical_drop_schema;
+
 import stl;
 import txn;
 import query_context;
@@ -23,10 +25,8 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import status;
-
+import logical_type;
 import infinity_exception;
-
-module physical_drop_schema;
 
 namespace infinity {
 

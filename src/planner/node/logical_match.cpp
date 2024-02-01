@@ -16,6 +16,8 @@ module;
 
 #include <sstream>
 
+module logical_match;
+
 import stl;
 import base_table_ref;
 import column_binding;
@@ -25,8 +27,7 @@ import parser;
 import default_values;
 import third_party;
 import catalog;
-
-module logical_match;
+import logical_type;
 
 namespace infinity {
 

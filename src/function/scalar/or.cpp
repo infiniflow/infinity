@@ -17,9 +17,10 @@ module;
 #include <type_traits>
 
 module or_func;
+
 import stl;
 import catalog;
-
+import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;

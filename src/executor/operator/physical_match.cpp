@@ -44,6 +44,7 @@ import iresearch_analyzer;
 import base_table_ref;
 import load_meta;
 import catalog;
+import logical_type;
 
 namespace infinity {
 

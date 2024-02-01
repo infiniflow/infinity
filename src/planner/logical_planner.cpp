@@ -71,6 +71,7 @@ import index_secondary;
 import index_full_text;
 import base_table_ref;
 import table_ref;
+import logical_type;
 import catalog;
 
 namespace {

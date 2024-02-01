@@ -28,6 +28,7 @@ import infinity_exception;
 import third_party;
 import logger;
 import status;
+import logical_type;
 
 namespace infinity {
 

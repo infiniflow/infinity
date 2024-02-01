@@ -14,17 +14,17 @@
 
 module;
 
+export module uuid_cast;
+
 import stl;
 import column_vector;
 import vector_buffer;
 import bound_cast_func;
 import parser;
 import column_vector_cast;
-
+import logical_type;
 import infinity_exception;
 import third_party;
-
-export module uuid_cast;
 
 namespace infinity {
 

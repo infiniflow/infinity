@@ -30,6 +30,7 @@ import data_block;
 import status;
 import infinity_exception;
 import logger;
+import logical_type;
 
 namespace infinity {
 

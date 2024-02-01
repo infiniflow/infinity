@@ -28,6 +28,7 @@ import value;
 import third_party;
 import default_values;
 import serialize;
+import logical_type;
 
 namespace infinity {
 

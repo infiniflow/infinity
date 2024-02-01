@@ -18,7 +18,7 @@ module min;
 
 import stl;
 import catalog;
-
+import logical_type;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;

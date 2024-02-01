@@ -19,6 +19,7 @@ module;
 
 module inequals;
 
+import logical_type;
 import stl;
 import catalog;
 import status;

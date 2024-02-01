@@ -27,6 +27,7 @@ import base_table_ref;
 import third_party;
 import infinity_exception;
 import catalog;
+import logical_type;
 
 namespace infinity {
 

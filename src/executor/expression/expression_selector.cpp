@@ -14,13 +14,15 @@
 
 module;
 
+module expression_selector;
+
 import stl;
 import data_block;
 import base_expression;
 import expression_state;
 import selection;
 import bitmask;
-
+import logical_type;
 import bitmask_buffer;
 import column_vector;
 import expression_evaluator;
@@ -29,8 +31,6 @@ import third_party;
 
 import infinity_exception;
 import parser;
-
-module expression_selector;
 
 namespace infinity {
 

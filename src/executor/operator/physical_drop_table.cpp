@@ -14,6 +14,8 @@
 
 module;
 
+module physical_drop_table;
+
 import stl;
 import txn;
 import query_context;
@@ -24,8 +26,7 @@ import physical_operator_type;
 import operator_state;
 import status;
 import infinity_exception;
-
-module physical_drop_table;
+import logical_type;
 
 namespace infinity {
 

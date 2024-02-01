@@ -28,6 +28,7 @@ import column_vector;
 import third_party;
 import catalog;
 import secondary_index_pgm;
+import logical_type;
 
 namespace infinity {
 

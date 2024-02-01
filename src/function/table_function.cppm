@@ -14,14 +14,15 @@
 
 module;
 
+export module table_function;
+
 import stl;
 import function;
 import function_data;
 import parser;
 //import query_context;
 import data_block;
-
-export module table_function;
+import logical_type;
 
 namespace infinity {
 

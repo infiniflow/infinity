@@ -14,11 +14,12 @@
 
 module;
 
+export module conjunction_expression;
+
 import stl;
 import base_expression;
 import parser;
-
-export module conjunction_expression;
+import logical_type;
 
 namespace infinity {
 

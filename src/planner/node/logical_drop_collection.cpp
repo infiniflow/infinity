@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
+module logical_drop_collection;
+
 import stl;
 import column_binding;
 import logical_node_type;
 import parser;
-
-module logical_drop_collection;
+import logical_type;
 
 namespace infinity {
 

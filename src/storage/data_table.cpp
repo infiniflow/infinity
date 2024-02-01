@@ -15,8 +15,11 @@
 module;
 
 #include <sstream>
-import stl;
 
+module data_table;
+
+import stl;
+import logical_type;
 import infinity_exception;
 import parser;
 import third_party;
@@ -24,8 +27,6 @@ import data_block;
 import table_def;
 import table_entry_type;
 import value;
-
-module data_table;
 
 namespace infinity {
 

@@ -14,11 +14,12 @@
 
 module;
 
+export module knn_expression;
+
 import stl;
 import base_expression;
 import parser;
-
-export module knn_expression;
+import logical_type;
 
 namespace infinity {
 

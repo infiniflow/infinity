@@ -16,6 +16,8 @@ module;
 
 #include <sstream>
 
+module logical_knn_scan;
+
 import stl;
 import base_table_ref;
 import column_binding;
@@ -24,8 +26,7 @@ import knn_expression;
 import parser;
 import default_values;
 import catalog;
-
-module logical_knn_scan;
+import logical_type;
 
 namespace infinity {
 

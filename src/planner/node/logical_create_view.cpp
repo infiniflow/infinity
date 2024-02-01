@@ -21,6 +21,7 @@ module logical_create_view;
 import stl;
 import column_binding;
 import parser;
+import logical_type;
 
 namespace infinity {
 

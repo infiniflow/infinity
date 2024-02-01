@@ -15,16 +15,17 @@
 module;
 
 #include <type_traits>
+
+module not_func;
+
 import stl;
 import catalog;
-
+import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
-
-module not_func;
 
 namespace infinity {
 

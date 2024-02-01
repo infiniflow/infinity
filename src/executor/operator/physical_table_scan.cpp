@@ -15,6 +15,9 @@
 module;
 
 #include <string>
+
+module physical_table_scan;
+
 import stl;
 import txn;
 import query_context;
@@ -36,8 +39,7 @@ import third_party;
 import logger;
 import column_vector;
 import infinity_exception;
-
-module physical_table_scan;
+import logical_type;
 
 namespace infinity {
 

@@ -14,8 +14,11 @@
 
 module;
 
-import stl;
 #include <string>
+
+module physical_update;
+
+import stl;
 import parser;
 import query_context;
 import operator_state;
@@ -29,8 +32,7 @@ import column_vector;
 import expression_evaluator;
 import expression_state;
 import base_expression;
-
-module physical_update;
+import logical_type;
 
 namespace infinity {
 

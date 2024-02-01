@@ -29,7 +29,6 @@ export using infinity::QueryDriver;
 export using infinity::SQLParser;
 export using infinity::ParserResult;
 
-export using infinity::LogicalType;
 export using infinity::ColumnDef;
 export using infinity::DataType;
 export using infinity::RowID;

@@ -19,6 +19,7 @@ export module match_expression;
 import stl;
 import parser;
 import base_expression;
+import logical_type;
 
 namespace infinity {
 

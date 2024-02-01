@@ -1,5 +1,8 @@
 module;
+
 #include <filesystem>
+
+module indexer;
 
 import stl;
 import memory_pool;
@@ -15,7 +18,7 @@ import parser;
 import column_vector;
 import third_party;
 import column_indexer;
-module indexer;
+import logical_type;
 
 namespace infinity {
 Indexer::Indexer() {}

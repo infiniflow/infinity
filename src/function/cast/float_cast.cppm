@@ -14,17 +14,17 @@
 
 module;
 
+export module float_cast;
+
 import parser;
 import stl;
 import bound_cast_func;
 import vector_buffer;
 import column_vector_cast;
-
+import logical_type;
 import infinity_exception;
 import third_party;
 import column_vector;
-
-export module float_cast;
 
 namespace infinity {
 

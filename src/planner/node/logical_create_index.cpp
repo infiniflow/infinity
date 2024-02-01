@@ -16,13 +16,14 @@ module;
 
 #include <sstream>
 
+module logical_create_index;
+
 import stl;
 import column_binding;
 import parser;
 import base_expression;
 import index_def;
-
-module logical_create_index;
+import logical_type;
 
 namespace infinity {
 

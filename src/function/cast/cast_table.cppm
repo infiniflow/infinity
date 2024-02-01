@@ -14,11 +14,12 @@
 
 module;
 
+export module cast_table;
+
 import singleton;
 import stl;
 import parser;
-
-export module cast_table;
+import logical_type;
 
 namespace infinity {
 

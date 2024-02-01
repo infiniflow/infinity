@@ -26,6 +26,7 @@ import scalar_function;
 import scalar_function_set;
 import parser;
 import third_party;
+import logical_type;
 
 namespace infinity {
 

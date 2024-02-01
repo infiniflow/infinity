@@ -15,11 +15,13 @@
 module;
 
 #include <sstream>
+
+module between_expression;
+
 import stl;
 import expression_type;
 import parser;
-
-module between_expression;
+import logical_type;
 
 namespace infinity {
 

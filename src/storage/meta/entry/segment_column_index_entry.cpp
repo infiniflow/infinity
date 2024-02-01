@@ -25,7 +25,7 @@ import buffer_obj;
 import logger;
 import third_party;
 import infinity_exception;
-
+import logical_type;
 import index_file_worker;
 import status;
 import index_base;

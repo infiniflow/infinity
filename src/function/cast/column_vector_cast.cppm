@@ -14,6 +14,8 @@
 
 module;
 
+export module column_vector_cast;
+
 import column_vector;
 import stl;
 import parser;
@@ -22,8 +24,7 @@ import bound_cast_func;
 import unary_operator;
 import embedding_unary_operator;
 import null_value;
-
-export module column_vector_cast;
+import logical_type;
 
 namespace infinity {
 

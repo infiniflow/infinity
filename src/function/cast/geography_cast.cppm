@@ -22,7 +22,7 @@ import vector_buffer;
 import bound_cast_func;
 import parser;
 import column_vector_cast;
-
+import logical_type;
 import infinity_exception;
 import third_party;
 

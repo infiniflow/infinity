@@ -14,6 +14,8 @@
 
 module;
 
+module hnsw_file_worker;
+
 import infinity_exception;
 import stl;
 import index_file_worker;
@@ -27,8 +29,7 @@ import lvq_store;
 import plain_store;
 import third_party;
 import logger;
-
-module hnsw_file_worker;
+import logical_type;
 
 namespace infinity {
 HnswFileWorker::~HnswFileWorker() {

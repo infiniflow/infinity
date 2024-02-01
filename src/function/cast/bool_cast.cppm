@@ -14,6 +14,8 @@
 
 module;
 
+export module bool_cast;
+
 import parser;
 import stl;
 import bound_cast_func;
@@ -21,8 +23,7 @@ import column_vector_cast;
 import infinity_exception;
 import third_party;
 import column_vector;
-
-export module bool_cast;
+import logical_type;
 
 namespace infinity {
 
