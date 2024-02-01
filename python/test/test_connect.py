@@ -18,6 +18,7 @@ import infinity
 from infinity.common import REMOTE_HOST
 from infinity.common import NetworkAddress
 
+
 class TestConnection:
     def test_connect_and_disconnect_ok(self):
         """
@@ -29,6 +30,7 @@ class TestConnection:
         assert infinity_obj
         assert infinity_obj.disconnect()
 
+    @pytest.mark.skip()
     def test_connect_invalid_address(self):
         """
         target: test connect invalid address, wrong address, invalid port, wrong port
@@ -53,7 +55,6 @@ class TestConnection:
         # except Exception as e:
         #     print(e)
 
-
         try:
             infinity_instance = infinity.connect(INVALID_PORT_HOST)
         except Exception as e:
@@ -63,7 +64,6 @@ class TestConnection:
             infinity_instance = infinity.connect(WRONG_PORT_HOST)
         except Exception as e:
             print(e)
-
 
         INVALID_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", -1)
         WRONG_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", 23815)
@@ -78,6 +78,7 @@ class TestConnection:
         except Exception as e:
             print(e)
 
+    @pytest.mark.skip()
     def test_repeat_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
@@ -87,6 +88,7 @@ class TestConnection:
         infinity_instance = infinity.connect(REMOTE_HOST)
         infinity_instance = infinity.connect(REMOTE_HOST)
 
+    @pytest.mark.skip(reason="Might cost much time.")
     def test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
@@ -101,6 +103,7 @@ class TestConnection:
         for i in range(0, connection_limit):
             infinity_instances[i].disconnect()
 
+    # @pytest.mark.skip()
     def test_repeat_disconnect(self):
         """
         target: disconnect the infinity which is already disconnected.

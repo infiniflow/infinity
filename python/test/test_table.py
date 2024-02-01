@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import concurrent.futures
+from utils import trace_expected_exceptions
 import pytest
 
-import infinity
-from infinity.common import REMOTE_HOST
 import common_values
+import infinity
 
 
 class TestTable:
@@ -53,7 +54,7 @@ class TestTable:
         4. list tables: empty
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -62,31 +63,21 @@ class TestTable:
             "my_table", {"c1": "int, primary key", "c2": "float"}, None)
         assert tb is not None
 
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "my_table!@#", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "my-table-dash", {"c1": "float, primary key", "c2": "int"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "123_table", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "bad_column", {"123": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
-        try:
+        with pytest.raises(Exception):
             tb = db_obj.create_table(
                 "", {"c1": "int, primary key", "c2": "float"}, None)
-        except Exception as e:
-            print(e)
 
         # FIXME: res = db_obj.describe_table("my_table")
 
@@ -114,7 +105,7 @@ class TestTable:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -193,7 +184,7 @@ class TestTable:
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -239,7 +230,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
         c_count = 10000
@@ -290,7 +281,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -314,7 +305,7 @@ class TestTable:
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
     def test_various_tables_with_various_columns(self):
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -355,7 +346,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -397,7 +388,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -423,7 +414,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -468,7 +459,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -512,7 +503,7 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
@@ -530,6 +521,35 @@ class TestTable:
         assert res.success
 
     # create/drop same table in different thread to test conflict
+    @trace_expected_exceptions
+    def test_create_or_drop_same_table_in_different_thread(self):
+        """
+        target: create/drop same table in different thread to test conflict
+        methods: create table at same time for 16 times
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # create table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into processpool
+            futures = [executor.submit(db_obj.create_table("my_table", {"c1": "int"}, None), i) for i in range(16)]
+            # wait all processes finished
+            concurrent.futures.wait(futures)
+
+        # drop table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into threadpool
+            futures = [executor.submit(db_obj.drop_table("my_table"), i) for i in range(16)]
+            # wait all threads finished
+            concurrent.futures.wait(futures)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # create empty column table
     def test_create_empty_column_table(self):
@@ -539,12 +559,12 @@ class TestTable:
         expect: all operations successfully
         """
         # connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("my_table")
 
         try:
-            tb = db_obj.create_table("my_table",None, None)
+            db_obj.create_table("my_table", None, None)
         except Exception as e:
             print(e)
 
