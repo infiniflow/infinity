@@ -302,11 +302,12 @@ public:
                                u64 column_count,
                                SizeT row_count,
                                SizeT row_capacity,
+                               SizeT actual_row_count,
                                TxnTimeStamp min_row_ts,
                                TxnTimeStamp max_row_ts)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), segment_dir_(std::move(segment_dir)), column_count_(column_count),
-          row_count_(row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
+          row_count_(row_count), actual_row_count_(actual_row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
     explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
@@ -320,6 +321,7 @@ public:
         total_size += sizeof(i32) + this->segment_dir_.size();
         total_size += sizeof(u64);
         total_size += sizeof(SizeT);
+        total_size += sizeof(actual_row_count_);
         total_size += sizeof(SizeT);
         total_size += sizeof(TxnTimeStamp) * 2;
         return total_size;
@@ -339,6 +341,7 @@ public:
     SegmentID segment_id() const { return segment_id_; }
     u64 column_count() const { return column_count_; }
     SizeT row_count() const { return row_count_; }
+    SizeT actual_row_count() const { return actual_row_count_; }
     SizeT row_capacity() const { return row_capacity_; }
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
@@ -355,6 +358,7 @@ private:
 private:
     u64 column_count_{0};
     SizeT row_count_{0};
+    SizeT actual_row_count_{0};
     SizeT row_capacity_{0};
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};

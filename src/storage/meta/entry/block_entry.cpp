@@ -30,6 +30,7 @@ import catalog_delta_entry;
 import infinity_exception;
 import parser;
 import column_vector;
+import bitmask;
 
 namespace infinity {
 
@@ -196,6 +197,30 @@ Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offs
         }
     }
     return {block_offset_begin, row_idx};
+}
+
+bool BlockEntry::CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
+    auto &block_version = this->block_version_;
+    auto &deleted = block_version->deleted_;
+    return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
+}
+
+void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const {
+    BlockOffset read_offset = 0;
+    while (true) {
+        auto [row_begin, row_end] = GetVisibleRange(query_ts, read_offset);
+        if (row_begin == row_end) {
+            break;
+        }
+        for (BlockOffset offset = read_offset; offset < row_begin; ++offset) {
+            bitmask.SetFalse(offset);
+        }
+        read_offset = row_end;
+    }
+    // FIXME: read row_count_ is not thread safe
+    for (BlockOffset offset = read_offset; offset < row_count_; ++offset) {
+        bitmask.SetFalse(offset);
+    }
 }
 
 u16 BlockEntry::AppendData(TransactionID txn_id,

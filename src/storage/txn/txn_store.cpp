@@ -145,13 +145,13 @@ void TxnTableStore::PrepareCommit() {
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
         const auto &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
-        NewCatalog::ImportSegment(table_entry_, txn_->CommitTS(), uncommitted);
+        NewCatalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
+    // Attention: "compact" needs to be ahead of "delete"
+    NewCatalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
     NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
     NewCatalog::CommitCreateIndex(txn_indexes_store_);
-
-    NewCatalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }

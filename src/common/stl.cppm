@@ -240,6 +240,8 @@ export {
     using Optional = std::optional<T>;
     constexpr std::nullopt_t None = std::nullopt;
 
+    using NoneType = std::nullopt_t;
+
     using StdOfStream = std::ofstream;
 
     // String

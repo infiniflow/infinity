@@ -171,7 +171,7 @@ int main() {
                             break;
                         }
                         const float *query = queries + cur_idx * dimension;
-                        auto result = knn_hnsw->KnnSearch1<false>(query, test_top);
+                        auto result = knn_hnsw->KnnSearchSorted<false>(query, test_top);
                         results[cur_idx] = std::move(result);
                     }
                 });

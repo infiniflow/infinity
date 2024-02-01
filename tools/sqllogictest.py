@@ -37,7 +37,7 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
             file = os.path.join(dirpath, filename)
 
             # filename = os.path.basename(file)
-            # if "fulltext" in filename or "fusion" in filename:
+            # if "fulltext" in filename or "fusion" in filename or "test_compact_big" in filename:
             #     continue
 
             print("Start running test file: " + file)

@@ -24,7 +24,7 @@ namespace infinity {
 
 export struct CreateIndexSharedData {
     CreateIndexSharedData(BlockIndex *block_index)  {
-        for (int i = 0; i < block_index->segments_.size(); ++i) {
+        for (auto i = 0; i < block_index->segments_.size(); ++i) {
             create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
         }
     }

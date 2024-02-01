@@ -13,14 +13,14 @@
 // limitations under the License.
 
 module;
-#include <utility>
 #include <limits>
+#include <utility>
+
+export module hnsw_common;
 
 import stl;
 import file_system;
 import infinity_exception;
-
-export module hnsw_common;
 
 namespace infinity {
 export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
@@ -151,5 +151,14 @@ public:
         return ret;
     }
 };
+
+export template <typename LabelType>
+class FilterBase {
+public:
+    virtual bool operator()(const LabelType &vertex_i) const = 0;
+};
+
+export template <typename Filter, typename LabelType>
+concept FilterConcept = requires(LabelType label) { std::is_same_v<Filter, NoneType> || std::is_base_of_v<FilterBase<LabelType>, Filter>; };
 
 } // namespace infinity
