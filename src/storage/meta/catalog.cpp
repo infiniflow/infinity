@@ -850,23 +850,28 @@ void NewCatalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_
     LOG_INFO(fmt::format("Saved catalog to: {}", catalog_path));
 }
 
-void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
 
     auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
     this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
 
-    // Assert catalog entry commit ts <= max_commit_ts
     auto global_entry_commit_ts = global_catalog_delta_entry->commit_ts();
     LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
-    if (global_entry_commit_ts > max_commit_ts) {
-        UnrecoverableError(
-            fmt::format("Global catalog delta entry commit ts {} not match checkpoint max commit ts {}", global_entry_commit_ts, max_commit_ts));
+    auto op_size = global_catalog_delta_entry->operations().size();
+    if (op_size == 0) {
+        LOG_INFO("Global catalog delta entry ops is empty. Skip flush.");
+        return true;
     }
-
     // Check the SegmentEntry's for flush the data to disk.
     auto &ops = global_catalog_delta_entry->operations();
     for (auto &op : ops) {
+        auto op_commit_ts = op->commit_ts();
+        if (op_commit_ts > max_commit_ts) {
+            this->global_catalog_delta_entry_->operations().emplace_back(std::move(op));
+            global_catalog_delta_entry->operations().pop_front();
+            continue;
+        }
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
@@ -904,6 +909,9 @@ void NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     outfile.open(delta_catalog_path, std::ios::binary);
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
+
+    LOG_INFO(fmt::format("Flush global catalog delta entry to: {}, size: {}.", delta_catalog_path, act_size));
+    return false;
 }
 
 } // namespace infinity

@@ -22,18 +22,19 @@ import pandas as pd
 import polars as pl
 import pyarrow as pa
 from pyarrow import Table
+from sqlglot import condition
 
 from infinity.common import VEC
-from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype
+from infinity.remote_thrift.utils import traverse_conditions
 
 '''FIXME: How to disable validation of only the search field?'''
 
 
 class Query(ABC):
-    def __init__(self, columns: Optional[List[str]], search: Optional[SearchExpr], filter: Optional[str],
-                 limit: Optional[int], offset: Optional[int]):
+    def __init__(self, columns: Optional[List[ParsedExpr]], search: Optional[SearchExpr], filter: Optional[ParsedExpr],
+                 limit: Optional[ParsedExpr], offset: Optional[ParsedExpr]):
         self.columns = columns
         self.search = search
         self.filter = filter
@@ -57,13 +58,13 @@ class InfinityThriftQueryBuilder(ABC):
         if self._search.knn_exprs is None:
             self._search.knn_exprs = list()
 
-        column_expr = ttypes.ColumnExpr(column_name=[vector_column_name], star=False)
+        column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
         if isinstance(embedding_data, list):
             embedding_data = embedding_data
         if isinstance(embedding_data, np.ndarray):
             embedding_data = embedding_data.tolist()
-        data = ttypes.EmbeddingData()
+        data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == 'bit':
             elem_type = ElementType.ElementBit
@@ -109,7 +110,7 @@ class InfinityThriftQueryBuilder(ABC):
             self._search = SearchExpr()
         if self._search.match_exprs is None:
             self._search.match_exprs = list()
-        match_expr = ttypes.MatchExpr()
+        match_expr = MatchExpr()
         match_expr.fields = fields
         match_expr.matching_text = matching_text
         match_expr.options_text = options_text
@@ -119,26 +120,51 @@ class InfinityThriftQueryBuilder(ABC):
     def fusion(self, method: str, options_text: str = '') -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
-        fusion_expr = ttypes.FusionExpr()
+        fusion_expr = FusionExpr()
         fusion_expr.method = method
         fusion_expr.options_text = options_text
         self._search.fusion_expr = fusion_expr
         return self
 
     def filter(self, where: Optional[str]) -> InfinityThriftQueryBuilder:
-        self._filter = where
+        where_expr = traverse_conditions(condition(where))
+        self._filter = where_expr
         return self
 
     def limit(self, limit: Optional[int]) -> InfinityThriftQueryBuilder:
-        self._limit = limit
+        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=limit)
+        expr_type = ParsedExprType(constant_expr=constant_exp)
+        limit_expr = ParsedExpr(type=expr_type)
+        self._limit = limit_expr
         return self
 
     def offset(self, offset: Optional[int]) -> InfinityThriftQueryBuilder:
-        self._offset = offset
+        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=offset)
+        expr_type = ParsedExprType(constant_expr=constant_exp)
+        offset_expr = ParsedExpr(type=expr_type)
+        self._offset = offset_expr
         return self
 
     def output(self, columns: Optional[list]) -> InfinityThriftQueryBuilder:
         self._columns = columns
+        select_list: List[ParsedExpr] = []
+        for column in columns:
+            match column:
+                case "*":
+                    column_expr = ColumnExpr(star=True, column_name=[])
+                    expr_type = ParsedExprType(column_expr=column_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_row_id":
+                    func_expr = FunctionExpr(function_name="row_id", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+
+                case _:
+                    select_list.append(traverse_conditions(condition(column)))
+
+        self._columns = select_list
         return self
 
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
@@ -165,3 +191,13 @@ class InfinityThriftQueryBuilder(ABC):
 
     def to_arrow(self) -> Table:
         return pa.Table.from_pandas(self.to_df())
+
+    # def explain(self) -> str:
+    #     query = Query(
+    #         columns=self._columns,
+    #         search=self._search,
+    #         filter=self._filter,
+    #         limit=self._limit,
+    #         offset=self._offset
+    #     )
+    #     return self._table._execute_query(query, explain=True)

@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
+import common_values
 import infinity
-from infinity.common import REMOTE_HOST
 from infinity.common import NetworkAddress
-
 class TestConnection:
     def test_connect_and_disconnect_ok(self):
         """
@@ -25,7 +22,7 @@ class TestConnection:
         method: connect server
         expected: ok
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         assert infinity_obj
         assert infinity_obj.disconnect()
 
@@ -53,7 +50,6 @@ class TestConnection:
         # except Exception as e:
         #     print(e)
 
-
         try:
             infinity_instance = infinity.connect(INVALID_PORT_HOST)
         except Exception as e:
@@ -63,7 +59,6 @@ class TestConnection:
             infinity_instance = infinity.connect(WRONG_PORT_HOST)
         except Exception as e:
             print(e)
-
 
         INVALID_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", -1)
         WRONG_PORT_LOCAL_HOST = NetworkAddress("0.0.0.0", 23815)
@@ -84,8 +79,8 @@ class TestConnection:
         method: connect server -> connect server
         expected: success
         """
-        infinity_instance = infinity.connect(REMOTE_HOST)
-        infinity_instance = infinity.connect(REMOTE_HOST)
+        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
 
     def test_multiple_connect(self):
         """
@@ -96,7 +91,7 @@ class TestConnection:
         connection_limit = 128
         infinity_instances = []
         for i in range(0, connection_limit):
-            infinity_instances.append(infinity.connect(REMOTE_HOST))
+            infinity_instances.append(infinity.connect(common_values.TEST_REMOTE_HOST))
 
         for i in range(0, connection_limit):
             infinity_instances[i].disconnect()
@@ -107,7 +102,7 @@ class TestConnection:
         method: connect server -> disconnect server -> disconnect server
         expected: failed
         """
-        infinity_instance = infinity.connect(REMOTE_HOST)
+        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_instance.disconnect()
 
         try:

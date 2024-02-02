@@ -16,7 +16,6 @@ import pandas as pd
 from numpy import dtype
 
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
 
 # create table with bool column
 # insert table 0, 1, true, false to check correctness
