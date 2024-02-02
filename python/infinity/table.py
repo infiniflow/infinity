@@ -13,8 +13,10 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Optional, Union
 
+import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
 
 
@@ -44,7 +46,34 @@ class Table(ABC):
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         pass
 
-
     @abstractmethod
     def _execute_query(self, query):
         pass
+
+
+class ExplainType(Enum):
+    Analyze = 1
+    Ast = 2
+    UnOpt = 3
+    Opt = 4
+    Physical = 5
+    Pipeline = 6
+    Fragment = 7
+
+    def to_ttype(self):
+        if self is ExplainType.Ast:
+            return ttypes.ExplainType.Ast
+        elif self is ExplainType.Analyze:
+            return ttypes.ExplainType.Analyze
+        elif self is ExplainType.UnOpt:
+            return ttypes.ExplainType.UnOpt
+        elif self is ExplainType.Opt:
+            return ttypes.ExplainType.Opt
+        elif self is ExplainType.Physical:
+            return ttypes.ExplainType.Physical
+        elif self is ExplainType.Pipeline:
+            return ttypes.ExplainType.Pipeline
+        elif self is ExplainType.Fragment:
+            return ttypes.ExplainType.Fragment
+        else:
+            raise Exception("Unknown explain type")

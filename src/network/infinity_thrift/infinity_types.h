@@ -176,6 +176,24 @@ std::ostream& operator<<(std::ostream& out, const IndexType::type& val);
 
 std::string to_string(const IndexType::type& val);
 
+struct ExplainType {
+  enum type {
+    Analyze = 0,
+    Ast = 1,
+    UnOpt = 2,
+    Opt = 3,
+    Physical = 4,
+    Pipeline = 5,
+    Fragment = 6
+  };
+};
+
+extern const std::map<int, const char*> _ExplainType_VALUES_TO_NAMES;
+
+std::ostream& operator<<(std::ostream& out, const ExplainType::type& val);
+
+std::string to_string(const ExplainType::type& val);
+
 class Option;
 
 class DropTableOptions;
@@ -271,6 +289,10 @@ class InsertRequest;
 class ImportRequest;
 
 class FileChunk;
+
+class ExplainRequest;
+
+class ExplainResponse;
 
 class SelectRequest;
 
@@ -3118,6 +3140,203 @@ class FileChunk : public virtual ::apache::thrift::TBase {
 void swap(FileChunk &a, FileChunk &b);
 
 std::ostream& operator<<(std::ostream& out, const FileChunk& obj);
+
+typedef struct _ExplainRequest__isset {
+  _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+  bool select_list :1;
+  bool search_expr :1;
+  bool where_expr :1;
+  bool group_by_list :1;
+  bool having_expr :1;
+  bool limit_expr :1;
+  bool offset_expr :1;
+  bool order_by_list :1;
+  bool explain_type :1;
+} _ExplainRequest__isset;
+
+class ExplainRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExplainRequest(const ExplainRequest&);
+  ExplainRequest& operator=(const ExplainRequest&);
+  ExplainRequest() noexcept
+                 : session_id(0),
+                   db_name(),
+                   table_name(),
+                   explain_type(static_cast<ExplainType::type>(0)) {
+
+
+
+  }
+
+  virtual ~ExplainRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+  std::vector<ParsedExpr>  select_list;
+  SearchExpr search_expr;
+  ParsedExpr where_expr;
+  std::vector<ParsedExpr>  group_by_list;
+  ParsedExpr having_expr;
+  ParsedExpr limit_expr;
+  ParsedExpr offset_expr;
+  std::vector<OrderByExpr>  order_by_list;
+  /**
+   * 
+   * @see ExplainType
+   */
+  ExplainType::type explain_type;
+
+  _ExplainRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_select_list(const std::vector<ParsedExpr> & val);
+
+  void __set_search_expr(const SearchExpr& val);
+
+  void __set_where_expr(const ParsedExpr& val);
+
+  void __set_group_by_list(const std::vector<ParsedExpr> & val);
+
+  void __set_having_expr(const ParsedExpr& val);
+
+  void __set_limit_expr(const ParsedExpr& val);
+
+  void __set_offset_expr(const ParsedExpr& val);
+
+  void __set_order_by_list(const std::vector<OrderByExpr> & val);
+
+  void __set_explain_type(const ExplainType::type val);
+
+  bool operator == (const ExplainRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(select_list == rhs.select_list))
+      return false;
+    if (__isset.search_expr != rhs.__isset.search_expr)
+      return false;
+    else if (__isset.search_expr && !(search_expr == rhs.search_expr))
+      return false;
+    if (__isset.where_expr != rhs.__isset.where_expr)
+      return false;
+    else if (__isset.where_expr && !(where_expr == rhs.where_expr))
+      return false;
+    if (__isset.group_by_list != rhs.__isset.group_by_list)
+      return false;
+    else if (__isset.group_by_list && !(group_by_list == rhs.group_by_list))
+      return false;
+    if (__isset.having_expr != rhs.__isset.having_expr)
+      return false;
+    else if (__isset.having_expr && !(having_expr == rhs.having_expr))
+      return false;
+    if (__isset.limit_expr != rhs.__isset.limit_expr)
+      return false;
+    else if (__isset.limit_expr && !(limit_expr == rhs.limit_expr))
+      return false;
+    if (__isset.offset_expr != rhs.__isset.offset_expr)
+      return false;
+    else if (__isset.offset_expr && !(offset_expr == rhs.offset_expr))
+      return false;
+    if (__isset.order_by_list != rhs.__isset.order_by_list)
+      return false;
+    else if (__isset.order_by_list && !(order_by_list == rhs.order_by_list))
+      return false;
+    if (!(explain_type == rhs.explain_type))
+      return false;
+    return true;
+  }
+  bool operator != (const ExplainRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExplainRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExplainRequest &a, ExplainRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ExplainRequest& obj);
+
+typedef struct _ExplainResponse__isset {
+  _ExplainResponse__isset() : success(false), error_msg(false), column_defs(true), column_fields(true) {}
+  bool success :1;
+  bool error_msg :1;
+  bool column_defs :1;
+  bool column_fields :1;
+} _ExplainResponse__isset;
+
+class ExplainResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExplainResponse(const ExplainResponse&);
+  ExplainResponse& operator=(const ExplainResponse&);
+  ExplainResponse() noexcept
+                  : success(0),
+                    error_msg() {
+
+
+  }
+
+  virtual ~ExplainResponse() noexcept;
+  bool success;
+  std::string error_msg;
+  std::vector<ColumnDef>  column_defs;
+  std::vector<ColumnField>  column_fields;
+
+  _ExplainResponse__isset __isset;
+
+  void __set_success(const bool val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_column_defs(const std::vector<ColumnDef> & val);
+
+  void __set_column_fields(const std::vector<ColumnField> & val);
+
+  bool operator == (const ExplainResponse & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(column_defs == rhs.column_defs))
+      return false;
+    if (!(column_fields == rhs.column_fields))
+      return false;
+    return true;
+  }
+  bool operator != (const ExplainResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExplainResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExplainResponse &a, ExplainResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ExplainResponse& obj);
 
 typedef struct _SelectRequest__isset {
   _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}

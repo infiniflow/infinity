@@ -20,10 +20,10 @@ from sqlglot import condition
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import INSERT_DATA, VEC
 from infinity.index import IndexInfo
-from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder
+from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, check_valid_name
-from infinity.table import Table
+from infinity.table import Table, ExplainType
 
 
 class RemoteTable(Table, ABC):
@@ -266,6 +266,9 @@ class RemoteTable(Table, ABC):
     def to_arrow(self):
         return self.query_builder.to_arrow()
 
+    def explain(self, explain_type: ExplainType = ExplainType.Physical):
+        return self.query_builder.explain(explain_type)
+
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 
         # execute the query
@@ -284,16 +287,17 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(res.error_msg)
 
-    # def _explain_query(self, query: Query) -> str:
-    #     res = self._conn.explain(db_name=self._db_name,
-    #                              table_name=self._table_name,
-    #                              select_list=query.columns,
-    #                              search_expr=query.search,
-    #                              where_expr=query.filter,
-    #                              group_by_list=None,
-    #                              limit_expr=query.limit,
-    #                              offset_expr=query.offset)
-    #     if res.success:
-    #         return build_result(res)
-    #     else:
-    #         raise Exception(res.error_msg)
+    def _explain_query(self, query: ExplainQuery) -> Any:
+        res = self._conn.explain(db_name=self._db_name,
+                                 table_name=self._table_name,
+                                 select_list=query.columns,
+                                 search_expr=query.search,
+                                 where_expr=query.filter,
+                                 group_by_list=None,
+                                 limit_expr=query.limit,
+                                 offset_expr=query.offset,
+                                 explain_type=query.explain_type.to_ttype())
+        if res.success:
+            return build_result(res)
+        else:
+            raise Exception(res.error_msg)
