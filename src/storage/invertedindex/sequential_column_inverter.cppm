@@ -1,6 +1,6 @@
 module;
 
-export module column_inverter;
+export module sequential_column_inverter;
 import stl;
 import analyzer;
 import parser;
@@ -27,14 +27,14 @@ public:
 };
 
 class MemoryIndexer;
-export class ColumnInverter {
+export class SequentialColumnInverter {
 public:
-    ColumnInverter(MemoryIndexer *memory_indexer);
-    ColumnInverter(const ColumnInverter &) = delete;
-    ColumnInverter(const ColumnInverter &&) = delete;
-    ColumnInverter &operator=(const ColumnInverter &) = delete;
-    ColumnInverter &operator=(const ColumnInverter &&) = delete;
-    ~ColumnInverter();
+    SequentialColumnInverter(MemoryIndexer *memory_indexer);
+    SequentialColumnInverter(const SequentialColumnInverter &) = delete;
+    SequentialColumnInverter(const SequentialColumnInverter &&) = delete;
+    SequentialColumnInverter &operator=(const SequentialColumnInverter &) = delete;
+    SequentialColumnInverter &operator=(const SequentialColumnInverter &&) = delete;
+    ~SequentialColumnInverter();
 
     void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 

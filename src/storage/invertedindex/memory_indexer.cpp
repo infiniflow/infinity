@@ -32,7 +32,7 @@ import column_vector;
 import analyzer;
 import analyzer_pool;
 import term;
-import column_inverter;
+import sequential_column_inverter;
 import invert_task;
 import commit_task;
 import task_executor;
@@ -69,7 +69,7 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
       num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
-    inverter_ = MakeUnique<ColumnInverter>(this);
+    inverter_ = MakeUnique<SequentialColumnInverter>(this);
     invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism());
     commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
 }
@@ -95,7 +95,7 @@ void MemoryIndexer::SetAnalyzer() {
 }
 
 void MemoryIndexer::Insert(RowID row_id, String &data) {
-    ColumnInverter inverter(this);
+    SequentialColumnInverter inverter(this);
     inverter.InvertColumn(RowID2DocID(row_id), data);
     inverter.Commit();
 }
@@ -123,7 +123,7 @@ void MemoryIndexer::SwitchActiveInverter() {
         inverter_->WaitForZeroRefCount();
         return;
     }
-    inverter_ = MakeUnique<ColumnInverter>(this);
+    inverter_ = MakeUnique<SequentialColumnInverter>(this);
     ++num_inverters_;
 }
 

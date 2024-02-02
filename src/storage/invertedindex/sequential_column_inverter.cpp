@@ -4,7 +4,7 @@ module;
 #include <cstring>
 #include <vector>
 
-module column_inverter;
+module sequential_column_inverter;
 import stl;
 import analyzer;
 import memory_pool;
@@ -48,22 +48,22 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(MemoryIndexer *memory_indexer)
+SequentialColumnInverter::SequentialColumnInverter(MemoryIndexer *memory_indexer)
     : column_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
       alloc_(memory_indexer->GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
 
-ColumnInverter::~ColumnInverter() {}
+SequentialColumnInverter::~SequentialColumnInverter() {}
 
-bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
+bool SequentialColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
+void SequentialColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
     for (SizeT i = 0; i < column_vector->Size(); ++i) {
         String data = column_vector->ToString(i);
         InvertColumn(RowID2DocID(row_ids[i]), data);
     }
 }
 
-void ColumnInverter::InvertColumn(u32 doc_id, const String &val) {
+void SequentialColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     terms_once_.clear();
     analyzer_->Analyze(val, terms_once_, jieba_specialize_);
     for (auto it = terms_once_.begin(); it != terms_once_.end(); ++it) {
@@ -73,7 +73,7 @@ void ColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     }
 }
 
-u32 ColumnInverter::AddTerm(StringRef term) {
+u32 SequentialColumnInverter::AddTerm(StringRef term) {
     const u32 terms_size = terms_.size();
     const u32 unpadded_size = terms_size + 4 + term.size() + 1;
     const u32 fully_padded_size = Align<4>(unpadded_size);
@@ -93,7 +93,7 @@ struct TermRefRadix {
     u32 operator()(const u64 v) { return v >> 32; }
 };
 
-void ColumnInverter::SortTerms() {
+void SequentialColumnInverter::SortTerms() {
     Vector<u64> first_four_bytes(term_refs_.size());
     for (u32 i = 1; i < term_refs_.size(); ++i) {
         u64 first_four = ntohl(*reinterpret_cast<const u32 *>(GetTermFromRef(term_refs_[i])));
@@ -131,10 +131,10 @@ void ColumnInverter::SortTerms() {
 }
 
 struct FullRadix {
-    u64 operator()(const ColumnInverter::PosInfo &p) const { return (static_cast<u64>(p.term_num_) << 32) | p.doc_id_; }
+    u64 operator()(const SequentialColumnInverter::PosInfo &p) const { return (static_cast<u64>(p.term_num_) << 32) | p.doc_id_; }
 };
 
-void ColumnInverter::Commit() {
+void SequentialColumnInverter::Commit() {
     SortTerms();
     ShiftBasedRadixSorter<PosInfo, FullRadix, std::less<PosInfo>, 56, true>::RadixSort(FullRadix(),
                                                                                        std::less<PosInfo>(),
@@ -152,7 +152,7 @@ void ColumnInverter::Commit() {
     }
 }
 
-void ColumnInverter::DoInsert() {
+void SequentialColumnInverter::DoInsert() {
     u32 last_term_num = 0;
     u32 last_term_pos = 0;
     u32 last_doc_id = 0;
@@ -177,7 +177,7 @@ void ColumnInverter::DoInsert() {
     }
 }
 
-void ColumnInverter::DoRTInsert() {
+void SequentialColumnInverter::DoRTInsert() {
     u32 last_term_num = 0;
     u32 last_term_pos = 0;
     u32 last_doc_id = 0;
@@ -202,5 +202,5 @@ void ColumnInverter::DoRTInsert() {
     }
 }
 
-void ColumnInverter::Flush() {}
+void SequentialColumnInverter::Flush() {}
 } // namespace infinity

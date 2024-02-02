@@ -3,11 +3,11 @@ module;
 module commit_task;
 
 import stl;
-import column_inverter;
+import sequential_column_inverter;
 
 namespace infinity {
 
-CommitTask::CommitTask(ColumnInverter *inverter) : inverter_(inverter) { inverter_->Retain(); }
+CommitTask::CommitTask(SequentialColumnInverter *inverter) : inverter_(inverter) { inverter_->Retain(); }
 
 CommitTask::~CommitTask() { inverter_->Release(); }
 
