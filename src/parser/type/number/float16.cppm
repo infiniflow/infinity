@@ -14,12 +14,12 @@
 
 module;
 
-#include "logical_type.h"
+#include "float16.h"
 
-export module logical_type;
+export module float16;
 
 namespace infinity {
 
-export using infinity::LogicalType;
+export using infinity::float16_t;
 
 }

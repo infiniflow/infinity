@@ -35,8 +35,6 @@ export using infinity::RowID;
 // TimeUnit
 export using infinity::TimeUnit;
 
-export using float16_t = float16_t;
-
 export using infinity::IntegerMixedType;
 export using infinity::FloatMixedType;
 export using infinity::ArrayMixedType;
