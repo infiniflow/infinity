@@ -16,6 +16,7 @@ module;
 
 #include <string.h>
 
+module memory_indexer;
 import stl;
 import memory_pool;
 import segment_posting;
@@ -39,7 +40,6 @@ import memory_posting;
 import indexer;
 import third_party;
 import index_builder;
-module memory_indexer;
 
 namespace infinity {
 
@@ -66,11 +66,11 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
                              SharedPtr<MemoryPool> byte_slice_pool,
                              SharedPtr<RecyclePool> buffer_pool)
     : indexer_(indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool),
-      num_inverters_(1), max_inverters_(2) {
+      num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
     inverter_ = MakeUnique<ColumnInverter>(this);
-    invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, 1, 1);
+    invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism());
     commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
 }
 

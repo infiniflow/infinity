@@ -1,5 +1,6 @@
 module;
 
+export module memory_indexer;
 import stl;
 import memory_pool;
 import segment_posting;
@@ -18,7 +19,6 @@ import task_executor;
 import memory_posting;
 import third_party;
 import index_builder;
-export module memory_indexer;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;

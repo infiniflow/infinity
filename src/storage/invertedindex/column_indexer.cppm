@@ -25,7 +25,7 @@ public:
 
     ~ColumnIndexer();
 
-    MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
+    MemoryIndexer *GetMemoryIndexer() { return active_memory_indexer_.get(); }
     // realtime insert
     void Insert(RowID row_id, String &data);
 
@@ -36,7 +36,7 @@ public:
     void Dump(IndexBuilder &index_builder);
 
 private:
-    UniquePtr<MemoryIndexer> memory_indexer_;
+    UniquePtr<MemoryIndexer> active_memory_indexer_;
 };
 
 } // namespace infinity
