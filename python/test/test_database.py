@@ -15,7 +15,6 @@
 import threading
 from utils import trace_expected_exceptions
 import infinity
-from infinity.common import NetworkAddress, REMOTE_HOST
 import common_values
 import pytest
 
@@ -44,7 +43,7 @@ class TestDatabase:
             - 'default'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # infinity
         db = infinity_obj.create_database("my_database")
@@ -107,7 +106,7 @@ class TestDatabase:
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # 2. create db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -142,7 +141,7 @@ class TestDatabase:
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         db_count = 100
 
@@ -186,7 +185,7 @@ class TestDatabase:
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         db_count = 1000000
         # db = infinity_obj.create_database('db_name')
@@ -230,7 +229,7 @@ class TestDatabase:
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         loop_count = 100
 
@@ -266,7 +265,7 @@ class TestDatabase:
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # 2. drop db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -289,7 +288,7 @@ class TestDatabase:
         1. create database
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # option: if not exists
         # other options are invalid
@@ -309,7 +308,7 @@ class TestDatabase:
         1. create database
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # option: if not exists
         # other options are invalid
@@ -329,7 +328,7 @@ class TestDatabase:
         1. drop database
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # option: if not exists
         # other options are invalid
@@ -349,7 +348,7 @@ class TestDatabase:
         1. create database
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # option: if not exists
         # other options are invalid
@@ -371,7 +370,7 @@ class TestDatabase:
         4. describe invalid name db
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
         # option: if not exists
         # other options are invalid
@@ -424,7 +423,7 @@ class TestDatabase:
         """
 
         # 1. connect and disconnect db
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         res = infinity_obj.disconnect()
 
         # 2. create db
