@@ -34,6 +34,7 @@ types_example_array = [
     # True,
     # vector
     # np.array([1.1, 2.2, 3.3])
+    # [1, 2, 3]
 ]
 
 # db_name, table_name, index_name, column_name
