@@ -31,9 +31,11 @@ class InfinityServiceIf {
   virtual void Insert(CommonResponse& _return, const InsertRequest& request) = 0;
   virtual void Import(CommonResponse& _return, const ImportRequest& request) = 0;
   virtual void Select(SelectResponse& _return, const SelectRequest& request) = 0;
+  virtual void Explain(SelectResponse& _return, const ExplainRequest& request) = 0;
   virtual void Delete(CommonResponse& _return, const DeleteRequest& request) = 0;
   virtual void Update(CommonResponse& _return, const UpdateRequest& request) = 0;
   virtual void UploadFileChunk(UploadResponse& _return, const FileChunk& request) = 0;
+  virtual void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) = 0;
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
   virtual void DescribeDatabase(DescribeDatabaseResponse& _return, const DescribeDatabaseRequest& request) = 0;
@@ -98,6 +100,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
   void Select(SelectResponse& /* _return */, const SelectRequest& /* request */) override {
     return;
   }
+  void Explain(SelectResponse& /* _return */, const ExplainRequest& /* request */) override {
+    return;
+  }
   void Delete(CommonResponse& /* _return */, const DeleteRequest& /* request */) override {
     return;
   }
@@ -105,6 +110,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void UploadFileChunk(UploadResponse& /* _return */, const FileChunk& /* request */) override {
+    return;
+  }
+  void ShowVariable(SelectResponse& /* _return */, const ShowVariableRequest& /* request */) override {
     return;
   }
   void ListDatabase(ListDatabaseResponse& /* _return */, const ListDatabaseRequest& /* request */) override {
@@ -1057,6 +1065,110 @@ class InfinityService_Select_presult {
 
 };
 
+typedef struct _InfinityService_Explain_args__isset {
+  _InfinityService_Explain_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Explain_args__isset;
+
+class InfinityService_Explain_args {
+ public:
+
+  InfinityService_Explain_args(const InfinityService_Explain_args&);
+  InfinityService_Explain_args& operator=(const InfinityService_Explain_args&);
+  InfinityService_Explain_args() noexcept {
+  }
+
+  virtual ~InfinityService_Explain_args() noexcept;
+  ExplainRequest request;
+
+  _InfinityService_Explain_args__isset __isset;
+
+  void __set_request(const ExplainRequest& val);
+
+  bool operator == (const InfinityService_Explain_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Explain_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Explain_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Explain_pargs {
+ public:
+
+
+  virtual ~InfinityService_Explain_pargs() noexcept;
+  const ExplainRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Explain_result__isset {
+  _InfinityService_Explain_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Explain_result__isset;
+
+class InfinityService_Explain_result {
+ public:
+
+  InfinityService_Explain_result(const InfinityService_Explain_result&);
+  InfinityService_Explain_result& operator=(const InfinityService_Explain_result&);
+  InfinityService_Explain_result() noexcept {
+  }
+
+  virtual ~InfinityService_Explain_result() noexcept;
+  SelectResponse success;
+
+  _InfinityService_Explain_result__isset __isset;
+
+  void __set_success(const SelectResponse& val);
+
+  bool operator == (const InfinityService_Explain_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Explain_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Explain_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Explain_presult__isset {
+  _InfinityService_Explain_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Explain_presult__isset;
+
+class InfinityService_Explain_presult {
+ public:
+
+
+  virtual ~InfinityService_Explain_presult() noexcept;
+  SelectResponse* success;
+
+  _InfinityService_Explain_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _InfinityService_Delete_args__isset {
   _InfinityService_Delete_args__isset() : request(false) {}
   bool request :1;
@@ -1364,6 +1476,110 @@ class InfinityService_UploadFileChunk_presult {
   UploadResponse* success;
 
   _InfinityService_UploadFileChunk_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_ShowVariable_args__isset {
+  _InfinityService_ShowVariable_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ShowVariable_args__isset;
+
+class InfinityService_ShowVariable_args {
+ public:
+
+  InfinityService_ShowVariable_args(const InfinityService_ShowVariable_args&);
+  InfinityService_ShowVariable_args& operator=(const InfinityService_ShowVariable_args&);
+  InfinityService_ShowVariable_args() noexcept {
+  }
+
+  virtual ~InfinityService_ShowVariable_args() noexcept;
+  ShowVariableRequest request;
+
+  _InfinityService_ShowVariable_args__isset __isset;
+
+  void __set_request(const ShowVariableRequest& val);
+
+  bool operator == (const InfinityService_ShowVariable_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowVariable_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowVariable_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ShowVariable_pargs {
+ public:
+
+
+  virtual ~InfinityService_ShowVariable_pargs() noexcept;
+  const ShowVariableRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowVariable_result__isset {
+  _InfinityService_ShowVariable_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowVariable_result__isset;
+
+class InfinityService_ShowVariable_result {
+ public:
+
+  InfinityService_ShowVariable_result(const InfinityService_ShowVariable_result&);
+  InfinityService_ShowVariable_result& operator=(const InfinityService_ShowVariable_result&);
+  InfinityService_ShowVariable_result() noexcept {
+  }
+
+  virtual ~InfinityService_ShowVariable_result() noexcept;
+  SelectResponse success;
+
+  _InfinityService_ShowVariable_result__isset __isset;
+
+  void __set_success(const SelectResponse& val);
+
+  bool operator == (const InfinityService_ShowVariable_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowVariable_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowVariable_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowVariable_presult__isset {
+  _InfinityService_ShowVariable_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowVariable_presult__isset;
+
+class InfinityService_ShowVariable_presult {
+ public:
+
+
+  virtual ~InfinityService_ShowVariable_presult() noexcept;
+  SelectResponse* success;
+
+  _InfinityService_ShowVariable_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -2253,6 +2469,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   void send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return);
+  void Explain(SelectResponse& _return, const ExplainRequest& request) override;
+  void send_Explain(const ExplainRequest& request);
+  void recv_Explain(SelectResponse& _return);
   void Delete(CommonResponse& _return, const DeleteRequest& request) override;
   void send_Delete(const DeleteRequest& request);
   void recv_Delete(CommonResponse& _return);
@@ -2262,6 +2481,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void UploadFileChunk(UploadResponse& _return, const FileChunk& request) override;
   void send_UploadFileChunk(const FileChunk& request);
   void recv_UploadFileChunk(UploadResponse& _return);
+  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
+  void send_ShowVariable(const ShowVariableRequest& request);
+  void recv_ShowVariable(SelectResponse& _return);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   void send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return);
@@ -2310,9 +2532,11 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_UploadFileChunk(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowVariable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DescribeDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -2333,9 +2557,11 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Insert"] = &InfinityServiceProcessor::process_Insert;
     processMap_["Import"] = &InfinityServiceProcessor::process_Import;
     processMap_["Select"] = &InfinityServiceProcessor::process_Select;
+    processMap_["Explain"] = &InfinityServiceProcessor::process_Explain;
     processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
     processMap_["Update"] = &InfinityServiceProcessor::process_Update;
     processMap_["UploadFileChunk"] = &InfinityServiceProcessor::process_UploadFileChunk;
+    processMap_["ShowVariable"] = &InfinityServiceProcessor::process_ShowVariable;
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
     processMap_["DescribeDatabase"] = &InfinityServiceProcessor::process_DescribeDatabase;
@@ -2462,6 +2688,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void Explain(SelectResponse& _return, const ExplainRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Explain(_return, request);
+    }
+    ifaces_[i]->Explain(_return, request);
+    return;
+  }
+
   void Delete(CommonResponse& _return, const DeleteRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -2489,6 +2725,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->UploadFileChunk(_return, request);
     }
     ifaces_[i]->UploadFileChunk(_return, request);
+    return;
+  }
+
+  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ShowVariable(_return, request);
+    }
+    ifaces_[i]->ShowVariable(_return, request);
     return;
   }
 
@@ -2631,6 +2877,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   int32_t send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return, const int32_t seqid);
+  void Explain(SelectResponse& _return, const ExplainRequest& request) override;
+  int32_t send_Explain(const ExplainRequest& request);
+  void recv_Explain(SelectResponse& _return, const int32_t seqid);
   void Delete(CommonResponse& _return, const DeleteRequest& request) override;
   int32_t send_Delete(const DeleteRequest& request);
   void recv_Delete(CommonResponse& _return, const int32_t seqid);
@@ -2640,6 +2889,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void UploadFileChunk(UploadResponse& _return, const FileChunk& request) override;
   int32_t send_UploadFileChunk(const FileChunk& request);
   void recv_UploadFileChunk(UploadResponse& _return, const int32_t seqid);
+  void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
+  int32_t send_ShowVariable(const ShowVariableRequest& request);
+  void recv_ShowVariable(SelectResponse& _return, const int32_t seqid);
   void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) override;
   int32_t send_ListDatabase(const ListDatabaseRequest& request);
   void recv_ListDatabase(ListDatabaseResponse& _return, const int32_t seqid);

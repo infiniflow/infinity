@@ -891,7 +891,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
     UniquePtr<PhysicalExplain> explain_node{nullptr};
     switch (logical_explain->explain_type()) {
         case ExplainType::kAnalyze: {
-            UnrecoverableError("Not implement: Explain analyze");
+            RecoverableError(Status::NotSupport("Not implement: Explain analyze"));
             break;
         }
         case ExplainType::kAst:

@@ -17,7 +17,7 @@ from numpy import dtype
 
 import common_values
 import infinity
-
+from utils import trace_expected_exceptions
 
 class TestUpdate:
 
@@ -95,9 +95,120 @@ class TestUpdate:
         assert res.success
 
     # update empty table
+    def test_update_empty_table(self):
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_empty_table")
+
+        db_obj.create_table("test_update_empty_table", {}, None)
+
+        tb_obj = db_obj.get_table("test_update_empty_table")
+
+        try:
+            # FIXME tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+            pass
+        except Exception as e:
+            print(e)
+
+        # res = tb_obj.output["*"].to_df()
+        # print(res)
+
     # update non-existent table
+    def test_update_non_existent_table(self):
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_non_existent_table")
+
+        db_obj.create_table("test_update_non_existent_table", {"c1": "int", "c2": "int", "c3": "int"}, None)
+
+        try:
+            tb_obj = db_obj.get_table("test_update_empty_table")
+        except Exception as e:
+            print(e)
+
+        try:
+            # FIXME tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+            pass
+        except Exception as e:
+            print(e)
+
     # update table, no row is met the condition
+    @trace_expected_exceptions
+    def test_update_no_row_is_met_the_condition(self):
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        for i in range(len(common_values.types_array)):
+            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i))
+
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.create_table("test_update_no_row_is_met_the_condition" + str(i),
+                                     {"c1": common_values.types_array[i],
+                                      "c2": common_values.types_array[i]}, None)
+            assert tb
+
+            tb_obj = db_obj.get_table("test_update_no_row_is_met_the_condition" + str(i))
+
+            try:
+                tb_obj.insert([{"c1": common_values.types_example_array[i],
+                                "c2": common_values.types_example_array[i]}])
+                res = tb_obj.output(["*"]).to_df()
+                print(res)
+                print("insert c1 = " + str(common_values.types_example_array[i]) +
+                      ", c2 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+
+            try:
+                tb_obj.update("c1 = 2",
+                              [{"c2": common_values.types_example_array[i]}])
+                res = tb_obj.output(["*"]).to_df()
+                print("update type: {} \n {}".format(common_values.types_array[i], res))
+
+            except Exception as e:
+                print(e)
+
     # update table, all rows are met the condition
+    @trace_expected_exceptions
+    def test_update_all_row_is_met_the_condition(self):
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        for i in range(len(common_values.types_array)):
+            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i))
+
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.create_table("test_update_all_row_is_met_the_condition" + str(i),
+                                     {"c1": common_values.types_array[i],
+                                      "c2": common_values.types_array[i]}, None)
+            assert tb
+
+            tb_obj = db_obj.get_table("test_update_all_row_is_met_the_condition" + str(i))
+
+            try:
+                tb_obj.insert([{"c1": common_values.types_example_array[i],
+                                "c2": common_values.types_example_array[i]}])
+                res = tb_obj.output(["*"]).to_df()
+                print(res)
+                print("insert c1 = " + str(common_values.types_example_array[i]) +
+                      ", c2 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+
+            try:
+                tb_obj.update("c1 = " + str(common_values.types_example_array[i]),
+                              [{"c2": common_values.types_example_array[i]}])
+                res = tb_obj.output(["*"]).to_df()
+                print("update type: {} \n {}".format(common_values.types_array[i], res))
+
+            except Exception as e:
+                print(e)
     # update table with only one block
     # update table with multiple blocks, but only one segment
     # update before delete, select after delete and check the change.

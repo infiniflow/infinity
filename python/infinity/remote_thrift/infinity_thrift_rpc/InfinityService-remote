@@ -33,9 +33,11 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  CommonResponse Insert(InsertRequest request)')
     print('  CommonResponse Import(ImportRequest request)')
     print('  SelectResponse Select(SelectRequest request)')
+    print('  SelectResponse Explain(ExplainRequest request)')
     print('  CommonResponse Delete(DeleteRequest request)')
     print('  CommonResponse Update(UpdateRequest request)')
     print('  UploadResponse UploadFileChunk(FileChunk request)')
+    print('  SelectResponse ShowVariable(ShowVariableRequest request)')
     print('  ListDatabaseResponse ListDatabase(ListDatabaseRequest request)')
     print('  ListTableResponse ListTable(ListTableRequest request)')
     print('  DescribeDatabaseResponse DescribeDatabase(DescribeDatabaseRequest request)')
@@ -177,6 +179,12 @@ elif cmd == 'Select':
         sys.exit(1)
     pp.pprint(client.Select(eval(args[0]),))
 
+elif cmd == 'Explain':
+    if len(args) != 1:
+        print('Explain requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.Explain(eval(args[0]),))
+
 elif cmd == 'Delete':
     if len(args) != 1:
         print('Delete requires 1 args')
@@ -194,6 +202,12 @@ elif cmd == 'UploadFileChunk':
         print('UploadFileChunk requires 1 args')
         sys.exit(1)
     pp.pprint(client.UploadFileChunk(eval(args[0]),))
+
+elif cmd == 'ShowVariable':
+    if len(args) != 1:
+        print('ShowVariable requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowVariable(eval(args[0]),))
 
 elif cmd == 'ListDatabase':
     if len(args) != 1:

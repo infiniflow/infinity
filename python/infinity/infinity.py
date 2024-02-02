@@ -11,12 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from pathlib import Path
-from typing import Union
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from infinity import URI
+
+
+class ShowVariable(Enum):
+    QUERY_COUNT = "query_count"
+    SESSION_COUNT = "session_count"
+    BUFFER_POOL_USAGE = "buffer_pool_usage"
+    VERSION = "version"
+    QUERY_MEMORY_LIMIT = "query_memory_limit"
+    QUERY_CPU_LIMIT = "query_cpu_limit"
+    LOG_LEVEL = "log_level"
+    SCHEDULE_POLICY = "schedule_policy"
+    LISTEN_ADDRESS = "listen_address"
+    SQL_PORT = "sql_port"
+    SDK_PORT = "sdk_port"
+    HTTP_API_PORT = "http_api_port"
+    DATA_URL = "data_url"
+    TIME_ZONE = "time_zone"
 
 
 # abstract class
@@ -46,4 +61,8 @@ class InfinityConnection(ABC):
 
     @abstractmethod
     def disconnect(self):
+        pass
+
+    @abstractmethod
+    def show_variable(self, variable: ShowVariable):
         pass
