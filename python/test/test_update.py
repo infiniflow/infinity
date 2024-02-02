@@ -95,6 +95,26 @@ class TestUpdate:
         assert res.success
 
     # update empty table
+    def test_update_empty_table(self):
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_empty_table")
+
+        db_obj.create_table("test_update_empty_table", {}, None)
+
+        tb_obj = db_obj.get_table("test_update_empty_table")
+
+        try:
+            # FIXME tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+            pass
+        except Exception as e:
+            print(e)
+
+        # res = tb_obj.output["*"].to_df()
+        # print(res)
+
     # update non-existent table
     # update table, no row is met the condition
     # update table, all rows are met the condition
