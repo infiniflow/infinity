@@ -1,0 +1,130 @@
+module;
+
+#include <string.h>
+#include <string_view>
+
+export module parallel_column_inverter;
+import stl;
+import analyzer;
+import parser;
+import column_vector;
+import memory_pool;
+import pool_allocator;
+import term;
+import index_defines;
+import third_party;
+
+namespace infinity {
+
+struct Hasher {
+    SizeT operator()(const StringView &value) const { return std::hash<StringView>{}(value); }
+};
+
+export inline bool StringViewCompare(StringView lhs, StringView rhs) {
+    const SizeT size = std::min(lhs.size(), rhs.size());
+    const auto res = ::memcmp(lhs.data(), rhs.data(), size);
+
+    if (0 == res) {
+        return lhs.size() < rhs.size();
+    }
+
+    return res < 0;
+}
+
+export struct HashedStringView : public StringView {
+    explicit HashedStringView(StringView ref, const Hasher &hasher = Hasher{}) : HashedStringView{ref, hasher(ref)} {}
+
+    HashedStringView(StringView ref, SizeT hash) : StringView(ref), hash_(hash) {}
+
+    SizeT hash_;
+};
+
+export struct ValueRef {
+    explicit ValueRef(SizeT ref, SizeT hash) : ref_{ref}, hash_{hash} {}
+
+    SizeT ref_;
+    SizeT hash_;
+};
+
+struct ValueRefHash {
+    using is_transparent = void;
+
+    SizeT operator()(const ValueRef &value) const noexcept { return value.hash_; }
+
+    SizeT operator()(const HashedStringView &value) const noexcept { return value.hash_; }
+};
+
+export struct TermPosting {
+    TermPosting(const char *data, u32 size) : term_(data, size) {}
+
+    StringView term_;
+    docid_t doc_id_{INVALID_DOCID};
+    u32 tf_;
+    u32 pos_;
+    u32 off_;
+};
+
+export class TermPostings {
+public:
+    TermPostings(const TermPostings &) = delete;
+    TermPostings(const TermPostings &&) = delete;
+    TermPostings &operator=(const TermPostings &) = delete;
+    TermPostings &operator=(const TermPostings &&) = delete;
+    TermPostings() : terms_{0, ValueRefHash{}, TermEq{postings_}} {}
+    ~TermPostings() {}
+
+    void Clear() {
+        terms_.clear();
+        postings_.clear();
+    }
+
+    void GetSorted(Vector<const TermPosting *> &term_postings);
+
+    TermPosting *Emplace(StringView term);
+
+    bool Empty() const { return terms_.empty(); }
+
+    SizeT Size() const { return terms_.size(); }
+
+private:
+    struct TermEq {
+        using is_transparent = void;
+        explicit TermEq(const Vector<TermPosting> &data) : data_{&data} {}
+        bool operator()(const ValueRef &lhs, const ValueRef &rhs) const noexcept { return lhs.ref_ == rhs.ref_; }
+        bool operator()(const ValueRef &lhs, const HashedStringView &rhs) const { return (*data_)[lhs.ref_].term_ == rhs; }
+        bool operator()(const HashedStringView &lhs, const ValueRef &rhs) const { return this->operator()(rhs, lhs); }
+
+        const Vector<TermPosting> *data_;
+    };
+
+    Vector<TermPosting> postings_;
+    FlatHashSet<ValueRef, ValueRefHash, TermEq> terms_;
+};
+
+class MemoryIndexer;
+export class ParallelColumnInverter {
+public:
+    ParallelColumnInverter(MemoryIndexer *memory_indexer);
+    ParallelColumnInverter(const ParallelColumnInverter &) = delete;
+    ParallelColumnInverter(const ParallelColumnInverter &&) = delete;
+    ParallelColumnInverter &operator=(const ParallelColumnInverter &) = delete;
+    ParallelColumnInverter &operator=(const ParallelColumnInverter &&) = delete;
+    ~ParallelColumnInverter();
+
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+
+    void InvertColumn(u32 doc_id, const String &val);
+
+    void Commit();
+
+    void Flush();
+
+private:
+    MemoryIndexer *column_indexer_{nullptr};
+    Analyzer *analyzer_{nullptr};
+    bool jieba_specialize_{false};
+    PoolAllocator<char> alloc_;
+    TermList terms_once_;
+};
+
+} // namespace infinity

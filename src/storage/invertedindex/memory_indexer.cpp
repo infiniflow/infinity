@@ -33,6 +33,7 @@ import analyzer;
 import analyzer_pool;
 import term;
 import sequential_column_inverter;
+import parallel_column_inverter;
 import invert_task;
 import commit_task;
 import task_executor;
