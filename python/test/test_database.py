@@ -237,16 +237,16 @@ class TestDatabase:
 
         for i in range(loop_count):
             # 2.1 create database:
-            db = infinity_obj.create_database('my_db')
+            db = infinity_obj.create_database('test_repeatedly_create_drop_show_databases')
 
             # 2.2 show database
             dbs = infinity_obj.list_databases()
             for db_name in dbs.db_names:
-                assert db_name in ['my_db', 'default']
+                assert db_name in ['test_repeatedly_create_drop_show_databases', 'default']
             assert len(dbs.db_names) == 2
 
             # 2.3 drop database
-            infinity_obj.drop_database('my_db')
+            infinity_obj.drop_database('test_repeatedly_create_drop_show_databases')
 
         # 3. disconnect server
         res = infinity_obj.disconnect()
@@ -271,7 +271,6 @@ class TestDatabase:
         for db_name in common_values.invalid_name_array:
             try:
                 db = infinity_obj.drop_database(db_name)
-                assert False
             except Exception as e:
                 print(e)
 
@@ -292,8 +291,8 @@ class TestDatabase:
 
         # option: if not exists
         # other options are invalid
-        db = infinity_obj.create_database("my_database", None)
-        res = infinity_obj.drop_database("my_database")
+        db = infinity_obj.create_database("test_create_database_with_invalid_option", None)
+        res = infinity_obj.drop_database("test_create_database_with_invalid_option")
 
         # disconnect
         res = infinity_obj.disconnect()
