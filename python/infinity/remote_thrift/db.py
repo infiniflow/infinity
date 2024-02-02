@@ -17,7 +17,7 @@ from abc import ABC
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.db import Database
 from infinity.remote_thrift.table import RemoteTable
-from infinity.remote_thrift.utils import check_valid_name
+from infinity.remote_thrift.utils import check_valid_name, select_res_to_polars
 
 
 def get_ordinary_info(column_big_info, column_defs, column_name, index):
@@ -148,7 +148,12 @@ class RemoteDatabase(Database, ABC):
 
     def describe_table(self, table_name):
         check_valid_name(table_name)
-        pass  # implement describe table logic here
+        res = self._conn.describe_table(
+            db_name=self._db_name, table_name=table_name)
+        if res.success is True:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(res.error_msg)
 
     def get_table(self, table_name):
         check_valid_name(table_name)
@@ -158,3 +163,10 @@ class RemoteDatabase(Database, ABC):
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
             raise Exception("Get Table Error")
+
+    def show_tables(self):
+        res = self._conn.show_tables(self._db_name)
+        if res.success is True:
+            return select_res_to_polars(res)
+        else:
+            raise Exception(res.error_msg)

@@ -146,7 +146,7 @@ def check_valid_name(name):
         return True
 
 
-def select_res_to_polars(res):
+def select_res_to_polars(res) -> pl.DataFrame:
     df_dict = {}
     data_dict, data_type_dict = build_result(res)
     for k, v in data_dict.items():

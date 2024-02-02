@@ -39,6 +39,8 @@ public:
 
     QueryResult DescribeTable(const String &table_name);
 
+    QueryResult ShowTables();
+
     UniquePtr<Table> GetTable(const String &table_name);
 
     [[nodiscard]] const String &db_name() const { return db_name_; }

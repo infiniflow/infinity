@@ -169,3 +169,6 @@ class ThriftInfinityClient:
     def show_variable(self, variable: ShowVariable):
         return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
                                                             variable_name=str(variable.value)))
+
+    def show_tables(self, db_name: str):
+        return self.client.ShowTables(ShowTablesRequest(session_id=self.session_id, db_name=db_name))
