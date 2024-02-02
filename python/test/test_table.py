@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import concurrent.futures
 import pytest
 
 import common_values
 import infinity
+from utils import trace_expected_exceptions
 
 
 class TestTable:
@@ -519,6 +521,35 @@ class TestTable:
         assert res.success
 
     # create/drop same table in different thread to test conflict
+    @trace_expected_exceptions
+    def test_create_or_drop_same_table_in_different_thread(self):
+        """
+        target: create/drop same table in different thread to test conflict
+        methods: create table at same time for 16 times
+        expect: all operations successfully
+        """
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        # create table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into processpool
+            futures = [executor.submit(db_obj.create_table("my_table", {"c1": "int"}, None), i) for i in range(16)]
+            # wait all processes finished
+            concurrent.futures.wait(futures)
+
+        # drop table
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            # commit task into threadpool
+            futures = [executor.submit(db_obj.drop_table("my_table"), i) for i in range(16)]
+            # wait all threads finished
+            concurrent.futures.wait(futures)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # create empty column table
     def test_create_empty_column_table(self):
