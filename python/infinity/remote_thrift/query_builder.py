@@ -42,6 +42,13 @@ class Query(ABC):
         self.offset = offset
 
 
+class ExplainQuery(Query):
+    def __init__(self, columns: Optional[List[ParsedExpr]], search: Optional[SearchExpr], filter: Optional[ParsedExpr],
+                 limit: Optional[ParsedExpr], offset: Optional[ParsedExpr], explain_type: Optional[ExplainType]):
+        super().__init__(columns, search, filter, limit, offset)
+        self.explain_type = explain_type
+
+
 class InfinityThriftQueryBuilder(ABC):
     def __init__(self, table):
         self._table = table
@@ -192,12 +199,18 @@ class InfinityThriftQueryBuilder(ABC):
     def to_arrow(self) -> Table:
         return pa.Table.from_pandas(self.to_df())
 
-    # def explain(self) -> str:
-    #     query = Query(
-    #         columns=self._columns,
-    #         search=self._search,
-    #         filter=self._filter,
-    #         limit=self._limit,
-    #         offset=self._offset
-    #     )
-    #     return self._table._execute_query(query, explain=True)
+    def explain(self, explain_type=ExplainType.Physical) -> Any:
+        query = ExplainQuery(
+            columns=self._columns,
+            search=self._search,
+            filter=self._filter,
+            limit=self._limit,
+            offset=self._offset,
+            explain_type=explain_type
+        )
+        df_dict = {}
+        data_dict, data_type_dict = self._table._explain_query(query)
+        for k, v in data_dict.items():
+            data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
+            df_dict[k] = data_series
+        return pl.from_pandas(pd.DataFrame(df_dict))
