@@ -22,7 +22,7 @@ from infinity.common import INSERT_DATA, VEC
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions, check_valid_name
+from infinity.remote_thrift.utils import traverse_conditions, check_valid_name, select_res_to_polars
 from infinity.table import Table, ExplainType
 
 
@@ -298,6 +298,6 @@ class RemoteTable(Table, ABC):
                                  offset_expr=query.offset,
                                  explain_type=query.explain_type.to_ttype())
         if res.success:
-            return build_result(res)
+            return select_res_to_polars(res)
         else:
             raise Exception(res.error_msg)

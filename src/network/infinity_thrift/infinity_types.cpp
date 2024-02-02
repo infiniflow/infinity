@@ -9047,4 +9047,116 @@ void UpdateRequest::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+ShowVariableRequest::~ShowVariableRequest() noexcept {
+}
+
+
+void ShowVariableRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void ShowVariableRequest::__set_variable_name(const std::string& val) {
+  this->variable_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const ShowVariableRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t ShowVariableRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->variable_name);
+          this->__isset.variable_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t ShowVariableRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("ShowVariableRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("variable_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->variable_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(ShowVariableRequest &a, ShowVariableRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.variable_name, b.variable_name);
+  swap(a.__isset, b.__isset);
+}
+
+ShowVariableRequest::ShowVariableRequest(const ShowVariableRequest& other329) {
+  session_id = other329.session_id;
+  variable_name = other329.variable_name;
+  __isset = other329.__isset;
+}
+ShowVariableRequest& ShowVariableRequest::operator=(const ShowVariableRequest& other330) {
+  session_id = other330.session_id;
+  variable_name = other330.variable_name;
+  __isset = other330.__isset;
+  return *this;
+}
+void ShowVariableRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "ShowVariableRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "variable_name=" << to_string(variable_name);
+  out << ")";
+}
+
 } // namespace

@@ -419,52 +419,9 @@ public:
         // auto start4 = std::chrono::steady_clock::now();
 
         if (result.IsOk()) {
-            auto data_block_count = result.result_table_->DataBlockCount();
-            auto column_count = result.result_table_->ColumnCount();
-            Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors = response.column_fields;
-
-            all_column_vectors.resize(column_count);
-
-            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
-                auto data_block = result.result_table_->GetDataBlockById(block_idx);
-                auto row_count = data_block->row_count();
-
-                for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-                    auto &result_column_vector = data_block->column_vectors[col_index];
-                    infinity_thrift_rpc::ColumnField &output_column_field = all_column_vectors[col_index];
-                    output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
-                    switch (result_column_vector->data_type()->type()) {
-                        case LogicalType::kBoolean:
-                        case LogicalType::kTinyInt:
-                        case LogicalType::kSmallInt:
-                        case LogicalType::kInteger:
-                        case LogicalType::kBigInt:
-                        case LogicalType::kHugeInt:
-                        case LogicalType::kFloat:
-                        case LogicalType::kDouble: {
-                            HandlePodType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kVarchar: {
-                            HandleVarcharType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kEmbedding: {
-                            HandleEmbeddingType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kRowID: {
-                            HandleRowIDType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Not implemented data type");
-                        }
-                    }
-                }
-            }
-
-            HandleColumnDef(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
+            auto &columns = response.column_fields;
+            columns.resize(result.result_table_->ColumnCount());
+            ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
         } else {
             response.__set_success(false);
@@ -563,52 +520,28 @@ public:
         const QueryResult result = table->Explain(explain_type, search_expr, filter, output_columns);
 
         if (result.IsOk()) {
-            auto data_block_count = result.result_table_->DataBlockCount();
-            auto column_count = result.result_table_->ColumnCount();
-            Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors = response.column_fields;
+            auto &columns = response.column_fields;
+            columns.resize(result.result_table_->ColumnCount());
+            ProcessDataBlocks(result, response, columns);
+            response.__set_success(true);
+        } else {
+            response.__set_success(false);
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+        }
+    }
 
-            all_column_vectors.resize(column_count);
+    void ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) override {
 
-            for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
-                auto data_block = result.result_table_->GetDataBlockById(block_idx);
-                auto row_count = data_block->row_count();
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        String variable_name = request.variable_name;
 
-                for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-                    auto &result_column_vector = data_block->column_vectors[col_index];
-                    infinity_thrift_rpc::ColumnField &output_column_field = all_column_vectors[col_index];
-                    output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
-                    switch (result_column_vector->data_type()->type()) {
-                        case LogicalType::kBoolean:
-                        case LogicalType::kTinyInt:
-                        case LogicalType::kSmallInt:
-                        case LogicalType::kInteger:
-                        case LogicalType::kBigInt:
-                        case LogicalType::kHugeInt:
-                        case LogicalType::kFloat:
-                        case LogicalType::kDouble: {
-                            HandlePodType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kVarchar: {
-                            HandleVarcharType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kEmbedding: {
-                            HandleEmbeddingType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        case LogicalType::kRowID: {
-                            HandleRowIDType(output_column_field, row_count, result_column_vector);
-                            break;
-                        }
-                        default: {
-                            UnrecoverableError("Not implemented data type");
-                        }
-                    }
-                }
-            }
+        const QueryResult result = infinity->ShowVariable(variable_name);
 
-            HandleColumnDef(response, column_count, result.result_table_->definition_ptr_, all_column_vectors);
+        if (result.IsOk()) {
+            auto &columns = response.column_fields;
+            columns.resize(result.result_table_->ColumnCount());
+            ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
         } else {
             response.__set_success(false);
@@ -1218,6 +1151,58 @@ private:
             }
         }
         return infinity_thrift_rpc::ElementType::ElementFloat32;
+    }
+
+    void
+    ProcessDataBlocks(const QueryResult &result, infinity_thrift_rpc::SelectResponse &response, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+        SizeT blocks_count = result.result_table_->DataBlockCount();
+        for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+            auto data_block = result.result_table_->GetDataBlockById(block_idx);
+            ProcessColumns(data_block, result.result_table_->ColumnCount(), columns);
+        }
+        HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
+    }
+
+    void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+        auto row_count = data_block->row_count();
+        for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+            auto &result_column_vector = data_block->column_vectors[col_index];
+            infinity_thrift_rpc::ColumnField &output_column_field = columns[col_index];
+            output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
+            ProcessColumnFieldType(output_column_field, row_count, result_column_vector);
+        }
+    }
+
+    void
+    ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const shared_ptr<ColumnVector> &column_vector) {
+        switch (column_vector->data_type()->type()) {
+            case LogicalType::kBoolean:
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kHugeInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble: {
+                HandlePodType(output_column_field, row_count, column_vector);
+                break;
+            }
+            case LogicalType::kVarchar: {
+                HandleVarcharType(output_column_field, row_count, column_vector);
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                HandleEmbeddingType(output_column_field, row_count, column_vector);
+                break;
+            }
+            case LogicalType::kRowID: {
+                HandleRowIDType(output_column_field, row_count, column_vector);
+                break;
+            }
+            default: {
+                UnrecoverableError("Not implemented data type");
+            }
+        }
     }
 };
 

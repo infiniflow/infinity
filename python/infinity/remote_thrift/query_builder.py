@@ -208,9 +208,4 @@ class InfinityThriftQueryBuilder(ABC):
             offset=self._offset,
             explain_type=explain_type
         )
-        df_dict = {}
-        data_dict, data_type_dict = self._table._explain_query(query)
-        for k, v in data_dict.items():
-            data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
-            df_dict[k] = data_series
-        return pl.from_pandas(pd.DataFrame(df_dict))
+        return self._table._explain_query(query)
