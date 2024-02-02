@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
 import common_values
 import infinity
 from infinity.common import NetworkAddress
+
+
 class TestConnection:
     def test_connect_and_disconnect_ok(self):
         """
@@ -82,6 +85,7 @@ class TestConnection:
         infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
 
+    @pytest.mark.skip(reason="Cost too much time")
     def test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.

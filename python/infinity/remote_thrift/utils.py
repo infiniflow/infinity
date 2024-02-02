@@ -14,9 +14,12 @@
 
 import re
 
+import pandas as pd
+import polars as pl
 import sqlglot.expressions as exp
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 
 
@@ -141,3 +144,13 @@ def check_valid_name(name):
         raise ValueError(f"invalid name: {name}")
     else:
         return True
+
+
+def select_res_to_polars(res):
+    df_dict = {}
+    data_dict, data_type_dict = build_result(res)
+    for k, v in data_dict.items():
+        data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
+        df_dict[k] = data_series
+
+    return pl.from_pandas(pd.DataFrame(df_dict))

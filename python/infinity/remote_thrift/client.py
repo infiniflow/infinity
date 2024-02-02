@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from infinity.remote_thrift.infinity_thrift_rpc import *
-from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket
 
 from infinity import URI
+from infinity.infinity import ShowVariable
+from infinity.remote_thrift.infinity_thrift_rpc import *
+from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 
 
 class ThriftInfinityClient:
@@ -123,6 +124,20 @@ class ThriftInfinityClient:
                                                 offset_expr=offset_expr,
                                                 ))
 
+    def explain(self, db_name: str, table_name: str, select_list, search_expr,
+                where_expr, group_by_list, limit_expr, offset_expr, explain_type):
+        return self.client.Explain(ExplainRequest(session_id=self.session_id,
+                                                  db_name=db_name,
+                                                  table_name=table_name,
+                                                  select_list=select_list,
+                                                  search_expr=search_expr,
+                                                  where_expr=where_expr,
+                                                  group_by_list=group_by_list,
+                                                  limit_expr=limit_expr,
+                                                  offset_expr=offset_expr,
+                                                  explain_type=explain_type
+                                                  ))
+
     def delete(self, db_name: str, table_name: str, where_expr):
         return self.client.Delete(DeleteRequest(session_id=self.session_id,
                                                 db_name=db_name,
@@ -150,3 +165,7 @@ class ThriftInfinityClient:
                                                      data=data,
                                                      is_last=is_last,
                                                      total_size=total_size))
+
+    def show_variable(self, variable: ShowVariable):
+        return self.client.ShowVariable(ShowVariableRequest(session_id=self.session_id,
+                                                            variable_name=str(variable.value)))
