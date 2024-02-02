@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pandas as pd
+import pytest
 from numpy import dtype
-
+from utils import trace_expected_exceptions
 import common_values
 import infinity
 
@@ -87,9 +88,115 @@ class TestDelete:
         assert res.success
 
     # delete empty table
+    def test_delete_empty_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        tb = db_obj.drop_table("test_delete_empty_table")
+        assert tb
+
+        tb = db_obj.create_table("test_delete_empty_table", {"c1": "int"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_empty_table")
+
+        try:
+            # FIXME res = table_obj.delete("c1 = 1")
+            res = table_obj()
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete non-existent table
-    # delete table, no row is met the condition
+    def test_delete_non_existent_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        tb = db_obj.drop_table("test_delete_non_existent_table", if_exists=True)
+        assert tb
+
+        tb = db_obj.create_table("test_delete_non_existent_table", {"c1": "int"}, None)
+        assert tb
+
+        table_obj = db_obj.get_table("test_delete_empty_table")
+        table_obj.delete()
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete table, all rows are met the condition
+    @trace_expected_exceptions
+    def test_delete_table_all_row_met_the_condition(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.drop_table("test_delete_table_all_row_met_the_condition" + str(i))
+
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.create_table("test_delete_table_all_row_met_the_condition" + str(i),
+                                     {"c1": common_values.types_array[i]}, None)
+            assert tb
+
+            table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition" + str(i))
+            try:
+                table_obj.insert([{"c1": common_values.types_example_array[i]}])
+                print("insert c1 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+            try:
+                table_obj.delete("c1 = " + str(common_values.types_example_array[i]))
+                print("delete c1 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+
+            res = table_obj.output(["*"]).to_df()
+            print("{}：{}".format(common_values.types_array[i], res))
+            assert tb
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
+    # delete table, no row is met the condition
+    def test_delete_table_no_rows_met_condition(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        for i in range(len(common_values.types_array)):
+            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i))
+
+        for i in range(len(common_values.types_array)):
+            tb = db_obj.create_table("test_delete_table_no_rows_met_condition" + str(i),
+                                     {"c1": common_values.types_array[i]}, None)
+            assert tb
+
+            table_obj = db_obj.get_table("test_delete_table_no_rows_met_condition" + str(i))
+            try:
+                table_obj.insert([{"c1": common_values.types_example_array[i]}])
+                print("insert c1 = " + str(common_values.types_example_array[i]))
+            except Exception as e:
+                print(e)
+            try:
+                table_obj.delete("c1 = 0")
+                print("delete c1 = 0")
+            except Exception as e:
+                print(e)
+
+            res = table_obj.output(["*"]).to_df()
+            print("{}：{}".format(common_values.types_array[i], res))
+            assert tb
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete table with only one block
     # delete table with multiple blocks, but only one segment
     # select before delete, select after delete and check the change.
