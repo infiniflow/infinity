@@ -16,11 +16,12 @@ module;
 
 #include <sstream>
 
+module logical_optimize;
+
 import stl;
 import parser;
 import column_binding;
-
-module logical_optimize;
+import data_type;
 
 namespace infinity {
 

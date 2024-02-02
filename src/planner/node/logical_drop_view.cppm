@@ -14,13 +14,14 @@
 
 module;
 
+export module logical_drop_view;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
-
-export module logical_drop_view;
+import data_type;
 
 namespace infinity {
 

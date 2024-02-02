@@ -23,6 +23,7 @@ import logger;
 import null_value;
 import stl;
 import infinity_context;
+import data_type;
 
 class NullValueTest : public BaseTest {};
 

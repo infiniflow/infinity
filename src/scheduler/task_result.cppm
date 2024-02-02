@@ -14,11 +14,12 @@
 
 module;
 
+export module task_result;
+
 import stl;
 import parser;
 import data_block;
-
-export module task_result;
+import data_type;
 
 namespace infinity {
 

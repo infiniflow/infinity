@@ -28,6 +28,7 @@ import binding;
 import base_expression;
 import block_index;
 import catalog;
+import data_type;
 
 namespace infinity {
 

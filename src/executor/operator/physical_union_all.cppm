@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_union_all;
+
 import stl;
 import parser;
 import query_context;
@@ -24,8 +26,7 @@ import base_expression;
 import data_table;
 import load_meta;
 import infinity_exception;
-
-export module physical_union_all;
+import data_type;
 
 namespace infinity {
 

@@ -16,6 +16,8 @@ module;
 
 #include <sstream>
 
+module logical_project;
+
 import stl;
 import logical_node_type;
 import column_binding;
@@ -23,8 +25,7 @@ import logical_node;
 import parser;
 import third_party;
 import base_expression;
-
-module logical_project;
+import data_type;
 
 namespace infinity {
 

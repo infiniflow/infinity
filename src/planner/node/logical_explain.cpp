@@ -14,12 +14,13 @@
 
 module;
 
+module logical_explain;
+
 import stl;
 import column_binding;
 import parser;
 import base_expression;
-
-module logical_explain;
+import data_type;
 
 namespace infinity {
 

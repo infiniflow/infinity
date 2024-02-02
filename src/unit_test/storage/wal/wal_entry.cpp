@@ -31,6 +31,8 @@ import data_block;
 import default_values;
 import index_ivfflat;
 import index_def;
+import logical_type;
+import data_type;
 
 class WalEntryTest : public BaseTest {};
 

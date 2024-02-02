@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_import;
+
 import stl;
 import parser;
 import query_context;
@@ -28,8 +30,7 @@ import zsv;
 import load_meta;
 import infinity_exception;
 import column_vector;
-
-export module physical_import;
+import data_type;
 
 namespace infinity {
 

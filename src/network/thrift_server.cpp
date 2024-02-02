@@ -53,6 +53,7 @@ import data_block;
 import query_options;
 import status;
 import logical_type;
+import data_type;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

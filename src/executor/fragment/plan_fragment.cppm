@@ -24,6 +24,7 @@ import physical_operator;
 import physical_source;
 import physical_sink;
 import query_context;
+import data_type;
 
 namespace infinity {
 

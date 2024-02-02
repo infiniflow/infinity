@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_create_index_prepare;
+
 import stl;
 import parser;
 import physical_operator_type;
@@ -23,8 +25,7 @@ import operator_state;
 import load_meta;
 import base_table_ref;
 import index_def;
-
-export module physical_create_index_prepare;
+import data_type;
 
 namespace infinity {
 export class PhysicalCreateIndexPrepare : public PhysicalOperator {

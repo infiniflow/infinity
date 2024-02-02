@@ -23,6 +23,8 @@ import logger;
 import parser;
 import table_def;
 import infinity_context;
+import data_type;
+import logical_type;
 
 class TableDefTest : public BaseTest {};
 

@@ -24,6 +24,7 @@ import parser;
 import match_expression;
 import base_table_ref;
 import catalog;
+import data_type;
 
 namespace infinity {
 

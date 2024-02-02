@@ -34,6 +34,9 @@ import third_party;
 import query_options;
 import query_result;
 
+import logical_type;
+import data_type;
+
 using namespace infinity;
 
 constexpr u64 second_unit = 1000 * 1000 * 1000;

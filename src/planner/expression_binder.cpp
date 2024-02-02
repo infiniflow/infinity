@@ -26,7 +26,7 @@ import bind_context;
 import third_party;
 import value;
 import logical_type;
-
+import data_type;
 import base_expression;
 import aggregate_expression;
 import column_expression;

@@ -25,6 +25,7 @@ import unary_operator;
 import embedding_unary_operator;
 import null_value;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

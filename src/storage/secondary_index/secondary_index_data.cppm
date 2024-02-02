@@ -29,6 +29,7 @@ import third_party;
 import catalog;
 import secondary_index_pgm;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

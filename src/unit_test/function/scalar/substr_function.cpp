@@ -35,6 +35,9 @@ import base_expression;
 import column_vector;
 import value_expression;
 import substring;
+import logical_type;
+import data_type;
+
 #if 0
 class SubstrFunctionTest : public BaseTest {};
 

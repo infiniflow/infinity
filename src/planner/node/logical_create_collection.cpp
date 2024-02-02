@@ -23,6 +23,7 @@ import column_binding;
 import parser;
 import base_expression;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

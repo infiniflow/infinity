@@ -21,6 +21,7 @@ import parser;
 import logical_node;
 import logical_node_type;
 import column_binding;
+import data_type;
 
 namespace infinity {
 

@@ -21,11 +21,11 @@
 #include <unordered_set>
 
 import compilation_config;
-
+import data_type;
 import infinity;
 import database;
 import table;
-
+import logical_type;
 import parser;
 import profiler;
 import local_file_system;

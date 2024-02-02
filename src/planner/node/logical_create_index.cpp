@@ -24,6 +24,7 @@ import parser;
 import base_expression;
 import index_def;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

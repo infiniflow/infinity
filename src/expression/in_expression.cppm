@@ -21,6 +21,7 @@ import base_expression;
 import parser;
 import stl;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

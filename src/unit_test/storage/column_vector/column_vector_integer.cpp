@@ -15,7 +15,8 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-
+import data_type;
+import logical_type;
 import logger;
 import column_vector;
 import value;

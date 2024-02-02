@@ -25,6 +25,7 @@ import column_vector_cast;
 import logical_type;
 import infinity_exception;
 import third_party;
+import data_type;
 
 namespace infinity {
 

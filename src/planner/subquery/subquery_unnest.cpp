@@ -29,7 +29,7 @@ import bind_context;
 import expression_type;
 import value;
 import dependent_join_flattener;
-
+import data_type;
 import value_expression;
 import function_expression;
 import aggregate_expression;

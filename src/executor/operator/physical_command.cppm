@@ -17,7 +17,7 @@ module;
 export module physical_command;
 
 import stl;
-
+import data_type;
 import physical_operator;
 import physical_operator_type;
 import query_context;

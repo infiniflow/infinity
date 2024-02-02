@@ -13,12 +13,15 @@
 // limitations under the License.
 
 module;
+
 #include <string>
+
+export module null_value;
+
 import parser;
 import stl;
 import infinity_exception;
-
-export module null_value;
+import data_type;
 
 export namespace infinity {
 

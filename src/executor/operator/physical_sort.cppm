@@ -29,6 +29,7 @@ import data_block;
 import load_meta;
 import infinity_exception;
 import physical_top;
+import data_type;
 
 namespace infinity {
 

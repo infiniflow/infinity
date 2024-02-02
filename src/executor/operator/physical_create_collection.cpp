@@ -14,6 +14,8 @@
 
 module;
 
+module physical_create_collection;
+
 import stl;
 import txn;
 import query_context;
@@ -23,8 +25,7 @@ import parser;
 import physical_operator_type;
 import operator_state;
 import load_meta;
-
-module physical_create_collection;
+import data_type;
 
 namespace infinity {
 

@@ -34,6 +34,8 @@ import data_block;
 import base_expression;
 import column_vector;
 import modulo;
+import logical_type;
+import data_type;
 
 class ModuloFunctionsTest : public BaseTest {};
 

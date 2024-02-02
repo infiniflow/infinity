@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_update;
+
 import stl;
 import parser;
 import query_context;
@@ -24,8 +26,7 @@ import catalog;
 import base_expression;
 import load_meta;
 import infinity_exception;
-
-export module physical_update;
+import data_type;
 
 namespace infinity {
 

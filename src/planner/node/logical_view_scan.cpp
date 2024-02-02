@@ -16,13 +16,14 @@ module;
 
 #include <sstream>
 
+module logical_view_scan;
+
 import stl;
 import column_binding;
 import parser;
 import base_expression;
 import view;
-
-module logical_view_scan;
+import data_type;
 
 namespace infinity {
 

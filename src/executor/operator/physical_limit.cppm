@@ -25,6 +25,7 @@ import value_expression;
 import data_table;
 import load_meta;
 import infinity_exception;
+import data_type;
 
 export module physical_limit;
 

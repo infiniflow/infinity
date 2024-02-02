@@ -23,7 +23,7 @@ import boost;
 import stl;
 import session;
 import infinity_exception;
-
+import data_type;
 import pg_message;
 import logger;
 import query_context;

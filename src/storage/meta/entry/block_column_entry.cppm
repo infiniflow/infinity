@@ -27,6 +27,7 @@ import column_vector;
 import local_file_system;
 import vector_buffer;
 import txn;
+import data_type;
 
 namespace infinity {
 

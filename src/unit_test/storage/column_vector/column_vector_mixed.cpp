@@ -27,6 +27,8 @@ import selection;
 import vector_buffer;
 import infinity_context;
 import global_resource_usage;
+import data_type;
+import logical_type;
 
 // mask the unittest because BUG1213_1
 #if 0

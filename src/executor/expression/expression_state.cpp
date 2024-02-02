@@ -19,7 +19,6 @@ module;
 module expression_state;
 
 import infinity_exception;
-
 import stl;
 import third_party;
 import column_vector;
@@ -37,6 +36,7 @@ import value_expression;
 import status;
 import parser;
 import default_values;
+import data_type;
 
 namespace infinity {
 

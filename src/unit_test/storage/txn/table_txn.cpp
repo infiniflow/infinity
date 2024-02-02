@@ -30,6 +30,8 @@ import default_values;
 import txn_manager;
 import txn;
 import status;
+import data_type;
+import logical_type;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {

@@ -15,7 +15,7 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-
+import data_type;
 import logger;
 import column_vector;
 import value;
@@ -27,6 +27,7 @@ import selection;
 import vector_buffer;
 import infinity_context;
 import global_resource_usage;
+import logical_type;
 
 class ColumnVectorBoolTest : public BaseTest {};
 

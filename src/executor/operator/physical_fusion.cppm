@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_fusion;
+
 import stl;
 import parser;
 import query_context;
@@ -24,8 +26,7 @@ import base_expression;
 import fusion_expression;
 import load_meta;
 import infinity_exception;
-
-export module physical_fusion;
+import data_type;
 
 namespace infinity {
 

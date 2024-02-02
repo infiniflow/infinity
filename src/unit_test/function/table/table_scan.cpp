@@ -40,6 +40,8 @@ import storage;
 import resource_manager;
 import query_context;
 import session_manager;
+import logical_type;
+import data_type;
 
 class TableScanTest : public BaseTest {
     void SetUp() override {

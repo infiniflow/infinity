@@ -14,6 +14,8 @@
 
 module;
 
+export module lazy_load;
+
 import stl;
 import logical_node_visitor;
 import logical_node;
@@ -25,8 +27,7 @@ import column_expression;
 import optimizer_rule;
 import parser;
 import load_meta;
-
-export module lazy_load;
+import data_type;
 
 namespace infinity {
 

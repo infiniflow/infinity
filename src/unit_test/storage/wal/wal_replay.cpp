@@ -15,6 +15,7 @@
 #include "type/complex/embedding_type.h"
 #include "unit_test/base_test.h"
 #include <memory>
+
 import stl;
 import global_resource_usage;
 import storage;
@@ -45,6 +46,8 @@ import backgroud_process;
 import compact_segments_task;
 import default_values;
 import base_table_ref;
+import data_type;
+import logical_type;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }

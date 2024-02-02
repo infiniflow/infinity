@@ -35,6 +35,8 @@ import base_expression;
 import column_vector;
 import value_expression;
 import substract;
+import logical_type;
+import data_type;
 
 class SubtractFunctionsTest : public BaseTest {};
 

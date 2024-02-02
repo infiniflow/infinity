@@ -27,6 +27,7 @@ import infinity_exception;
 import bitmask;
 import bitmask_buffer;
 import third_party;
+import data_type;
 
 namespace infinity {
 

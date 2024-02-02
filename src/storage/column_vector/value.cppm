@@ -20,6 +20,7 @@ import stl;
 import type_info;
 import logical_type;
 import infinity_exception;
+import data_type;
 
 namespace infinity {
 

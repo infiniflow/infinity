@@ -36,6 +36,8 @@ import column_vector;
 import table_entry_type;
 import meta_state;
 import status;
+import data_type;
+import logical_type;
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

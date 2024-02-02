@@ -23,6 +23,7 @@ import logical_node_type;
 import column_binding;
 import catalog;
 import base_expression;
+import data_type;
 
 namespace infinity {
 

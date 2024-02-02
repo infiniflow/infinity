@@ -22,7 +22,7 @@ import selection;
 import parser;
 import column_vector;
 import value;
-
+import data_type;
 import infinity_exception;
 
 namespace infinity {

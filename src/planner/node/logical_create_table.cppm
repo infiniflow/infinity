@@ -14,14 +14,15 @@
 
 module;
 
+export module logical_create_table;
+
 import stl;
 import logical_node;
 import table_def;
 import parser;
 import logical_node_type;
 import column_binding;
-
-export module logical_create_table;
+import data_type;
 
 namespace infinity {
 

@@ -14,6 +14,8 @@
 
 module;
 
+export module logical_insert;
+
 import stl;
 import logical_node_type;
 import column_binding;
@@ -21,8 +23,7 @@ import logical_node;
 import parser;
 import base_expression;
 import catalog;
-
-export module logical_insert;
+import data_type;
 
 namespace infinity {
 

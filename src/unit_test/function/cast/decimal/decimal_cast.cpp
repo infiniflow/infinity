@@ -36,6 +36,8 @@ import cast_table;
 import column_vector;
 import decimal_cast;
 import bound_cast_func;
+import data_type;
+import logical_type;
 
 class DecimalCastTest : public BaseTest {};
 

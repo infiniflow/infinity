@@ -26,6 +26,7 @@ import parser;
 import local_file_system;
 import column_vector;
 import bitmask;
+import data_type;
 
 namespace infinity {
 

@@ -21,6 +21,7 @@ import column_vector;
 import expression_type;
 import value;
 import stl;
+import data_type;
 
 export module value_expression;
 

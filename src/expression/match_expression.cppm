@@ -20,6 +20,7 @@ import stl;
 import parser;
 import base_expression;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

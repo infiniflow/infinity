@@ -24,6 +24,7 @@ import query_context;
 import operator_state;
 import load_meta;
 import index_def;
+import data_type;
 
 namespace infinity {
 export class PhysicalCreateIndexFinish : public PhysicalOperator {

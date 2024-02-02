@@ -14,11 +14,12 @@
 
 module;
 
+export module special_function;
+
 import stl;
 import function;
 import parser;
-
-export module special_function;
+import data_type;
 
 namespace infinity {
 

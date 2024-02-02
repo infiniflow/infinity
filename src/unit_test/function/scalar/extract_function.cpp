@@ -35,6 +35,8 @@ import default_values;
 import data_block;
 import base_expression;
 import column_vector;
+import logical_type;
+import data_type;
 
 class ExtractFunctionTest : public BaseTest {};
 

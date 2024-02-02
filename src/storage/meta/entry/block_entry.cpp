@@ -26,7 +26,7 @@ import defer_op;
 import local_file_system;
 import serialize;
 import catalog_delta_entry;
-
+import data_type;
 import infinity_exception;
 import parser;
 import column_vector;

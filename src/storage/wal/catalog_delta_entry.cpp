@@ -24,7 +24,7 @@ import data_block;
 import table_def;
 import index_def;
 import infinity_exception;
-
+import data_type;
 import stl;
 import parser;
 import third_party;

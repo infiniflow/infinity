@@ -24,6 +24,7 @@ import infinity_exception;
 import bound_cast_func;
 import column_vector;
 import third_party;
+import data_type;
 
 namespace infinity {
 

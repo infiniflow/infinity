@@ -14,14 +14,15 @@
 
 module;
 
+export module logical_view_scan;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
 import view;
-
-export module logical_view_scan;
+import data_type;
 
 namespace infinity {
 

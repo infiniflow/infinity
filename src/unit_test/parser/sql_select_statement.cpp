@@ -22,6 +22,8 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import logical_type;
+import data_type;
 
 class SelectStatementParsingTest : public BaseTest {};
 

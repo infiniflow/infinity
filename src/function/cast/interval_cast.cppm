@@ -26,6 +26,7 @@ import logical_type;
 import infinity_exception;
 import third_party;
 // import logger;
+import data_type;
 
 namespace infinity {
 

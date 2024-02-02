@@ -25,6 +25,7 @@ import base_expression;
 import knn_expression;
 import base_table_ref;
 import catalog;
+import data_type;
 
 namespace infinity {
 

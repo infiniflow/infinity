@@ -35,6 +35,8 @@ import data_block;
 import uuid_cast;
 import column_vector;
 import bound_cast_func;
+import data_type;
+import logical_type;
 #if 0
 class UuidCastTest : public BaseTest {};
 

@@ -23,6 +23,8 @@ import query_options;
 import parser;
 import database;
 import table;
+import logical_type;
+import data_type;
 
 class InfinityTest : public BaseTest {
     void SetUp() override {

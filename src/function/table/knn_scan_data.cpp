@@ -14,6 +14,8 @@
 
 module;
 
+module knn_scan_data;
+
 import stl;
 import parser;
 
@@ -37,8 +39,7 @@ import data_block;
 import column_vector;
 import base_expression;
 import expression_state;
-
-module knn_scan_data;
+import data_type;
 
 namespace infinity {
 

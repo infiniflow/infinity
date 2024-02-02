@@ -34,6 +34,8 @@ import physical_import;
 import default_values;
 import infinity_exception;
 import base_table_ref;
+import logical_type;
+import data_type;
 
 using namespace infinity;
 

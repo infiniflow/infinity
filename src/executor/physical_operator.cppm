@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_operator;
+
 import stl;
 import physical_operator_type;
 import query_context;
@@ -22,8 +24,7 @@ import parser;
 import data_table;
 import base_table_ref;
 import load_meta;
-
-export module physical_operator;
+import data_type;
 
 namespace infinity {
 

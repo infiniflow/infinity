@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_create_index_do;
+
 import stl;
 import parser;
 import physical_operator_type;
@@ -24,8 +26,7 @@ import load_meta;
 
 import index_def;
 import base_table_ref;
-
-export module physical_create_index_do;
+import data_type;
 
 namespace infinity {
 

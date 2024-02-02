@@ -34,6 +34,7 @@ import default_values;
 import data_block;
 import cast_table;
 import column_vector;
+import logical_type;
 
 class CastTableTest : public BaseTest {};
 

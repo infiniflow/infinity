@@ -14,10 +14,11 @@
 
 module;
 
+export module varchar_layout;
+
 import parser;
 import stl;
-
-export module varchar_layout;
+import data_type;
 
 namespace infinity {
 // TODO shenyushi: Is this file in an appropriate location?

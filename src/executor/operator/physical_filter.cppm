@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_filter;
+
 import stl;
 import parser;
 import query_context;
@@ -26,8 +28,7 @@ import expression_evaluator;
 import expression_selector;
 import load_meta;
 import infinity_exception;
-
-export module physical_filter;
+import data_type;
 
 namespace infinity {
 

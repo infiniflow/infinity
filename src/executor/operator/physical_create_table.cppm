@@ -26,6 +26,7 @@ import index_def;
 import table_def;
 import load_meta;
 import infinity_exception;
+import data_type;
 
 namespace infinity {
 

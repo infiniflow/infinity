@@ -25,6 +25,7 @@ import aggregate_function_set;
 import parser;
 import third_party;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

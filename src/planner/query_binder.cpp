@@ -19,7 +19,7 @@ module;
 module query_binder;
 
 import stl;
-
+import data_type;
 import infinity_exception;
 import parser;
 import bind_context;

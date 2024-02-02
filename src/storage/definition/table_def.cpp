@@ -15,13 +15,14 @@
 module;
 
 #include <sstream>
+
+module table_def;
+
 import stl;
 import parser;
 import serialize;
-
+import data_type;
 import infinity_exception;
-
-module table_def;
 
 namespace infinity {
 

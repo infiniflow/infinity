@@ -17,7 +17,7 @@ module;
 export module catalog:view_entry;
 
 import :base_entry;
-
+import data_type;
 import stl;
 import parser;
 

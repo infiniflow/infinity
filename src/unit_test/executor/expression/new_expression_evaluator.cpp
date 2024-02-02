@@ -41,6 +41,8 @@ import data_table;
 import table_def;
 import data_block;
 import default_values;
+import logical_type;
+import data_type;
 
 class ExpressionEvaluatorTest : public BaseTest {};
 

@@ -19,6 +19,7 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import parser;
+import data_type;
 
 export module logical_dummy_scan;
 

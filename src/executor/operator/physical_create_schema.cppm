@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_create_schema;
+
 import stl;
 import parser;
 import query_context;
@@ -23,8 +25,7 @@ import physical_operator_type;
 import index_def;
 import load_meta;
 import infinity_exception;
-
-export module physical_create_schema;
+import data_type;
 
 namespace infinity {
 

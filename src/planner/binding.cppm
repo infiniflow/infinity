@@ -14,12 +14,13 @@
 
 module;
 
+export module binding;
+
 import stl;
 import parser;
 import block_index;
 import catalog;
-
-export module binding;
+import data_type;
 
 namespace infinity {
 

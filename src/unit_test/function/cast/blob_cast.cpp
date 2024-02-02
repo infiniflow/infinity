@@ -36,6 +36,8 @@ import cast_table;
 import column_vector;
 import blob_cast;
 import bound_cast_func;
+import data_type;
+import logical_type;
 #if 0
 class BlobCastTest : public BaseTest {};
 

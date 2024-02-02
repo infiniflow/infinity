@@ -36,6 +36,7 @@ import cast_table;
 import column_vector;
 import bitmap_cast;
 import bound_cast_func;
+
 #if 0
 class BitmapCastTest : public BaseTest {};
 

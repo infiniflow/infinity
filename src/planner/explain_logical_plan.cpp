@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module explain_logical_plan;
+
 import stl;
 import logical_node;
 import logical_create_schema;
@@ -64,8 +66,7 @@ import in_expression;
 import value_expression;
 import reference_expression;
 import infinity_exception;
-
-module explain_logical_plan;
+import data_type;
 
 namespace infinity {
 

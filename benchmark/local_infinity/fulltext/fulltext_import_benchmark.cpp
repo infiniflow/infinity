@@ -26,6 +26,8 @@ import database;
 import table;
 import query_options;
 import parser;
+import data_type;
+import logical_type;
 
 using namespace infinity;
 

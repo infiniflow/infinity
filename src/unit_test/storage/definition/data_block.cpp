@@ -27,6 +27,8 @@ import default_values;
 import profiler;
 import value;
 import infinity_context;
+import data_type;
+import logical_type;
 
 class DataBlockTest : public BaseTest {};
 

@@ -18,6 +18,8 @@ module;
 #include <concepts>
 #include <sstream>
 
+export module column_vector;
+
 import stl;
 import parser;
 import global_resource_usage;
@@ -29,8 +31,7 @@ import value;
 import third_party;
 import infinity_exception;
 import fix_heap;
-
-export module column_vector;
+import data_type;
 
 namespace infinity {
 

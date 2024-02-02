@@ -34,6 +34,8 @@ import data_block;
 import base_expression;
 import column_vector;
 import less_equals;
+import logical_type;
+import data_type;
 
 class LessEqualsFunctionsTest : public BaseTest {};
 

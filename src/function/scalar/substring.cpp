@@ -25,6 +25,7 @@ import scalar_function_set;
 import parser;
 import third_party;
 import column_vector;
+import data_type;
 
 namespace infinity {
 

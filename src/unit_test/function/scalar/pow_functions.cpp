@@ -34,6 +34,8 @@ import data_block;
 import base_expression;
 import column_vector;
 import pow;
+import logical_type;
+import data_type;
 
 class PowFunctionsTest : public BaseTest {};
 

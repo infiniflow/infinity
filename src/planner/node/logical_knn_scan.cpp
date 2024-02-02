@@ -27,6 +27,7 @@ import parser;
 import default_values;
 import catalog;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

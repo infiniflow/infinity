@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_drop_index;
+
 import stl;
 
 import physical_operator;
@@ -23,8 +25,7 @@ import parser;
 import operator_state;
 import load_meta;
 import infinity_exception;
-
-export module physical_drop_index;
+import data_type;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import fusion_expression;
 import match_expression;
 import knn_expression;
 import logical_type;
+import data_type;
 
 namespace infinity {
 

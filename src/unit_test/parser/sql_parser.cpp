@@ -22,6 +22,9 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import data_type;
+import logical_type;
+import type_info;
 
 class SQLParserTest : public BaseTest {};
 

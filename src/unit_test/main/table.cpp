@@ -25,6 +25,8 @@ import database;
 import table;
 import status;
 import third_party;
+import logical_type;
+import data_type;
 
 class InfinityTableTest : public BaseTest {
     void SetUp() override {

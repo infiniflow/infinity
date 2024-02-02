@@ -28,7 +28,7 @@ import buffer_manager;
 import index_def;
 import block_index;
 import data_access_state;
-
+import data_type;
 import logger;
 import txn_store;
 import status;

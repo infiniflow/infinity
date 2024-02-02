@@ -16,11 +16,12 @@ module;
 
 #include <sstream>
 
+module logical_export;
+
 import stl;
 import column_binding;
 import parser;
-
-module logical_export;
+import data_type;
 
 namespace infinity {
 

@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_drop_view;
+
 import stl;
 import parser;
 import query_context;
@@ -22,8 +24,7 @@ import physical_operator;
 import physical_operator_type;
 import load_meta;
 import infinity_exception;
-
-export module physical_drop_view;
+import data_type;
 
 namespace infinity {
 export class PhysicalDropView final : public PhysicalOperator {

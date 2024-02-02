@@ -14,12 +14,13 @@
 
 module;
 
+export module function_expression;
+
 import stl;
 import base_expression;
 import parser;
 import scalar_function;
-
-export module function_expression;
+import data_type;
 
 namespace infinity {
 

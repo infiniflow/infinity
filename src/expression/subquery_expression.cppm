@@ -14,13 +14,14 @@
 
 module;
 
+export module subquery_expression;
+
 import base_expression;
 import bound_select_statement;
 import parser;
 import stl;
 import column_expression;
-
-export module subquery_expression;
+import data_type;
 
 namespace infinity {
 

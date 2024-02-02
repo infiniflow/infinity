@@ -22,6 +22,8 @@ import third_party;
 import logger;
 import parser;
 import infinity_context;
+import data_type;
+import logical_type;
 
 class ColumnDefTest : public BaseTest {};
 

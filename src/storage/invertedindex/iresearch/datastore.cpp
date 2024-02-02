@@ -34,6 +34,9 @@ module;
 #include "search/filter.hpp"
 #include "search/score.hpp"
 
+module iresearch_datastore;
+
+
 import stl;
 import parser;
 import logger;
@@ -59,8 +62,7 @@ import local_file_system;
 import buffer_manager;
 import index_full_text;
 import infinity_exception;
-
-module iresearch_datastore;
+import data_type;
 
 namespace infinity {
 

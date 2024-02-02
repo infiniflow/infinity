@@ -14,11 +14,14 @@
 
 module;
 
+export module base_expression;
+
+
 import stl;
 import expression_type;
 import parser;
+import data_type;
 
-export module base_expression;
 
 namespace infinity {
 
