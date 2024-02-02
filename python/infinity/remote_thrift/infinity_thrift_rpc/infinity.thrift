@@ -19,10 +19,10 @@ Invalid
 }
 
 enum ConflictType {
-    Invalid,
-    Ignore,
-    Error,
-    Replace,
+Invalid,
+Ignore,
+Error,
+Replace,
 }
 
 struct Option {}
@@ -384,6 +384,38 @@ struct FileChunk {
 8:  i64 total_size,
 }
 
+enum ExplainType {
+Analyze,
+Ast,
+UnOpt,
+Opt,
+Physical,
+Pipeline,
+Fragment,
+}
+
+struct ExplainRequest {
+1:  i64 session_id,
+2:  string db_name,
+3:  string table_name,
+4:  list<ParsedExpr> select_list = [],
+5:  optional SearchExpr search_expr,
+6:  optional ParsedExpr where_expr,
+7:  optional list<ParsedExpr> group_by_list = [],
+8:  optional ParsedExpr having_expr,
+9:  optional ParsedExpr limit_expr,
+10:  optional ParsedExpr offset_expr,
+11:  optional list<OrderByExpr> order_by_list = [],
+12:  ExplainType explain_type,
+}
+
+struct ExplainResponse {
+1: bool success,
+2: string error_msg,
+3: list<ColumnDef> column_defs = [],
+4: list<ColumnField> column_fields = [];
+}
+
 struct SelectRequest {
 1: i64 session_id,
 2:  string db_name,
@@ -432,6 +464,7 @@ CommonResponse DropTable(1:DropTableRequest request),
 CommonResponse Insert(1:InsertRequest request),
 CommonResponse Import(1:ImportRequest request),
 SelectResponse Select(1:SelectRequest request),
+SelectResponse Explain(1:ExplainRequest request),
 CommonResponse Delete(1:DeleteRequest request),
 CommonResponse Update(1:UpdateRequest request),
 UploadResponse UploadFileChunk(1:FileChunk request),
