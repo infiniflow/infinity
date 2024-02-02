@@ -37,6 +37,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  CommonResponse Delete(DeleteRequest request)')
     print('  CommonResponse Update(UpdateRequest request)')
     print('  UploadResponse UploadFileChunk(FileChunk request)')
+    print('  SelectResponse ShowVariable(ShowVariableRequest request)')
     print('  ListDatabaseResponse ListDatabase(ListDatabaseRequest request)')
     print('  ListTableResponse ListTable(ListTableRequest request)')
     print('  DescribeDatabaseResponse DescribeDatabase(DescribeDatabaseRequest request)')
@@ -201,6 +202,12 @@ elif cmd == 'UploadFileChunk':
         print('UploadFileChunk requires 1 args')
         sys.exit(1)
     pp.pprint(client.UploadFileChunk(eval(args[0]),))
+
+elif cmd == 'ShowVariable':
+    if len(args) != 1:
+        print('ShowVariable requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.ShowVariable(eval(args[0]),))
 
 elif cmd == 'ListDatabase':
     if len(args) != 1:

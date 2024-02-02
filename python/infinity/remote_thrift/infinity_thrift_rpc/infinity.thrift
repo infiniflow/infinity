@@ -452,6 +452,11 @@ struct UpdateRequest {
 5:  i64 session_id,
 }
 
+struct ShowVariableRequest{
+1: i64 session_id,
+2: string variable_name,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(),
@@ -468,6 +473,7 @@ SelectResponse Explain(1:ExplainRequest request),
 CommonResponse Delete(1:DeleteRequest request),
 CommonResponse Update(1:UpdateRequest request),
 UploadResponse UploadFileChunk(1:FileChunk request),
+SelectResponse ShowVariable(1:ShowVariableRequest request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
