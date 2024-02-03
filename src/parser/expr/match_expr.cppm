@@ -20,6 +20,7 @@ export module match_expr;
 
 namespace infinity {
 
+export using IrsFilter = irs::filter;
 export using infinity::MatchExpr;
 
 }

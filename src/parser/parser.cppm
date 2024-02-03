@@ -21,7 +21,7 @@ export module parser;
 
 namespace infinity {
 
-export using IrsFilter = irs::filter;
+//export using IrsFilter = irs::filter;
 
 export using infinity::SQLParser;
 //export using infinity::ParserResult;

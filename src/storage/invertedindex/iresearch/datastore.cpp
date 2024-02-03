@@ -36,7 +36,6 @@ module;
 
 module iresearch_datastore;
 
-
 import stl;
 import parser;
 import logger;
@@ -63,6 +62,7 @@ import buffer_manager;
 import index_full_text;
 import infinity_exception;
 import data_type;
+import match_expr;
 
 namespace infinity {
 
