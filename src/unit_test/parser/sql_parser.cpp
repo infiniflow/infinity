@@ -33,6 +33,7 @@ import extra_ddl_info;
 import create_table_info;
 import create_index_info;
 import column_def;
+import parser_result;
 
 class SQLParserTest : public BaseTest {};
 

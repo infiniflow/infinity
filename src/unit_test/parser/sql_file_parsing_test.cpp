@@ -24,6 +24,7 @@ import parser;
 import logger;
 import null_value;
 import stl;
+import parser_result;
 
 class SQLFileParsingTest : public BaseTest {};
 

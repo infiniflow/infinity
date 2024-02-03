@@ -42,6 +42,7 @@ import table_reference;
 import join_reference;
 import cross_product_reference;
 import subquery_reference;
+import parser_result;
 
 class SelectStatementParsingTest : public BaseTest {};
 

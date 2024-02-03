@@ -48,6 +48,7 @@ import query_result;
 import status;
 import session_manager;
 import base_statement;
+import parser_result;
 
 namespace infinity {
 
