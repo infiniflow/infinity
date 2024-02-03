@@ -67,7 +67,7 @@ import value_expression;
 import reference_expression;
 import infinity_exception;
 import data_type;
-
+import knn_expr;
 import select_statement;
 
 namespace infinity {

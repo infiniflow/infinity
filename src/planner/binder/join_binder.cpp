@@ -22,6 +22,8 @@ import parser;
 import bind_context;
 import status;
 import infinity_exception;
+import parsed_expr;
+import knn_expr;
 
 namespace infinity {
 

@@ -29,6 +29,7 @@ import bound_update_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
+import parsed_expr;
 
 export module query_binder;
 

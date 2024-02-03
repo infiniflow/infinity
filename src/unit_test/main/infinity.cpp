@@ -25,6 +25,10 @@ import database;
 import table;
 import logical_type;
 import data_type;
+import parsed_expr;
+import constant_expr;
+import search_expr;
+import column_expr;
 
 class InfinityTest : public BaseTest {
     void SetUp() override {

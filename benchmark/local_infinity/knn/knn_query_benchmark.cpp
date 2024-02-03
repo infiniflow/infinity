@@ -32,6 +32,11 @@ import local_file_system;
 import third_party;
 import query_options;
 import query_result;
+import knn_expr;
+import column_expr;
+import parsed_expr;
+import search_expr;
+import function_expr;
 
 using namespace infinity;
 

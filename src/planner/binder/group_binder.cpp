@@ -29,6 +29,12 @@ import logger;
 import third_party;
 import function_set;
 import bind_alias_proxy;
+import parsed_expr;
+import constant_expr;
+import column_expr;
+import function_expr;
+import subquery_expr;
+import knn_expr;
 
 namespace infinity {
 

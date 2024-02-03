@@ -19,6 +19,8 @@ import parser;
 import base_expression;
 import bind_context;
 import expression_binder;
+import parsed_expr;
+import knn_expr;
 
 export module aggregate_binder;
 

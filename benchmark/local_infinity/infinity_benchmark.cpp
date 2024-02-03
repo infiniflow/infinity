@@ -36,6 +36,10 @@ import query_result;
 import embedding_info;
 import logical_type;
 import data_type;
+import parsed_expr;
+import column_expr;
+import constant_expr;
+import update_statement;
 
 using namespace infinity;
 

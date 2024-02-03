@@ -30,6 +30,9 @@ import show_statement;
 import select_statement;
 import update_statement;
 import insert_statement;
+import column_expr;
+import function_expr;
+import constant_expr;
 
 class StatementParsingTest : public BaseTest {};
 

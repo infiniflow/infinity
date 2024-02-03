@@ -23,6 +23,8 @@ import bind_context;
 import expression_binder;
 import status;
 import infinity_exception;
+import parsed_expr;
+import knn_expr;
 
 namespace infinity {
 

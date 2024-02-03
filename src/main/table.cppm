@@ -20,6 +20,9 @@ import value;
 import parser;
 import session;
 import query_result;
+import parsed_expr;
+import search_expr;
+import update_statement;
 
 namespace infinity {
 

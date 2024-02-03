@@ -58,6 +58,8 @@ import base_statement;
 import select_statement;
 import delete_statement;
 import update_statement;
+import parsed_expr;
+import column_expr;
 
 namespace infinity {
 

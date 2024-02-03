@@ -27,6 +27,7 @@ import column_expression;
 import column_identifer;
 import catalog;
 import block_index;
+import column_expr;
 
 namespace infinity {
 

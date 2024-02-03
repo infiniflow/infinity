@@ -24,6 +24,7 @@ import expression_binder;
 import status;
 import infinity_exception;
 import third_party;
+import parsed_expr;
 
 namespace infinity {
 

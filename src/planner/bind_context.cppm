@@ -30,6 +30,8 @@ import block_index;
 import catalog;
 import data_type;
 import select_statement;
+import parsed_expr;
+import search_expr;
 
 namespace infinity {
 

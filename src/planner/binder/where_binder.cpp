@@ -14,6 +14,8 @@
 
 module;
 
+module where_binder;
+
 import stl;
 import base_expression;
 import parser;
@@ -23,8 +25,8 @@ import bind_context;
 import infinity_exception;
 import third_party;
 import bind_alias_proxy;
-
-module where_binder;
+import parsed_expr;
+import column_expr;
 
 namespace infinity {
 

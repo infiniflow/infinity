@@ -59,6 +59,18 @@ import catalog;
 import query_context;
 import logger;
 import embedding_info;
+import parsed_expr;
+import function_expr;
+import constant_expr;
+import column_expr;
+import case_expr;
+import in_expr;
+import knn_expr;
+import search_expr;
+import cast_expr;
+import between_expr;
+import subquery_expr;
+import match_expr;
 
 namespace infinity {
 

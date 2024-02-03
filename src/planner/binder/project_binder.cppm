@@ -20,6 +20,9 @@ import base_expression;
 import bind_context;
 import expression_binder;
 import query_context;
+import parsed_expr;
+import function_expr;
+import column_expr;
 
 export module project_binder;
 

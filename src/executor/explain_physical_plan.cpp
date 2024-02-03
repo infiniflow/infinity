@@ -79,6 +79,7 @@ import base_expression;
 import knn_expression;
 import third_party;
 import select_statement;
+import knn_expr;
 
 namespace infinity {
 

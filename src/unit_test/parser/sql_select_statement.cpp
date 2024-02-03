@@ -26,6 +26,17 @@ import logical_type;
 import data_type;
 import base_statement;
 import select_statement;
+import parsed_expr;
+import column_expr;
+import constant_expr;
+import function_expr;
+import knn_expr;
+import match_expr;
+import search_expr;
+import case_expr;
+import subquery_expr;
+import between_expr;
+import cast_expr;
 
 class SelectStatementParsingTest : public BaseTest {};
 

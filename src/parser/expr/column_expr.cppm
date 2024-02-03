@@ -12,24 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
-#include "parsed_expr.h"
+#include "column_expr.h"
+
+export module column_expr;
 
 namespace infinity {
 
-class BetweenExpr : public ParsedExpr {
-public:
-    explicit BetweenExpr() : ParsedExpr(ParsedExprType::kBetween) {}
+export using infinity::ColumnExpr;
 
-    ~BetweenExpr() override;
-
-    [[nodiscard]] std::string ToString() const override;
-
-public:
-    ParsedExpr *value_{nullptr};
-    ParsedExpr *upper_bound_{nullptr};
-    ParsedExpr *lower_bound_{nullptr};
-};
-
-} // namespace infinity
+}

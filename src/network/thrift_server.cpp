@@ -56,6 +56,15 @@ import status;
 import logical_type;
 import data_type;
 import embedding_info;
+import constant_expr;
+import column_expr;
+import function_expr;
+import knn_expr;
+import match_expr;
+import fusion_expr;
+import parsed_expr;
+import update_statement;
+import search_expr;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

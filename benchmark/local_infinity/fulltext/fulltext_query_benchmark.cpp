@@ -29,6 +29,10 @@ import profiler;
 import infinity;
 import database;
 import table;
+import search_expr;
+import parsed_expr;
+import match_expr;
+import function_expr;
 
 using namespace infinity;
 

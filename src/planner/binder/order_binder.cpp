@@ -24,6 +24,10 @@ import column_expression;
 import third_party;
 import status;
 import infinity_exception;
+import parsed_expr;
+import constant_expr;
+import knn_expr;
+import function_expr;
 
 namespace infinity {
 

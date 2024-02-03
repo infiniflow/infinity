@@ -21,5 +21,7 @@ export module select_statement;
 namespace infinity {
 
 export using infinity::SelectStatement;
+export using infinity::OrderByExpr;
+export using infinity::WithExpr;
 
 }

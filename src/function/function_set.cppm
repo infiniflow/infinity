@@ -21,6 +21,7 @@ import stl;
 import parser;
 import function;
 import base_expression;
+import function_expr;
 //import catalog;
 
 namespace infinity {

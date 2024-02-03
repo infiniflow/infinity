@@ -21,5 +21,6 @@ export module update_statement;
 namespace infinity {
 
 export using infinity::UpdateStatement;
+export using infinity::UpdateExpr;
 
 }

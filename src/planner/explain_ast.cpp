@@ -31,6 +31,7 @@ import drop_statement;
 import show_statement;
 import flush_statement;
 import optimize_statement;
+import parsed_expr;
 
 namespace infinity {
 
