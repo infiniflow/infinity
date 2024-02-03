@@ -24,6 +24,7 @@ import parser;
 import infinity_context;
 import data_type;
 import logical_type;
+import column_def;
 
 class ColumnDefTest : public BaseTest {};
 

@@ -41,6 +41,7 @@ import aggregate_expression;
 import status;
 import logical_type;
 import data_type;
+import column_def;
 
 namespace infinity {
 

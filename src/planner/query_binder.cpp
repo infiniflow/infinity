@@ -61,6 +61,7 @@ import update_statement;
 import parsed_expr;
 import column_expr;
 import knn_expr;
+import column_def;
 
 namespace infinity {
 

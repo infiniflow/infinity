@@ -22,6 +22,7 @@ import logger;
 import third_party;
 import stl;
 import catalog_delta_entry;
+import column_def;
 
 class CatalogDeltaEntryTest : public BaseTest {};
 

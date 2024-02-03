@@ -34,6 +34,7 @@ import catalog_delta_entry;
 import third_party;
 import status;
 import infinity_exception;
+import column_def;
 
 namespace infinity {
 

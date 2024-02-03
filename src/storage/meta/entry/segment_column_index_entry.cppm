@@ -26,6 +26,7 @@ import parser;
 import index_file_worker;
 import status;
 import index_base;
+import column_def;
 
 namespace infinity {
 

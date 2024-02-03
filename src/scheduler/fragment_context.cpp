@@ -57,6 +57,7 @@ import task_scheduler;
 import plan_fragment;
 import aggregate_expression;
 import expression_state;
+import column_def;
 
 namespace infinity {
 

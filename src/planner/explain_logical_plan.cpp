@@ -70,6 +70,7 @@ import data_type;
 import knn_expr;
 import select_statement;
 import extra_ddl_info;
+import column_def;
 
 namespace infinity {
 

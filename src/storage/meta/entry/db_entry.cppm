@@ -27,6 +27,7 @@ import table_detail;
 import buffer_manager;
 import status;
 import extra_ddl_info;
+import column_def;
 
 namespace infinity {
 

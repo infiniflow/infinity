@@ -24,6 +24,7 @@ import data_block;
 import infinity_exception;
 import data_type;
 import third_party;
+import column_def;
 
 namespace infinity {
 

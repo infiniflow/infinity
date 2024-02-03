@@ -20,6 +20,7 @@ import parser;
 import index_base;
 import file_worker;
 import stl;
+import column_def;
 
 namespace infinity {
 

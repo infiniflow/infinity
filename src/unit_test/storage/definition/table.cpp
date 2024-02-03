@@ -30,6 +30,7 @@ import column_vector;
 import infinity_context;
 import data_type;
 import logical_type;
+import column_def;
 
 class TableTest : public BaseTest {};
 

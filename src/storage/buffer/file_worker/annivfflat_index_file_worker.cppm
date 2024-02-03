@@ -28,6 +28,7 @@ import logical_type;
 import embedding_info;
 import create_index_info;
 import knn_expr;
+import column_def;
 
 namespace infinity {
 

@@ -31,6 +31,7 @@ import blocking_queue;
 import expression_state;
 import status;
 import data_type;
+import column_def;
 
 namespace infinity {
 

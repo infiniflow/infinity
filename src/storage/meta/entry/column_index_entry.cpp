@@ -36,6 +36,7 @@ import secondary_index_file_worker;
 import logger;
 import embedding_info;
 import create_index_info;
+import column_def;
 
 namespace infinity {
 

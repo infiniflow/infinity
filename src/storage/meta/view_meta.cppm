@@ -21,6 +21,7 @@ import :base_entry;
 import stl;
 import parser;
 import status;
+import column_def;
 
 namespace infinity {
 

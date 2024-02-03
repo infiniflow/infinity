@@ -31,6 +31,7 @@ import status;
 import infinity_exception;
 import logger;
 import logical_type;
+import column_def;
 
 namespace infinity {
 

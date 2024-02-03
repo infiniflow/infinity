@@ -13,11 +13,12 @@
 // limitations under the License.
 module;
 
+export module table_def;
+
 import stl;
 import parser;
 import index_def;
-
-export module table_def;
+import column_def;
 
 
 namespace infinity {

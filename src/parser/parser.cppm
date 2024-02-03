@@ -26,7 +26,7 @@ export using IrsFilter = irs::filter;
 export using infinity::SQLParser;
 export using infinity::ParserResult;
 
-export using infinity::ColumnDef;
+//export using infinity::ColumnDef;
 export using infinity::RowID;
 
 // TimeUnit
@@ -63,7 +63,7 @@ export using infinity::ParserException;
 
 //export using infinity::DDLType;
 //export using infinity::ConflictType;
-export using infinity::ConstraintType;
+//export using infinity::ConstraintType;
 //export using infinity::KnnDistanceType;
 export using infinity::TableRefType;
 export using infinity::ExplainType;
@@ -99,12 +99,12 @@ export using infinity::JoinType;
 //export using infinity::ExportType;
 //export using infinity::SetScope;
 
-export using infinity::ColumnDef;
-export using infinity::TableConstraint;
+//export using infinity::ColumnDef;
+//export using infinity::TableConstraint;
 
 //export using infinity::ConflictTypeToStr;
 export using infinity::EmbeddingType;
-export using infinity::ConstrainTypeToString;
+//export using infinity::ConstrainTypeToString;
 export using infinity::ToEmbeddingDataType;
 
 }

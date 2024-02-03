@@ -27,6 +27,7 @@ import serialize;
 import third_party;
 import table_entry_type;
 import index_base;
+import column_def;
 
 namespace infinity {
 

@@ -81,6 +81,7 @@ import third_party;
 import select_statement;
 import knn_expr;
 import extra_ddl_info;
+import column_def;
 
 namespace infinity {
 

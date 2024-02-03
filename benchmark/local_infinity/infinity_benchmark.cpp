@@ -43,6 +43,7 @@ import update_statement;
 import create_index_info;
 import extra_ddl_info;
 import knn_expr;
+import column_def;
 
 using namespace infinity;
 

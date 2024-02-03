@@ -43,6 +43,7 @@ import data_block;
 import default_values;
 import logical_type;
 import data_type;
+import column_def;
 
 class ExpressionEvaluatorTest : public BaseTest {};
 

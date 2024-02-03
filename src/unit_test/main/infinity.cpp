@@ -29,6 +29,7 @@ import parsed_expr;
 import constant_expr;
 import search_expr;
 import column_expr;
+import column_def;
 
 class InfinityTest : public BaseTest {
     void SetUp() override {

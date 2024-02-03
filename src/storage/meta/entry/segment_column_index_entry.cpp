@@ -44,6 +44,7 @@ import secondary_index_data;
 import type_info;
 import embedding_info;
 import create_index_info;
+import column_def;
 
 namespace infinity {
 

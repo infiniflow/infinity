@@ -27,6 +27,7 @@ import operator_state;
 import status;
 import infinity_exception;
 import logical_type;
+import column_def;
 
 namespace infinity {
 

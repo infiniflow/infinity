@@ -54,6 +54,7 @@ import status;
 import column_vector;
 import default_values;
 import embedding_info;
+import column_def;
 
 namespace infinity {
 

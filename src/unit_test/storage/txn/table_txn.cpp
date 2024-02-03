@@ -33,6 +33,7 @@ import status;
 import data_type;
 import logical_type;
 import extra_ddl_info;
+import column_def;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {

@@ -23,6 +23,7 @@ import parser;
 import index_base;
 import infinity_exception;
 import default_values;
+import column_def;
 
 namespace infinity {
 

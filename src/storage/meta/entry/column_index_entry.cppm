@@ -26,6 +26,7 @@ import third_party;
 import index_base;
 import index_file_worker;
 import status;
+import column_def;
 
 namespace infinity {
 

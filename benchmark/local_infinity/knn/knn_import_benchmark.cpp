@@ -37,6 +37,7 @@ import query_options;
 import query_result;
 import extra_ddl_info;
 import knn_expr;
+import column_def;
 
 using namespace infinity;
 

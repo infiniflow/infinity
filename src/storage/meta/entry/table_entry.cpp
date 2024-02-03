@@ -41,6 +41,7 @@ import index_full_text;
 import catalog_delta_entry;
 import extra_ddl_info;
 import create_index_info;
+import column_def;
 
 namespace infinity {
 

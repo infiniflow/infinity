@@ -27,6 +27,7 @@ import logical_show;
 import load_meta;
 import infinity_exception;
 import data_type;
+import column_def;
 
 namespace infinity {
 

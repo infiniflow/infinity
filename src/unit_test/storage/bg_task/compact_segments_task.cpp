@@ -37,6 +37,7 @@ import base_table_ref;
 import logical_type;
 import data_type;
 import extra_ddl_info;
+import column_def;
 
 using namespace infinity;
 

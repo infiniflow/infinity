@@ -22,6 +22,7 @@ import hnsw_alg;
 import parser;
 import index_base;
 import knn_expr;
+import column_def;
 
 namespace infinity {
 
