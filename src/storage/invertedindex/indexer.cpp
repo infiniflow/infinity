@@ -14,7 +14,7 @@ import index_config;
 import inmem_index_segment_reader;
 import posting_writer;
 import data_block;
-import parser;
+
 import column_vector;
 import third_party;
 import column_indexer;

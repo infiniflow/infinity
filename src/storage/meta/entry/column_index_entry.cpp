@@ -28,7 +28,7 @@ import random;
 import buffer_manager;
 import infinity_exception;
 import index_file_worker;
-import parser;
+
 import catalog_delta_entry;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;

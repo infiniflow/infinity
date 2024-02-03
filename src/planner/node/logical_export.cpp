@@ -20,7 +20,7 @@ module logical_export;
 
 import stl;
 import column_binding;
-import parser;
+
 import data_type;
 
 namespace infinity {

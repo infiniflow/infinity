@@ -25,7 +25,7 @@ import infinity;
 import database;
 import table;
 import query_options;
-import parser;
+
 import data_type;
 import logical_type;
 import create_index_info;

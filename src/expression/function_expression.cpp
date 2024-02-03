@@ -17,7 +17,7 @@ module;
 #include <sstream>
 import stl;
 import expression_type;
-import parser;
+
 import scalar_function;
 
 module function_expression;

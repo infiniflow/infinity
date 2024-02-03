@@ -20,7 +20,7 @@ module logical_import;
 
 import stl;
 import column_binding;
-import parser;
+
 import catalog;
 import data_type;
 

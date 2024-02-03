@@ -20,7 +20,7 @@ import logical_explain;
 import column_remapper;
 import column_pruner;
 import lazy_load;
-import parser;
+
 import explain_logical_plan;
 import optimizer_rule;
 import bound_delete_statement;

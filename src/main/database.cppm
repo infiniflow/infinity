@@ -20,7 +20,7 @@ import query_options;
 import table;
 import table_detail;
 import session;
-import parser;
+
 import column_def;
 
 namespace infinity {

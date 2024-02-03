@@ -19,7 +19,7 @@ export module annivfflat_index_file_worker;
 import stl;
 import index_file_worker;
 import file_worker;
-import parser;
+
 import index_base;
 import annivfflat_index_data;
 import infinity_exception;

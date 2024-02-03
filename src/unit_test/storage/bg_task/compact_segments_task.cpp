@@ -27,7 +27,7 @@ import txn;
 import buffer_manager;
 import txn_manager;
 import column_vector;
-import parser;
+
 import table_def;
 import value;
 import physical_import;

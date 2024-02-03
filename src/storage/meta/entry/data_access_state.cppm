@@ -19,7 +19,7 @@ export module data_access_state;
 import stl;
 import data_block;
 import column_vector;
-import parser;
+
 import data_type;
 
 namespace infinity {

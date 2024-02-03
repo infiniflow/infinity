@@ -22,7 +22,7 @@ module physical_command;
 import stl;
 import query_context;
 import operator_state;
-import parser;
+
 import profiler;
 import local_file_system;
 import file_writer;

@@ -18,7 +18,7 @@ module bind_alias_proxy;
 
 import stl;
 import base_expression;
-import parser;
+
 import bind_context;
 import expression_binder;
 import status;

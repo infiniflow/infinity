@@ -14,7 +14,7 @@ import stl;
 import index_base;
 import ann_ivf_flat;
 import annivfflat_index_data;
-import parser;
+
 import local_file_system;
 import knn_expr;
 

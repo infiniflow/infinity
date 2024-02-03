@@ -17,7 +17,7 @@ module;
 #include <sstream>
 import stl;
 import catalog;
-import parser;
+
 import base_expression;
 
 module function_set;

@@ -20,7 +20,7 @@ import :base_entry;
 import :segment_column_index_entry;
 
 import stl;
-import parser;
+
 import index_base;
 import third_party;
 import index_base;

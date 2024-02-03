@@ -31,7 +31,7 @@ import logger;
 import data_block;
 import txn_store;
 import txn_state;
-import parser;
+
 import meta_state;
 import data_access_state;
 import status;

@@ -19,7 +19,7 @@ module scalar_function;
 
 import stl;
 import function;
-import parser;
+
 import status;
 import infinity_exception;
 import data_block;

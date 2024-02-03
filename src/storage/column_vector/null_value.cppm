@@ -18,7 +18,7 @@ module;
 
 export module null_value;
 
-import parser;
+
 import stl;
 import infinity_exception;
 import data_type;

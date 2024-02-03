@@ -18,7 +18,7 @@ export module fusion_expression;
 
 import stl;
 import base_expression;
-import parser;
+
 import logical_type;
 import data_type;
 import search_options;

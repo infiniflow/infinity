@@ -22,7 +22,7 @@ module index_ivfflat;
 import infinity_exception;
 import stl;
 import index_def;
-import parser;
+
 import third_party;
 import serialize;
 import index_base;

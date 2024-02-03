@@ -21,7 +21,7 @@ module logical_join;
 
 import stl;
 import column_binding;
-import parser;
+
 import logical_node_type;
 import base_expression;
 import data_type;

@@ -20,7 +20,7 @@ module logical_create_schema;
 
 import stl;
 import column_binding;
-import parser;
+
 import logical_type;
 import data_type;
 

@@ -11,25 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 
-module logical_explain;
+#include "sql_parser.h"
 
-import stl;
-import column_binding;
-
-import base_expression;
-import data_type;
+export module sql_parser;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalExplain::GetColumnBindings() const { return {}; }
+export using infinity::SQLParser;
 
-SharedPtr<Vector<String>> LogicalExplain::GetOutputNames() const { return MakeShared<Vector<String>>(); }
-
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalExplain::GetOutputTypes() const { return MakeShared<Vector<SharedPtr<DataType>>>(); }
-
-String LogicalExplain::ToString(i64 &space) const { return "LogicalExplain"; }
-
-} // namespace infinity
+}

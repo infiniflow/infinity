@@ -17,7 +17,7 @@ module;
 export module load_meta;
 
 import stl;
-import parser;
+
 import column_binding;
 import data_type;
 

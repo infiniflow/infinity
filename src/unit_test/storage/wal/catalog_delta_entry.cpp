@@ -14,7 +14,7 @@
 
 #include "unit_test/base_test.h"
 
-import parser;
+
 import infinity_exception;
 import index_base;
 import index_def;

@@ -14,7 +14,7 @@
 
 module;
 
-import parser;
+
 import stl;
 import base_expression;
 import data_type;

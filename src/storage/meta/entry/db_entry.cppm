@@ -21,7 +21,7 @@ import :base_entry;
 
 import stl;
 import table_entry_type;
-import parser;
+
 import third_party;
 import table_detail;
 import buffer_manager;

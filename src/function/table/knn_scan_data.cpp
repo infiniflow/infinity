@@ -17,7 +17,7 @@ module;
 module knn_scan_data;
 
 import stl;
-import parser;
+
 
 import infinity_exception;
 import third_party;

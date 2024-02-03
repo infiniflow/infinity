@@ -21,7 +21,7 @@ import third_party;
 import infinity_exception;
 import vector_heap_chunk;
 import global_resource_usage;
-import parser;
+
 import catalog;
 import buffer_manager;
 import data_file_worker;

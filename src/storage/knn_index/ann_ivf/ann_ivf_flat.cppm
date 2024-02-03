@@ -18,7 +18,7 @@ export module ann_ivf_flat;
 
 import stl;
 import knn_distance;
-import parser;
+
 import infinity_exception;
 import index_base;
 import annivfflat_index_data;

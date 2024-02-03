@@ -20,7 +20,7 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import file_system;
 import local_file_system;
 import file_writer;

@@ -19,7 +19,7 @@ module;
 module explain_ast;
 
 import stl;
-import parser;
+
 import status;
 import infinity_exception;
 import base_statement;

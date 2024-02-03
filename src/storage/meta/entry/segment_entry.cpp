@@ -34,7 +34,7 @@ import buffer_handle;
 import logger;
 import local_file_system;
 import random;
-import parser;
+
 import txn_store;
 
 import catalog_delta_entry;

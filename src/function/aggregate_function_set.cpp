@@ -20,7 +20,7 @@ import base_expression;
 import aggregate_function;
 
 import infinity_exception;
-import parser;
+
 import cast_table;
 
 module aggregate_function_set;

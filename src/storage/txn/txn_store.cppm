@@ -17,7 +17,7 @@ module;
 export module txn_store;
 
 import stl;
-import parser;
+
 import data_access_state;
 import status;
 import data_type;

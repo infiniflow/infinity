@@ -30,7 +30,7 @@ import data_type;
 import third_party;
 
 import infinity_exception;
-import parser;
+
 
 namespace infinity {
 

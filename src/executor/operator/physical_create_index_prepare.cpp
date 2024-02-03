@@ -19,7 +19,7 @@ module;
 module physical_create_index_prepare;
 
 import stl;
-import parser;
+
 import physical_operator_type;
 import physical_operator;
 import query_context;

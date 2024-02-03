@@ -29,7 +29,7 @@ import column_vector;
 import expression_state;
 import base_expression;
 import expression_evaluator;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import data_block;

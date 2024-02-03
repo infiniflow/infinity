@@ -21,7 +21,7 @@ import global_resource_usage;
 import infinity_exception;
 import serialize;
 import stl;
-import parser;
+
 import serialize;
 
 module bitmask;

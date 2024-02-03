@@ -14,7 +14,7 @@
 
 export module query_options;
 
-import parser;
+
 import extra_ddl_info;
 import statement_common;
 

@@ -17,7 +17,7 @@ module;
 export module timestamp_cast;
 
 import stl;
-import parser;
+
 import column_vector_cast;
 import logical_type;
 import infinity_exception;

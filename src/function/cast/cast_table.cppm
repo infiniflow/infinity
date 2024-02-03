@@ -18,7 +18,7 @@ export module cast_table;
 
 import singleton;
 import stl;
-import parser;
+
 import logical_type;
 
 namespace infinity {

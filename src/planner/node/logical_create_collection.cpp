@@ -20,7 +20,7 @@ module logical_create_collection;
 
 import stl;
 import column_binding;
-import parser;
+
 import base_expression;
 import logical_type;
 import data_type;

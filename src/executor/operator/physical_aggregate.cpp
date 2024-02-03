@@ -25,7 +25,7 @@ import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import operator_state;
 import data_block;
 import utility;
@@ -34,7 +34,7 @@ import column_vector;
 import third_party;
 import infinity_exception;
 import default_values;
-import parser;
+
 import expression_state;
 import expression_evaluator;
 import aggregate_expression;

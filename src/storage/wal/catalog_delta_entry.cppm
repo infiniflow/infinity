@@ -20,7 +20,7 @@ import table_def;
 import index_def;
 import data_block;
 import stl;
-import parser;
+
 import infinity_exception;
 import catalog;
 import serialize;

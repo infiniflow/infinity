@@ -21,7 +21,7 @@ module physical_optimize;
 import stl;
 import txn;
 import query_context;
-import parser;
+
 import operator_state;
 import infinity_exception;
 import table_def;

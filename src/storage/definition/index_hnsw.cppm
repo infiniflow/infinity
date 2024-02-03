@@ -18,7 +18,7 @@ export module index_hnsw;
 
 import stl;
 import index_def;
-import parser;
+
 import third_party;
 import index_base;
 import base_table_ref;

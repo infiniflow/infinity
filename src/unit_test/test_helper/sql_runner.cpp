@@ -25,7 +25,7 @@ import session;
 import query_context;
 import infinity_context;
 import third_party;
-import parser;
+import sql_parser;
 import logical_planner;
 import optimizer;
 import physical_planner;

@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import query_context;
 import column_expr;
 

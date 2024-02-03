@@ -23,7 +23,7 @@ import compilation_config;
 import local_file_system;
 import file_system;
 import file_system_type;
-import parser;
+
 import third_party;
 import profiler;
 import infinity;

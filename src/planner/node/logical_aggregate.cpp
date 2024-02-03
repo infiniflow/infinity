@@ -20,7 +20,7 @@ module logical_aggregate;
 
 import stl;
 import column_binding;
-import parser;
+
 import base_expression;
 import data_type;
 

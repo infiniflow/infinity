@@ -20,7 +20,7 @@ export module unary_operator;
 
 import stl;
 import column_vector;
-import parser;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;

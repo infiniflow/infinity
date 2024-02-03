@@ -22,7 +22,7 @@ import stl;
 import data_type;
 import infinity_exception;
 import column_binding;
-import parser;
+
 
 namespace infinity {
 

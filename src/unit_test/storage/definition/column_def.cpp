@@ -20,7 +20,7 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import infinity_context;
 import data_type;
 import logical_type;

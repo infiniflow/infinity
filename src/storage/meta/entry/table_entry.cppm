@@ -22,7 +22,7 @@ import :table_index_meta;
 import :base_entry;
 
 import stl;
-import parser;
+
 import txn_store;
 import buffer_manager;
 import third_party;

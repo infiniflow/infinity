@@ -22,7 +22,7 @@ import stl;
 import buffer_handle;
 import third_party;
 import buffer_obj;
-import parser;
+
 import index_file_worker;
 import status;
 import index_base;

@@ -18,14 +18,14 @@ module;
 
 module catalog;
 
-import parser;
+
 import third_party;
 import local_file_system;
 import default_values;
 import random;
 import index_def;
 import index_base;
-import parser;
+
 import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;

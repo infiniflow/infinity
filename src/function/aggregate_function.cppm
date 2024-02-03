@@ -25,7 +25,7 @@ import column_vector;
 import vector_buffer;
 import infinity_exception;
 import base_expression;
-import parser;
+
 import logical_type;
 import data_type;
 

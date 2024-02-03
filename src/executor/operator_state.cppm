@@ -24,7 +24,7 @@ import data_block;
 import table_scan_function_data;
 import knn_scan_data;
 import table_def;
-import parser;
+
 import merge_knn_data;
 import create_index_data;
 import blocking_queue;

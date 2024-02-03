@@ -21,7 +21,7 @@ module column_vector;
 
 import stl;
 import selection;
-import parser;
+
 import type_info;
 import infinity_exception;
 import default_values;

@@ -23,7 +23,7 @@ import base_table_ref;
 import column_binding;
 import logical_node_type;
 import knn_expression;
-import parser;
+
 import default_values;
 import catalog;
 import logical_type;

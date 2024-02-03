@@ -16,7 +16,7 @@ module;
 
 export module index_file_worker;
 
-import parser;
+
 import index_base;
 import file_worker;
 import stl;

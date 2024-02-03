@@ -17,7 +17,7 @@ module dependent_join_flattener;
 
 import status;
 import stl;
-import parser;
+
 import logical_node;
 import logical_node_type;
 import third_party;

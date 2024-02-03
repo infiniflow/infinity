@@ -22,7 +22,7 @@ import query_result;
 import table;
 import infinity_context;
 import query_context;
-import parser;
+
 import create_statement;
 import drop_statement;
 import show_statement;

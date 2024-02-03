@@ -19,7 +19,7 @@ import :db_entry;
 import :base_entry;
 
 import stl;
-import parser;
+
 import buffer_manager;
 import third_party;
 import status;

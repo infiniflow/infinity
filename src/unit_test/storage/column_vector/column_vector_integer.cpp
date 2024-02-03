@@ -20,7 +20,7 @@ import logical_type;
 import logger;
 import column_vector;
 import value;
-import parser;
+
 import default_values;
 import third_party;
 import stl;

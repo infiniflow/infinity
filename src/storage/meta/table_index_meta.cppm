@@ -20,7 +20,7 @@ import :table_index_entry;
 import :base_entry;
 
 import stl;
-import parser;
+
 import third_party;
 import index_def;
 import status;

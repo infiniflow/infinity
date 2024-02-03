@@ -20,7 +20,7 @@ module;
 module index_secondary;
 
 import stl;
-import parser;
+
 import base_table_ref;
 import infinity_exception;
 import third_party;

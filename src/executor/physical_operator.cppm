@@ -20,7 +20,7 @@ import stl;
 import physical_operator_type;
 import query_context;
 import operator_state;
-import parser;
+
 import data_table;
 import base_table_ref;
 import load_meta;

@@ -23,7 +23,7 @@ import logger;
 import data_table;
 import table_def;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import column_vector;

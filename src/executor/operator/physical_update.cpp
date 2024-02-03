@@ -19,7 +19,7 @@ module;
 module physical_update;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;

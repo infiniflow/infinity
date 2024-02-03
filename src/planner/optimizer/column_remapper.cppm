@@ -24,7 +24,7 @@ import base_expression;
 import column_binding;
 import query_context;
 import column_expression;
-import parser;
+
 import optimizer_rule;
 import logical_node_type;
 

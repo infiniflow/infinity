@@ -17,7 +17,7 @@ module;
 export module binding;
 
 import stl;
-import parser;
+
 import block_index;
 import catalog;
 import data_type;

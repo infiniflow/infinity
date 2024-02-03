@@ -15,7 +15,7 @@
 #include "unit_test/base_test.h"
 
 import third_party;
-import parser;
+
 import stl;
 import infinity_context;
 import query_driver;

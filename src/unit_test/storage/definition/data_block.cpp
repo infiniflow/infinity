@@ -20,7 +20,7 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import table_def;
 import data_block;
 import default_values;

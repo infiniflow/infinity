@@ -18,7 +18,7 @@ import stl;
 import bitmask;
 import column_vector;
 import infinity_exception;
-import parser;
+
 import bitmask_buffer;
 import embedding_info;
 

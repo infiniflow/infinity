@@ -20,7 +20,7 @@ module txn_store;
 
 import stl;
 import third_party;
-import parser;
+
 import status;
 import infinity_exception;
 import data_block;

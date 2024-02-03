@@ -70,7 +70,7 @@ import physical_match;
 import physical_fusion;
 import status;
 import physical_operator_type;
-import parser;
+
 import explain_logical_plan;
 import logical_show;
 import infinity_exception;

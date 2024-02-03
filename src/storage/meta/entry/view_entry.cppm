@@ -19,7 +19,7 @@ export module catalog:view_entry;
 import :base_entry;
 import data_type;
 import stl;
-import parser;
+
 import select_statement;
 import create_view_info;
 // FIXME: Not finished

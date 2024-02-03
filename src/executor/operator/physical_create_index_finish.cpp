@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import third_party;
 import logger;
 import physical_operator_type;

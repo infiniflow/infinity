@@ -22,7 +22,7 @@ import :segment_column_index_entry;
 import :base_entry;
 
 import stl;
-import parser;
+
 import txn_store;
 
 import third_party;

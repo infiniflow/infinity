@@ -22,7 +22,7 @@ import function_data;
 import column_vector;
 import data_type;
 import infinity_exception;
-import parser;
+
 import data_block;
 import bitmask;
 import unary_operator;

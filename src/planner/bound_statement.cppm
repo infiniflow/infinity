@@ -19,7 +19,7 @@ export module bound_statement;
 import stl;
 import logical_node;
 import query_context;
-import parser;
+
 import data_type;
 
 namespace infinity {

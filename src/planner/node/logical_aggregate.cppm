@@ -21,7 +21,7 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 import base_expression;
-import parser;
+
 import base_table_ref;
 import data_type;
 

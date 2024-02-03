@@ -16,7 +16,7 @@ module;
 
 import base_expression;
 import bound_select_statement;
-import parser;
+
 import column_vector;
 import expression_type;
 import value;

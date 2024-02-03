@@ -42,7 +42,7 @@ import column_vector;
 import data_block;
 import value;
 import third_party;
-import parser;
+
 import file_writer;
 import table_def;
 import file_system_type;

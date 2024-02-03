@@ -19,7 +19,7 @@ export module reference_expression;
 import stl;
 import expression_type;
 import base_expression;
-import parser;
+
 import data_type;
 
 namespace infinity {

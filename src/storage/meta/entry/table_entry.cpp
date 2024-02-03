@@ -20,7 +20,7 @@ module;
 module catalog;
 
 import stl;
-import parser;
+
 import table_entry_type;
 import third_party;
 import txn;

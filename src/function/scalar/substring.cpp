@@ -22,7 +22,7 @@ import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-import parser;
+
 import third_party;
 import column_vector;
 import data_type;

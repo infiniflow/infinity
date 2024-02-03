@@ -20,7 +20,7 @@ module physical_knn_scan;
 
 import stl;
 import query_context;
-import parser;
+
 import logger;
 import operator_state;
 import global_block_id;

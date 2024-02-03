@@ -21,7 +21,7 @@ module;
 export module column_vector;
 
 import stl;
-import parser;
+
 import global_resource_usage;
 import vector_buffer;
 import bitmask;

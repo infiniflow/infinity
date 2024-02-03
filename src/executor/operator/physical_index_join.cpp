@@ -18,7 +18,7 @@ module;
 import stl;
 import query_context;
 import operator_state;
-import parser;
+
 
 module physical_index_join;
 

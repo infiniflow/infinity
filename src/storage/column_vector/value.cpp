@@ -18,7 +18,7 @@ module;
 
 module value;
 
-import parser;
+
 import stl;
 import global_resource_usage;
 import logger;

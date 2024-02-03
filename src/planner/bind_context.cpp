@@ -17,7 +17,7 @@ module;
 module bind_context;
 
 import stl;
-import parser;
+
 import binding;
 import third_party;
 import status;

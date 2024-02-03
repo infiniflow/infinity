@@ -53,7 +53,7 @@ import base_expression;
 
 import logical_node_type;
 import third_party;
-import parser;
+
 import expression_type;
 import knn_expression;
 import aggregate_expression;

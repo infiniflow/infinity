@@ -21,7 +21,7 @@ module;
 module physical_match;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;

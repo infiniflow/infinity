@@ -21,7 +21,7 @@ import query_options;
 import query_result;
 import infinity_context;
 import query_context;
-import parser;
+
 import infinity_exception;
 import logger;
 import insert_statement;

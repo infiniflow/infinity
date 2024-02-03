@@ -15,7 +15,7 @@ module;
 
 export module value;
 
-import parser;
+
 import stl;
 import type_info;
 import logical_type;

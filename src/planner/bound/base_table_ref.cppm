@@ -21,7 +21,7 @@ export module base_table_ref;
 import stl;
 import table_ref;
 import catalog;
-import parser;
+
 import table_function;
 import block_index;
 import data_type;

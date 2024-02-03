@@ -17,7 +17,7 @@ module;
 export module bind_context;
 
 import stl;
-import parser;
+
 import column_binding;
 import third_party;
 

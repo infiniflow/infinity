@@ -22,7 +22,7 @@ export module binary_operator;
 import stl;
 import column_vector;
 import vector_buffer;
-import parser;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;

@@ -27,7 +27,7 @@ import local_file_system;
 import third_party;
 import catalog;
 import table_entry_type;
-import parser;
+
 import txn_store;
 import data_access_state;
 import status;

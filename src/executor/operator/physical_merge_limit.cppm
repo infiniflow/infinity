@@ -17,7 +17,7 @@ module;
 export module physical_merge_limit;
 
 import stl;
-import parser;
+
 import base_expression;
 import query_context;
 import operator_state;

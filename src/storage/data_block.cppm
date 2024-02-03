@@ -19,7 +19,7 @@ export module data_block;
 import stl;
 import default_values;
 import selection;
-import parser;
+
 import column_vector;
 import value;
 import data_type;

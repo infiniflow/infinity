@@ -20,7 +20,7 @@ module physical_sink;
 
 import stl;
 import query_context;
-import parser;
+
 import operator_state;
 import physical_operator_type;
 import fragment_context;

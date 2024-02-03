@@ -22,7 +22,7 @@ import status;
 import infinity_exception;
 import aggregate_function;
 import aggregate_function_set;
-import parser;
+
 import third_party;
 import logical_type;
 import data_type;

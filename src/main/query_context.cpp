@@ -28,7 +28,7 @@ import task_scheduler;
 import storage;
 import resource_manager;
 import txn;
-import parser;
+import sql_parser;
 import profiler;
 import infinity_exception;
 import logical_planner;

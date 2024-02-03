@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import function;
 import bind_context;
 import base_expression;

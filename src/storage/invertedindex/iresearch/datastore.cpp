@@ -37,7 +37,7 @@ module;
 module iresearch_datastore;
 
 import stl;
-import parser;
+
 import logger;
 import iresearch_document;
 import iresearch_analyzer;

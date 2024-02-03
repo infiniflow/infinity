@@ -21,7 +21,7 @@ import base_expression;
 import column_expression;
 import reference_expression;
 import special_function;
-import parser;
+
 import third_party;
 import logger;
 

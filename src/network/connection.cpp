@@ -30,7 +30,7 @@ import query_context;
 import infinity_context;
 import third_party;
 import data_table;
-import parser;
+
 import logical_node_type;
 import query_result;
 import session_manager;

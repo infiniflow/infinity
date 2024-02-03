@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import base_table_ref;
 
 import infinity_exception;

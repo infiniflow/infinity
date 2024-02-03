@@ -16,7 +16,7 @@ module;
 
 export module varchar_cast;
 
-import parser;
+
 import stl;
 import bound_cast_func;
 import column_vector_cast;

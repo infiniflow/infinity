@@ -18,7 +18,7 @@ export module index_ivfflat;
 
 import stl;
 import index_def;
-import parser;
+
 import index_base;
 import third_party;
 import base_table_ref;

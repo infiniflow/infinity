@@ -17,7 +17,7 @@ module;
 export module physical_optimize;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;

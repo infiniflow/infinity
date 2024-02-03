@@ -112,7 +112,7 @@ import logical_command;
 import logical_match;
 import logical_fusion;
 
-import parser;
+
 import value;
 import value_expression;
 import explain_physical_plan;

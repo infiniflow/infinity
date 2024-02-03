@@ -18,7 +18,7 @@ import stl;
 import logical_node_type;
 import column_binding;
 import load_meta;
-import parser;
+
 import data_type;
 
 export module logical_node;

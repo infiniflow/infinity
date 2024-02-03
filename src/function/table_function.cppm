@@ -19,7 +19,7 @@ export module table_function;
 import stl;
 import function;
 import function_data;
-import parser;
+
 //import query_context;
 import data_block;
 import logical_type;

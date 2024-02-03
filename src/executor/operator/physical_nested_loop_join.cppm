@@ -17,7 +17,7 @@ module;
 export module physical_nested_loop_join;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;

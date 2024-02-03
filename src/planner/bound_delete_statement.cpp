@@ -37,7 +37,7 @@ import logical_table_scan;
 import logical_filter;
 import logical_delete;
 import subquery_unnest;
-import parser;
+
 import conjunction_expression;
 import table_reference;
 

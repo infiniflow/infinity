@@ -20,7 +20,7 @@ import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import catalog;
 import data_type;
 import statement_common;

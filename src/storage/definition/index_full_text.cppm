@@ -18,7 +18,7 @@ export module index_full_text;
 
 import stl;
 import index_def;
-import parser;
+
 import third_party;
 import index_base;
 import create_index_info;

@@ -23,7 +23,7 @@ import base_table_ref;
 import column_binding;
 import logical_node_type;
 import match_expression;
-import parser;
+
 import default_values;
 import third_party;
 import catalog;

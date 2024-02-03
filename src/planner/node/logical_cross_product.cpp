@@ -21,7 +21,7 @@ module logical_cross_product;
 import stl;
 import column_binding;
 import logical_node_type;
-import parser;
+
 import data_type;
 
 namespace infinity {

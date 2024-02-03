@@ -23,7 +23,7 @@ import base_expression;
 import subquery_expression;
 import column_expression;
 import status;
-import parser;
+
 import query_context;
 import bind_context;
 import expression_type;

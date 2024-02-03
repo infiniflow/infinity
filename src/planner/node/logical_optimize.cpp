@@ -19,7 +19,7 @@ module;
 module logical_optimize;
 
 import stl;
-import parser;
+
 import column_binding;
 import data_type;
 

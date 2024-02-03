@@ -26,7 +26,7 @@ import index_def;
 import infinity_exception;
 import data_type;
 import stl;
-import parser;
+
 import third_party;
 import logger;
 

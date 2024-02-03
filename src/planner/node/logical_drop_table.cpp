@@ -21,7 +21,7 @@ module logical_drop_table;
 import stl;
 import column_binding;
 import logical_node_type;
-import parser;
+
 import logical_type;
 import data_type;
 

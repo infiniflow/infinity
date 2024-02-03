@@ -18,7 +18,7 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+import sql_parser;
 import logger;
 import stl;
 import infinity_context;

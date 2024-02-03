@@ -16,7 +16,7 @@ module;
 
 export module view;
 
-import parser;
+
 import stl;
 import data_type;
 import select_statement;

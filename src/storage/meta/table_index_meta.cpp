@@ -19,7 +19,7 @@ module;
 module catalog;
 
 import stl;
-import parser;
+
 import index_def;
 import txn_manager;
 import default_values;

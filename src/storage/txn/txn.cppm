@@ -16,7 +16,7 @@ module;
 export module txn;
 
 import stl;
-import parser;
+
 import table_detail;
 import table_def;
 import index_def;

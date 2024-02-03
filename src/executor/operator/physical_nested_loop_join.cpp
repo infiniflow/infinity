@@ -16,7 +16,7 @@ module;
 
 #include <string>
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 

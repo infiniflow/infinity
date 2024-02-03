@@ -20,7 +20,7 @@ module logical_view_scan;
 
 import stl;
 import column_binding;
-import parser;
+
 import base_expression;
 import view;
 import data_type;

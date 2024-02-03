@@ -19,7 +19,7 @@ export module catalog:table_meta;
 import :base_entry;
 
 import stl;
-import parser;
+
 import third_party;
 import table_entry_type;
 import buffer_manager;

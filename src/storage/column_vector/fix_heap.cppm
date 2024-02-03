@@ -20,7 +20,7 @@ import global_resource_usage;
 import stl;
 import vector_heap_chunk;
 import default_values;
-import parser;
+
 import data_type;
 
 namespace infinity {

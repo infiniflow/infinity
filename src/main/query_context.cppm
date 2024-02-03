@@ -24,7 +24,7 @@ import profiler;
 import storage;
 import txn;
 import data_table;
-import parser;
+import sql_parser;
 import optimizer;
 import status;
 import query_result;

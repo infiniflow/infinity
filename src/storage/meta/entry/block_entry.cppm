@@ -22,7 +22,7 @@ import :base_entry;
 import stl;
 import default_values;
 import third_party;
-import parser;
+
 import local_file_system;
 import column_vector;
 import bitmask;

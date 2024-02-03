@@ -17,7 +17,7 @@ module;
 export module merge_knn;
 
 import stl;
-import parser;
+
 import knn_result_handler;
 
 import infinity_exception;

@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import column_expr;
 import infinity_exception;
 import third_party;

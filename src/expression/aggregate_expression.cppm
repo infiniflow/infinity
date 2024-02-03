@@ -18,7 +18,7 @@ export module aggregate_expression;
 
 import column_binding;
 import base_expression;
-import parser;
+
 import stl;
 import aggregate_function;
 import data_type;

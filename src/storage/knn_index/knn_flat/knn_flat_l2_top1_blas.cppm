@@ -19,7 +19,7 @@ export module knn_flat_l2_top1_blas;
 import stl;
 import knn_result_handler;
 import knn_distance;
-import parser;
+
 
 import infinity_exception;
 import default_values;

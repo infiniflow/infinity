@@ -17,7 +17,7 @@ module;
 export module index_base;
 
 import stl;
-import parser;
+
 import third_party;
 import create_index_info;
 

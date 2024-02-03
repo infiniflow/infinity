@@ -17,7 +17,7 @@ module;
 export module cast_expression;
 
 import column_binding;
-import parser;
+
 import stl;
 import expression_type;
 import bound_cast_func;

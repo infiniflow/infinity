@@ -14,7 +14,7 @@
 
 module;
 
-import parser;
+
 import stl;
 import base_statement;
 import create_statement;

@@ -33,7 +33,7 @@ import infinity_context;
 import session;
 import session_manager;
 import query_context;
-import parser;
+
 import status;
 import create_statement;
 import show_statement;

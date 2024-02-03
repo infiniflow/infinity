@@ -16,7 +16,7 @@ module;
 
 module cast_expression;
 
-import parser;
+
 import base_expression;
 import logical_type;
 import infinity_exception;

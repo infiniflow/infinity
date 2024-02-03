@@ -16,7 +16,7 @@ module;
 
 export module float_cast;
 
-import parser;
+
 import stl;
 import bound_cast_func;
 import vector_buffer;

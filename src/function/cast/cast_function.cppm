@@ -17,7 +17,7 @@ module;
 export module cast_function;
 
 import bound_cast_func;
-import parser;
+
 import data_type;
 
 namespace infinity {

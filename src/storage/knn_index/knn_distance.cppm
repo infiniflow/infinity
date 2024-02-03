@@ -17,7 +17,7 @@ module;
 export module knn_distance;
 
 import stl;
-import parser;
+
 import bitmask;
 import knn_expr;
 import data_type;

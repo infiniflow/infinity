@@ -32,7 +32,7 @@ export import :irs_index_entry;
 export import :base_entry;
 
 import stl;
-import parser;
+
 
 import table_def;
 import function;

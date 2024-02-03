@@ -19,7 +19,7 @@ module;
 export module knn_result_handler;
 
 import stl;
-import parser;
+
 import infinity_exception;
 import bitmask;
 import data_type;

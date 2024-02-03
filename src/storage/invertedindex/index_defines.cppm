@@ -3,7 +3,7 @@ module;
 export module index_defines;
 
 import stl;
-import parser;
+
 import default_values;
 import data_type;
 

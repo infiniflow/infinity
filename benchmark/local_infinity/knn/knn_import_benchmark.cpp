@@ -26,7 +26,7 @@ import infinity;
 import database;
 import table;
 import logical_type;
-import parser;
+
 import profiler;
 import local_file_system;
 import third_party;

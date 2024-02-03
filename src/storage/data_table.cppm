@@ -19,7 +19,7 @@ export module data_table;
 import table_def;
 import base_table;
 import stl;
-import parser;
+
 import data_block;
 import infinity_exception;
 import data_type;

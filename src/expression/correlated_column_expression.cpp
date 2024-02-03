@@ -20,7 +20,7 @@ module correlated_column_expression;
 
 import stl;
 import expression_type;
-import parser;
+
 import data_type;
 
 namespace infinity {

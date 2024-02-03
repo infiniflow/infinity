@@ -18,7 +18,7 @@ import compilation_config;
 import buffer_manager;
 import buffer_obj;
 import buffer_handle;
-import parser;
+
 import file_worker;
 import data_type;
 import block_column_iter;

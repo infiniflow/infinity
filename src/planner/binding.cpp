@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import block_index;
 import catalog;
 

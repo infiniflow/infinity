@@ -17,7 +17,7 @@ export module table;
 import stl;
 import query_options;
 import value;
-import parser;
+
 import session;
 import query_result;
 import parsed_expr;

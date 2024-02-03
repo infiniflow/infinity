@@ -17,7 +17,7 @@ module;
 export module physical_sort;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import expression_evaluator;

@@ -20,7 +20,7 @@ module logical_planner;
 
 import stl;
 import bind_context;
-import parser;
+
 
 import infinity_exception;
 import query_binder;
@@ -60,7 +60,7 @@ import explain_logical_plan;
 import explain_ast;
 
 import local_file_system;
-import parser;
+
 import index_def;
 import status;
 import default_values;

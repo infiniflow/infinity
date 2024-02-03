@@ -20,7 +20,7 @@ export module knn_flat_ip;
 
 import stl;
 import knn_distance;
-import parser;
+
 import knn_result_handler;
 import infinity_exception;
 import default_values;

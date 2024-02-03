@@ -18,7 +18,7 @@ export module function_expression;
 
 import stl;
 import base_expression;
-import parser;
+
 import scalar_function;
 import data_type;
 

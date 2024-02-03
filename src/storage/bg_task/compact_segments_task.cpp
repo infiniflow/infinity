@@ -23,7 +23,7 @@ import stl;
 import catalog;
 import default_values;
 import infinity_exception;
-import parser;
+
 import data_access_state;
 import column_vector;
 import buffer_manager;

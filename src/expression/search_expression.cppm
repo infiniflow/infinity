@@ -17,7 +17,7 @@ module;
 export module search_expression;
 
 import stl;
-import parser;
+
 import base_expression;
 import fusion_expression;
 import match_expression;

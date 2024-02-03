@@ -21,7 +21,7 @@ module query_binder;
 import stl;
 import data_type;
 import infinity_exception;
-import parser;
+
 import bind_context;
 import join_table_ref;
 import base_table_ref;

@@ -18,7 +18,7 @@ export module special_function;
 
 import stl;
 import function;
-import parser;
+
 import data_type;
 
 namespace infinity {

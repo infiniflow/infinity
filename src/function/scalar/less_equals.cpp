@@ -24,7 +24,7 @@ import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-import parser;
+
 import third_party;
 import data_type;
 

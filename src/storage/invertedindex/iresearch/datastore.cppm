@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;

@@ -18,7 +18,7 @@ module project_binder;
 
 import stl;
 import base_expression;
-import parser;
+
 import bind_context;
 import function;
 import function_set;

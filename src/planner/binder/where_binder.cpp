@@ -18,7 +18,7 @@ module where_binder;
 
 import stl;
 import base_expression;
-import parser;
+
 import function;
 import bind_context;
 

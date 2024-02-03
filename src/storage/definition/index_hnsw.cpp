@@ -20,7 +20,7 @@ module;
 module index_hnsw;
 
 import stl;
-import parser;
+
 import index_def;
 import third_party;
 import infinity_exception;

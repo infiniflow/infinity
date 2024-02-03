@@ -17,7 +17,7 @@ module;
 export module join_table_ref;
 
 import stl;
-import parser;
+
 import table_ref;
 import base_expression;
 import table_reference;

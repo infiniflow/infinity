@@ -20,7 +20,7 @@ import stl;
 import knn_result_handler;
 import bitmask;
 import knn_distance;
-import parser;
+
 
 import infinity_exception;
 import default_values;

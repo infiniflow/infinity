@@ -20,7 +20,7 @@ module catalog;
 
 import stl;
 import buffer_manager;
-import parser;
+
 import buffer_obj;
 import buffer_handle;
 import column_vector;

@@ -24,7 +24,7 @@ import default_values;
 import third_party;
 import buffer_manager;
 import data_access_state;
-import parser;
+
 import infinity_exception;
 
 namespace infinity {

@@ -16,7 +16,7 @@ module;
 
 export module varchar_layout;
 
-import parser;
+
 import stl;
 import data_type;
 

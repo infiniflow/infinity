@@ -11,7 +11,7 @@ import index_config;
 import index_segment_reader;
 import posting_writer;
 import data_block;
-import parser;
+
 import column_vector;
 import analyzer;
 import sequential_column_inverter;

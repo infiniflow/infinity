@@ -22,7 +22,7 @@ import :base_entry;
 
 import stl;
 import table_entry_type;
-import parser;
+
 import logger;
 import default_values;
 import third_party;

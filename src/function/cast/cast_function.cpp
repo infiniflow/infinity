@@ -21,7 +21,7 @@ import integer_cast;
 import float_cast;
 import embedding_cast;
 import varchar_cast;
-import parser;
+
 import third_party;
 
 module cast_function;

@@ -20,7 +20,7 @@ module;
 import stl;
 import index_base;
 import third_party;
-import parser;
+
 import serialize;
 import infinity_exception;
 import statement_common;

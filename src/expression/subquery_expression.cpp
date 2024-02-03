@@ -21,7 +21,7 @@ module subquery_expression;
 import stl;
 import bound_select_statement;
 import expression_type;
-import parser;
+
 import logical_type;
 
 namespace infinity {

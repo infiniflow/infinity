@@ -19,7 +19,7 @@ module;
 export module secondary_index_data;
 
 import stl;
-import parser;
+
 import default_values;
 import file_system;
 import file_system_type;

@@ -19,7 +19,7 @@ export module hnsw_file_worker;
 import stl;
 import index_file_worker;
 import hnsw_alg;
-import parser;
+
 import index_base;
 import knn_expr;
 import column_def;

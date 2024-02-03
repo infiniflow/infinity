@@ -20,7 +20,7 @@ module between_expression;
 
 import stl;
 import expression_type;
-import parser;
+
 import logical_type;
 
 namespace infinity {

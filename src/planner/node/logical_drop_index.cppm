@@ -17,7 +17,7 @@ module;
 export module logical_drop_index;
 
 import stl;
-import parser;
+
 import logical_node;
 import logical_node_type;
 import column_binding;

@@ -20,7 +20,7 @@ import :base_entry;
 
 import stl;
 import buffer_obj;
-import parser;
+
 import third_party;
 import buffer_manager;
 import column_vector;

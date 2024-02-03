@@ -25,7 +25,7 @@
 #include <unordered_set>
 
 import compilation_config;
-import parser;
+
 import profiler;
 import local_file_system;
 import third_party;

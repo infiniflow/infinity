@@ -19,7 +19,7 @@ module;
 module fragment_context;
 
 import stl;
-import parser;
+
 import fragment_task;
 
 import infinity_exception;

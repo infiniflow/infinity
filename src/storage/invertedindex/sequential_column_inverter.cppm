@@ -4,7 +4,7 @@ export module sequential_column_inverter;
 
 import stl;
 import analyzer;
-import parser;
+
 import column_vector;
 import memory_pool;
 import pool_allocator;

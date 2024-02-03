@@ -17,7 +17,7 @@ module;
 export module plan_fragment;
 
 import stl;
-import parser;
+
 import data_table;
 import fragment_context;
 import physical_operator;

@@ -21,7 +21,7 @@ module physical_show;
 import stl;
 import txn;
 import query_context;
-import parser;
+
 import profiler;
 import operator_state;
 import data_block;

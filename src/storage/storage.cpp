@@ -32,7 +32,7 @@ import builtin_functions;
 import local_file_system;
 import third_party;
 import logger;
-import parser;
+
 import txn;
 import infinity_exception;
 import status;

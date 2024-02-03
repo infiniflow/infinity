@@ -19,7 +19,7 @@ export module catalog:view_meta;
 import :base_entry;
 
 import stl;
-import parser;
+
 import status;
 import column_def;
 

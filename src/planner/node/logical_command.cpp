@@ -21,7 +21,7 @@ module logical_command;
 import stl;
 import column_binding;
 import logical_node_type;
-import parser;
+
 import logical_type;
 import infinity_exception;
 import data_type;
