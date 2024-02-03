@@ -24,6 +24,7 @@ import parser;
 import base_expression;
 import base_table_ref;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

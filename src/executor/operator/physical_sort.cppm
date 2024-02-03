@@ -30,6 +30,7 @@ import load_meta;
 import infinity_exception;
 import physical_top;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

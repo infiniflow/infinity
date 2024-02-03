@@ -22,6 +22,7 @@ import parser;
 import stl;
 import column_expression;
 import data_type;
+import subquery_expr;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import logical_node;
 import parser;
 import base_expression;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

@@ -23,5 +23,7 @@ namespace infinity {
 export using infinity::SelectStatement;
 export using infinity::OrderByExpr;
 export using infinity::WithExpr;
+export using infinity::OrderType;
+export using infinity::SetOperatorType;
 
 }

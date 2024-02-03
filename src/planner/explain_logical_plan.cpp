@@ -69,6 +69,7 @@ import infinity_exception;
 import data_type;
 import knn_expr;
 import select_statement;
+import extra_ddl_info;
 
 namespace infinity {
 

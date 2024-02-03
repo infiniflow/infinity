@@ -71,11 +71,11 @@ export using infinity::FlushType;
 export using infinity::OptimizeType;
 //export using infinity::IndexType;
 
-export using infinity::UseCmd;
-export using infinity::CheckTable;
-export using infinity::SetCmd;
-export using infinity::ExportCmd;
-export using infinity::CompactTable;
+//export using infinity::UseCmd;
+//export using infinity::CheckTable;
+//export using infinity::SetCmd;
+//export using infinity::ExportCmd;
+//export using infinity::CompactTable;
 
 export using infinity::InitParameter;
 
@@ -87,22 +87,22 @@ export using infinity::SubqueryReference;
 
 export using infinity::ShowStmtType;
 export using infinity::CopyFileType;
-export using infinity::SetOperatorType;
+//export using infinity::SetOperatorType;
 
-export using infinity::OrderType;
-export using infinity::LiteralType;
-export using infinity::SubqueryType;
+//export using infinity::OrderType;
+//export using infinity::LiteralType;
+//export using infinity::SubqueryType;
 export using infinity::JoinType;
-export using infinity::KnnDistanceType;
-export using infinity::CommandType;
-export using infinity::SetVarType;
-export using infinity::ExportType;
-export using infinity::SetScope;
+//export using infinity::KnnDistanceType;
+//export using infinity::CommandType;
+//export using infinity::SetVarType;
+//export using infinity::ExportType;
+//export using infinity::SetScope;
 
 export using infinity::ColumnDef;
 export using infinity::TableConstraint;
 
-export using infinity::ConflictTypeToStr;
+//export using infinity::ConflictTypeToStr;
 export using infinity::EmbeddingType;
 export using infinity::ConstrainTypeToString;
 export using infinity::ToEmbeddingDataType;

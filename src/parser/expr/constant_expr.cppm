@@ -21,5 +21,6 @@ export module constant_expr;
 namespace infinity {
 
 export using infinity::ConstantExpr;
+export using infinity::LiteralType;
 
 }

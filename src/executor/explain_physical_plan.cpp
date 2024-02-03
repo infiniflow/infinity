@@ -80,6 +80,7 @@ import knn_expression;
 import third_party;
 import select_statement;
 import knn_expr;
+import extra_ddl_info;
 
 namespace infinity {
 

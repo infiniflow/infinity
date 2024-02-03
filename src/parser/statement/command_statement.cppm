@@ -22,5 +22,14 @@ namespace infinity {
 
 export using infinity::CommandStatement;
 export using infinity::CommandInfo;
+export using infinity::CommandType;
+export using infinity::SetVarType;
+export using infinity::ExportType;
+export using infinity::SetScope;
+export using infinity::SetCmd;
+export using infinity::UseCmd;
+export using infinity::CheckTable;
+export using infinity::ExportCmd;
+export using infinity::CompactTable;
 
 }

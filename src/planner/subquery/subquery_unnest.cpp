@@ -52,7 +52,7 @@ import cast_table;
 
 import catalog;
 import third_party;
-
+import subquery_expr;
 import infinity_exception;
 
 namespace infinity {

@@ -33,6 +33,7 @@ import load_meta;
 import infinity_exception;
 import physical_limit;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

@@ -29,6 +29,7 @@ import infinity_exception;
 import base_table_ref;
 import physical_top;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

@@ -30,6 +30,7 @@ import select_statement;
 import delete_statement;
 import update_statement;
 import parsed_expr;
+import knn_expr;
 
 export module query_binder;
 

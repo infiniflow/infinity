@@ -21,5 +21,6 @@ export module subquery_expr;
 namespace infinity {
 
 export using infinity::SubqueryExpr;
+export using infinity::SubqueryType;
 
 }
