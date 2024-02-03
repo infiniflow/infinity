@@ -16,6 +16,8 @@ import memory_indexer;
 import third_party;
 namespace infinity {
 
+TermPostings::TermPostings(MemoryIndexer *memory_indexer) : memory_indexer_(memory_indexer), terms_{0, ValueRefHash{}, TermEq{postings_}} {}
+
 void TermPostings::GetSorted(Vector<const TermPosting *> &term_postings) {
     term_postings.resize(term_postings.size());
 
@@ -51,8 +53,10 @@ TermPosting *TermPostings::Emplace(StringView term) {
 }
 
 ParallelColumnInverter::ParallelColumnInverter(MemoryIndexer *memory_indexer)
-    : memory_indexer_(memory_indexer), term_postings_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()),
-      jieba_specialize_(memory_indexer->IsJiebaSpecialize()), alloc_(memory_indexer->GetPool()) {}
+    : memory_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
+      alloc_(memory_indexer->GetPool()) {
+    term_postings_ = MakeUnique<TermPostings>(memory_indexer_);
+}
 
 ParallelColumnInverter::~ParallelColumnInverter() {}
 
@@ -61,7 +65,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     analyzer_->Analyze(val, terms_once_, jieba_specialize_);
     for (auto it = terms_once_.begin(); it != terms_once_.end(); ++it) {
         StringView term(it->text_);
-        TermPosting *term_posting = term_postings_.Emplace(term);
+        TermPosting *term_posting = term_postings_->Emplace(term);
         term_posting->values_.emplace_back(doc_id, it->word_offset_);
     }
 }

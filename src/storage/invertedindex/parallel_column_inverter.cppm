@@ -80,7 +80,7 @@ public:
     TermPostings(const TermPostings &&) = delete;
     TermPostings &operator=(const TermPostings &) = delete;
     TermPostings &operator=(const TermPostings &&) = delete;
-    TermPostings(MemoryIndexer *memory_indexer) : memory_indexer_(memory_indexer), terms_{0, ValueRefHash{}, TermEq{postings_}} {}
+    explicit TermPostings(MemoryIndexer *memory_indexer);
     ~TermPostings() {}
 
     void Clear() {
@@ -113,7 +113,7 @@ private:
 
 export class ParallelColumnInverter {
 public:
-    ParallelColumnInverter(MemoryIndexer *memory_indexer);
+    explicit ParallelColumnInverter(MemoryIndexer *memory_indexer);
     ParallelColumnInverter(const ParallelColumnInverter &) = delete;
     ParallelColumnInverter(const ParallelColumnInverter &&) = delete;
     ParallelColumnInverter &operator=(const ParallelColumnInverter &) = delete;
@@ -130,7 +130,7 @@ public:
 
 private:
     MemoryIndexer *memory_indexer_{nullptr};
-    TermPostings term_postings_;
+    UniquePtr<TermPostings> term_postings_;
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;
