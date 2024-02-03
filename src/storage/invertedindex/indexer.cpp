@@ -20,7 +20,6 @@ import third_party;
 import column_indexer;
 import logical_type;
 import index_builder;
-module indexer;
 
 namespace infinity {
 Indexer::Indexer() {}

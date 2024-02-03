@@ -28,7 +28,7 @@ void TermPostings::GetSorted(Vector<const TermPosting *> &term_postings) {
     std::sort(term_postings.begin(), term_postings.end(), [](const auto lhs, const auto rhs) { return StringViewCompare(lhs->term_, rhs->term_); });
 }
 
-TermPosting *TermPostings::Emplace(StringView term) {
+TermPosting *TermPostings::Emplace(std::string_view term) {
     const HashedStringView hashed_term{term};
 
     bool is_new = false;
@@ -64,7 +64,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     terms_once_.clear();
     analyzer_->Analyze(val, terms_once_, jieba_specialize_);
     for (auto it = terms_once_.begin(); it != terms_once_.end(); ++it) {
-        StringView term(it->text_);
+        std::string_view term(it->text_);
         TermPosting *term_posting = term_postings_->Emplace(term);
         term_posting->values_.emplace_back(doc_id, it->word_offset_);
     }
