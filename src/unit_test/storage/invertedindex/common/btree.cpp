@@ -32,6 +32,11 @@ TEST_F(BtreeTest, test1) {
     MemoryPool memory_pool;
     SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator = MakeShared<vespalib::alloc::MemoryPoolAllocator>(&memory_pool);
     Btree<u32, u32> btree(memory_allocator.get());
+    GenerationHandler generation_handler;
+    GenerationHandler::generation_t generation = generation_handler.getCurrentGeneration();
+    btree.getAllocator().assign_generation(generation);
+    btree.getAllocator().freeze();
+
     btree.insert(1, 2);
     btree.insert(3, 4);
     btree.insert(5, 6);
@@ -45,5 +50,18 @@ TEST_F(BtreeTest, test1) {
     for (; iter.valid(); ++iter, ++i) {
         EXPECT_EQ(iter.getKey(), 2 * i + 1);
         EXPECT_EQ(iter.getData(), 2 * i + 2);
+    }
+
+    GenerationHandler::generation_t oldest_used_gen = generation_handler.get_oldest_used_generation();
+    generation_handler.incGeneration();
+    generation = generation_handler.getCurrentGeneration();
+    btree.getAllocator().reclaim_memory(oldest_used_gen);
+
+    std::cout << "usedBytes " << btree.getMemoryUsage().usedBytes() << " allocatedBytes " << btree.getMemoryUsage().allocatedBytes()
+              << " allocatedBytesOnHold " << btree.getMemoryUsage().allocatedBytesOnHold() << std::endl;
+
+    std::cout << "oldest_used_gen " << oldest_used_gen << " currentgen " << generation << std::endl;
+    for (auto it = btree.begin(); it.valid(); ++it) {
+        std::cout << "key " << it.getKey() << " value " << it.getData() << std::endl;
     }
 }

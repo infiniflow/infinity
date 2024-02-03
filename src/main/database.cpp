@@ -30,10 +30,8 @@ import command_statement;
 
 namespace infinity {
 
-QueryResult Database::CreateTable(const String &table_name,
-                                  Vector<ColumnDef *> column_defs,
-                                  Vector<TableConstraint *> constraints,
-                                  const CreateTableOptions &) {
+QueryResult
+Database::CreateTable(const String &table_name, Vector<ColumnDef *> column_defs, Vector<TableConstraint *> constraints, const CreateTableOptions &) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -81,7 +79,7 @@ QueryResult Database::ListTables() {
     return result;
 }
 
-QueryResult Database::DescribeTable(const String &) {
+QueryResult Database::DescribeTable(const String &table_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -89,7 +87,23 @@ QueryResult Database::DescribeTable(const String &) {
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name_;
+    show_statement->table_name_ = table_name;
     show_statement->show_type_ = ShowStmtType::kColumns;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Database::ShowTables() {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name_;
+    show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
 }
@@ -103,7 +117,7 @@ UniquePtr<Table> Database::GetTable(const String &table_name) {
                             InfinityContext::instance().session_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<CheckTable>(table_name.c_str());
-    QueryResult result= query_context_ptr->QueryStatement(command_statement.get());
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     if (result.status_.ok()) {
         return MakeUnique<Table>(table_name, session_);
     } else {

@@ -1,6 +1,6 @@
 module;
 
-export module column_inverter;
+export module sequential_column_inverter;
 import stl;
 import analyzer;
 import parser;
@@ -26,15 +26,15 @@ public:
     bool ZeroRefCount();
 };
 
-class ColumnIndexer;
-export class ColumnInverter {
+class MemoryIndexer;
+export class SequentialColumnInverter {
 public:
-    ColumnInverter(ColumnIndexer *column_indexer);
-    ColumnInverter(const ColumnInverter &) = delete;
-    ColumnInverter(const ColumnInverter &&) = delete;
-    ColumnInverter &operator=(const ColumnInverter &) = delete;
-    ColumnInverter &operator=(const ColumnInverter &&) = delete;
-    ~ColumnInverter();
+    SequentialColumnInverter(MemoryIndexer *memory_indexer);
+    SequentialColumnInverter(const SequentialColumnInverter &) = delete;
+    SequentialColumnInverter(const SequentialColumnInverter &&) = delete;
+    SequentialColumnInverter &operator=(const SequentialColumnInverter &) = delete;
+    SequentialColumnInverter &operator=(const SequentialColumnInverter &&) = delete;
+    ~SequentialColumnInverter();
 
     void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
 
@@ -67,6 +67,8 @@ public:
             return term_pos_ < rhs.term_pos_;
         }
     };
+
+    void Flush();
 
 private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;
@@ -105,7 +107,7 @@ private:
 
     void DoRTInsert();
 
-    ColumnIndexer *column_indexer_{nullptr};
+    MemoryIndexer *memory_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;

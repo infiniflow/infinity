@@ -637,15 +637,46 @@ public:
         }
     }
 
-    void DescribeDatabase(infinity_thrift_rpc::DescribeDatabaseResponse &response,
-                          const infinity_thrift_rpc::DescribeDatabaseRequest &request) override {
+    void DescribeDatabase(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeDatabaseRequest &request) override {
         // Your implementation goes here
         printf("DescribeDatabase\n");
     }
 
-    void DescribeTable(infinity_thrift_rpc::DescribeTableResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) override {
-        // Your implementation goes here
-        printf("DescribeTable\n");
+    void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) override {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+        String table_name = request.table_name;
+
+        const QueryResult result = database->DescribeTable(table_name);
+
+        if (result.IsOk()) {
+            auto &columns = response.column_fields;
+            columns.resize(result.result_table_->ColumnCount());
+            ProcessDataBlocks(result, response, columns);
+            response.__set_success(true);
+        } else {
+            response.__set_success(false);
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+        }
+    }
+
+    void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) override {
+        auto infinity = GetInfinityBySessionID(request.session_id);
+        auto database = infinity->GetDatabase(request.db_name);
+
+        const QueryResult result = database->ShowTables();
+
+        if (result.IsOk()) {
+            auto &columns = response.column_fields;
+            columns.resize(result.result_table_->ColumnCount());
+            ProcessDataBlocks(result, response, columns);
+            response.__set_success(true);
+        } else {
+            response.__set_success(false);
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+        }
     }
 
     void GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) override {

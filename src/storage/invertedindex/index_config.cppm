@@ -12,6 +12,10 @@ public:
 
     u64 GetMemoryQuota() const { return memory_quota_; }
 
+    void SetIndexingParallelism(u32 count) { indexing_threads_ = count; }
+
+    u32 GetIndexingParallelism() const { return indexing_threads_; }
+
     void SetOptionFlag(optionflag_t flag) {
         flag_ = flag;
         posting_format_option_.InitOptionFlag(flag_);
@@ -43,6 +47,7 @@ public:
 private:
     String index_name_;
     u64 memory_quota_;
+    u32 indexing_threads_{1};
     PostingFormatOption posting_format_option_;
     optionflag_t flag_;
     bool is_short_list_vbyte_compress_;

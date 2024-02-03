@@ -345,22 +345,23 @@ void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_chec
                 block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
             }
         }
-    }
-    if (block_entries.empty()) {
-        return;
-    }
-    for (BlockEntry *block_entry : block_entries) {
-        LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                              block_entry->checkpoint_ts(),
-                              block_entry->min_row_ts(),
-                              block_entry->max_row_ts(),
-                              max_commit_ts));
-        block_entry->Flush(max_commit_ts);
-        LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                              block_entry->checkpoint_ts(),
-                              block_entry->min_row_ts(),
-                              block_entry->max_row_ts(),
-                              max_commit_ts));
+
+        if (block_entries.empty()) {
+            return;
+        }
+        for (BlockEntry *block_entry : block_entries) {
+            LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                                  block_entry->checkpoint_ts(),
+                                  block_entry->min_row_ts(),
+                                  block_entry->max_row_ts(),
+                                  max_commit_ts));
+            block_entry->Flush(max_commit_ts);
+            LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
+                                  block_entry->checkpoint_ts(),
+                                  block_entry->min_row_ts(),
+                                  block_entry->max_row_ts(),
+                                  max_commit_ts));
+        }
     }
 }
 

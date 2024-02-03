@@ -304,6 +304,8 @@ class UpdateRequest;
 
 class ShowVariableRequest;
 
+class ShowTablesRequest;
+
 
 class Option : public virtual ::apache::thrift::TBase {
  public:
@@ -3708,6 +3710,56 @@ class ShowVariableRequest : public virtual ::apache::thrift::TBase {
 void swap(ShowVariableRequest &a, ShowVariableRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowVariableRequest& obj);
+
+typedef struct _ShowTablesRequest__isset {
+  _ShowTablesRequest__isset() : session_id(false), db_name(false) {}
+  bool session_id :1;
+  bool db_name :1;
+} _ShowTablesRequest__isset;
+
+class ShowTablesRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowTablesRequest(const ShowTablesRequest&);
+  ShowTablesRequest& operator=(const ShowTablesRequest&);
+  ShowTablesRequest() noexcept
+                    : session_id(0),
+                      db_name() {
+  }
+
+  virtual ~ShowTablesRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+
+  _ShowTablesRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  bool operator == (const ShowTablesRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowTablesRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowTablesRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowTablesRequest &a, ShowTablesRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowTablesRequest& obj);
 
 } // namespace
 
