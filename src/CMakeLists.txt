@@ -383,6 +383,8 @@ target_link_libraries(test_hnsw
 
 add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
 
+target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
+
 target_link_libraries(test_hnsw_bitmask
     infinity_core
     sql_parser
