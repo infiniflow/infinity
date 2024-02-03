@@ -24,6 +24,7 @@ import logger;
 import stl;
 import infinity_context;
 import decimal_info;
+import parser_assert;
 
 class DecimalInfoTest : public BaseTest {};
 

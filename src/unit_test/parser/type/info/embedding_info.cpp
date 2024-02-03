@@ -25,6 +25,8 @@ import stl;
 import infinity_context;
 import embedding_info;
 import knn_expr;
+import parser_assert;
+import parser_defaults;
 
 class EmbeddingInfoTest : public BaseTest {};
 

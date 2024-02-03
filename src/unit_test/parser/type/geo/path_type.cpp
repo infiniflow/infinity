@@ -22,6 +22,8 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import parser_assert;
+
 #if 0
 class PathTypeTest : public BaseTest {};
 

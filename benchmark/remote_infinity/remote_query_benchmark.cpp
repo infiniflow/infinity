@@ -30,6 +30,7 @@ import profiler;
 import local_file_system;
 import third_party;
 import statement_common;
+import data_type;
 
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;

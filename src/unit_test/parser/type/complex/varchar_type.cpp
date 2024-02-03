@@ -23,6 +23,7 @@ import logger;
 import stl;
 import infinity_context;
 import data_type;
+import parser_assert;
 
 class VarcharTypeTest : public BaseTest {};
 

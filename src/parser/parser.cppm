@@ -14,8 +14,8 @@
 module;
 
 #include "sql_parser.h"
-#include "type/info/array_info.h"
-#include "type/number/float16.h"
+//#include "type/info/array_info.h"
+//#include "type/number/float16.h"
 
 export module parser;
 
@@ -47,20 +47,20 @@ export using infinity::SQLParser;
 
 //export using infinity::EmbeddingDataType;
 
-export template <typename T>
-int32_t GetSizeInBytes(const T &value);
+//export template <typename T>
+//int32_t GetSizeInBytes(const T &value);
+//
+//export template <>
+//int32_t GetSizeInBytes(const std::string &value);
 
-export template <>
-int32_t GetSizeInBytes(const std::string &value);
-
-export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
-export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
-export constexpr uint64_t VARCHAR_PREFIX_LEN = VARCHAR_PREFIX_LENGTH;
-export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;
-export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
+//export constexpr int64_t EMBEDDING_LIMIT = EMBEDDING_LIMIT_INTERNAL;
+//export constexpr int64_t MAX_BITMAP_SIZE = MAX_BITMAP_SIZE_INTERNAL;
+//export constexpr uint64_t VARCHAR_PREFIX_LEN = VARCHAR_PREFIX_LENGTH;
+//export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;
+//export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
 
 // Parser Exception
-export using infinity::ParserException;
+//export using infinity::ParserException;
 
 
 //export using infinity::DDLType;

@@ -11,22 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 
-#include "serialize.h"
+#include "parser_assert.h"
 
-export module serialize;
+export module parser_assert;
 
 namespace infinity {
 
-export using infinity::GetSizeInBytes;
-export using infinity::ReadBuf;
-export using infinity::ReadBufAdv;
-export using infinity::WriteBuf;
-export using infinity::WriteBufAdv;
-
-export using infinity::WriteBufAdv;
-
+export using infinity::ParserException;
 
 }
