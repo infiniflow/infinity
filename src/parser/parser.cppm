@@ -23,7 +23,7 @@ export module parser;
 namespace infinity {
 
 export using IrsFilter = irs::filter;
-export using infinity::SearchOptions;
+
 export using infinity::QueryDriver;
 
 export using infinity::SQLParser;

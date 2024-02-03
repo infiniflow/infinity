@@ -39,6 +39,7 @@ import iresearch_document;
 import iresearch_analyzer;
 import third_party;
 import logger;
+import search_options;
 
 using namespace infinity;
 

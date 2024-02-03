@@ -11,31 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 
-export module fusion_expression;
+#include "search_options.h"
 
-import stl;
-import base_expression;
-import parser;
-import logical_type;
-import data_type;
-import search_options;
+export module search_options;
 
 namespace infinity {
 
-export class FusionExpression : public BaseExpression {
-public:
-    FusionExpression(const String &method, SharedPtr<SearchOptions> options);
+export using infinity::SearchOptions;
 
-    [[nodiscard]] inline DataType Type() const override { return DataType(LogicalType::kFloat); }
-
-    String ToString() const override;
-
-public:
-    String method_{};
-    SharedPtr<SearchOptions> options_{};
-};
-
-} // namespace infinity
+}

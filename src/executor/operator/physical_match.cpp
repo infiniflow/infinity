@@ -45,6 +45,7 @@ import base_table_ref;
 import load_meta;
 import catalog;
 import logical_type;
+import search_options;
 
 namespace infinity {
 
