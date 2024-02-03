@@ -144,10 +144,39 @@ void MemoryIndexer::SwitchActiveInverter() {
     ++num_inverters_;
 }
 
+void MemoryIndexer::SwitchActiveParallelInverters() {
+    inflight_parallel_inverters_.emplace_back(std::move(parallel_inverters_));
+    while (!inflight_parallel_inverters_.empty()) {
+        free_parallel_inverters_.emplace_back(std::move(inflight_parallel_inverters_.front()));
+        inflight_inverters_.pop_front();
+    }
+    if (!free_parallel_inverters_.empty()) {
+        parallel_inverters_ = std::move(free_parallel_inverters_.back());
+        free_parallel_inverters_.pop_back();
+        return;
+    }
+    if (num_inverters_ >= max_inverters_) {
+        parallel_inverters_ = std::move(inflight_parallel_inverters_.front());
+        inflight_parallel_inverters_.pop_front();
+        return;
+    }
+    parallel_inverters_.resize(index_config_.GetIndexingParallelism());
+    for (u32 i = 0; i < index_config_.GetIndexingParallelism(); ++i) {
+        parallel_inverters_[i] = MakeUnique<ParallelColumnInverter>(this);
+    }
+
+    ++num_inverters_;
+}
+
 void MemoryIndexer::Commit() {
-    auto task = MakeUnique<CommitTask>(inverter_.get());
-    commit_executor_->Execute(0, std::move(task));
-    SwitchActiveInverter();
+    if (index_config_.GetIndexingParallelism() > 1) {
+        SwitchActiveParallelInverters();
+        invert_executor_->SyncAll();
+    } else {
+        auto task = MakeUnique<CommitTask>(inverter_.get());
+        commit_executor_->Execute(0, std::move(task));
+        SwitchActiveInverter();
+    }
 }
 
 bool MemoryIndexer::NeedDump() { return indexer_->NeedDump(); }

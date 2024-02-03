@@ -35,7 +35,7 @@ public:
     SequentialColumnInverter(const SequentialColumnInverter &&) = delete;
     SequentialColumnInverter &operator=(const SequentialColumnInverter &) = delete;
     SequentialColumnInverter &operator=(const SequentialColumnInverter &&) = delete;
-    ~SequentialColumnInverter();
+    virtual ~SequentialColumnInverter();
 
     void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) override;
 

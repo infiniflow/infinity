@@ -119,15 +119,15 @@ public:
     ParallelColumnInverter(const ParallelColumnInverter &&) = delete;
     ParallelColumnInverter &operator=(const ParallelColumnInverter &) = delete;
     ParallelColumnInverter &operator=(const ParallelColumnInverter &&) = delete;
-    ~ParallelColumnInverter();
+    virtual ~ParallelColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) override;
 
-    void InvertColumn(u32 doc_id, const String &val);
+    void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Commit();
+    void Commit() override;
 
-    void Flush();
+    void Flush() override;
 
 private:
     MemoryIndexer *memory_indexer_{nullptr};

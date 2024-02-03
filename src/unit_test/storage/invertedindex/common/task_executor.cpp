@@ -32,7 +32,7 @@ class Executor {
 public:
     UniquePtr<SequencedTaskExecutor> executor_;
 
-    Executor() : executor_(SequencedTaskExecutor::Create(SequencedTask, 2, 1000)) {}
+    Executor() : executor_(SequencedTaskExecutor::Create(SequencedTask, 10, 1000)) {}
 };
 
 class Task {
@@ -83,7 +83,7 @@ TEST_F(TaskExecutorTest, test2) {
     EXPECT_EQ(0, task->val_);
 
     executor.executor_->ExecuteLambda(0, [=]() {
-        usleep(2000);
+        usleep(200);
         task->Modify(0, 10);
     });
     executor.executor_->ExecuteLambda(0, [=]() { task->Modify(10, 20); });
@@ -102,7 +102,7 @@ TEST_F(TaskExecutorTest, test3) {
         SharedPtr<Task> task(MakeShared<Task>());
         EXPECT_EQ(0, task->val_);
         executor.executor_->ExecuteLambda(0, [=]() {
-            usleep(2000);
+            usleep(200);
             task->Modify(0, 10);
         });
         executor.executor_->ExecuteLambda(1, [=]() { task->Modify(10, 20); });
@@ -118,4 +118,30 @@ TEST_F(TaskExecutorTest, test3) {
         break;
     }
     EXPECT_TRUE(try_count < 100);
+}
+
+class Inverter {
+public:
+    Inverter() {}
+
+    void Add() {
+        std::lock_guard<std::mutex> guard(m_);
+        ++val_;
+    }
+
+    std::mutex m_;
+    std::condition_variable cv_;
+    int val_{0};
+};
+
+TEST_F(TaskExecutorTest, test4) {
+    Executor executor;
+    SharedPtr<Inverter> task = MakeShared<Inverter>();
+    EXPECT_EQ(0, task->val_);
+
+    for (u32 i = 0; i < 10; ++i) {
+        executor.executor_->ExecuteLambda(i, [=]() { task->Add(); });
+    }
+    executor.executor_->SyncAll();
+    EXPECT_EQ(10, task->val_);
 }

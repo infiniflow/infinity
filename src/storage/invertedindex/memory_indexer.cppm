@@ -92,6 +92,8 @@ private:
 
     void SwitchActiveInverter();
 
+    void SwitchActiveParallelInverters();
+
 private:
     Indexer *indexer_{nullptr};
     IndexMode index_mode_{NEAR_REAL_TIME};
@@ -108,7 +110,10 @@ private:
     Vector<UniquePtr<SequentialColumnInverter>> free_inverters_;
     Deque<UniquePtr<SequentialColumnInverter>> inflight_inverters_;
     UniquePtr<SequentialColumnInverter> inverter_;
+
     Vector<UniquePtr<ParallelColumnInverter>> parallel_inverters_;
+    Vector<Vector<UniquePtr<ParallelColumnInverter>>> free_parallel_inverters_;
+    Deque<Vector<UniquePtr<ParallelColumnInverter>>> inflight_parallel_inverters_;
 
     u32 num_inverters_;
     u32 max_inverters_;
