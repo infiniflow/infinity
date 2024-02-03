@@ -49,7 +49,7 @@ static u32 Align(u32 unaligned) {
 }
 
 SequentialColumnInverter::SequentialColumnInverter(MemoryIndexer *memory_indexer)
-    : column_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
+    : memory_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
       alloc_(memory_indexer->GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
 
 SequentialColumnInverter::~SequentialColumnInverter() {}
@@ -141,14 +141,14 @@ void SequentialColumnInverter::Commit() {
                                                                                        &positions_[0],
                                                                                        positions_.size(),
                                                                                        16);
-    if (column_indexer_->IsRealTime()) {
+    if (memory_indexer_->IsRealTime()) {
         DoRTInsert();
     } else {
         DoInsert();
     }
-    if (column_indexer_->NeedDump()) {
+    if (memory_indexer_->NeedDump()) {
         Flush();
-        column_indexer_->Reset();
+        memory_indexer_->Reset();
     }
 }
 
@@ -163,7 +163,7 @@ void SequentialColumnInverter::DoInsert() {
             if (last_term_num != i.term_num_) {
                 last_term_num = i.term_num_;
                 term = GetTermFromNum(last_term_num);
-                posting = column_indexer_->GetOrAddPosting(String(term.data()));
+                posting = memory_indexer_->GetOrAddPosting(String(term.data()));
             }
             last_doc_id = i.doc_id_;
             if (last_doc_id != 0) {
@@ -188,7 +188,7 @@ void SequentialColumnInverter::DoRTInsert() {
             if (last_term_num != i.term_num_) {
                 last_term_num = i.term_num_;
                 term = GetTermFromNum(last_term_num);
-                posting = column_indexer_->GetOrAddRTPosting(String(term.data()));
+                posting = memory_indexer_->GetOrAddRTPosting(String(term.data()));
             }
             last_doc_id = i.doc_id_;
             if (last_doc_id != 0) {

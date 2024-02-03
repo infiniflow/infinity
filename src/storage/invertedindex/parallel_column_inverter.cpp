@@ -1,4 +1,6 @@
 module;
+
+#include <string.h>
 #include <vector>
 
 module parallel_column_inverter;
@@ -24,12 +26,43 @@ void TermPostings::GetSorted(Vector<const TermPosting *> &term_postings) {
     std::sort(term_postings.begin(), term_postings.end(), [](const auto lhs, const auto rhs) { return StringViewCompare(lhs->term_, rhs->term_); });
 }
 
-TermPosting *TermPostings::Emplace(StringView term) { return nullptr; }
+TermPosting *TermPostings::Emplace(StringView term) {
+    const HashedStringView hashed_term{term};
+
+    bool is_new = false;
+    const auto it = terms_.lazy_emplace(hashed_term, [&, size = terms_.size()](const auto &ctor) {
+        ctor(size, hashed_term.hash_);
+        is_new = true;
+    });
+    if (!is_new) {
+        return &postings_[it->ref_];
+    }
+    const auto term_size = term.size();
+    try {
+        // TODO using a dedicate object pool
+        MemoryPool *pool = memory_indexer_->GetPool();
+        auto *start = (char *)pool->Allocate(term_size);
+        memcpy(start, term.data(), term_size);
+        return &postings_.emplace_back(start, term_size);
+    } catch (...) {
+        terms_.erase(it);
+        return nullptr;
+    }
+}
 
 ParallelColumnInverter::ParallelColumnInverter(MemoryIndexer *memory_indexer)
-    : column_indexer_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()), jieba_specialize_(memory_indexer->IsJiebaSpecialize()),
-      alloc_(memory_indexer->GetPool()) {}
+    : memory_indexer_(memory_indexer), term_postings_(memory_indexer), analyzer_(memory_indexer->GetAnalyzer()),
+      jieba_specialize_(memory_indexer->IsJiebaSpecialize()), alloc_(memory_indexer->GetPool()) {}
 
 ParallelColumnInverter::~ParallelColumnInverter() {}
 
+void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
+    terms_once_.clear();
+    analyzer_->Analyze(val, terms_once_, jieba_specialize_);
+    for (auto it = terms_once_.begin(); it != terms_once_.end(); ++it) {
+        StringView term(it->text_);
+        TermPosting *term_posting = term_postings_.Emplace(term);
+        term_posting->emplace_back(doc_id, it->word_offset_);
+    }
+}
 } // namespace infinity

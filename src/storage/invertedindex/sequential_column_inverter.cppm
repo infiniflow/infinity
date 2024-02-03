@@ -107,7 +107,7 @@ private:
 
     void DoRTInsert();
 
-    MemoryIndexer *column_indexer_{nullptr};
+    MemoryIndexer *memory_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;

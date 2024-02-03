@@ -57,12 +57,22 @@ struct ValueRefHash {
 export struct TermPosting {
     TermPosting(const char *data, u32 size) : term_(data, size) {}
 
+    struct PosInfo {
+        u32 doc_id_{0};
+        u32 term_pos_{0};
+
+        bool operator<(const PosInfo &rhs) const {
+            if (doc_id_ != rhs.doc_id_) {
+                return doc_id_ < rhs.doc_id_;
+            }
+            return term_pos_ < rhs.term_pos_;
+        }
+    };
     StringView term_;
-    docid_t doc_id_{INVALID_DOCID};
-    u32 tf_;
-    u32 pos_;
-    u32 off_;
+    Vector<PosInfo> values_;
 };
+
+class MemoryIndexer;
 
 export class TermPostings {
 public:
@@ -70,7 +80,7 @@ public:
     TermPostings(const TermPostings &&) = delete;
     TermPostings &operator=(const TermPostings &) = delete;
     TermPostings &operator=(const TermPostings &&) = delete;
-    TermPostings() : terms_{0, ValueRefHash{}, TermEq{postings_}} {}
+    TermPostings(MemoryIndexer *memory_indexer) : memory_indexer_(memory_indexer), terms_{0, ValueRefHash{}, TermEq{postings_}} {}
     ~TermPostings() {}
 
     void Clear() {
@@ -96,12 +106,11 @@ private:
 
         const Vector<TermPosting> *data_;
     };
-
+    MemoryIndexer *memory_indexer_{nullptr};
     Vector<TermPosting> postings_;
     FlatHashSet<ValueRef, ValueRefHash, TermEq> terms_;
 };
 
-class MemoryIndexer;
 export class ParallelColumnInverter {
 public:
     ParallelColumnInverter(MemoryIndexer *memory_indexer);
@@ -120,7 +129,8 @@ public:
     void Flush();
 
 private:
-    MemoryIndexer *column_indexer_{nullptr};
+    MemoryIndexer *memory_indexer_{nullptr};
+    TermPostings term_postings_;
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;
