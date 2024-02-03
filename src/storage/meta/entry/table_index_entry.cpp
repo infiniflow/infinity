@@ -31,6 +31,7 @@ import index_full_text;
 import catalog_delta_entry;
 import base_table_ref;
 import iresearch_datastore;
+import create_index_info;
 
 namespace infinity {
 

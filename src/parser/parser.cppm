@@ -69,7 +69,7 @@ export using infinity::TableRefType;
 export using infinity::ExplainType;
 export using infinity::FlushType;
 export using infinity::OptimizeType;
-export using infinity::IndexType;
+//export using infinity::IndexType;
 
 export using infinity::UseCmd;
 export using infinity::CheckTable;

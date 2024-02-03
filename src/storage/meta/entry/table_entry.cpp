@@ -40,6 +40,7 @@ import index_base;
 import index_full_text;
 import catalog_delta_entry;
 import extra_ddl_info;
+import create_index_info;
 
 namespace infinity {
 

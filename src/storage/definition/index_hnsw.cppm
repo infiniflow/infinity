@@ -22,6 +22,7 @@ import parser;
 import third_party;
 import index_base;
 import base_table_ref;
+import create_index_info;
 
 namespace infinity {
 

@@ -21,6 +21,7 @@ import index_def;
 import parser;
 import third_party;
 import index_base;
+import create_index_info;
 
 namespace infinity {
 

@@ -64,6 +64,7 @@ import knn_expression;
 import value;
 import status;
 import buffer_obj;
+import create_index_info;
 
 namespace infinity {
 
