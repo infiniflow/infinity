@@ -124,6 +124,7 @@ using std::ranges::equal;
 
 }
 
+using std::decay_t;
 using std::function;
 using std::numeric_limits;
 

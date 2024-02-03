@@ -165,10 +165,36 @@ public:
 
     void SetTaskLimit(u32 task_limit);
 
+    template <class Function>
+    void ExecuteLambda(u32 id, Function &&function);
+
 private:
     explicit SequencedTaskExecutor(Vector<UniquePtr<TaskExecutor>> executors);
 
     Vector<UniquePtr<TaskExecutor>> executors_;
 };
+
+template <typename Function>
+class LambdaTask : public TaskExecutor::Task {
+    Function func_;
+
+public:
+    LambdaTask(const Function &func) : func_(func) {}
+    LambdaTask(Function &func) : func_(std::move(func)) {}
+    LambdaTask(const LambdaTask &) = delete;
+    LambdaTask &operator=(const LambdaTask &) = delete;
+    ~LambdaTask() {}
+    void Run() override { func_(); }
+};
+
+template <typename Function>
+TaskExecutor::Task::ptr MakeLamdaTask(Function &&function) {
+    return MakeUnique<LambdaTask<std::decay_t<Function>>>(std::forward<Function>(function));
+}
+
+template <class Function>
+void SequencedTaskExecutor::ExecuteLambda(u32 id, Function &&function) {
+    Execute(id, MakeLamdaTask(std::forward<Function>(function)));
+}
 
 } // namespace infinity
