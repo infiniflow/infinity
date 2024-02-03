@@ -62,7 +62,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     for (auto it = terms_once_.begin(); it != terms_once_.end(); ++it) {
         StringView term(it->text_);
         TermPosting *term_posting = term_postings_.Emplace(term);
-        term_posting->emplace_back(doc_id, it->word_offset_);
+        term_posting->values_.emplace_back(doc_id, it->word_offset_);
     }
 }
 } // namespace infinity
