@@ -18,6 +18,7 @@ import stl;
 import parser;
 import table_ref;
 import bound_statement;
+import table_reference;
 
 export module subquery_table_ref;
 

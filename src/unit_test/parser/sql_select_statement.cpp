@@ -38,6 +38,10 @@ import subquery_expr;
 import between_expr;
 import cast_expr;
 import knn_expr;
+import table_reference;
+import join_reference;
+import cross_product_reference;
+import subquery_reference;
 
 class SelectStatementParsingTest : public BaseTest {};
 

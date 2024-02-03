@@ -69,6 +69,7 @@ import cross_product_table_ref;
 import join_table_ref;
 import knn_expression;
 import third_party;
+import table_reference;
 
 namespace infinity {
 

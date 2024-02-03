@@ -71,6 +71,7 @@ import knn_expr;
 import select_statement;
 import extra_ddl_info;
 import column_def;
+import join_reference;
 
 namespace infinity {
 

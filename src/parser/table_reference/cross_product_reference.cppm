@@ -14,18 +14,12 @@
 
 module;
 
-import stl;
-import parser;
-import table_ref;
-import table_reference;
+#include "cross_product_reference.h"
 
-export module dummy_table_ref;
+export module cross_product_reference;
 
 namespace infinity {
 
-class DummyTableRef : public TableRef {
-public:
-    explicit DummyTableRef() : TableRef(TableRefType::kDummy, "Dummy") {}
-};
+export using infinity::CrossProductReference;
 
-} // namespace infinity
+}

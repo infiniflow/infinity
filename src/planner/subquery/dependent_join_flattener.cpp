@@ -43,6 +43,7 @@ import scalar_function_set;
 import corrlated_expr_detector;
 import rewrite_correlated_expression;
 import data_type;
+import join_reference;
 
 namespace infinity {
 

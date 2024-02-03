@@ -41,6 +41,11 @@ import drop_collection_info;
 //import drop_index_info;
 import drop_schema_info;
 import drop_table_info;
+import base_table_reference;
+import cross_product_reference;
+import join_reference;
+import subquery_reference;
+import table_reference;
 
 namespace infinity {
 

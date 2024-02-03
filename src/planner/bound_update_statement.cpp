@@ -39,6 +39,7 @@ import logical_update;
 import subquery_unnest;
 import parser;
 import conjunction_expression;
+import table_reference;
 
 namespace infinity {
 

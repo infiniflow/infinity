@@ -27,6 +27,7 @@ import data_table;
 import load_meta;
 import infinity_exception;
 import data_type;
+import join_reference;
 
 namespace infinity {
 

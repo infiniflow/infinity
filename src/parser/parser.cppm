@@ -65,7 +65,7 @@ export using infinity::ParserException;
 //export using infinity::ConflictType;
 //export using infinity::ConstraintType;
 //export using infinity::KnnDistanceType;
-export using infinity::TableRefType;
+//export using infinity::TableRefType;
 export using infinity::ExplainType;
 export using infinity::FlushType;
 export using infinity::OptimizeType;
@@ -79,11 +79,11 @@ export using infinity::OptimizeType;
 
 export using infinity::InitParameter;
 
-export using infinity::BaseTableReference;
-export using infinity::TableReference;
-export using infinity::JoinReference;
-export using infinity::CrossProductReference;
-export using infinity::SubqueryReference;
+//export using infinity::BaseTableReference;
+//export using infinity::TableReference;
+//export using infinity::JoinReference;
+//export using infinity::CrossProductReference;
+//export using infinity::SubqueryReference;
 
 export using infinity::ShowStmtType;
 export using infinity::CopyFileType;
@@ -92,7 +92,7 @@ export using infinity::CopyFileType;
 //export using infinity::OrderType;
 //export using infinity::LiteralType;
 //export using infinity::SubqueryType;
-export using infinity::JoinType;
+//export using infinity::JoinType;
 //export using infinity::KnnDistanceType;
 //export using infinity::CommandType;
 //export using infinity::SetVarType;

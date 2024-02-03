@@ -26,6 +26,7 @@ import table_function;
 import block_index;
 import data_type;
 import infinity_exception;
+import table_reference;
 
 namespace infinity {
 

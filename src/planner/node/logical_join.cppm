@@ -23,6 +23,7 @@ import logical_node;
 import parser;
 import base_expression;
 import data_type;
+import join_reference;
 
 namespace infinity {
 

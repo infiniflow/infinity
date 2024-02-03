@@ -31,6 +31,11 @@ import delete_statement;
 import update_statement;
 import parsed_expr;
 import knn_expr;
+import table_reference;
+import base_table_reference;
+import subquery_reference;
+import join_reference;
+import cross_product_reference;
 
 export module query_binder;
 

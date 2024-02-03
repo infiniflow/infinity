@@ -62,6 +62,11 @@ import parsed_expr;
 import column_expr;
 import knn_expr;
 import column_def;
+import base_table_reference;
+import table_reference;
+import subquery_reference;
+import join_reference;
+import cross_product_reference;
 
 namespace infinity {
 

@@ -38,6 +38,7 @@ import create_index_info;
 import create_table_info;
 import drop_table_info;
 import drop_index_info;
+import table_reference;
 
 class StatementParsingTest : public BaseTest {};
 

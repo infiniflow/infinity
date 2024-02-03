@@ -14,18 +14,13 @@
 
 module;
 
-import stl;
-import parser;
-import table_ref;
-import table_reference;
+#include "table_reference.h"
 
-export module dummy_table_ref;
+export module table_reference;
 
 namespace infinity {
 
-class DummyTableRef : public TableRef {
-public:
-    explicit DummyTableRef() : TableRef(TableRefType::kDummy, "Dummy") {}
-};
+export using infinity::TableReference;
+export using infinity::TableRefType;
 
-} // namespace infinity
+}
