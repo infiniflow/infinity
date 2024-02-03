@@ -32,6 +32,8 @@ import delete_statement;
 import update_statement;
 import select_statement;
 import explain_statement;
+import drop_index_info;
+import drop_table_info;
 
 namespace infinity {
 

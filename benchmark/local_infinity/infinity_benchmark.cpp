@@ -40,6 +40,7 @@ import parsed_expr;
 import column_expr;
 import constant_expr;
 import update_statement;
+import create_index_info;
 
 using namespace infinity;
 

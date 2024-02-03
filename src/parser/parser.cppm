@@ -61,7 +61,7 @@ export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
 export using infinity::ParserException;
 
 
-export using infinity::DDLType;
+//export using infinity::DDLType;
 export using infinity::ConflictType;
 export using infinity::ConstraintType;
 export using infinity::KnnDistanceType;
@@ -71,20 +71,20 @@ export using infinity::FlushType;
 export using infinity::OptimizeType;
 export using infinity::IndexType;
 
-export using infinity::ExtraDDLInfo;
-export using infinity::CreateTableInfo;
-export using infinity::CreateIndexInfo;
-export using infinity::CreateViewInfo;
-export using infinity::CreateCollectionInfo;
-export using infinity::CreateSchemaInfo;
-
-export using infinity::DropIndexInfo;
-export using infinity::DropTableInfo;
-export using infinity::DropCollectionInfo;
-export using infinity::DropSchemaInfo;
-export using infinity::DropViewInfo;
-export using infinity::CommandInfo;
-export using infinity::IndexInfo;
+//export using infinity::ExtraDDLInfo;
+//export using infinity::CreateTableInfo;
+//export using infinity::CreateIndexInfo;
+//export using infinity::CreateViewInfo;
+//export using infinity::CreateCollectionInfo;
+//export using infinity::CreateSchemaInfo;
+//
+//export using infinity::DropIndexInfo;
+//export using infinity::DropTableInfo;
+//export using infinity::DropCollectionInfo;
+//export using infinity::DropSchemaInfo;
+//export using infinity::DropViewInfo;
+//export using infinity::CommandInfo;
+//export using infinity::IndexInfo;
 
 export using infinity::UseCmd;
 export using infinity::CheckTable;
@@ -113,24 +113,6 @@ export using infinity::CommandType;
 export using infinity::SetVarType;
 export using infinity::ExportType;
 export using infinity::SetScope;
-
-
-//export using infinity::ColumnExpr;
-//export using infinity::ConstantExpr;
-//export using infinity::FunctionExpr;
-//export using infinity::KnnExpr;
-//export using infinity::MatchExpr;
-//export using infinity::QueryExpr;
-//export using infinity::FusionExpr;
-//export using infinity::SearchExpr;
-//export using infinity::BetweenExpr;
-//export using infinity::SubqueryExpr;
-//export using infinity::CaseExpr;
-//export using infinity::WhenThen;
-//export using infinity::CastExpr;
-//export using infinity::WithExpr;
-//export using infinity::UpdateExpr;
-//export using infinity::InExpr;
 
 export using infinity::ColumnDef;
 export using infinity::TableConstraint;

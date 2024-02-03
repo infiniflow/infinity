@@ -26,6 +26,7 @@ import index_def;
 import load_meta;
 import infinity_exception;
 import data_type;
+import create_view_info;
 
 namespace infinity {
 

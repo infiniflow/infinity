@@ -43,6 +43,7 @@ import segment_iter;
 import secondary_index_data;
 import type_info;
 import embedding_info;
+import create_index_info;
 
 namespace infinity {
 

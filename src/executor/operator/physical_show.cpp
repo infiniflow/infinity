@@ -54,6 +54,7 @@ import buffer_manager;
 import session_manager;
 import compilation_config;
 import logical_type;
+import create_index_info;
 
 namespace infinity {
 

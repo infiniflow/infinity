@@ -26,6 +26,7 @@ import operator_state;
 import load_meta;
 import infinity_exception;
 import base_table_ref;
+import command_statement;
 
 namespace infinity {
 

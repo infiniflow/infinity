@@ -29,6 +29,9 @@ import decimal_info;
 import embedding_info;
 import base_statement;
 import create_statement;
+import extra_ddl_info;
+import create_table_info;
+import create_index_info;
 
 class SQLParserTest : public BaseTest {};
 

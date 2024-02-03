@@ -14,13 +14,12 @@
 
 module;
 
-#include "command_statement.h"
+#include "drop_view_info.h"
 
-export module command_statement;
+export module drop_view_info;
 
 namespace infinity {
 
-export using infinity::CommandStatement;
-export using infinity::CommandInfo;
+export using infinity::DropViewInfo;
 
 }

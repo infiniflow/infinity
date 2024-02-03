@@ -33,6 +33,11 @@ import insert_statement;
 import column_expr;
 import function_expr;
 import constant_expr;
+import extra_ddl_info;
+import create_index_info;
+import create_table_info;
+import drop_table_info;
+import drop_index_info;
 
 class StatementParsingTest : public BaseTest {};
 

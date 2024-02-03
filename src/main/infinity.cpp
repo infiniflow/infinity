@@ -40,6 +40,8 @@ import show_statement;
 import drop_statement;
 import command_statement;
 import flush_statement;
+import create_schema_info;
+import drop_schema_info;
 
 namespace infinity {
 

@@ -20,6 +20,7 @@ import parser;
 import stl;
 import data_type;
 import select_statement;
+import create_view_info;
 
 // A view means a logical plan
 namespace infinity {

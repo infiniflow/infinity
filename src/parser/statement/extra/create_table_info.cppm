@@ -14,13 +14,12 @@
 
 module;
 
-#include "command_statement.h"
+#include "create_table_info.h"
 
-export module command_statement;
+export module create_table_info;
 
 namespace infinity {
 
-export using infinity::CommandStatement;
-export using infinity::CommandInfo;
+export using infinity::CreateTableInfo;
 
 }

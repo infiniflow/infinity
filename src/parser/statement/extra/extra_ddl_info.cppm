@@ -14,13 +14,13 @@
 
 module;
 
-#include "command_statement.h"
+#include "extra_ddl_info.h"
 
-export module command_statement;
+export module extra_ddl_info;
 
 namespace infinity {
 
-export using infinity::CommandStatement;
-export using infinity::CommandInfo;
+export using infinity::ExtraDDLInfo;
+export using infinity::DDLType;
 
 }

@@ -27,6 +27,8 @@ import create_statement;
 import drop_statement;
 import show_statement;
 import command_statement;
+import create_table_info;
+import drop_table_info;
 
 namespace infinity {
 

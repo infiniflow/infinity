@@ -23,6 +23,7 @@ import query_result;
 import parsed_expr;
 import search_expr;
 import update_statement;
+import create_index_info;
 
 namespace infinity {
 
