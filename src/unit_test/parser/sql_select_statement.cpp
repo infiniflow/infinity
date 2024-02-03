@@ -37,6 +37,7 @@ import case_expr;
 import subquery_expr;
 import between_expr;
 import cast_expr;
+import knn_expr;
 
 class SelectStatementParsingTest : public BaseTest {};
 

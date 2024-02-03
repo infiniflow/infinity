@@ -31,6 +31,7 @@ import embedding_info;
 import parsed_expr;
 import column_expr;
 import extra_ddl_info;
+import knn_expr;
 
 class InfinityTableTest : public BaseTest {
     void SetUp() override {

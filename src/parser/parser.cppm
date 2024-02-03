@@ -43,7 +43,7 @@ export using infinity::MixedType;
 export using infinity::MixedValueType;
 export using infinity::TupleMixedType;
 
-export using infinity::EmbeddingDataType;
+//export using infinity::EmbeddingDataType;
 
 export template <typename T>
 int32_t GetSizeInBytes(const T &value);
@@ -64,7 +64,7 @@ export using infinity::ParserException;
 //export using infinity::DDLType;
 //export using infinity::ConflictType;
 export using infinity::ConstraintType;
-export using infinity::KnnDistanceType;
+//export using infinity::KnnDistanceType;
 export using infinity::TableRefType;
 export using infinity::ExplainType;
 export using infinity::FlushType;

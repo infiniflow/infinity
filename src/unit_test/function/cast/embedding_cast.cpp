@@ -38,6 +38,7 @@ import bound_cast_func;
 import data_type;
 import logical_type;
 import embedding_info;
+import knn_expr;
 
 class EmbeddingCastTest : public BaseTest {};
 

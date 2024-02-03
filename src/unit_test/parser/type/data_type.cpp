@@ -28,6 +28,7 @@ import type_info;
 import bitmap_info;
 import decimal_info;
 import embedding_info;
+import knn_expr;
 
 class DataTypeTest : public BaseTest {};
 

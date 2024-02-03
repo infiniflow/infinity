@@ -27,6 +27,7 @@ import index_ivfflat;
 import logical_type;
 import embedding_info;
 import create_index_info;
+import knn_expr;
 
 namespace infinity {
 

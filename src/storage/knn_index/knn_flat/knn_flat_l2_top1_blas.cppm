@@ -14,6 +14,8 @@
 
 module;
 
+export module knn_flat_l2_top1_blas;
+
 import stl;
 import knn_result_handler;
 import knn_distance;
@@ -24,8 +26,7 @@ import default_values;
 import vector_distance;
 import mlas_matrix_multiply;
 import bitmask;
-
-export module knn_flat_l2_top1_blas;
+import knn_expr;
 
 namespace infinity {
 

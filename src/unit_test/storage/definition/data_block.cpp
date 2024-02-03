@@ -32,6 +32,7 @@ import logical_type;
 import decimal_info;
 import embedding_info;
 import array_info;
+import knn_expr;
 
 class DataBlockTest : public BaseTest {};
 

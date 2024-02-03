@@ -15,6 +15,9 @@
 module;
 
 #include <functional>
+
+export module knn_flat_ip;
+
 import stl;
 import knn_distance;
 import parser;
@@ -23,8 +26,7 @@ import infinity_exception;
 import default_values;
 import vector_distance;
 import bitmask;
-
-export module knn_flat_ip;
+import knn_expr;
 
 namespace infinity {
 

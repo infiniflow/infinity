@@ -24,6 +24,7 @@ import logger;
 import stl;
 import infinity_context;
 import embedding_info;
+import knn_expr;
 
 class EmbeddingInfoTest : public BaseTest {};
 

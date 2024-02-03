@@ -21,6 +21,7 @@ import base_expression;
 import parser;
 import logical_type;
 import data_type;
+import knn_expr;
 
 namespace infinity {
 

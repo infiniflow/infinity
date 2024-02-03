@@ -30,6 +30,7 @@ import global_resource_usage;
 import data_type;
 import logical_type;
 import embedding_info;
+import knn_expr;
 
 class ColumnVectorEmbeddingTest : public BaseTest {};
 

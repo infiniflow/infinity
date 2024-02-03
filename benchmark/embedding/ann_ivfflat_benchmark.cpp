@@ -16,6 +16,7 @@ import ann_ivf_flat;
 import annivfflat_index_data;
 import parser;
 import local_file_system;
+import knn_expr;
 
 static const char *sift1m_train = "/benchmark_dataset/sift1M/sift_learn.fvecs";
 static const char *sift1M_base = "/benchmark_dataset/sift1M/sift_base.fvecs";

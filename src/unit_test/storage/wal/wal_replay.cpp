@@ -50,6 +50,7 @@ import data_type;
 import logical_type;
 import embedding_info;
 import extra_ddl_info;
+import knn_expr;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }

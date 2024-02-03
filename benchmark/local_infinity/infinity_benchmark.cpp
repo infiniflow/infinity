@@ -42,6 +42,7 @@ import constant_expr;
 import update_statement;
 import create_index_info;
 import extra_ddl_info;
+import knn_expr;
 
 using namespace infinity;
 

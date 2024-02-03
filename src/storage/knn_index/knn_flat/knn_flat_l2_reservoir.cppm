@@ -14,6 +14,8 @@
 
 module;
 
+export module knn_flat_l2_reservoir;
+
 import stl;
 import knn_result_handler;
 import knn_distance;
@@ -23,8 +25,7 @@ import parser;
 import infinity_exception;
 import default_values;
 import vector_distance;
-
-export module knn_flat_l2_reservoir;
+import knn_expr;
 
 namespace infinity {
 

@@ -24,6 +24,7 @@ import parser;
 import knn_flat_ip_blas;
 import infinity_context;
 import bitmask;
+import knn_expr;
 
 class KnnFlatIpBlasTest : public BaseTest {};
 

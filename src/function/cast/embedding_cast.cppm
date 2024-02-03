@@ -31,6 +31,7 @@ import status;
 import logical_type;
 import data_type;
 import embedding_info;
+import knn_expr;
 
 namespace infinity {
 

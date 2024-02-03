@@ -14,6 +14,8 @@
 
 module;
 
+export module knn_flat_ip_blas;
+
 import stl;
 import knn_result_handler;
 import knn_distance;
@@ -22,8 +24,7 @@ import infinity_exception;
 import default_values;
 import mlas_matrix_multiply;
 import bitmask;
-
-export module knn_flat_ip_blas;
+import knn_expr;
 
 namespace infinity {
 

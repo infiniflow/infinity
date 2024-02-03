@@ -23,6 +23,7 @@ import logger;
 import parser;
 import knn_flat_l2_blas_reservoir;
 import infinity_context;
+import knn_expr;
 
 class KnnFlatL2BlasReservoirTest : public BaseTest {};
 

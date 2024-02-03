@@ -36,6 +36,7 @@ import create_index_info;
 import query_options;
 import query_result;
 import extra_ddl_info;
+import knn_expr;
 
 using namespace infinity;
 
