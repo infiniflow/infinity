@@ -36,6 +36,7 @@ import infinity_exception;
 import base_table_ref;
 import logical_type;
 import data_type;
+import extra_ddl_info;
 
 using namespace infinity;
 

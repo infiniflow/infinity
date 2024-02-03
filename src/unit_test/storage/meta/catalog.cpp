@@ -31,6 +31,7 @@ import txn_manager;
 import txn;
 import catalog;
 import status;
+import extra_ddl_info;
 
 class CatalogTest : public BaseTest {
     void SetUp() override {

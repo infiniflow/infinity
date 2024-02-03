@@ -24,6 +24,7 @@ import physical_operator_type;
 import operator_state;
 import status;
 import load_meta;
+import extra_ddl_info;
 
 module physical_create_table;
 

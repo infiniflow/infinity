@@ -30,6 +30,7 @@ import third_party;
 import infinity_exception;
 import status;
 import iresearch_datastore;
+import extra_ddl_info;
 
 namespace infinity {
 

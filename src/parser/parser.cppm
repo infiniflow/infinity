@@ -62,7 +62,7 @@ export using infinity::ParserException;
 
 
 //export using infinity::DDLType;
-export using infinity::ConflictType;
+//export using infinity::ConflictType;
 export using infinity::ConstraintType;
 export using infinity::KnnDistanceType;
 export using infinity::TableRefType;
@@ -70,21 +70,6 @@ export using infinity::ExplainType;
 export using infinity::FlushType;
 export using infinity::OptimizeType;
 export using infinity::IndexType;
-
-//export using infinity::ExtraDDLInfo;
-//export using infinity::CreateTableInfo;
-//export using infinity::CreateIndexInfo;
-//export using infinity::CreateViewInfo;
-//export using infinity::CreateCollectionInfo;
-//export using infinity::CreateSchemaInfo;
-//
-//export using infinity::DropIndexInfo;
-//export using infinity::DropTableInfo;
-//export using infinity::DropCollectionInfo;
-//export using infinity::DropSchemaInfo;
-//export using infinity::DropViewInfo;
-//export using infinity::CommandInfo;
-//export using infinity::IndexInfo;
 
 export using infinity::UseCmd;
 export using infinity::CheckTable;

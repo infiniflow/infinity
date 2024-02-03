@@ -29,6 +29,7 @@ import parser;
 import data_type;
 import logical_type;
 import create_index_info;
+import extra_ddl_info;
 
 using namespace infinity;
 

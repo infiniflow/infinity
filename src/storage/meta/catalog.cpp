@@ -41,6 +41,7 @@ import txn_store;
 import data_access_state;
 import catalog_delta_entry;
 import file_writer;
+import extra_ddl_info;
 
 namespace infinity {
 

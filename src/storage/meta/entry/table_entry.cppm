@@ -30,6 +30,7 @@ import table_entry_type;
 import block_index;
 import data_access_state;
 import status;
+import extra_ddl_info;
 
 namespace infinity {
 

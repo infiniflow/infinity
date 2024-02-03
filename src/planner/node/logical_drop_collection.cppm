@@ -22,6 +22,7 @@ import logical_node;
 import logical_node_type;
 import column_binding;
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 

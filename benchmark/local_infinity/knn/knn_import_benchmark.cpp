@@ -35,6 +35,7 @@ import embedding_info;
 import create_index_info;
 import query_options;
 import query_result;
+import extra_ddl_info;
 
 using namespace infinity;
 

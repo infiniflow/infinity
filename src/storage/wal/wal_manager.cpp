@@ -32,6 +32,7 @@ import txn_store;
 import data_access_state;
 import status;
 import bg_task;
+import extra_ddl_info;
 
 import infinity_exception;
 // #include "statement/extra/extra_ddl_info.h"

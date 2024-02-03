@@ -24,6 +24,7 @@ import parser;
 import third_party;
 import index_def;
 import status;
+import extra_ddl_info;
 
 namespace infinity {
 

@@ -30,6 +30,7 @@ import data_type;
 import embedding_info;
 import parsed_expr;
 import column_expr;
+import extra_ddl_info;
 
 class InfinityTableTest : public BaseTest {
     void SetUp() override {

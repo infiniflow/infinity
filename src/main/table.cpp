@@ -34,6 +34,7 @@ import select_statement;
 import explain_statement;
 import drop_index_info;
 import drop_table_info;
+import extra_ddl_info;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import parser;
 import buffer_manager;
 import third_party;
 import status;
+import extra_ddl_info;
 
 namespace infinity {
 

@@ -49,6 +49,7 @@ import base_table_ref;
 import data_type;
 import logical_type;
 import embedding_info;
+import extra_ddl_info;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }

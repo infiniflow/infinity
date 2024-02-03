@@ -26,6 +26,7 @@ import load_meta;
 import base_table_ref;
 import index_def;
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 export class PhysicalCreateIndexPrepare : public PhysicalOperator {

@@ -38,6 +38,7 @@ import meta_state;
 import status;
 import data_type;
 import logical_type;
+import extra_ddl_info;
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

@@ -30,6 +30,7 @@ import default_values;
 import txn_manager;
 import txn;
 import status;
+import extra_ddl_info;
 
 class DBTxnTest : public BaseTest {
     void SetUp() override {

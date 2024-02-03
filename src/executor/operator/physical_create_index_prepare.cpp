@@ -44,6 +44,7 @@ import dist_func_ip;
 import hnsw_alg;
 import lvq_store;
 import plain_store;
+import extra_ddl_info;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,

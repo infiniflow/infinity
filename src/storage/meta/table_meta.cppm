@@ -24,6 +24,7 @@ import third_party;
 import table_entry_type;
 import buffer_manager;
 import status;
+import extra_ddl_info;
 
 namespace infinity {
 

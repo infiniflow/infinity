@@ -14,6 +14,8 @@
 
 export module query_options;
 import parser;
+import extra_ddl_info;
+
 namespace infinity {
 
 export class CreateDatabaseOptions {

@@ -48,6 +48,7 @@ import table_detail;
 import index_def;
 import txn_store;
 import data_access_state;
+import extra_ddl_info;
 
 namespace infinity {
 
