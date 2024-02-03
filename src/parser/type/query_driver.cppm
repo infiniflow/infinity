@@ -14,23 +14,12 @@
 
 module;
 
-export module create_index_data;
+#include "query_driver.h"
 
-import stl;
-import catalog;
-import block_index;
+export module query_driver;
 
 namespace infinity {
 
-export struct CreateIndexSharedData {
-    explicit CreateIndexSharedData(BlockIndex *block_index) {
-        SizeT segment_count = block_index->segments_.size();
-        for (SizeT i = 0; i < segment_count; ++i) {
-            create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
-        }
-    }
+export using infinity::QueryDriver;
 
-    HashMap<u32, atomic_u64> create_index_idxes_{};
-};
-
-}; // namespace infinity
+}

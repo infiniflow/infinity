@@ -18,6 +18,7 @@ import third_party;
 import parser;
 import stl;
 import infinity_context;
+import query_driver;
 
 class QueryDriverTest : public BaseTest {};
 

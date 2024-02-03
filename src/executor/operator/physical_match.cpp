@@ -46,6 +46,7 @@ import load_meta;
 import catalog;
 import logical_type;
 import search_options;
+import query_driver;
 
 namespace infinity {
 

@@ -13,7 +13,6 @@
 // limitations under the License.
 module;
 
-#include "query_driver.h"
 #include "sql_parser.h"
 #include "type/info/array_info.h"
 #include "type/number/float16.h"
@@ -23,8 +22,6 @@ export module parser;
 namespace infinity {
 
 export using IrsFilter = irs::filter;
-
-export using infinity::QueryDriver;
 
 export using infinity::SQLParser;
 export using infinity::ParserResult;
