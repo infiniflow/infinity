@@ -70,7 +70,14 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
       num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
-    inverter_ = MakeUnique<SequentialColumnInverter>(this);
+    if (index_config_.GetIndexingParallelism() > 1) {
+        inverter_ = MakeUnique<SequentialColumnInverter>(this);
+    } else {
+        parallel_inverters_.resize(index_config_.GetIndexingParallelism());
+        for (u32 i = 0; i < index_config_.GetIndexingParallelism(); ++i) {
+            parallel_inverters_[i] = MakeUnique<ParallelColumnInverter>(this);
+        }
+    }
     invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism());
     commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
 }
@@ -102,8 +109,17 @@ void MemoryIndexer::Insert(RowID row_id, String &data) {
 }
 
 void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
-    auto task = MakeUnique<InvertTask>(inverter_.get(), column_vector, row_ids);
-    invert_executor_->Execute(0, std::move(task));
+    if (index_config_.GetIndexingParallelism() > 1) {
+        for (u32 i = 0; i < row_ids.size(); i += parallel_inverters_.size()) {
+            for (u32 j = 0; j < parallel_inverters_.size(); ++j) {
+                auto task = MakeUnique<InvertTask>(parallel_inverters_[j].get(), column_vector->ToString(i + j), RowID2DocID(row_ids[i + j]));
+                invert_executor_->Execute(j, std::move(task));
+            }
+        }
+    } else {
+        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, row_ids);
+        invert_executor_->Execute(0, std::move(task));
+    }
 }
 
 void MemoryIndexer::SwitchActiveInverter() {

@@ -13,6 +13,7 @@ import pool_allocator;
 import term;
 import index_defines;
 import third_party;
+import column_inverter;
 
 namespace infinity {
 
@@ -111,7 +112,7 @@ private:
     FlatHashSet<ValueRef, ValueRefHash, TermEq> terms_;
 };
 
-export class ParallelColumnInverter {
+export class ParallelColumnInverter : public ColumnInverter {
 public:
     explicit ParallelColumnInverter(MemoryIndexer *memory_indexer);
     ParallelColumnInverter(const ParallelColumnInverter &) = delete;

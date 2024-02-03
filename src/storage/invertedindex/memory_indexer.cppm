@@ -108,6 +108,8 @@ private:
     Vector<UniquePtr<SequentialColumnInverter>> free_inverters_;
     Deque<UniquePtr<SequentialColumnInverter>> inflight_inverters_;
     UniquePtr<SequentialColumnInverter> inverter_;
+    Vector<UniquePtr<ParallelColumnInverter>> parallel_inverters_;
+
     u32 num_inverters_;
     u32 max_inverters_;
     UniquePtr<SequencedTaskExecutor> invert_executor_;

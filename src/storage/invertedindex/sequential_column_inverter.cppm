@@ -9,6 +9,7 @@ import memory_pool;
 import pool_allocator;
 import term;
 import string_ref;
+import column_inverter;
 
 namespace infinity {
 
@@ -27,7 +28,7 @@ public:
 };
 
 class MemoryIndexer;
-export class SequentialColumnInverter {
+export class SequentialColumnInverter : public ColumnInverter {
 public:
     SequentialColumnInverter(MemoryIndexer *memory_indexer);
     SequentialColumnInverter(const SequentialColumnInverter &) = delete;
@@ -36,11 +37,11 @@ public:
     SequentialColumnInverter &operator=(const SequentialColumnInverter &&) = delete;
     ~SequentialColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) override;
 
-    void InvertColumn(u32 doc_id, const String &val);
+    void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Commit();
+    void Commit() override;
 
     void Retain() { ref_count_.Retain(); }
 
@@ -68,7 +69,7 @@ public:
         }
     };
 
-    void Flush();
+    void Flush() override;
 
 private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;

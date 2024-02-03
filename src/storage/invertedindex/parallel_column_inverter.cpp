@@ -69,4 +69,10 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
         term_posting->values_.emplace_back(doc_id, it->word_offset_);
     }
 }
+
+void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
+
+void ParallelColumnInverter::Commit() {}
+
+void ParallelColumnInverter::Flush() {}
 } // namespace infinity
