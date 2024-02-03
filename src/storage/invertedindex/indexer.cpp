@@ -15,6 +15,7 @@ import parser;
 import column_vector;
 import third_party;
 import column_indexer;
+import index_builder;
 module indexer;
 
 namespace infinity {
@@ -70,13 +71,16 @@ void Indexer::Commit() {
 }
 
 SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
-    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id].get());
+    return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
-void Indexer::Flush() {
+bool Indexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
+
+void Indexer::Dump(IndexBuilder &builder) {
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Flush();
+        column_indexers_[column_id]->Dump(builder);
     }
 }
+
 } // namespace infinity

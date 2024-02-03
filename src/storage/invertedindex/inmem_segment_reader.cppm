@@ -6,13 +6,13 @@ import segment_posting;
 import index_segment_reader;
 import index_defines;
 import posting_writer;
-import column_indexer;
+import memory_indexer;
 export module inmem_index_segment_reader;
 
 namespace infinity {
 export class InMemIndexSegmentReader : public IndexSegmentReader {
 public:
-    InMemIndexSegmentReader(ColumnIndexer *column_indexer);
+    InMemIndexSegmentReader(MemoryIndexer *column_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
     docid_t GetBaseDocId() const override;
@@ -22,7 +22,7 @@ public:
 private:
     PostingWriter *GetPostingWriter(const String &term) const;
 
-    ColumnIndexer::PostingTable *posting_table_{nullptr};
+    MemoryIndexer::PostingTable *posting_table_{nullptr};
 };
 
 } // namespace infinity
