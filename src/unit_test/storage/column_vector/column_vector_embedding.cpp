@@ -29,6 +29,7 @@ import infinity_context;
 import global_resource_usage;
 import data_type;
 import logical_type;
+import embedding_info;
 
 class ColumnVectorEmbeddingTest : public BaseTest {};
 

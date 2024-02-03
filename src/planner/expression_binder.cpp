@@ -58,6 +58,7 @@ import status;
 import catalog;
 import query_context;
 import logger;
+import embedding_info;
 
 namespace infinity {
 

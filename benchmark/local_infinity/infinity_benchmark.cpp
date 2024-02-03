@@ -33,7 +33,7 @@ import third_party;
 
 import query_options;
 import query_result;
-
+import embedding_info;
 import logical_type;
 import data_type;
 

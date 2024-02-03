@@ -31,6 +31,7 @@ import profiler;
 import local_file_system;
 import third_party;
 import logical_node_type;
+import embedding_info;
 
 import query_options;
 import query_result;

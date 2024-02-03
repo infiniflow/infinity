@@ -37,6 +37,7 @@ import column_vector;
 import bound_cast_func;
 import data_type;
 import logical_type;
+import embedding_info;
 
 class EmbeddingCastTest : public BaseTest {};
 

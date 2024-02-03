@@ -47,10 +47,6 @@ export using infinity::MixedValueType;
 export using infinity::TupleMixedType;
 
 export using infinity::EmbeddingDataType;
-export using infinity::EmbeddingInfo;
-export using infinity::DecimalInfo;
-export using infinity::BitmapInfo;
-export using infinity::ArrayInfo;
 
 export template <typename T>
 int32_t GetSizeInBytes(const T &value);

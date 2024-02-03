@@ -25,6 +25,7 @@ import annivfflat_index_data;
 import infinity_exception;
 import index_ivfflat;
 import logical_type;
+import embedding_info;
 
 namespace infinity {
 

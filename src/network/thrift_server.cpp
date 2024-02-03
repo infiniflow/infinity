@@ -55,6 +55,7 @@ import query_options;
 import status;
 import logical_type;
 import data_type;
+import embedding_info;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

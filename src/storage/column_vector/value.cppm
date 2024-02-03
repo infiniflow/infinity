@@ -21,6 +21,7 @@ import type_info;
 import logical_type;
 import infinity_exception;
 import data_type;
+import embedding_info;
 
 namespace infinity {
 

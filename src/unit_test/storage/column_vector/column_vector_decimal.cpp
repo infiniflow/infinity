@@ -29,6 +29,7 @@ import global_resource_usage;
 import infinity_context;
 import data_type;
 import logical_type;
+import decimal_info;
 
 class ColumnVectorDecimalTest : public BaseTest {};
 

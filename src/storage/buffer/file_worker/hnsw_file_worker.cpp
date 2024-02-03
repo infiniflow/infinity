@@ -30,6 +30,7 @@ import plain_store;
 import third_party;
 import logger;
 import logical_type;
+import embedding_info;
 
 namespace infinity {
 HnswFileWorker::~HnswFileWorker() {

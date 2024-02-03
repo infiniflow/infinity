@@ -23,6 +23,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import embedding_info;
 
 class EmbeddingInfoTest : public BaseTest {};
 

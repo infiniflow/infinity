@@ -29,6 +29,9 @@ import value;
 import infinity_context;
 import data_type;
 import logical_type;
+import decimal_info;
+import embedding_info;
+import array_info;
 
 class DataBlockTest : public BaseTest {};
 

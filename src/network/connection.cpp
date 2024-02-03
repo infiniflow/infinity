@@ -36,6 +36,7 @@ import query_result;
 import session_manager;
 import type_info;
 import logical_type;
+import embedding_info;
 
 namespace infinity {
 

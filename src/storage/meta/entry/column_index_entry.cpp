@@ -34,6 +34,7 @@ import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
 import logger;
+import embedding_info;
 
 namespace infinity {
 
