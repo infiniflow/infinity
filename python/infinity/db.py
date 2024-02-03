@@ -37,3 +37,6 @@ class Database(ABC):
     def get_table(self, table_name):
         pass  # implement get table logic here
 
+    @abstractmethod
+    def show_tables(self):
+        pass
