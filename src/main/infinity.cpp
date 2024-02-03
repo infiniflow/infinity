@@ -35,6 +35,11 @@ import session_manager;
 import query_context;
 import parser;
 import status;
+import create_statement;
+import show_statement;
+import drop_statement;
+import command_statement;
+import flush_statement;
 
 namespace infinity {
 

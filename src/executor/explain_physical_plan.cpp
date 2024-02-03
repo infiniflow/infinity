@@ -78,6 +78,7 @@ import catalog;
 import base_expression;
 import knn_expression;
 import third_party;
+import select_statement;
 
 namespace infinity {
 

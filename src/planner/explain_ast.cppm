@@ -16,6 +16,15 @@ module;
 
 import parser;
 import stl;
+import base_statement;
+import create_statement;
+import insert_statement;
+import copy_statement;
+import drop_statement;
+import select_statement;
+import show_statement;
+import flush_statement;
+import optimize_statement;
 
 export module explain_ast;
 

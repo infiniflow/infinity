@@ -19,6 +19,7 @@ export module view;
 import parser;
 import stl;
 import data_type;
+import select_statement;
 
 // A view means a logical plan
 namespace infinity {

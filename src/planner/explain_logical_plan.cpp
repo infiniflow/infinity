@@ -68,6 +68,8 @@ import reference_expression;
 import infinity_exception;
 import data_type;
 
+import select_statement;
+
 namespace infinity {
 
 void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

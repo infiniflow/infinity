@@ -22,6 +22,14 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import base_statement;
+import create_statement;
+import drop_statement;
+import copy_statement;
+import show_statement;
+import select_statement;
+import update_statement;
+import insert_statement;
 
 class StatementParsingTest : public BaseTest {};
 

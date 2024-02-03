@@ -27,6 +27,8 @@ import logical_type;
 import type_info;
 import decimal_info;
 import embedding_info;
+import base_statement;
+import create_statement;
 
 class SQLParserTest : public BaseTest {};
 

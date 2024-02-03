@@ -60,7 +60,7 @@ export constexpr uint64_t VARCHAR_LEN_LIMIT = VARCHAR_LENGTH_LIMIT;
 // Parser Exception
 export using infinity::ParserException;
 
-export using infinity::StatementType;
+
 export using infinity::DDLType;
 export using infinity::ConflictType;
 export using infinity::ConstraintType;
@@ -104,22 +104,22 @@ export using infinity::ShowStmtType;
 export using infinity::CopyFileType;
 export using infinity::SetOperatorType;
 
-export using infinity::BaseStatement;
-export using infinity::CreateStatement;
-export using infinity::SelectStatement;
-export using infinity::UpdateStatement;
-export using infinity::DeleteStatement;
-export using infinity::InsertStatement;
-export using infinity::DropStatement;
-export using infinity::ShowStatement;
-export using infinity::CopyStatement;
-export using infinity::PrepareStatement;
-export using infinity::ExecuteStatement;
-export using infinity::FlushStatement;
-export using infinity::OptimizeStatement;
-export using infinity::AlterStatement;
-export using infinity::ExplainStatement;
-export using infinity::CommandStatement;
+//export using infinity::BaseStatement;
+//export using infinity::CreateStatement;
+//export using infinity::SelectStatement;
+//export using infinity::UpdateStatement;
+//export using infinity::DeleteStatement;
+//export using infinity::InsertStatement;
+//export using infinity::DropStatement;
+//export using infinity::ShowStatement;
+//export using infinity::CopyStatement;
+//export using infinity::PrepareStatement;
+//export using infinity::ExecuteStatement;
+//export using infinity::FlushStatement;
+//export using infinity::OptimizeStatement;
+//export using infinity::AlterStatement;
+//export using infinity::ExplainStatement;
+//export using infinity::CommandStatement;
 
 export using infinity::ParsedExprType;
 export using infinity::OrderType;

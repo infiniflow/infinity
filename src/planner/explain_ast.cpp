@@ -22,7 +22,15 @@ import stl;
 import parser;
 import status;
 import infinity_exception;
-
+import base_statement;
+import select_statement;
+import copy_statement;
+import insert_statement;
+import create_statement;
+import drop_statement;
+import show_statement;
+import flush_statement;
+import optimize_statement;
 
 namespace infinity {
 

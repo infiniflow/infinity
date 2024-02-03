@@ -29,6 +29,7 @@ import base_expression;
 import block_index;
 import catalog;
 import data_type;
+import select_statement;
 
 namespace infinity {
 

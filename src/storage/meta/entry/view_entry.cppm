@@ -20,6 +20,7 @@ import :base_entry;
 import data_type;
 import stl;
 import parser;
+import select_statement;
 
 // FIXME: Not finished
 

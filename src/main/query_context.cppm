@@ -28,6 +28,7 @@ import parser;
 import optimizer;
 import status;
 import query_result;
+import base_statement;
 
 export module query_context;
 

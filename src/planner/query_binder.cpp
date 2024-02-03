@@ -54,6 +54,10 @@ import cast_expression;
 import search_expression;
 import status;
 import default_values;
+import base_statement;
+import select_statement;
+import delete_statement;
+import update_statement;
 
 namespace infinity {
 

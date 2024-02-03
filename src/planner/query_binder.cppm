@@ -26,6 +26,9 @@ import binding;
 import bind_alias_proxy;
 import bound_delete_statement;
 import bound_update_statement;
+import select_statement;
+import delete_statement;
+import update_statement;
 
 export module query_binder;
 

@@ -15,6 +15,9 @@
 module;
 
 #include <memory>
+
+module sql_runner;
+
 import stl;
 import data_table;
 import logger;
@@ -40,8 +43,7 @@ import resource_manager;
 import storage;
 import query_result;
 import session_manager;
-
-module sql_runner;
+import base_statement;
 
 namespace infinity {
 

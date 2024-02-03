@@ -24,6 +24,14 @@ import query_context;
 import parser;
 import infinity_exception;
 import logger;
+import insert_statement;
+import create_statement;
+import drop_statement;
+import copy_statement;
+import delete_statement;
+import update_statement;
+import select_statement;
+import explain_statement;
 
 namespace infinity {
 
