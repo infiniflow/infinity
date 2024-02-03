@@ -44,6 +44,7 @@ import create_index_info;
 import extra_ddl_info;
 import knn_expr;
 import column_def;
+import statement_common;
 
 using namespace infinity;
 

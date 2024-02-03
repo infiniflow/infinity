@@ -58,6 +58,7 @@ import plan_fragment;
 import aggregate_expression;
 import expression_state;
 import column_def;
+import explain_statement;
 
 namespace infinity {
 

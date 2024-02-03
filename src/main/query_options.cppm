@@ -13,8 +13,10 @@
 // limitations under the License.
 
 export module query_options;
+
 import parser;
 import extra_ddl_info;
+import statement_common;
 
 namespace infinity {
 

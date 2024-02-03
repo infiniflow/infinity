@@ -40,6 +40,7 @@ import drop_table_info;
 import drop_index_info;
 import table_reference;
 import parser_result;
+import statement_common;
 
 class StatementParsingTest : public BaseTest {};
 

@@ -72,6 +72,9 @@ import select_statement;
 import extra_ddl_info;
 import column_def;
 import join_reference;
+import statement_common;
+import flush_statement;
+import optimize_statement;
 
 namespace infinity {
 

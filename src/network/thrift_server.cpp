@@ -68,6 +68,7 @@ import search_expr;
 import create_index_info;
 import extra_ddl_info;
 import column_def;
+import statement_common;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

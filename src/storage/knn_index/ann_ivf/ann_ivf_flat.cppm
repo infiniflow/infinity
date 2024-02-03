@@ -28,6 +28,7 @@ import search_top_k;
 import knn_result_handler;
 import bitmask;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

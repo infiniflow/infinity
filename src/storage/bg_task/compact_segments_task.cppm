@@ -25,6 +25,7 @@ import infinity_exception;
 import txn;
 import global_block_id;
 import base_table_ref;
+import data_type;
 
 namespace infinity {
 

@@ -23,6 +23,7 @@ import logical_node;
 import parser;
 import catalog;
 import data_type;
+import statement_common;
 
 namespace infinity {
 

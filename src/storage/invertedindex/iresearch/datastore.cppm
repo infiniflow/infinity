@@ -27,6 +27,7 @@ import index_def;
 import catalog;
 import buffer_manager;
 import default_values;
+import data_type;
 
 export module iresearch_datastore;
 

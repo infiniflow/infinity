@@ -20,6 +20,7 @@ import stl;
 import parser;
 import bitmask;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

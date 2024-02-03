@@ -20,6 +20,7 @@ import parser;
 import ann_ivf_flat;
 import bitmask;
 import knn_expr;
+import data_type;
 
 class AnnIVFFlatL2Test : public BaseTest {};
 

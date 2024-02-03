@@ -46,6 +46,7 @@ import cross_product_reference;
 import join_reference;
 import subquery_reference;
 import table_reference;
+import statement_common;
 
 namespace infinity {
 

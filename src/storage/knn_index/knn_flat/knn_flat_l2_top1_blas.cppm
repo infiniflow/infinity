@@ -27,6 +27,7 @@ import vector_distance;
 import mlas_matrix_multiply;
 import bitmask;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

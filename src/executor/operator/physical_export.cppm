@@ -25,6 +25,7 @@ import physical_operator_type;
 import load_meta;
 import infinity_exception;
 import data_type;
+import statement_common;
 
 namespace infinity {
 

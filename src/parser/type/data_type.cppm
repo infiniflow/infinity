@@ -72,4 +72,21 @@ export using MixedT = MixedType;
 
 export using infinity::DataType;
 
+export using infinity::RowID;
+export using infinity::TimeUnit;
+
+export using infinity::IntegerMixedType;
+export using infinity::FloatMixedType;
+export using infinity::ArrayMixedType;
+export using infinity::BaseMixedType;
+export using infinity::LongStrMixedType;
+export using infinity::MissingMixedType;
+export using infinity::ShortStrMixedType;
+export using infinity::MixedType;
+export using infinity::MixedValueType;
+export using infinity::TupleMixedType;
+
+export using infinity::EmbeddingType;
+export using infinity::ToEmbeddingDataType;
+
 }

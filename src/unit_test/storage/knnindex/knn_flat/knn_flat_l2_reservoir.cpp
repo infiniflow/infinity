@@ -24,6 +24,7 @@ import parser;
 import knn_flat_l2_reservoir;
 import infinity_context;
 import knn_expr;
+import data_type;
 
 class KnnFlatL2ReservoirTest : public BaseTest {};
 

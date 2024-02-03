@@ -23,6 +23,7 @@ import third_party;
 import parser;
 import serialize;
 import infinity_exception;
+import statement_common;
 
 module index_full_text;
 

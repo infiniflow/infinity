@@ -24,6 +24,7 @@ import parser;
 import knn_flat_ip_blas_reservoir;
 import infinity_context;
 import knn_expr;
+import data_type;
 
 class KnnFlatIpBlasReservoirTest : public BaseTest {};
 

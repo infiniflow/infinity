@@ -23,6 +23,7 @@ import index_base;
 import index_full_text;
 import index_def;
 import parser;
+import statement_common;
 
 class IndexDefTest : public BaseTest {};
 

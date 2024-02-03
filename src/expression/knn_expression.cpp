@@ -22,6 +22,7 @@ import scalar_function;
 
 import infinity_exception;
 import third_party;
+import statement_common;
 
 module knn_expression;
 

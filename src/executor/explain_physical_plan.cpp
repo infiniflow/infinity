@@ -82,6 +82,8 @@ import select_statement;
 import knn_expr;
 import extra_ddl_info;
 import column_def;
+import statement_common;
+import flush_statement;
 
 namespace infinity {
 

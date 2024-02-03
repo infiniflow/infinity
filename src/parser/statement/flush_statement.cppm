@@ -21,5 +21,6 @@ export module flush_statement;
 namespace infinity {
 
 export using infinity::FlushStatement;
+export using infinity::FlushType;
 
 }

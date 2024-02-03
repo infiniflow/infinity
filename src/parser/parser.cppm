@@ -27,21 +27,23 @@ export using infinity::SQLParser;
 //export using infinity::ParserResult;
 
 //export using infinity::ColumnDef;
-export using infinity::RowID;
+//export using infinity::RowID;
+//export using infinity::TimeUnit;
+//
+//export using infinity::IntegerMixedType;
+//export using infinity::FloatMixedType;
+//export using infinity::ArrayMixedType;
+//export using infinity::BaseMixedType;
+//export using infinity::LongStrMixedType;
+//export using infinity::MissingMixedType;
+//export using infinity::ShortStrMixedType;
+//export using infinity::MixedType;
+//export using infinity::MixedValueType;
+//export using infinity::TupleMixedType;
+//
+//export using infinity::EmbeddingType;
+//export using infinity::ToEmbeddingDataType;
 
-// TimeUnit
-export using infinity::TimeUnit;
-
-export using infinity::IntegerMixedType;
-export using infinity::FloatMixedType;
-export using infinity::ArrayMixedType;
-export using infinity::BaseMixedType;
-export using infinity::LongStrMixedType;
-export using infinity::MissingMixedType;
-export using infinity::ShortStrMixedType;
-export using infinity::MixedType;
-export using infinity::MixedValueType;
-export using infinity::TupleMixedType;
 
 //export using infinity::EmbeddingDataType;
 
@@ -66,9 +68,9 @@ export using infinity::ParserException;
 //export using infinity::ConstraintType;
 //export using infinity::KnnDistanceType;
 //export using infinity::TableRefType;
-export using infinity::ExplainType;
-export using infinity::FlushType;
-export using infinity::OptimizeType;
+//export using infinity::ExplainType;
+//export using infinity::FlushType;
+//export using infinity::OptimizeType;
 //export using infinity::IndexType;
 
 //export using infinity::UseCmd;
@@ -77,7 +79,7 @@ export using infinity::OptimizeType;
 //export using infinity::ExportCmd;
 //export using infinity::CompactTable;
 
-export using infinity::InitParameter;
+//export using infinity::InitParameter;
 
 //export using infinity::BaseTableReference;
 //export using infinity::TableReference;
@@ -85,8 +87,8 @@ export using infinity::InitParameter;
 //export using infinity::CrossProductReference;
 //export using infinity::SubqueryReference;
 
-export using infinity::ShowStmtType;
-export using infinity::CopyFileType;
+//export using infinity::ShowStmtType;
+//export using infinity::CopyFileType;
 //export using infinity::SetOperatorType;
 
 //export using infinity::OrderType;
@@ -103,9 +105,7 @@ export using infinity::CopyFileType;
 //export using infinity::TableConstraint;
 
 //export using infinity::ConflictTypeToStr;
-export using infinity::EmbeddingType;
 //export using infinity::ConstrainTypeToString;
-export using infinity::ToEmbeddingDataType;
 
 }
 

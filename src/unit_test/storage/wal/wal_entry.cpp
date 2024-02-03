@@ -34,6 +34,7 @@ import index_def;
 import logical_type;
 import data_type;
 import column_def;
+import statement_common;
 
 class WalEntryTest : public BaseTest {};
 

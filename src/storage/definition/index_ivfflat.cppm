@@ -23,6 +23,7 @@ import index_base;
 import third_party;
 import base_table_ref;
 import create_index_info;
+import statement_common;
 
 namespace infinity {
 export class IndexIVFFlat final : public IndexBase {

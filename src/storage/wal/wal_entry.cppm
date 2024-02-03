@@ -24,6 +24,7 @@ import data_block;
 import stl;
 import parser;
 import infinity_exception;
+import data_type;
 
 namespace infinity {
 

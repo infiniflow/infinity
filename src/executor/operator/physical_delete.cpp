@@ -28,6 +28,7 @@ import operator_state;
 import logical_type;
 import data_block;
 import column_vector;
+import data_type;
 
 module physical_delete;
 

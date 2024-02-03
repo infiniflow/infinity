@@ -11,6 +11,7 @@ import column_vector;
 import third_party;
 import index_builder;
 import indexer;
+import data_type;
 
 namespace infinity {
 

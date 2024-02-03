@@ -30,7 +30,7 @@ import column_vector;
 import base_expression;
 import expression_state;
 import knn_expr;
-
+import statement_common;
 import base_table_ref;
 
 namespace infinity {

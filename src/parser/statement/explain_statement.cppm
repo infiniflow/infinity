@@ -21,5 +21,6 @@ export module explain_statement;
 namespace infinity {
 
 export using infinity::ExplainStatement;
+export using infinity::ExplainType;
 
 }

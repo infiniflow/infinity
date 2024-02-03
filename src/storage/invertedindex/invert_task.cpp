@@ -6,6 +6,7 @@ import stl;
 import sequential_column_inverter;
 import column_vector;
 import parser;
+import data_type;
 
 namespace infinity {
 

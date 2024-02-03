@@ -26,6 +26,7 @@ import parser;
 import infinity_exception;
 import default_values;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

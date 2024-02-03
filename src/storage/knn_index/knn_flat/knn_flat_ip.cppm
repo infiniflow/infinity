@@ -27,6 +27,7 @@ import default_values;
 import vector_distance;
 import bitmask;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

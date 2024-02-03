@@ -27,6 +27,7 @@ import infinity_exception;
 import default_values;
 import vector_distance;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

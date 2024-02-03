@@ -25,6 +25,7 @@ import knn_flat_ip;
 import infinity_context;
 import bitmask;
 import knn_expr;
+import data_type;
 
 class KnnFlatIpTest : public BaseTest {};
 

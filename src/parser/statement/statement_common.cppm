@@ -14,13 +14,14 @@
 
 module;
 
-#include "show_statement.h"
+#include "statement_common.h"
 
-export module show_statement;
+export module statement_common;
 
 namespace infinity {
 
-export using infinity::ShowStatement;
-export using infinity::ShowStmtType;
+export using infinity::InitParameter;
+export using infinity::CopyFileType;
+
 
 }

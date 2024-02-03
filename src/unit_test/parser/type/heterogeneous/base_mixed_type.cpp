@@ -22,6 +22,7 @@ import parser;
 import logger;
 import stl;
 import infinity_context;
+import data_type;
 
 class BaseMixedTypeTest : public BaseTest {};
 

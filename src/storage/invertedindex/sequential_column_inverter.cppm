@@ -1,6 +1,7 @@
 module;
 
 export module sequential_column_inverter;
+
 import stl;
 import analyzer;
 import parser;
@@ -9,6 +10,7 @@ import memory_pool;
 import pool_allocator;
 import term;
 import string_ref;
+import data_type;
 
 namespace infinity {
 

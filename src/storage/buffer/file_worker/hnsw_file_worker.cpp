@@ -32,6 +32,7 @@ import logger;
 import logical_type;
 import embedding_info;
 import create_index_info;
+import data_type;
 
 namespace infinity {
 HnswFileWorker::~HnswFileWorker() {

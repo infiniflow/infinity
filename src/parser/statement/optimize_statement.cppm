@@ -21,5 +21,6 @@ export module optimize_statement;
 namespace infinity {
 
 export using infinity::OptimizeStatement;
+export using infinity::OptimizeType;
 
 }

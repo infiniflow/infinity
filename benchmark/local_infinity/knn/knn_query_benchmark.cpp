@@ -37,6 +37,7 @@ import column_expr;
 import parsed_expr;
 import search_expr;
 import function_expr;
+import statement_common;
 
 using namespace infinity;
 

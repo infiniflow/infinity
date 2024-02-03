@@ -25,6 +25,7 @@ import knn_flat_l2_top1_blas;
 import infinity_context;
 import bitmask;
 import knn_expr;
+import data_type;
 
 class KnnFlatL2Top1BlasTest : public BaseTest {};
 

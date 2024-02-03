@@ -26,6 +26,7 @@ import optimizer_rule;
 import bound_delete_statement;
 import bound_update_statement;
 import logical_node;
+import explain_statement;
 
 module optimizer;
 

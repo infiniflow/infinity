@@ -28,6 +28,7 @@ import third_party;
 import infinity_exception;
 import catalog;
 import logical_type;
+import data_type;
 
 namespace infinity {
 
