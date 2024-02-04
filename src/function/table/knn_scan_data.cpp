@@ -39,6 +39,7 @@ import data_block;
 import column_vector;
 import base_expression;
 import expression_state;
+import internal_types;
 import data_type;
 
 namespace infinity {

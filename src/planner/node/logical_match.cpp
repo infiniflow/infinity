@@ -28,7 +28,7 @@ import default_values;
 import third_party;
 import catalog;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

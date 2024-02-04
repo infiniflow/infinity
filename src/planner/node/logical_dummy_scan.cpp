@@ -20,8 +20,8 @@ module logical_dummy_scan;
 
 import stl;
 import column_binding;
-
 import data_type;
+import internal_types;
 
 namespace infinity {
 

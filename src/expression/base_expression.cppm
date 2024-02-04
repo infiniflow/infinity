@@ -19,9 +19,8 @@ export module base_expression;
 
 import stl;
 import expression_type;
-
 import data_type;
-
+import internal_types;
 
 namespace infinity {
 

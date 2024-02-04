@@ -19,10 +19,10 @@ export module data_block;
 import stl;
 import default_values;
 import selection;
-
+import data_type;
 import column_vector;
 import value;
-import data_type;
+import internal_types;
 import infinity_exception;
 
 namespace infinity {

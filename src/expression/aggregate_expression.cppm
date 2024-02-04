@@ -18,10 +18,10 @@ export module aggregate_expression;
 
 import column_binding;
 import base_expression;
-
+import data_type;
 import stl;
 import aggregate_function;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

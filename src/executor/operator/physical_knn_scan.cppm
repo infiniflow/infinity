@@ -30,6 +30,7 @@ import block_index;
 import load_meta;
 import knn_expression;
 import infinity_exception;
+import internal_types;
 import data_type;
 
 namespace infinity {

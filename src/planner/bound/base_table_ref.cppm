@@ -24,9 +24,10 @@ import catalog;
 
 import table_function;
 import block_index;
-import data_type;
+import internal_types;
 import infinity_exception;
 import table_reference;
+import data_type;
 
 namespace infinity {
 

@@ -36,7 +36,7 @@ import expression_type;
 import third_party;
 import status;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -40,7 +40,7 @@ import expression_evaluator;
 import aggregate_expression;
 import status;
 import logical_type;
-import data_type;
+import internal_types;
 import column_def;
 
 namespace infinity {

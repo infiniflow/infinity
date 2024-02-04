@@ -21,7 +21,6 @@ module;
 export module column_vector;
 
 import stl;
-
 import global_resource_usage;
 import vector_buffer;
 import bitmask;
@@ -31,6 +30,7 @@ import value;
 import third_party;
 import infinity_exception;
 import fix_heap;
+import internal_types;
 import data_type;
 
 namespace infinity {

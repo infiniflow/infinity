@@ -21,7 +21,7 @@
 #include <unordered_set>
 
 import compilation_config;
-import data_type;
+import internal_types;
 import infinity;
 import database;
 import table;
@@ -39,6 +39,7 @@ import extra_ddl_info;
 import knn_expr;
 import column_def;
 import statement_common;
+import data_type;
 
 using namespace infinity;
 

@@ -49,6 +49,7 @@ import substring;
 import substract;
 
 import special_function;
+import internal_types;
 import data_type;
 
 import logical_type;

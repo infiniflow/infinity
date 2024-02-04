@@ -38,7 +38,7 @@ import parsed_expr;
 import search_expr;
 import function_expr;
 import statement_common;
-import data_type;
+import internal_types;
 
 using namespace infinity;
 

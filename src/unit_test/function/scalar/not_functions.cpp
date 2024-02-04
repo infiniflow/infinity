@@ -35,6 +35,7 @@ import base_expression;
 import column_vector;
 import not_func;
 import logical_type;
+import internal_types;
 import data_type;
 
 class NotFunctionsTest : public BaseTest {};

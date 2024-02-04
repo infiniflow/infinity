@@ -22,7 +22,7 @@ import stl;
 import column_binding;
 
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

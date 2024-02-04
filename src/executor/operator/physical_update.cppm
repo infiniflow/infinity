@@ -26,6 +26,7 @@ import catalog;
 import base_expression;
 import load_meta;
 import infinity_exception;
+import internal_types;
 import data_type;
 
 namespace infinity {

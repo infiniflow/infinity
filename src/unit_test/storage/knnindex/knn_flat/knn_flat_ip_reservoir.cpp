@@ -24,7 +24,7 @@ import logger;
 import knn_flat_ip_reservoir;
 import infinity_context;
 import knn_expr;
-import data_type;
+import internal_types;
 
 class KnnFlatIpReservoirTest : public BaseTest {};
 

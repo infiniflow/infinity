@@ -29,9 +29,10 @@ import third_party;
 import logger;
 import status;
 import logical_type;
-import data_type;
+import internal_types;
 import embedding_info;
 import knn_expr;
+import data_type;
 
 namespace infinity {
 

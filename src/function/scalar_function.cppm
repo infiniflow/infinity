@@ -20,9 +20,9 @@ import stl;
 import function;
 import function_data;
 import column_vector;
-import data_type;
+import internal_types;
 import infinity_exception;
-
+import data_type;
 import data_block;
 import bitmask;
 import unary_operator;

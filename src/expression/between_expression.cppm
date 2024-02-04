@@ -18,9 +18,9 @@ export module between_expression;
 
 import column_binding;
 import base_expression;
-
-import stl;
 import data_type;
+import stl;
+import internal_types;
 
 namespace infinity {
 

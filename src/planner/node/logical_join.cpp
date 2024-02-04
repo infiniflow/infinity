@@ -24,7 +24,7 @@ import column_binding;
 
 import logical_node_type;
 import base_expression;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

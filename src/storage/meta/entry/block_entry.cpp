@@ -26,8 +26,9 @@ import defer_op;
 import local_file_system;
 import serialize;
 import catalog_delta_entry;
-import data_type;
+import internal_types;
 import infinity_exception;
+import data_type;
 
 import column_vector;
 import bitmask;

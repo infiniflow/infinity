@@ -28,6 +28,7 @@ import base_expression;
 import load_meta;
 import infinity_exception;
 import data_block;
+import internal_types;
 import data_type;
 
 namespace infinity {

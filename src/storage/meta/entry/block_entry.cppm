@@ -22,11 +22,11 @@ import :base_entry;
 import stl;
 import default_values;
 import third_party;
-
+import data_type;
 import local_file_system;
 import column_vector;
 import bitmask;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

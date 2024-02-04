@@ -20,6 +20,7 @@ import stl;
 import logical_node;
 import query_context;
 
+import internal_types;
 import data_type;
 
 namespace infinity {

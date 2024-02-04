@@ -26,6 +26,7 @@ import load_meta;
 
 import index_def;
 import base_table_ref;
+import internal_types;
 import data_type;
 
 namespace infinity {

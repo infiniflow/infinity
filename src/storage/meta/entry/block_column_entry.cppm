@@ -20,14 +20,14 @@ import :base_entry;
 
 import stl;
 import buffer_obj;
-
+import data_type;
 import third_party;
 import buffer_manager;
 import column_vector;
 import local_file_system;
 import vector_buffer;
 import txn;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

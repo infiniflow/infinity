@@ -25,8 +25,9 @@ import third_party;
 import stl;
 import global_resource_usage;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
+import data_type;
 
 class ColumnVectorTest : public BaseTest {};
 

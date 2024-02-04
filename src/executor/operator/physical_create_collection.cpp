@@ -25,8 +25,9 @@ import data_table;
 import physical_operator_type;
 import operator_state;
 import load_meta;
-import data_type;
+import internal_types;
 import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

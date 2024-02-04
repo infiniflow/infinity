@@ -18,8 +18,8 @@ import stl;
 import logical_node_type;
 import column_binding;
 import load_meta;
-
 import data_type;
+import internal_types;
 
 export module logical_node;
 

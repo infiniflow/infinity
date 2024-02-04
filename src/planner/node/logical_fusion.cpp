@@ -25,7 +25,7 @@ import logical_node_type;
 import fusion_expression;
 
 import default_values;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

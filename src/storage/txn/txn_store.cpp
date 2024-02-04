@@ -29,6 +29,7 @@ import data_access_state;
 import txn;
 import default_values;
 import catalog;
+import internal_types;
 import data_type;
 
 namespace infinity {

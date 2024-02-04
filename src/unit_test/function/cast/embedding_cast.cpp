@@ -35,10 +35,11 @@ import data_block;
 import embedding_cast;
 import column_vector;
 import bound_cast_func;
-import data_type;
+import internal_types;
 import logical_type;
 import embedding_info;
 import knn_expr;
+import data_type;
 
 class EmbeddingCastTest : public BaseTest {};
 

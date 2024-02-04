@@ -25,7 +25,7 @@ import knn_flat_l2_blas;
 import infinity_context;
 import bitmask;
 import knn_expr;
-import data_type;
+import internal_types;
 
 class KnnFlatL2BlasTest : public BaseTest {};
 

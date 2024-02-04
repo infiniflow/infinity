@@ -17,9 +17,9 @@ module;
 export module binding;
 
 import stl;
-
 import block_index;
 import catalog;
+import internal_types;
 import data_type;
 
 namespace infinity {

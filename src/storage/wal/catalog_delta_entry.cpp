@@ -24,8 +24,9 @@ import data_block;
 import table_def;
 import index_def;
 import infinity_exception;
-import data_type;
+import internal_types;
 import stl;
+import data_type;
 
 import third_party;
 import logger;

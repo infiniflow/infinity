@@ -66,7 +66,7 @@ import in_expression;
 import value_expression;
 import reference_expression;
 import infinity_exception;
-import data_type;
+import internal_types;
 import knn_expr;
 import select_statement;
 import extra_ddl_info;

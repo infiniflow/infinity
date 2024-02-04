@@ -26,8 +26,9 @@ import logical_type;
 import bitmask_buffer;
 import column_vector;
 import expression_evaluator;
-import data_type;
+import internal_types;
 import third_party;
+import data_type;
 
 import infinity_exception;
 

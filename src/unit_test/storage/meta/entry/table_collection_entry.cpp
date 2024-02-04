@@ -36,10 +36,11 @@ import column_vector;
 import table_entry_type;
 import meta_state;
 import status;
-import data_type;
+import internal_types;
 import logical_type;
 import extra_ddl_info;
 import column_def;
+import data_type;
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

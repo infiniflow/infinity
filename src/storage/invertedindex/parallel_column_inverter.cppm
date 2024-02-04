@@ -13,7 +13,7 @@ import pool_allocator;
 import term;
 import index_defines;
 import third_party;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

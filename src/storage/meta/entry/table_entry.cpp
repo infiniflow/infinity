@@ -28,7 +28,7 @@ import buffer_manager;
 import index_def;
 import block_index;
 import data_access_state;
-import data_type;
+import internal_types;
 import logger;
 import txn_store;
 import status;
@@ -42,6 +42,7 @@ import catalog_delta_entry;
 import extra_ddl_info;
 import create_index_info;
 import column_def;
+import data_type;
 
 namespace infinity {
 

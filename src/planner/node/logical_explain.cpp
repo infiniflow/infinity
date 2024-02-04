@@ -20,7 +20,7 @@ import stl;
 import column_binding;
 
 import base_expression;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

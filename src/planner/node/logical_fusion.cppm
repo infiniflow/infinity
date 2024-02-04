@@ -25,6 +25,7 @@ import fusion_expression;
 import match_expression;
 import base_table_ref;
 import catalog;
+import internal_types;
 import data_type;
 
 namespace infinity {

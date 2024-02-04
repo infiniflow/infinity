@@ -27,7 +27,7 @@ import selection;
 import vector_buffer;
 import infinity_context;
 import global_resource_usage;
-import data_type;
+import internal_types;
 import logical_type;
 #if 0
 class ColumnVectorBlobTest : public BaseTest {};

@@ -26,7 +26,7 @@ import bind_context;
 import third_party;
 import value;
 import logical_type;
-import data_type;
+import internal_types;
 import base_expression;
 import aggregate_expression;
 import column_expression;
@@ -71,6 +71,7 @@ import cast_expr;
 import between_expr;
 import subquery_expr;
 import match_expr;
+import data_type;
 
 namespace infinity {
 

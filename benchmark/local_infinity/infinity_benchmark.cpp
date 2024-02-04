@@ -35,7 +35,7 @@ import query_options;
 import query_result;
 import embedding_info;
 import logical_type;
-import data_type;
+import internal_types;
 import parsed_expr;
 import column_expr;
 import constant_expr;
@@ -45,6 +45,7 @@ import extra_ddl_info;
 import knn_expr;
 import column_def;
 import statement_common;
+import data_type;
 
 using namespace infinity;
 

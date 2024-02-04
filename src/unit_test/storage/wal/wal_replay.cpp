@@ -46,13 +46,14 @@ import backgroud_process;
 import compact_segments_task;
 import default_values;
 import base_table_ref;
-import data_type;
+import internal_types;
 import logical_type;
 import embedding_info;
 import extra_ddl_info;
 import knn_expr;
 import column_def;
 import statement_common;
+import data_type;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }

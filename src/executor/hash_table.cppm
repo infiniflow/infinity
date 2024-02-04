@@ -16,9 +16,9 @@ module;
 
 export module hash_table;
 
-
 import stl;
 import column_vector;
+import internal_types;
 import data_type;
 
 namespace infinity {

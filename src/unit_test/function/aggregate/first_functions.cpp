@@ -32,7 +32,7 @@ import column_expression;
 import value;
 import default_values;
 import data_block;
-import data_type;
+import internal_types;
 import logical_type;
 #if 0
 class FirstFunctionTest : public BaseTest {};

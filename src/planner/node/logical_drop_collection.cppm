@@ -21,8 +21,9 @@ import stl;
 import logical_node;
 import logical_node_type;
 import column_binding;
-import data_type;
+import internal_types;
 import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

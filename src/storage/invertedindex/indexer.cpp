@@ -20,7 +20,7 @@ import third_party;
 import column_indexer;
 import logical_type;
 import index_builder;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

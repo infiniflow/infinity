@@ -20,7 +20,7 @@ import stl;
 
 import data_access_state;
 import status;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

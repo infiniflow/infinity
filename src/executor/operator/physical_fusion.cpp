@@ -40,7 +40,7 @@ import default_values;
 import third_party;
 import infinity_exception;
 import value;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

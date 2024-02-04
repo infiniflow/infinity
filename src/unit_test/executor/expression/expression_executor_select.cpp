@@ -31,6 +31,7 @@ import column_vector;
 import logger;
 import selection;
 import logical_type;
+import internal_types;
 import data_type;
 
 class ExpressionExecutorSelectTest : public BaseTest {};

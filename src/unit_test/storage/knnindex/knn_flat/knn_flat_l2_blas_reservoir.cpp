@@ -24,7 +24,7 @@ import logger;
 import knn_flat_l2_blas_reservoir;
 import infinity_context;
 import knn_expr;
-import data_type;
+import internal_types;
 
 class KnnFlatL2BlasReservoirTest : public BaseTest {};
 

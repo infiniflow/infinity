@@ -19,7 +19,7 @@ module;
 module logical_show;
 
 import stl;
-import data_type;
+import internal_types;
 import infinity_exception;
 import column_binding;
 

@@ -25,7 +25,7 @@ import logical_node;
 
 import third_party;
 import base_expression;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

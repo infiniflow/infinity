@@ -28,10 +28,11 @@ import binding;
 import base_expression;
 import block_index;
 import catalog;
-import data_type;
+import internal_types;
 import select_statement;
 import parsed_expr;
 import search_expr;
+import data_type;
 
 namespace infinity {
 

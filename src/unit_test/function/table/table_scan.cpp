@@ -41,6 +41,7 @@ import resource_manager;
 import query_context;
 import session_manager;
 import logical_type;
+import internal_types;
 import data_type;
 
 class TableScanTest : public BaseTest {

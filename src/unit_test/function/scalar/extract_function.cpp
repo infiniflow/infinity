@@ -36,6 +36,7 @@ import data_block;
 import base_expression;
 import column_vector;
 import logical_type;
+import internal_types;
 import data_type;
 
 class ExtractFunctionTest : public BaseTest {};

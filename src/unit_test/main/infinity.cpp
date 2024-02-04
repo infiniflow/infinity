@@ -24,12 +24,13 @@ import query_options;
 import database;
 import table;
 import logical_type;
-import data_type;
+import internal_types;
 import parsed_expr;
 import constant_expr;
 import search_expr;
 import column_expr;
 import column_def;
+import data_type;
 
 class InfinityTest : public BaseTest {
     void SetUp() override {

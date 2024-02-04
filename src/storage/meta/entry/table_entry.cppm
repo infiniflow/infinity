@@ -32,7 +32,7 @@ import data_access_state;
 import status;
 import extra_ddl_info;
 import column_def;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

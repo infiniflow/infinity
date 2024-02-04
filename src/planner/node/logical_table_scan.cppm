@@ -21,6 +21,7 @@ import logical_node;
 
 import base_table_ref;
 import catalog;
+import internal_types;
 import data_type;
 
 export module logical_table_scan;

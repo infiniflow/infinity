@@ -22,13 +22,14 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import type_info;
 import bitmap_info;
 import decimal_info;
 import embedding_info;
 import knn_expr;
+import internal_types;
 import data_type;
 
 class DataTypeTest : public BaseTest {};

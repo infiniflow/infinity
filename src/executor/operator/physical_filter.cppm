@@ -28,6 +28,7 @@ import expression_evaluator;
 import expression_selector;
 import load_meta;
 import infinity_exception;
+import internal_types;
 import data_type;
 
 namespace infinity {

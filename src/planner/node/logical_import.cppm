@@ -22,8 +22,9 @@ import column_binding;
 import logical_node;
 
 import catalog;
-import data_type;
+import internal_types;
 import statement_common;
+import data_type;
 
 namespace infinity {
 

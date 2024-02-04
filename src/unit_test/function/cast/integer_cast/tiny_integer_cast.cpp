@@ -36,8 +36,9 @@ import cast_table;
 import column_vector;
 import integer_cast;
 import bound_cast_func;
-import data_type;
+import internal_types;
 import logical_type;
+import data_type;
 
 class TinyIntegerCastTest : public BaseTest {};
 

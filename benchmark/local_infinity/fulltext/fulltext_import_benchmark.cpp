@@ -26,12 +26,13 @@ import database;
 import table;
 import query_options;
 
-import data_type;
+import internal_types;
 import logical_type;
 import create_index_info;
 import extra_ddl_info;
 import column_def;
 import statement_common;
+import data_type;
 
 using namespace infinity;
 

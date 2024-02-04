@@ -22,7 +22,7 @@ import sql_parser;
 import logger;
 import stl;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import type_info;
 import decimal_info;
@@ -34,6 +34,7 @@ import create_table_info;
 import create_index_info;
 import column_def;
 import parser_result;
+import data_type;
 
 class SQLParserTest : public BaseTest {};
 

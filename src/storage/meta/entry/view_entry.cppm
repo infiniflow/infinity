@@ -17,9 +17,9 @@ module;
 export module catalog:view_entry;
 
 import :base_entry;
-import data_type;
+import internal_types;
 import stl;
-
+import data_type;
 import select_statement;
 import create_view_info;
 // FIXME: Not finished

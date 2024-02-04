@@ -18,7 +18,7 @@ module;
 
 module logical_limit;
 
-import data_type;
+import internal_types;
 import stl;
 import logical_node_type;
 import column_binding;

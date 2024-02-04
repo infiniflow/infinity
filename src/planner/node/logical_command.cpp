@@ -24,7 +24,7 @@ import logical_node_type;
 
 import logical_type;
 import infinity_exception;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

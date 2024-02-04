@@ -30,10 +30,11 @@ import default_values;
 import txn_manager;
 import txn;
 import status;
-import data_type;
+import internal_types;
 import logical_type;
 import extra_ddl_info;
 import column_def;
+import data_type;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {

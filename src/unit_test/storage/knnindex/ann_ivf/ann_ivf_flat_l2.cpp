@@ -20,7 +20,7 @@ import stl;
 import ann_ivf_flat;
 import bitmask;
 import knn_expr;
-import data_type;
+import internal_types;
 
 class AnnIVFFlatL2Test : public BaseTest {};
 

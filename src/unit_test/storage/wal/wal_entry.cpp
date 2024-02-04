@@ -32,9 +32,10 @@ import default_values;
 import index_ivfflat;
 import index_def;
 import logical_type;
-import data_type;
+import internal_types;
 import column_def;
 import statement_common;
+import data_type;
 
 class WalEntryTest : public BaseTest {};
 

@@ -33,6 +33,7 @@ import varchar_layout;
 import logger;
 import data_file_worker;
 import catalog_delta_entry;
+import internal_types;
 import data_type;
 
 namespace infinity {

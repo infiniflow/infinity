@@ -28,9 +28,10 @@ import data_block;
 import default_values;
 import column_vector;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import column_def;
+import data_type;
 
 class TableTest : public BaseTest {};
 

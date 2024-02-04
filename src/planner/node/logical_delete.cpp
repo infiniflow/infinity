@@ -27,7 +27,7 @@ import base_table_ref;
 import column_binding;
 import logical_node_type;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

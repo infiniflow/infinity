@@ -24,6 +24,7 @@ import scalar_function;
 import scalar_function_set;
 
 import third_party;
+import internal_types;
 import data_type;
 
 namespace infinity {

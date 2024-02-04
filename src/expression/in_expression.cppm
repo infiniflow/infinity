@@ -18,10 +18,10 @@ export module in_expression;
 
 import column_binding;
 import base_expression;
-
+import data_type;
 import stl;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

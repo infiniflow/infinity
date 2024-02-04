@@ -23,7 +23,7 @@ import bind_context;
 import load_meta;
 import logical_node;
 import status;
-import data_type;
+import internal_types;
 import base_statement;
 import select_statement;
 import copy_statement;
@@ -40,6 +40,7 @@ import execute_statement;
 import alter_statement;
 import explain_statement;
 import command_statement;
+import data_type;
 
 namespace infinity {
 

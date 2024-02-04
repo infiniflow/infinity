@@ -36,6 +36,7 @@ import value_expression;
 import status;
 
 import default_values;
+import internal_types;
 import data_type;
 
 namespace infinity {

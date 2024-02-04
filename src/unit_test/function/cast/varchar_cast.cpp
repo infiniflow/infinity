@@ -33,8 +33,9 @@ import value;
 import default_values;
 import data_block;
 import varchar_cast;
-import data_type;
+import internal_types;
 import logical_type;
+import data_type;
 
 class VarcharTest : public BaseTest {};
 

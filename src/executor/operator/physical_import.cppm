@@ -30,8 +30,9 @@ import zsv;
 import load_meta;
 import infinity_exception;
 import column_vector;
-import data_type;
+import internal_types;
 import statement_common;
+import data_type;
 
 namespace infinity {
 

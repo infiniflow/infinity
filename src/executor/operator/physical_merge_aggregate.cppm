@@ -28,6 +28,7 @@ import value;
 import data_block;
 import stl;
 
+import internal_types;
 import data_type;
 
 namespace infinity {

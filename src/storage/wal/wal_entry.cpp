@@ -28,7 +28,7 @@ import infinity_exception;
 import stl;
 
 import third_party;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

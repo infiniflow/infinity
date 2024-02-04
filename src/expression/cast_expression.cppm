@@ -22,6 +22,7 @@ import stl;
 import expression_type;
 import bound_cast_func;
 import base_expression;
+import internal_types;
 import data_type;
 
 namespace infinity {

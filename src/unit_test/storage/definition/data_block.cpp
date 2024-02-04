@@ -27,12 +27,13 @@ import default_values;
 import profiler;
 import value;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import decimal_info;
 import embedding_info;
 import array_info;
 import knn_expr;
+import data_type;
 
 class DataBlockTest : public BaseTest {};
 

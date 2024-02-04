@@ -20,11 +20,12 @@ import buffer_obj;
 import buffer_handle;
 
 import file_worker;
-import data_type;
+import internal_types;
 import block_column_iter;
 import block_iter;
 import segment_iter;
 import catalog;
+import data_type;
 
 using namespace infinity;
 

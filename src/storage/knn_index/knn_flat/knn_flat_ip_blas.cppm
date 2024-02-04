@@ -25,7 +25,7 @@ import default_values;
 import mlas_matrix_multiply;
 import bitmask;
 import knn_expr;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

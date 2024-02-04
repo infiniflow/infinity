@@ -24,7 +24,7 @@ import column_vector;
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -17,7 +17,7 @@ module;
 export module physical_command;
 
 import stl;
-import data_type;
+import internal_types;
 import physical_operator;
 import physical_operator_type;
 import query_context;
@@ -27,6 +27,7 @@ import load_meta;
 import infinity_exception;
 import base_table_ref;
 import command_statement;
+import data_type;
 
 namespace infinity {
 

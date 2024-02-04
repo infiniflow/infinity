@@ -27,9 +27,10 @@ import selection;
 import vector_buffer;
 import global_resource_usage;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import decimal_info;
+import data_type;
 
 class ColumnVectorDecimalTest : public BaseTest {};
 

@@ -32,8 +32,9 @@ import column_vector;
 import load_meta;
 import infinity_exception;
 import physical_limit;
-import data_type;
+import internal_types;
 import select_statement;
+import data_type;
 
 namespace infinity {
 

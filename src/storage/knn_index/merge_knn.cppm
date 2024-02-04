@@ -23,7 +23,7 @@ import knn_result_handler;
 import infinity_exception;
 import bitmask;
 import default_values;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -23,7 +23,7 @@ import logger;
 import stl;
 import infinity_context;
 import logical_type;
-import data_type;
+import internal_types;
 import base_statement;
 import select_statement;
 import parsed_expr;

@@ -20,7 +20,7 @@ import task_executor;
 import memory_posting;
 import third_party;
 import index_builder;
-import data_type;
+import internal_types;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;

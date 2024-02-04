@@ -10,7 +10,7 @@ import memory_pool;
 import pool_allocator;
 import term;
 import string_ref;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

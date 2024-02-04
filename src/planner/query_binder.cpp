@@ -19,7 +19,7 @@ module;
 module query_binder;
 
 import stl;
-import data_type;
+import internal_types;
 import infinity_exception;
 
 import bind_context;
@@ -67,6 +67,7 @@ import table_reference;
 import subquery_reference;
 import join_reference;
 import cross_product_reference;
+import data_type;
 
 namespace infinity {
 

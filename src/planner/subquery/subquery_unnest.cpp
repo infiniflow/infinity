@@ -29,7 +29,7 @@ import bind_context;
 import expression_type;
 import value;
 import dependent_join_flattener;
-import data_type;
+import internal_types;
 import value_expression;
 import function_expression;
 import aggregate_expression;
@@ -55,6 +55,7 @@ import third_party;
 import subquery_expr;
 import infinity_exception;
 import join_reference;
+import data_type;
 
 namespace infinity {
 

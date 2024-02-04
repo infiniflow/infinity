@@ -30,8 +30,9 @@ import create_index_data;
 import blocking_queue;
 import expression_state;
 import status;
-import data_type;
+import internal_types;
 import column_def;
+import data_type;
 
 namespace infinity {
 

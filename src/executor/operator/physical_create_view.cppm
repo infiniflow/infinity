@@ -25,8 +25,9 @@ import physical_operator_type;
 import index_def;
 import load_meta;
 import infinity_exception;
-import data_type;
+import internal_types;
 import create_view_info;
+import data_type;
 
 namespace infinity {
 

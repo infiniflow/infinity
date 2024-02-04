@@ -21,8 +21,9 @@ import bound_select_statement;
 
 import stl;
 import column_expression;
-import data_type;
+import internal_types;
 import subquery_expr;
+import data_type;
 
 namespace infinity {
 

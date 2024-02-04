@@ -21,7 +21,7 @@ import stl;
 import vector_heap_chunk;
 import default_values;
 
-import data_type;
+import internal_types;
 
 namespace infinity {
 

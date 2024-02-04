@@ -22,7 +22,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import data_type;
+import internal_types;
 import parser_assert;
 
 class DateTypeTest : public BaseTest {};

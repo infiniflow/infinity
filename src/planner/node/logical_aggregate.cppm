@@ -23,6 +23,7 @@ import logical_node;
 import base_expression;
 
 import base_table_ref;
+import internal_types;
 import data_type;
 
 namespace infinity {

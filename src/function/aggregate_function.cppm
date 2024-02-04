@@ -25,9 +25,9 @@ import column_vector;
 import vector_buffer;
 import infinity_exception;
 import base_expression;
-
-import logical_type;
 import data_type;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

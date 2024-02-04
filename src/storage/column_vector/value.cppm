@@ -20,8 +20,9 @@ import stl;
 import type_info;
 import logical_type;
 import infinity_exception;
-import data_type;
+import internal_types;
 import embedding_info;
+import data_type;
 
 namespace infinity {
 

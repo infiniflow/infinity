@@ -27,7 +27,7 @@ import knn_expression;
 import default_values;
 import catalog;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -61,7 +61,7 @@ import local_file_system;
 import buffer_manager;
 import index_full_text;
 import infinity_exception;
-import data_type;
+import internal_types;
 import match_expr;
 
 namespace infinity {

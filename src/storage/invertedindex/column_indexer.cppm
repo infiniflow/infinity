@@ -11,7 +11,7 @@ import column_vector;
 import third_party;
 import index_builder;
 import memory_indexer;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -17,10 +17,10 @@ module;
 export module match_expression;
 
 import stl;
-
+import data_type;
 import base_expression;
 import logical_type;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

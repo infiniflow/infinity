@@ -27,10 +27,11 @@ import selection;
 import vector_buffer;
 import infinity_context;
 import global_resource_usage;
-import data_type;
+import internal_types;
 import logical_type;
 import embedding_info;
 import knn_expr;
+import data_type;
 
 class ColumnVectorEmbeddingTest : public BaseTest {};
 

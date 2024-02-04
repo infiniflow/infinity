@@ -20,7 +20,7 @@ import stl;
 import data_block;
 import column_vector;
 
-import data_type;
+import internal_types;
 
 namespace infinity {
 

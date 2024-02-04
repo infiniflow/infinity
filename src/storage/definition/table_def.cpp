@@ -19,9 +19,9 @@ module;
 module table_def;
 
 import stl;
-
-import serialize;
 import data_type;
+import serialize;
+import internal_types;
 import infinity_exception;
 
 namespace infinity {

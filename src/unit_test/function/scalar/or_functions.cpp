@@ -35,6 +35,7 @@ import base_expression;
 import column_vector;
 import or_func;
 import logical_type;
+import internal_types;
 import data_type;
 
 class OrFunctionsTest : public BaseTest {};

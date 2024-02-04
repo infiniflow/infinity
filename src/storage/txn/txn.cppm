@@ -30,7 +30,7 @@ import txn_store;
 import database_detail;
 import status;
 import extra_ddl_info;
-import data_type;
+import internal_types;
 
 namespace infinity {
 

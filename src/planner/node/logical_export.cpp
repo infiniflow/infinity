@@ -21,7 +21,7 @@ module logical_export;
 import stl;
 import column_binding;
 
-import data_type;
+import internal_types;
 
 namespace infinity {
 

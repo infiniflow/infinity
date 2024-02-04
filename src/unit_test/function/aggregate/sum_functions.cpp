@@ -32,8 +32,9 @@ import column_expression;
 import value;
 import default_values;
 import data_block;
-import data_type;
+import internal_types;
 import logical_type;
+import data_type;
 
 class SumFunctionTest : public BaseTest {};
 

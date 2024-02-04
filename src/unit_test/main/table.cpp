@@ -26,7 +26,7 @@ import table;
 import status;
 import third_party;
 import logical_type;
-import data_type;
+import internal_types;
 import embedding_info;
 import parsed_expr;
 import column_expr;
@@ -34,6 +34,7 @@ import extra_ddl_info;
 import knn_expr;
 import column_def;
 import explain_statement;
+import data_type;
 
 class InfinityTableTest : public BaseTest {
     void SetUp() override {

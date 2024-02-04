@@ -18,9 +18,9 @@ export module function_expression;
 
 import stl;
 import base_expression;
-
-import scalar_function;
 import data_type;
+import scalar_function;
+import internal_types;
 
 namespace infinity {
 

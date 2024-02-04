@@ -28,6 +28,7 @@ import base_table_ref;
 import catalog;
 import block_index;
 import load_meta;
+import internal_types;
 import data_type;
 
 namespace infinity {

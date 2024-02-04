@@ -18,8 +18,8 @@ export module special_function;
 
 import stl;
 import function;
-
 import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -23,9 +23,10 @@ import logger;
 
 import table_def;
 import infinity_context;
-import data_type;
+import internal_types;
 import logical_type;
 import column_def;
+import data_type;
 
 class TableDefTest : public BaseTest {};
 

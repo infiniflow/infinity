@@ -54,7 +54,7 @@ import data_block;
 import query_options;
 import status;
 import logical_type;
-import data_type;
+import internal_types;
 import embedding_info;
 import constant_expr;
 import column_expr;
@@ -69,6 +69,7 @@ import create_index_info;
 import extra_ddl_info;
 import column_def;
 import statement_common;
+import data_type;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;

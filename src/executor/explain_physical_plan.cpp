@@ -19,7 +19,7 @@ module;
 module explain_physical_plan;
 
 import stl;
-import data_type;
+import internal_types;
 import physical_operator;
 import physical_union_all;
 import physical_index_scan;

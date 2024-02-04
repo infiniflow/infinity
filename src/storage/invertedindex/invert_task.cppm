@@ -7,7 +7,7 @@ import task_executor;
 import sequential_column_inverter;
 import column_vector;
 
-import data_type;
+import internal_types;
 
 namespace infinity {
 export class InvertTask : public TaskExecutor::Task {
