@@ -69,4 +69,77 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
         term_posting->values_.emplace_back(doc_id, it->word_offset_);
     }
 }
+
+void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
+
+void ParallelColumnInverter::Flush() {}
+
+ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
+    inverters_.resize(size_);
+    for (u32 i = 0; i < size_; ++i) {
+        inverters_[i] = MakeUnique<ParallelColumnInverter>(memory_indexer);
+    }
+}
+
+void ParallelColumnInverters::Commit() {
+    Vector<Vector<const TermPosting *>> all_postings(size_);
+    for (u32 i = 0; i < size_; ++i) {
+        TermPostings *term_postings_slice = inverters_[i]->GetTermPostings();
+        Vector<const TermPosting *> &term_postings = all_postings[i];
+        term_postings.resize(term_postings_slice->Size());
+        for (u32 j = 0; j < term_postings_slice->Size(); ++j) {
+            term_postings.push_back(&(term_postings_slice->postings_[i]));
+        }
+        term_postings_slice->GetSorted(term_postings);
+    }
+    auto cmp = [](const Pair<const TermPosting *, u32> &lhs, const Pair<const TermPosting *, u32> &rhs) {
+        return StringViewCompare(lhs.first->term_, rhs.first->term_);
+    };
+    Heap<Pair<const TermPosting *, u32>, decltype(cmp)> pq(cmp);
+    for (u32 i = 0; i < size_; ++i) {
+        if (!all_postings[i].empty()) {
+            pq.push({all_postings[i][0], i});
+            all_postings[i].erase(all_postings[i].begin());
+        }
+    }
+
+    Vector<const TermPosting *> to_merge(size_);
+    StringView prev_term = pq.top().first->term_;
+    while (!pq.empty()) {
+        auto [term_posting, array_index] = pq.top();
+        pq.pop();
+        {
+            if (!StringViewCompare(prev_term, term_posting->term_)) {
+                DoMerge(to_merge);
+                prev_term = term_posting->term_;
+                to_merge.clear();
+            } else {
+                to_merge.push_back(term_posting);
+            }
+        }
+        if (!all_postings[array_index].empty()) {
+            pq.push({all_postings[array_index][0], array_index});
+            all_postings[array_index].erase(all_postings[array_index].begin());
+        }
+    }
+    DoMerge(to_merge);
+}
+
+void ParallelColumnInverters::DoMerge(Vector<const TermPosting *> &to_merge) {
+    Vector<TermPosting::PosInfo> values;
+    u32 total_size = 0;
+    for (u32 i = 0; i < to_merge.size(); ++i) {
+        total_size += to_merge[i]->values_.size();
+    }
+    values.resize(total_size);
+    TermPosting::PosInfo *ptr = values.data();
+    for (u32 i = 0; i < to_merge.size(); ++i) {
+        memcpy(ptr, to_merge[i]->values_.data(), to_merge[i]->values_.size() * sizeof(TermPosting::PosInfo));
+        ptr += to_merge[i]->values_.size();
+    }
+    std::sort(values.begin(), values.end());
+
+    MemoryIndexer::PostingPtr posting = memory_indexer_->GetOrAddPosting(String(to_merge[0]->term_));
+}
+
 } // namespace infinity

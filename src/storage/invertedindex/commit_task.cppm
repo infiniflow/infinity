@@ -4,19 +4,18 @@ export module commit_task;
 
 import stl;
 import task_executor;
-import sequential_column_inverter;
-import parser;
+import column_inverter;
 
 namespace infinity {
 export class CommitTask : public TaskExecutor::Task {
 public:
-    CommitTask(SequentialColumnInverter *inverter);
+    CommitTask(InverterReference *inverter);
 
     ~CommitTask();
 
     void Run() override;
 
 private:
-    SequentialColumnInverter *inverter_{nullptr};
+    InverterReference *inverter_{nullptr};
 };
 } // namespace infinity
