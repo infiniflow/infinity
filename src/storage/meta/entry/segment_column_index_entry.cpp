@@ -127,7 +127,8 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                                    const ColumnDef *column_def,
                                                    const SegmentEntry *segment_entry,
                                                    Txn *txn,
-                                                   bool prepare) {
+                                                   bool prepare,
+                                                   bool check_ts) {
     TxnTimeStamp begin_ts = txn->BeginTS();
 
     auto *buffer_mgr = txn->GetBufferMgr();
@@ -176,13 +177,21 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             BufferHandle buffer_handle = GetIndex();
 
             auto InsertHnsw = [&](auto &hnsw_index) {
-                OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                if (!prepare) {
-                    // Single thread insert
-                    hnsw_index->InsertVecs(iter, segment_entry->row_count()); // estimate insert count
+                auto InsertHnswInner = [&](auto &iter) {
+                    if (!prepare) {
+                        // Single thread insert
+                        hnsw_index->InsertVecs(iter, segment_entry->row_count()); // estimate insert count
+                    } else {
+                        // Multi thread insert data, write file in the physical create index finish stage.
+                        hnsw_index->StoreData(iter, segment_entry->row_count());
+                    }
+                };
+                if (check_ts) {
+                    OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    InsertHnswInner(iter);
                 } else {
-                    // Multi thread insert data, write file in the physical create index finish stage.
-                    hnsw_index->StoreData(iter, segment_entry->row_count());
+                    OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    InsertHnswInner(iter);
                 }
             };
 

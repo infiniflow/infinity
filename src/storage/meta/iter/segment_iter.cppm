@@ -26,7 +26,8 @@ import default_values;
 
 namespace infinity {
 
-export class SegmentIter {
+export template <bool CheckTS = true>
+class SegmentIter {
 public:
     SegmentIter(const SegmentEntry *entry, BufferManager *buffer_mgr, Vector<ColumnID> &&column_ids, TxnTimeStamp iterate_ts)
         : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(column_ids), iterate_ts_(iterate_ts), block_idx_(0) {
@@ -34,7 +35,7 @@ public:
         if (block_entries.empty()) {
             block_iter_ = None;
         } else {
-            block_iter_ = BlockIter(block_entries[block_idx_].get(), buffer_mgr, column_ids_, iterate_ts_);
+            block_iter_ = BlockIter<CheckTS>(block_entries[block_idx_].get(), buffer_mgr, column_ids_, iterate_ts_);
         }
     }
 
@@ -54,7 +55,7 @@ public:
             return None;
         }
         // FIXME: segment_entry should store the block capacity
-        block_iter_ = BlockIter(block_entries[block_idx_].get(), buffer_mgr_, column_ids_, iterate_ts_);
+        block_iter_ = BlockIter<CheckTS>(block_entries[block_idx_].get(), buffer_mgr_, column_ids_, iterate_ts_);
         return Next();
     }
 
@@ -65,10 +66,10 @@ private:
     const TxnTimeStamp iterate_ts_;
 
     BlockID block_idx_;
-    Optional<BlockIter> block_iter_;
+    Optional<BlockIter<CheckTS>> block_iter_;
 };
 
-export template <typename DataType>
+export template <typename DataType, bool CheckTS = true>
 class OneColumnIterator {
 public:
     using LabelType = SegmentOffset;
@@ -86,7 +87,7 @@ public:
     }
 
 private:
-    SegmentIter segment_iter_;
+    SegmentIter<CheckTS> segment_iter_;
 };
 
 } // namespace infinity

@@ -93,7 +93,8 @@ private:
                               const ColumnDef *column_def,
                               const SegmentEntry *segment_entry,
                               Txn *txn,
-                              bool prepare);
+                              bool prepare,
+                              bool check_ts);
 
     Status CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx);
 

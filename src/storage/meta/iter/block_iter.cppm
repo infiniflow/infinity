@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <utility>
+#include <vector>
 
 export module block_iter;
 
@@ -27,7 +27,8 @@ import infinity_exception;
 
 namespace infinity {
 
-export class BlockIter {
+export template <bool CheckTS = true>
+class BlockIter {
 public:
     BlockIter(const BlockEntry *entry, BufferManager *buffer_mgr, const Vector<ColumnID> &column_ids, TxnTimeStamp iterate_ts) {
         for (auto column_id : column_ids) {
@@ -60,7 +61,7 @@ public:
     }
 
 private:
-    Vector<BlockColumnIter> column_iters_;
+    Vector<BlockColumnIter<CheckTS>> column_iters_;
 };
 
 } // namespace infinity

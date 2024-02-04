@@ -25,7 +25,8 @@ import column_vector;
 
 namespace infinity {
 
-export class BlockColumnIter {
+export template <bool CheckTS = true>
+class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp iterate_ts)
         : block_entry_(entry->GetBlockEntry()), column_vector_(entry->GetColumnVector(buffer_mgr)), ele_size_(entry->column_type()->Size()),
@@ -54,6 +55,30 @@ private:
 
     BlockOffset offset_;
     BlockOffset read_end_;
+};
+
+export template <>
+class BlockColumnIter<false> {
+public:
+    BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp)
+        : block_entry_(entry->GetBlockEntry()), column_vector_(entry->GetColumnVector(buffer_mgr)), ele_size_(entry->column_type()->Size()),
+          size_(block_entry_->row_count()), offset_(0) {}
+
+    Optional<Pair<const void *, BlockOffset>> Next() {
+        if (offset_ == size_) {
+            return None;
+        }
+        auto ret = column_vector_.data() + offset_ * ele_size_;
+        return std::make_pair(ret, offset_++);
+    }
+
+private:
+    const BlockEntry *const block_entry_;
+    const ColumnVector column_vector_;
+    const SizeT ele_size_;
+    const BlockOffset size_;
+
+    BlockOffset offset_;
 };
 
 } // namespace infinity
