@@ -69,7 +69,6 @@ private:
     DataStore data_store_;
     GraphStore graph_store_;
     Distance distance_;
-    const UniquePtr<LabelType[]> labels_;
 
     std::mutex global_mutex_;
     mutable Vector<std::shared_mutex> vertex_mutex_;
@@ -82,7 +81,6 @@ private:
             DataStore data_store,
             GraphStore graph_store,
             Distance distance,
-            UniquePtr<LabelType[]> labels,
             SizeT ef,
             SizeT random_seed)
         : M_(M), Mmax_(Mmax), Mmax0_(Mmax0), ef_construction_(std::max(M_, ef_construction)), //
@@ -90,7 +88,6 @@ private:
           data_store_(std::move(data_store)),                                                 //
           graph_store_(std::move(graph_store)),                                               //
           distance_(std::move(distance)),                                                     //
-          labels_(std::move(labels)),                                                         //
           vertex_mutex_(data_store_.max_vec_num()) {
         if (ef == 0) {
             ef = ef_construction_;
@@ -107,16 +104,7 @@ public:
         auto data_store = DataStore::Make(max_vertex, dim, std::move(args));
         auto graph_store = GraphStore::Make(max_vertex, Mmax, Mmax0);
         Distance distance(data_store.dim());
-        return UniquePtr<This>(new This(M,
-                                        Mmax,
-                                        Mmax0,
-                                        ef_construction,
-                                        std::move(data_store),
-                                        std::move(graph_store),
-                                        std::move(distance),
-                                        MakeUnique<LabelType[]>(max_vertex),
-                                        0,
-                                        0));
+        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
     }
 
     ~KnnHnsw() = default;
@@ -291,7 +279,7 @@ private:
         }
     }
 
-    LabelType GetLabel(VertexType vertex_i) const { return labels_[vertex_i]; }
+    LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
     template <bool WithLock = false, FilterConcept<LabelType> Filter = NoneType>
     Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
@@ -304,36 +292,29 @@ private:
     }
 
 public:
-    template <typename Iterator>
-        requires DataIteratorConcept<Iterator, const DataType *>
-    void InsertVecs(Iterator iter, const LabelType *labels, SizeT insert_n) {
-        VertexType start_i = StoreData(iter, labels, insert_n);
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    void InsertVecs(Iterator iter, SizeT insert_n) {
+        VertexType start_i = StoreData(iter, insert_n);
         for (VertexType vertex_i = start_i; vertex_i < VertexType(start_i + insert_n); ++vertex_i) {
             Build(vertex_i);
         }
     }
 
     // This function for test
-    void InsertVecs(const DataType *query, const LabelType *labels, SizeT insert_n) {
-        VertexType start_i = StoreDataRaw(query, labels, insert_n);
+    void InsertVecsRaw(const DataType *query, SizeT insert_n) {
+        VertexType start_i = StoreDataRaw(query, insert_n);
         for (VertexType vertex_i = start_i; vertex_i < VertexType(start_i + insert_n); ++vertex_i) {
             Build(vertex_i);
         }
     }
 
-    template <typename Iterator>
-        requires DataIteratorConcept<Iterator, const DataType *>
-    VertexType StoreData(Iterator iter, const LabelType *labels, SizeT insert_n) {
-        auto ret = data_store_.AddVec(iter, insert_n);
-        if (ret == DataStore::ERR_IDX) {
-            UnrecoverableError("Data index is not enough.");
-        }
-        Copy(labels, labels + insert_n, labels_.get() + ret);
-        return ret;
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    VertexType StoreData(Iterator iter, SizeT insert_n) {
+        return data_store_.AddVec(iter, insert_n);
     }
 
-    VertexType StoreDataRaw(const DataType *query, const LabelType *labels, SizeT insert_n) {
-        return StoreData(DenseVectorIter(query, data_store_.dim(), insert_n), labels, insert_n);
+    VertexType StoreDataRaw(const DataType *query, SizeT insert_n) {
+        return StoreData(DenseVectorIter(query, data_store_.dim(), insert_n, data_store_.cur_vec_num()), insert_n);
     }
 
     template <bool WithLock = true>
@@ -382,7 +363,7 @@ public:
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
-            labels[i] = labels_[v_ptr[i]];
+            labels[i] = GetLabel(v_ptr[i]);
         }
         return {result_n, std::move(d_ptr), std::move(labels)};
     }
@@ -398,7 +379,7 @@ public:
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         Vector<Pair<DataType, LabelType>> result(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
-            result[i] = {d_ptr[i], labels_[v_ptr[i]]};
+            result[i] = {d_ptr[i], GetLabel(v_ptr[i])};
         }
         std::sort(result.begin(), result.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
         return result;
@@ -419,7 +400,6 @@ public:
         file_handler.Write(&ef_construction_, sizeof(ef_construction_));
         data_store_.Save(file_handler);
         graph_store_.SaveGraph(file_handler, data_store_.cur_vec_num());
-        file_handler.Write(labels_.get(), sizeof(LabelType) * data_store_.cur_vec_num());
     }
 
     static UniquePtr<This> Load(FileHandler &file_handler, DataStore::InitArgs args) {
@@ -433,10 +413,7 @@ public:
         auto graph_store = GraphStore::LoadGraph(file_handler, data_store.max_vec_num(), Mmax, Mmax0, data_store.cur_vec_num());
         Distance distance(data_store.dim());
 
-        auto labels = MakeUnique<LabelType[]>(data_store.cur_vec_num());
-        file_handler.Read(labels.get(), sizeof(LabelType) * data_store.cur_vec_num());
-        return UniquePtr<This>(
-            new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), std::move(labels), 0, 0));
+        return UniquePtr<This>(new This(M, Mmax, Mmax0, ef_construction, std::move(data_store), std::move(graph_store), std::move(distance), 0, 0));
     }
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------

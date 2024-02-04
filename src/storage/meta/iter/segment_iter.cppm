@@ -14,31 +14,37 @@
 
 module;
 
+#include <utility>
+
 export module segment_iter;
 
 import stl;
 import catalog;
 import block_iter;
+import buffer_manager;
+import default_values;
 
 namespace infinity {
 
 export class SegmentIter {
 public:
-    SegmentIter(const SegmentEntry *entry, SharedPtr<Vector<SizeT>> column_ids) : entry_(entry), block_idx_(0), column_ids_(column_ids) {
+    SegmentIter(const SegmentEntry *entry, BufferManager *buffer_mgr, Vector<ColumnID> &&column_ids, TxnTimeStamp iterate_ts)
+        : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(column_ids), iterate_ts_(iterate_ts), block_idx_(0) {
         const auto &block_entries = entry->block_entries();
         if (block_entries.empty()) {
             block_iter_ = None;
         } else {
-            block_iter_ = BlockIter(block_entries[block_idx_].get(), *column_ids);
+            block_iter_ = BlockIter(block_entries[block_idx_].get(), buffer_mgr, column_ids_, iterate_ts_);
         }
     }
 
-    Optional<Vector<const void *>> Next() {
+    Optional<Pair<Vector<const void *>, SegmentOffset>> Next() {
         if (!block_iter_.has_value()) {
             return None;
         }
         if (auto ret = block_iter_->Next(); ret) {
-            return ret;
+            auto &[vec, offset] = *ret;
+            return std::make_pair(std::move(vec), SegmentOffset(offset + block_idx_ * DEFAULT_BLOCK_CAPACITY));
         }
         block_idx_++;
 
@@ -47,26 +53,34 @@ public:
             block_iter_ = None;
             return None;
         }
-        block_iter_ = BlockIter(block_entries[block_idx_].get(), *column_ids_);
+        // FIXME: segment_entry should store the block capacity
+        block_iter_ = BlockIter(block_entries[block_idx_].get(), buffer_mgr_, column_ids_, iterate_ts_);
         return Next();
     }
 
 private:
-    const SegmentEntry *entry_;
-    SizeT block_idx_;
-    Optional<BlockIter> block_iter_;
+    const SegmentEntry *const entry_;
+    BufferManager *const buffer_mgr_;
+    const Vector<ColumnID> column_ids_;
+    const TxnTimeStamp iterate_ts_;
 
-    SharedPtr<Vector<SizeT>> column_ids_;
+    BlockID block_idx_;
+    Optional<BlockIter> block_iter_;
 };
 
 export template <typename DataType>
 class OneColumnIterator {
 public:
-    OneColumnIterator(const SegmentEntry *entry, SizeT column_id) : segment_iter_(entry, MakeShared<Vector<SizeT>>(Vector<SizeT>{column_id})) {}
+    using LabelType = SegmentOffset;
 
-    Optional<const DataType *> Next() {
+    OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
+        : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
+
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
         if (auto ret = segment_iter_.Next(); ret) {
-            return reinterpret_cast<const DataType *>((*ret)[0]);
+            auto [vec, offset] = *ret;
+            auto v_ptr = reinterpret_cast<const DataType *>(vec[0]);
+            return std::make_pair(v_ptr, offset);
         }
         return None;
     }

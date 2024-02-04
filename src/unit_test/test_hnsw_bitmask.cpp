@@ -76,11 +76,8 @@ int main() {
     int M = 16;
     int ef_construction = 200;
     auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction, {});
-    auto labels = MakeUnique<LabelT[]>(base_embedding_count);
-    for (int i = 0; i < base_embedding_count; ++i) {
-        labels[i] = i;
-    }
-    hnsw_index->InsertVecs(base_embedding.get(), labels.get(), base_embedding_count);
+
+    hnsw_index->InsertVecs(base_embedding.get(), base_embedding_count);
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);

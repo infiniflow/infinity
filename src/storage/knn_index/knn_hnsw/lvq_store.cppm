@@ -16,6 +16,7 @@ module;
 
 #include <new>
 #include <type_traits>
+#include <utility>
 #include <xmmintrin.h>
 
 import stl;
@@ -28,20 +29,21 @@ export module lvq_store;
 
 namespace infinity {
 
-export template <typename DataType, typename CompressType, LVQCacheConcept<DataType, CompressType> LVQCache>
+export template <typename DataType, typename LabelType, typename CompressType, LVQCacheConcept<DataType, CompressType> LVQCache>
 class LVQStore {
 public:
     // Compress type must be i8 temporarily
     static_assert(std::is_same<CompressType, i8>());
 
-    using This = LVQStore<DataType, CompressType, LVQCache>;
+    using This = LVQStore<DataType, LabelType, CompressType, LVQCache>;
+    using PlainStore = PlainStore<DataType, LabelType>;
+
     using InitArgs = SizeT; // buffer size
     class LVQData;
     using StoreType = LVQData;
     struct QueryLVQ;
     using QueryType = QueryLVQ;
 
-    static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
     static constexpr SizeT PADDING_SIZE = 32;
 
 private:
@@ -67,10 +69,12 @@ private:
     const SizeT compress_data_offset_;
     const SizeT compress_data_size_;
 
-    char *const ptr_;
+    char *ptr_;
 
     const SizeT buffer_plain_size_;
-    PlainStore<DataType> plain_data_;
+    PlainStore plain_data_;
+
+    UniquePtr<LabelType[]> labels_;
 
 private:
     constexpr GlobalCacheType *GetGlobalCacheMut() { return reinterpret_cast<GlobalCacheType *>(ptr_ + global_cache_offset_); }
@@ -109,47 +113,37 @@ public:
     };
 
     SizeT cur_vec_num() const { return meta_.cur_vec_num() + plain_data_.cur_vec_num(); }
-    SizeT max_vec_num() const { return meta_.max_vec_num_; }
-    SizeT dim() const { return meta_.dim_; }
+    SizeT max_vec_num() const { return meta_.max_vec_num(); }
+    SizeT dim() const { return meta_.dim(); }
 
 private:
     LVQStore(DataStoreMeta meta, This::InitArgs init_args)
-        : meta_(std::move(meta)),                                                                                                                      //
+        : meta_(std::move(meta)),                                                                                                                 //
           compress_data_offset_(AlignTo(mean_offset_ + dim() * sizeof(MeanType), PADDING_SIZE)),                                                  //
           compress_data_size_(AlignTo(compress_vec_offset_ + sizeof(CompressType) * dim(), PADDING_SIZE)),                                        //
           ptr_(static_cast<char *>(operator new[](compress_data_offset_ + compress_data_size_ * max_vec_num(), std::align_val_t(PADDING_SIZE)))), //
           buffer_plain_size_(init_args),                                                                                                          //
-          plain_data_(PlainStore<DataType>::Make(0, dim()))                                                                                       //
+          plain_data_(PlainStore::Make(0, dim())),                                                                                                //
+          labels_(MakeUnique<LabelType[]>(max_vec_num()))                                                                                         //
     {}
-
-    void Init() {
-        // MeanType *mean = GetMeanMut();
-        // std::fill(mean, mean + dim(), 0);
-        std::fill(ptr_, ptr_ + compress_data_offset_ + compress_data_size_ * max_vec_num(), 0);
-    }
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs init_args) {
         DataStoreMeta meta(max_vec_num, dim);
         auto ret = This(std::move(meta), std::move(init_args));
-        ret.Init();
+        std::fill(ret.ptr_, ret.ptr_ + ret.compress_data_offset_ + ret.compress_data_size_ * ret.max_vec_num(), 0);
         return ret;
     }
 
-    LVQStore(const This &) = delete;
-    LVQStore &operator=(const This &) = delete;
-    LVQStore &operator=(This &&other) = delete;
-
     LVQStore(This &&other)
-        : meta_(std::move(other.meta_)),                         //
+        : meta_(std::move(other.meta_)),                    //
           compress_data_offset_(other.compress_data_size_), //
           compress_data_size_(other.compress_data_offset_), //
-          ptr_(other.ptr_),                                 //
+          ptr_(std::exchange(other.ptr_, nullptr)),         //
           buffer_plain_size_(other.buffer_plain_size_),     //
-          plain_data_(std::move(other.plain_data_))              //
-    {
-        const_cast<char *&>(other.ptr_) = nullptr;
-    }
+          plain_data_(std::move(other.plain_data_)),        //
+          labels_(std::move(other.labels_))                 //
+    {}
 
     ~LVQStore() {
         if (ptr_ != nullptr) {
@@ -161,12 +155,14 @@ public:
         Compress();
         meta_.Save(file_handler);
         file_handler.Write(ptr_, compress_data_offset_ + compress_data_size_ * cur_vec_num());
+        file_handler.Write(labels_.get(), sizeof(LabelType) * cur_vec_num());
     }
 
     static This Load(FileHandler &file_handler, SizeT max_vec_num, This::InitArgs init_args) {
         DataStoreMeta meta = DataStoreMeta::Load(file_handler, max_vec_num);
         auto ret = This(std::move(meta), std::move(init_args));
         file_handler.Read(ret.ptr_, ret.compress_data_offset_ + ret.compress_data_size_ * ret.cur_vec_num());
+        file_handler.Read(ret.labels_.get(), sizeof(LabelType) * ret.cur_vec_num());
         return ret;
     }
 
@@ -202,7 +198,7 @@ private:
             ScalarType scale_inv = 1 / scale;
             for (SizeT j = 0; j < dim(); ++j) {
                 auto c = std::floor((vec[j] - mean[j] - bias) * scale_inv + 0.5);
-                if(!(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min())) {
+                if (!(c <= std::numeric_limits<CompressType>::max() && c >= std::numeric_limits<CompressType>::min())) {
                     UnrecoverableError("CompressVec error");
                 }
                 compress[j] = c;
@@ -214,12 +210,11 @@ private:
     }
 
     // TODO SIMD optimization here
-    template <typename Iterator>
-        requires DataIteratorConcept<Iterator, const DataType *>
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     SizeT MergeCompress(Iterator query_iter, SizeT vec_num) {
         SizeT compress_n = meta_.cur_vec_num();
         if (auto ret = meta_.AllocateVec(vec_num + plain_data_.cur_vec_num()); ret > max_vec_num()) {
-            return ERR_IDX;
+            UnrecoverableError("exceed max vec num");
         }
         auto decompress_vecs = MakeUnique<DataType[]>(dim() * compress_n);
         for (SizeT vec_i = 0; vec_i < compress_n; ++vec_i) {
@@ -237,12 +232,21 @@ private:
         }
         Iterator query_iter1 = query_iter;
 
-        for (SizeT i = 0; i < vec_num; ++i) {
-            auto vec = *(query_iter1.Next());
+        SizeT actual_size = 0;
+        while (true) {
+            auto vec_opt = query_iter1.Next();
+            if (!vec_opt.has_value()) {
+                break;
+            }
+            const auto &[vec, label] = *vec_opt;
             for (SizeT j = 0; j < dim(); ++j) {
                 mean[j] += vec[j];
             }
+            labels_[compress_n + actual_size] = label;
+            ++actual_size;
         }
+        meta_.ReturnNotUsed(vec_num - actual_size);
+
         for (SizeT i = 0; i < dim(); ++i) {
             mean[i] /= cur_vec_num();
         }
@@ -256,33 +260,32 @@ private:
             CompressVec(plain_data_.GetVec(vec_i - compress_n), GetLVQData(vec_i));
             ++vec_i;
         }
-        while (vec_i < compress_n + plain_data_.cur_vec_num() + vec_num) {
-            auto vec = *(query_iter.Next());
+        while (vec_i < compress_n + plain_data_.cur_vec_num() + actual_size) {
+            const auto *vec = query_iter.Next()->first;
             CompressVec(vec, GetLVQData(vec_i));
             ++vec_i;
         }
         *GetGlobalCacheMut() = LVQCache::MakeGlobalCache(GetMean(), dim());
-        plain_data_ = PlainStore<DataType>::Make(std::min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
-        return cur_vec_num() - vec_num;
+        plain_data_ = PlainStore::Make(std::min(buffer_plain_size_, max_vec_num() - cur_vec_num()), dim());
+        return cur_vec_num() - actual_size;
     }
 
 public:
-    SizeT AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIter(vec, dim(), vec_num), vec_num); }
+    SizeT AddVec(const DataType *vec, SizeT vec_num) {
+        return AddVec(DenseVectorIter<DataType, LabelType>(vec, dim(), vec_num, meta_.cur_vec_num()), vec_num);
+    }
 
-    template <typename Iterator>
-        requires DataIteratorConcept<Iterator, const DataType *>
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     SizeT AddVec(Iterator query_iter, SizeT vec_num) {
-        if (SizeT idx = plain_data_.AddVec(query_iter, vec_num); idx != DataStoreMeta::ERR_IDX) {
-            return meta_.cur_vec_num() + idx;
-        } else if (SizeT idx = MergeCompress(std::move(query_iter), vec_num); idx != DataStoreMeta::ERR_IDX) {
-            return idx;
-        } else {
-            return ERR_IDX;
+        try {
+            return meta_.cur_vec_num() + plain_data_.AddVec(query_iter, vec_num);
+        } catch (const UnrecoverableException &) {
+            return MergeCompress(std::move(query_iter), vec_num);
         }
     }
 
     StoreType GetVec(SizeT vec_i) const {
-        if(vec_i >= meta_.cur_vec_num()) {
+        if (vec_i >= meta_.cur_vec_num()) {
             UnrecoverableError("Get Vec error");
         }
         return GetLVQData(vec_i);
@@ -302,13 +305,17 @@ public:
         return QueryType{std::move(ptr)};
     }
 
+    LabelType GetLabel(VertexType vec_i) const {
+        if ((SizeT)vec_i < meta_.cur_vec_num()) {
+            return labels_[vec_i];
+        }
+        return plain_data_.GetLabel(vec_i - meta_.cur_vec_num());
+    }
+
     void Compress() {
         // query_iter is empty here. Should implement better
-        DenseVectorIter<DataType> empty_iter(nullptr, dim(), 0);
-        SizeT ret = MergeCompress(empty_iter, 0);
-        if(ret == DataStoreMeta::ERR_IDX) {
-            UnrecoverableError("Compress error");
-        }
+        auto empty_iter = DenseVectorIter<DataType, LabelType>(nullptr, dim(), 0, LabelType{});
+        MergeCompress(empty_iter, 0);
     }
 };
 

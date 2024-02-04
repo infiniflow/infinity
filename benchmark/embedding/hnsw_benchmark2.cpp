@@ -45,7 +45,7 @@ int main() {
     // std::tuple<> init_args = {};
     // std::string save_place = save_dir + "/my_sift_plain_l2.hnsw";
 
-    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, LabelT, int8_t>>;
     SizeT init_args = {0};
     std::string save_place = save_dir + "/my_sift_lvq8_l2_1.hnsw";
 
@@ -77,9 +77,8 @@ int main() {
 
         {
             std::cout << "Build thread number: " << build_thread_n << std::endl;
-            auto labels = std::make_unique<LabelT[]>(embedding_count);
-            std::iota(labels.get(), labels.get() + embedding_count, 0);
-            VertexType start_i = knn_hnsw->StoreDataRaw(input_embeddings, labels.get(), embedding_count);
+
+            VertexType start_i = knn_hnsw->StoreDataRaw(input_embeddings, embedding_count);
             delete[] input_embeddings;
             Atomic<VertexType> next_i = start_i;
             std::vector<std::thread> threads;

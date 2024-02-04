@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//#include <cassert>
-//#include <cstdint>
+// #include <cassert>
+// #include <cstdint>
 #include <fstream>
-//#include <memory>
-//#include <queue>
-//#include <random>
+// #include <memory>
+// #include <queue>
+// #include <random>
 
 import hnsw_alg;
 import file_system;
@@ -43,12 +43,10 @@ int main() {
     int M = 16;
     int ef_construction = 200;
 
-    using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainL2Dist<float>>;
-    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, int8_t>>;
+    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float, LabelT>, PlainL2Dist<float, LabelT>>;
+    using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>, LVQL2Dist<float, LabelT, int8_t>>;
 
     // NOTE: inner product correct rate is not 1. (the vector and itself's distance is not the smallest)
-    // using Hnsw = KnnHnsw<float, LabelT, PlainStore<float>, PlainIPDist<float>>;
-    // using Hnsw = KnnHnsw<float, LabelT, LVQStore<float, int8_t, LVQIPCache<float, int8_t>>, LVQIPDist<float, int8_t>>;
 
     std::mt19937 rng;
     rng.seed(0);
@@ -64,9 +62,7 @@ int main() {
     {
         auto hnsw_index = Hnsw::Make(element_size, dim, M, ef_construction, {});
 
-        auto labels = MakeUnique<LabelT[]>(element_size);
-        std::iota(labels.get(), labels.get() + element_size, 0);
-        hnsw_index->InsertVecs(data.get(), labels.get(), element_size);
+        hnsw_index->InsertVecsRaw(data.get(), element_size);
         std::ofstream os("tmp/dump.txt");
         hnsw_index->Dump(os);
         hnsw_index->Check();
@@ -77,7 +73,6 @@ int main() {
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
             auto result = hnsw_index->KnnSearchSorted(query, 1);
-//            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;
             }
@@ -103,7 +98,6 @@ int main() {
         for (int i = 0; i < element_size; ++i) {
             const float *query = data.get() + i * dim;
             auto result = hnsw_index->KnnSearchSorted(query, 1);
-//            assert(result.size() == 1);
             if (result[0].second == (LabelT)i) {
                 ++correct;
             }

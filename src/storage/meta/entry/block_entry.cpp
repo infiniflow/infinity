@@ -183,14 +183,14 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry 
     return block_entry;
 }
 
-Pair<u16, u16> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
+Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     auto &block_version = this->block_version_;
     auto &deleted = block_version->deleted_;
-    u16 block_offset_end = block_version->GetRowCount(begin_ts);
+    BlockOffset block_offset_end = block_version->GetRowCount(begin_ts);
     while (block_offset_begin < block_offset_end && deleted[block_offset_begin] != 0 && deleted[block_offset_begin] <= begin_ts) {
         block_offset_begin++;
     }
-    u16 row_idx;
+    BlockOffset row_idx;
     for (row_idx = block_offset_begin; row_idx < block_offset_end; ++row_idx) {
         if (deleted[row_idx] != 0 && deleted[row_idx] <= begin_ts) {
             break;

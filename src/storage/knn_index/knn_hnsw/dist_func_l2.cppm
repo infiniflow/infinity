@@ -27,10 +27,10 @@ export module dist_func_l2;
 
 namespace infinity {
 
-export template <typename DataType>
+export template <typename DataType, typename LabelType>
 class PlainL2Dist {
 public:
-    using DataStore = PlainStore<DataType>;
+    using DataStore = PlainStore<DataType, LabelType>;
     using StoreType = typename DataStore::StoreType;
 
 private:
@@ -79,14 +79,14 @@ public:
         return {norm1 * scale, norm2 * scale * scale};
     }
 
-    static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT ) { return {}; }
+    static GlobalCacheType MakeGlobalCache(const MeanType *, SizeT) { return {}; }
 };
 
-export template <typename DataType, typename CompressType>
+export template <typename DataType, typename LabelType, typename CompressType>
 class LVQL2Dist {
 public:
-    using This = LVQL2Dist<DataType, CompressType>;
-    using DataStore = LVQStore<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using This = LVQL2Dist<DataType, CompressType, LabelType>;
+    using DataStore = LVQStore<DataType, LabelType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename DataStore::StoreType;
 
 private:

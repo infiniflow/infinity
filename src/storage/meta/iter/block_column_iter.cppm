@@ -14,34 +14,46 @@
 
 module;
 
+#include <utility>
+
 export module block_column_iter;
 
 import stl;
-import buffer_handle;
 import catalog;
+import buffer_manager;
+import column_vector;
 
 namespace infinity {
 
 export class BlockColumnIter {
 public:
-    BlockColumnIter(BlockColumnEntry *entry, u16 row_count)
-        : buffer_handle_(entry->buffer()->Load()), ele_size_(entry->column_type()->Size()), row_count_(row_count), offset_(0) {}
+    BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp iterate_ts)
+        : block_entry_(entry->GetBlockEntry()), column_vector_(entry->GetColumnVector(buffer_mgr)), ele_size_(entry->column_type()->Size()),
+          iterate_ts_(iterate_ts), offset_(0), read_end_(0) {}
+    // TODO: Does `ColumnVector` implements the move constructor?
 
-    Optional<const void *> Next() {
-        if (offset_ >= row_count_) {
-            return None;
+    Optional<Pair<const void *, BlockOffset>> Next() {
+        // FIXME: because no non-copy way to get data from `ColumnVector`, use data() tmply
+        if (offset_ == read_end_) {
+            auto [begin, end] = block_entry_->GetVisibleRange(iterate_ts_, read_end_);
+            if (begin == end) {
+                return None;
+            }
+            read_end_ = end;
+            offset_ = begin;
         }
-        auto ret = static_cast<const char *>(buffer_handle_.GetData()) + offset_ * ele_size_;
-        ++offset_;
-        return ret;
+        auto ret = column_vector_.data() + offset_ * ele_size_;
+        return std::make_pair(ret, offset_++);
     }
 
 private:
-    BufferHandle buffer_handle_;
-    SizeT ele_size_;
-    SizeT row_count_;
+    const BlockEntry *const block_entry_;
+    const ColumnVector column_vector_;
+    const SizeT ele_size_;
+    const TxnTimeStamp iterate_ts_;
 
-    SizeT offset_;
+    BlockOffset offset_;
+    BlockOffset read_end_;
 };
 
 } // namespace infinity
