@@ -25,7 +25,7 @@ import stl;
 import infinity_exception;
 import txn_manager;
 import buffer_manager;
-import wal;
+import wal_entry;
 import third_party;
 import logger;
 import data_block;

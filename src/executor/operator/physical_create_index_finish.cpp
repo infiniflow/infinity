@@ -24,7 +24,6 @@ import query_context;
 import operator_state;
 import load_meta;
 import index_def;
-import wal;
 import infinity_exception;
 
 module physical_create_index_finish;

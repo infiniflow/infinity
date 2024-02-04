@@ -24,7 +24,7 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal;
+import wal_entry;
 import value;
 
 import data_block;

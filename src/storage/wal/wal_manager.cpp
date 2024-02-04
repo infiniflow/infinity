@@ -37,7 +37,7 @@ import extra_ddl_info;
 import infinity_exception;
 // #include "statement/extra/extra_ddl_info.h"
 
-module wal;
+module wal_manager;
 
 namespace infinity {
 

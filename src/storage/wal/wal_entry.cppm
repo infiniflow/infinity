@@ -16,7 +16,7 @@ module;
 
 #include <typeinfo>
 
-export module wal:wal_entry;
+export module wal_entry;
 
 import table_def;
 import index_def;

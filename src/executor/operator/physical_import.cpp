@@ -43,7 +43,6 @@ import local_file_system;
 import defer_op;
 import txn_store;
 import catalog;
-import wal;
 import file_system_type;
 import file_system;
 import buffer_handle;
@@ -55,6 +54,7 @@ import column_vector;
 import default_values;
 import embedding_info;
 import column_def;
+import wal_entry;
 
 namespace infinity {
 

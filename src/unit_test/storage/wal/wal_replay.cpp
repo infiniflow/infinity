@@ -28,7 +28,7 @@ import value;
 import txn_store;
 import buffer_manager;
 import meta_state;
-import wal;
+import wal_entry;
 import infinity_exception;
 import status;
 import column_vector;

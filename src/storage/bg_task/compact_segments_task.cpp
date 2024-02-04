@@ -32,7 +32,8 @@ import txn_state;
 import txn_manager;
 import infinity_exception;
 import bg_task;
-import wal;
+import wal_manager;
+import wal_entry;
 import global_block_id;
 import block_index;
 

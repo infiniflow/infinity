@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module wal;
+module wal_entry;
 
 import crc;
 import serialize;

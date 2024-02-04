@@ -14,11 +14,11 @@
 
 module;
 
-export module wal:wal_manager;
-import :wal_entry;
+export module wal_manager;
 
 import stl;
 import bg_task;
+import wal_entry;
 
 namespace infinity {
 
