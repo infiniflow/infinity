@@ -15,25 +15,23 @@
 module;
 
 export module catalog;
-export import :db_meta;
-export import :db_entry;
-export import :table_meta;
-export import :table_entry;
-export import :view_meta;
-export import :view_entry;
-export import :segment_entry;
-export import :block_entry;
-export import :block_column_entry;
-export import :table_index_meta;
-export import :table_index_entry;
-export import :column_index_entry;
-export import :segment_column_index_entry;
-export import :irs_index_entry;
-export import :base_entry;
+//export import :db_meta;
+//export import :db_entry;
+//export import :table_meta;
+//export import :table_entry;
+//export import :view_meta;
+//export import :view_entry;
+//export import :segment_entry;
+//export import :block_entry;
+//export import :block_column_entry;
+//export import :table_index_meta;
+//export import :table_index_entry;
+//export import :column_index_entry;
+//export import :segment_column_index_entry;
+//export import :irs_index_entry;
+//export import :base_entry;
 
 import stl;
-
-
 import table_def;
 import function;
 import function_set;
@@ -49,8 +47,15 @@ import index_def;
 import txn_store;
 import data_access_state;
 import extra_ddl_info;
+import db_entry;
+import table_entry;
+import table_index_entry;
+import segment_entry;
+import db_meta;
 
 namespace infinity {
+
+class TxnManager;
 
 class ProfileHistory {
 private:

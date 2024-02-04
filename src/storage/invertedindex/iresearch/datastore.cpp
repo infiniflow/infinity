@@ -55,7 +55,7 @@ import default_values;
 import data_block;
 import txn;
 import index_def;
-import catalog;
+
 import buffer_handle;
 import local_file_system;
 import buffer_manager;
@@ -63,6 +63,9 @@ import index_full_text;
 import infinity_exception;
 import internal_types;
 import match_expr;
+
+import table_entry;
+import segment_entry;
 
 namespace infinity {
 

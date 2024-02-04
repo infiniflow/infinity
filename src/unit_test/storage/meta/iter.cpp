@@ -24,7 +24,10 @@ import internal_types;
 import block_column_iter;
 import block_iter;
 import segment_iter;
-import catalog;
+import block_column_entry;
+import block_entry;
+import segment_entry;
+import table_entry;
 import data_type;
 
 using namespace infinity;

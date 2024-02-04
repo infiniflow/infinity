@@ -14,9 +14,9 @@
 
 module;
 
-export module catalog:view_entry;
+export module view_entry;
 
-import :base_entry;
+import base_entry;
 import internal_types;
 import stl;
 import data_type;

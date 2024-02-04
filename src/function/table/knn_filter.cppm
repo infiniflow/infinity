@@ -14,12 +14,13 @@
 
 module;
 
+export module knn_filter;
+
 import stl;
 import hnsw_common;
 import bitmask;
-import catalog;
 
-export module knn_filter;
+import segment_entry;
 
 namespace infinity {
 

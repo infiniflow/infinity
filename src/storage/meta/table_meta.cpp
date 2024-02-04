@@ -16,9 +16,7 @@ module;
 
 #include <vector>
 
-module catalog;
-
-import :base_entry;
+module table_meta;
 
 import stl;
 import table_entry_type;

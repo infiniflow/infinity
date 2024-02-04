@@ -20,7 +20,7 @@ export module base_table_ref;
 
 import stl;
 import table_ref;
-import catalog;
+import table_entry;
 
 import table_function;
 import block_index;

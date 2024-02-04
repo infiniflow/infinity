@@ -25,7 +25,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-import catalog;
+
 import index_def;
 import status;
 import infinity_exception;

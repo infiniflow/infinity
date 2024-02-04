@@ -28,6 +28,7 @@ import logger;
 import data_access_state;
 import txn;
 import default_values;
+import table_entry;
 import catalog;
 import internal_types;
 import data_type;

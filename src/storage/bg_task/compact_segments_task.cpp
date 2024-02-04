@@ -37,6 +37,8 @@ import wal_entry;
 import global_block_id;
 import block_index;
 
+import block_entry;
+
 namespace infinity {
 
 RowID RowIDRemapper::GetNewRowID(SegmentID segment_id, BlockID block_id, BlockOffset block_offset) const {

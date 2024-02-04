@@ -27,7 +27,7 @@ import column_identifer;
 import binding;
 import base_expression;
 import block_index;
-import catalog;
+import table_entry;
 import internal_types;
 import select_statement;
 import parsed_expr;

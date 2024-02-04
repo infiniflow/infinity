@@ -30,7 +30,7 @@ import status;
 import logger;
 import iresearch_datastore;
 import base_table_ref;
-import catalog;
+import irs_index_entry;
 
 namespace infinity {
 

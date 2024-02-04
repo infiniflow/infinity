@@ -47,7 +47,7 @@ import project_binder;
 import limit_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
-import catalog;
+
 import table_entry_type;
 import block_index;
 import cast_expression;
@@ -68,6 +68,9 @@ import subquery_reference;
 import join_reference;
 import cross_product_reference;
 import data_type;
+
+import base_entry;
+import view_entry;
 
 namespace infinity {
 

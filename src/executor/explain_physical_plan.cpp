@@ -74,7 +74,7 @@ import physical_operator_type;
 import explain_logical_plan;
 import logical_show;
 import infinity_exception;
-import catalog;
+
 import base_expression;
 import knn_expression;
 import third_party;
@@ -84,6 +84,8 @@ import extra_ddl_info;
 import column_def;
 import statement_common;
 import flush_statement;
+
+import table_entry;
 
 namespace infinity {
 

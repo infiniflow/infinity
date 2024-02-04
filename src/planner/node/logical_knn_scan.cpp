@@ -25,7 +25,7 @@ import logical_node_type;
 import knn_expression;
 
 import default_values;
-import catalog;
+
 import logical_type;
 import internal_types;
 

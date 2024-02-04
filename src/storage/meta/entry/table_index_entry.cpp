@@ -16,8 +16,7 @@ module;
 
 #include <vector>
 
-module catalog;
-
+module table_index_entry;
 
 import third_party;
 import local_file_system;

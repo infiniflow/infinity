@@ -17,7 +17,7 @@ module;
 export module create_index_data;
 
 import stl;
-import catalog;
+import segment_entry;
 import block_index;
 
 namespace infinity {

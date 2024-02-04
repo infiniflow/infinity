@@ -28,7 +28,7 @@ import file_system_type;
 import infinity_exception;
 import column_vector;
 import third_party;
-import catalog;
+
 import secondary_index_pgm;
 import logger;
 

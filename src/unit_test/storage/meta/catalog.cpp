@@ -32,6 +32,8 @@ import catalog;
 import status;
 import extra_ddl_info;
 
+import base_entry;
+
 class CatalogTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();

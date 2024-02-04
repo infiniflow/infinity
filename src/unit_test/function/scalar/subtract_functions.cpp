@@ -22,7 +22,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+
 import scalar_function;
 import scalar_function_set;
 import function_set;
@@ -38,6 +38,7 @@ import substract;
 import logical_type;
 import internal_types;
 import data_type;
+import catalog;
 
 class SubtractFunctionsTest : public BaseTest {};
 

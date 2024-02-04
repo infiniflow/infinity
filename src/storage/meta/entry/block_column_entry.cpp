@@ -16,7 +16,7 @@ module;
 
 #include <string>
 
-module catalog;
+module block_column_entry;
 
 import stl;
 import buffer_manager;

@@ -16,17 +16,17 @@ module;
 
 #include <sstream>
 
+module fix_heap;
+
 import stl;
 import third_party;
 import infinity_exception;
 import vector_heap_chunk;
 import global_resource_usage;
 
-import catalog;
+import block_column_entry;
 import buffer_manager;
 import data_file_worker;
-
-module fix_heap;
 
 namespace infinity {
 FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) { GlobalResourceUsage::IncrObjectCount(); }

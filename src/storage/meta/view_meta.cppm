@@ -14,12 +14,10 @@
 
 module;
 
-export module catalog:view_meta;
-
-import :base_entry;
+export module view_meta;
 
 import stl;
-
+import base_entry;
 import status;
 import column_def;
 

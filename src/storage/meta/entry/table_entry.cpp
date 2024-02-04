@@ -17,7 +17,7 @@ module;
 #include <stdexcept>
 #include <string>
 
-module catalog;
+module table_entry;
 
 import stl;
 

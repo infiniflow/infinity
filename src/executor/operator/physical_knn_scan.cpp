@@ -33,7 +33,7 @@ import knn_distance;
 import third_party;
 
 import infinity_exception;
-import catalog;
+
 import default_values;
 
 import knn_expression;
@@ -66,6 +66,10 @@ import status;
 import buffer_obj;
 import create_index_info;
 import knn_expr;
+
+import block_entry;
+import column_index_entry;
+import segment_entry;
 
 namespace infinity {
 

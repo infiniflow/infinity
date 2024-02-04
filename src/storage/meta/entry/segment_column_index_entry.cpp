@@ -16,7 +16,7 @@ module;
 
 #include <vector>
 
-module catalog;
+module segment_column_index_entry;
 
 import stl;
 import buffer_manager;
@@ -45,6 +45,8 @@ import type_info;
 import embedding_info;
 import create_index_info;
 import column_def;
+import block_column_entry;
+import default_values;
 
 namespace infinity {
 

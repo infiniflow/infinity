@@ -35,6 +35,9 @@ import bg_task;
 import extra_ddl_info;
 
 import infinity_exception;
+
+import block_entry;
+import segment_entry;
 // #include "statement/extra/extra_ddl_info.h"
 
 module wal_manager;

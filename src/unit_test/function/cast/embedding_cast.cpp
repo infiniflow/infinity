@@ -22,7 +22,7 @@ import third_party;
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+
 
 import function_set;
 import aggregate_function_set;

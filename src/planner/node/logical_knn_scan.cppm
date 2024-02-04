@@ -24,7 +24,7 @@ import logical_node;
 import base_expression;
 import knn_expression;
 import base_table_ref;
-import catalog;
+import table_entry;
 import internal_types;
 import data_type;
 

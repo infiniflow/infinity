@@ -14,14 +14,14 @@
 
 module;
 
+export module session;
+
 import stl;
 import txn;
 import config;
 import options;
 import profiler;
 import catalog;
-
-export module session;
 
 namespace infinity {
 

@@ -23,7 +23,7 @@ import logical_node;
 
 import match_expression;
 import base_table_ref;
-import catalog;
+import table_entry;
 import internal_types;
 import data_type;
 

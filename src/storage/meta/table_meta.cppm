@@ -14,9 +14,7 @@
 
 module;
 
-export module catalog:table_meta;
-
-import :base_entry;
+export module table_meta;
 
 import stl;
 
@@ -26,10 +24,11 @@ import buffer_manager;
 import status;
 import extra_ddl_info;
 import column_def;
+import base_entry;
 
 namespace infinity {
 
-export class DBEntry;
+class DBEntry;
 class TableEntry;
 class TxnManager;
 

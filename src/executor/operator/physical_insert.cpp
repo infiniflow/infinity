@@ -34,7 +34,7 @@ import base_expression;
 import default_values;
 import status;
 import infinity_exception;
-import catalog;
+
 import column_def;
 
 namespace infinity {

@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module catalog;
+module block_entry;
 
 import stl;
 import default_values;

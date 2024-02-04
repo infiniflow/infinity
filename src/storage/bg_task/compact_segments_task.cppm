@@ -18,7 +18,7 @@ export module compact_segments_task;
 
 import stl;
 import bg_task;
-import catalog;
+import segment_entry;
 
 import default_values;
 import infinity_exception;

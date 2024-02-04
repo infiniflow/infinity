@@ -17,7 +17,7 @@ module;
 import stl;
 
 import block_index;
-import catalog;
+
 
 import infinity_exception;
 

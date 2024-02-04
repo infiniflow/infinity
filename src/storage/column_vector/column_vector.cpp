@@ -32,11 +32,13 @@ import serialize;
 import third_party;
 import logger;
 import value;
-import catalog;
+
 import buffer_manager;
 import status;
 import logical_type;
 import embedding_info;
+
+import block_column_entry;
 
 namespace infinity {
 

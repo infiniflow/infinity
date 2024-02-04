@@ -18,7 +18,7 @@ module;
 #include <string>
 #include <vector>
 
-module catalog;
+module segment_entry;
 
 import stl;
 import third_party;

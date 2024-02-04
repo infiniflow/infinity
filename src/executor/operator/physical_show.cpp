@@ -31,7 +31,7 @@ import table_entry_type;
 import value_expression;
 import logical_show;
 import table_detail;
-import catalog;
+
 import value;
 import table_def;
 import data_table;
@@ -55,6 +55,8 @@ import session_manager;
 import compilation_config;
 import logical_type;
 import create_index_info;
+
+import column_index_entry;
 
 namespace infinity {
 

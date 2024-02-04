@@ -14,10 +14,7 @@
 
 module;
 
-export module catalog:column_index_entry;
-
-import :base_entry;
-import :segment_column_index_entry;
+export module column_index_entry;
 
 import stl;
 
@@ -27,17 +24,19 @@ import index_base;
 import index_file_worker;
 import status;
 import column_def;
+import base_entry;
+import segment_column_index_entry;
 
 namespace infinity {
 
-export struct TableIndexEntry;
+struct TableIndexEntry;
 
 class BufferManager;
 struct TableEntry;
 class Txn;
 class BlockIndex;
 
-struct ColumnIndexEntry : public BaseEntry {
+export struct ColumnIndexEntry : public BaseEntry {
     friend struct TableEntry;
     friend struct TableIndexEntry;
 

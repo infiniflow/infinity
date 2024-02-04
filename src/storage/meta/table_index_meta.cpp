@@ -16,7 +16,7 @@ module;
 
 #include <vector>
 
-module catalog;
+module table_index_meta;
 
 import stl;
 
@@ -31,6 +31,8 @@ import infinity_exception;
 import status;
 import iresearch_datastore;
 import extra_ddl_info;
+
+import txn;
 
 namespace infinity {
 

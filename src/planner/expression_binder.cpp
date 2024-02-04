@@ -55,7 +55,7 @@ import scalar_function_set;
 import scalar_function;
 import special_function;
 import status;
-import catalog;
+
 import query_context;
 import logger;
 import embedding_info;
@@ -72,6 +72,9 @@ import between_expr;
 import subquery_expr;
 import match_expr;
 import data_type;
+
+import catalog;
+import table_entry;
 
 namespace infinity {
 

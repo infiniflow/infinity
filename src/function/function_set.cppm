@@ -22,7 +22,7 @@ import stl;
 import function;
 import base_expression;
 import function_expr;
-//import catalog;
+//
 
 namespace infinity {
 

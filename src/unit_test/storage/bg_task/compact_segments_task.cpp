@@ -39,6 +39,8 @@ import internal_types;
 import extra_ddl_info;
 import column_def;
 import data_type;
+import segment_entry;
+import block_entry;
 
 using namespace infinity;
 

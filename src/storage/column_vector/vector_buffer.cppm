@@ -14,15 +14,15 @@
 
 module;
 
+#include <variant>
+
+export module vector_buffer;
+
 import stl;
 import global_resource_usage;
 import heap_chunk;
 import fix_heap;
 import buffer_handle;
-
-#include <variant>
-
-export module vector_buffer;
 
 namespace infinity {
 

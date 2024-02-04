@@ -55,6 +55,12 @@ import column_def;
 import statement_common;
 import data_type;
 
+import segment_entry;
+import block_entry;
+import block_column_entry;
+import table_index_entry;
+import base_entry;
+
 class WalReplayTest : public BaseTest {
     void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 

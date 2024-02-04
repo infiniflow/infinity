@@ -15,12 +15,12 @@
 module;
 
 #include <sstream>
-import stl;
-import catalog;
-
-import base_expression;
 
 module function_set;
+
+import stl;
+import catalog;
+import base_expression;
 
 namespace infinity {
 

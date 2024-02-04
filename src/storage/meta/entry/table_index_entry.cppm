@@ -14,28 +14,29 @@
 
 module;
 
-export module catalog:table_index_entry;
-
-import :irs_index_entry;
-import :column_index_entry;
-import :segment_column_index_entry;
-import :base_entry;
+export module table_index_entry;
 
 import stl;
 
 import txn_store;
-
+import irs_index_entry;
+import column_index_entry;
+import segment_column_index_entry;
+import base_entry;
+import index_def;
+import block_index;
 import third_party;
 import status;
 
 namespace infinity {
+
 class Txn;
 class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
 class BaseTableRef;
 
-struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry : public BaseEntry {
 
     friend struct TableEntry;
 

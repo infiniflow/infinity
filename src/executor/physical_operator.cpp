@@ -26,7 +26,8 @@ import query_context;
 import base_table_ref;
 import third_party;
 import infinity_exception;
-import catalog;
+import block_entry;
+import block_column_entry;
 import logical_type;
 import internal_types;
 

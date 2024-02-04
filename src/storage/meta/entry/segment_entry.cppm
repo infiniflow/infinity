@@ -14,18 +14,17 @@
 
 module;
 
-export module catalog:segment_entry;
-
-import :block_entry;
-import :base_entry;
+export module segment_entry;
 
 import stl;
 import default_values;
 import third_party;
 import buffer_manager;
 import data_access_state;
-
+import block_entry;
+import base_entry;
 import infinity_exception;
+import txn;
 
 namespace infinity {
 
@@ -33,7 +32,7 @@ class TxnTableStore;
 struct TableEntry;
 class CompactSegmentsTask;
 
-struct SegmentEntry : public BaseEntry {
+export struct SegmentEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:

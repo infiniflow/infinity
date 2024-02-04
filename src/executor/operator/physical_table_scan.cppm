@@ -25,7 +25,7 @@ import physical_operator_type;
 import global_block_id;
 import table_function;
 import base_table_ref;
-import catalog;
+import table_entry;
 import block_index;
 import load_meta;
 import internal_types;

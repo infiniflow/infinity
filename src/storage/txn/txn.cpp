@@ -37,7 +37,7 @@ import data_access_state;
 import status;
 import table_detail;
 import table_entry_type;
-import catalog;
+
 import database_detail;
 import status;
 import table_def;

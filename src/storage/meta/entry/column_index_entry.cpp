@@ -17,7 +17,7 @@ module;
 #include <ctime>
 #include <string>
 
-module catalog;
+module column_index_entry;
 
 import stl;
 import index_base;

@@ -21,9 +21,11 @@ import stl;
 import logical_node;
 import logical_node_type;
 import column_binding;
-import catalog;
+
 import internal_types;
 import data_type;
+
+import table_entry;
 
 namespace infinity {
 

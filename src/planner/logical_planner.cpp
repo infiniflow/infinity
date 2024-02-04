@@ -72,7 +72,7 @@ import index_full_text;
 import base_table_ref;
 import table_ref;
 import logical_type;
-import catalog;
+
 import extra_ddl_info;
 import create_schema_info;
 import create_table_info;

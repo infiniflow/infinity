@@ -31,7 +31,7 @@ import data_block;
 import table_scan_function_data;
 import base_table_ref;
 import block_index;
-import catalog;
+
 import default_values;
 import infinity_exception;
 import infinity_exception;
@@ -40,6 +40,8 @@ import logger;
 import column_vector;
 import infinity_exception;
 import logical_type;
+
+import block_entry;
 
 namespace infinity {
 

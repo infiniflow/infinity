@@ -14,12 +14,7 @@
 
 module;
 
-export module catalog:table_entry;
-
-import :segment_entry;
-import :block_entry;
-import :table_index_meta;
-import :base_entry;
+export module table_entry;
 
 import stl;
 
@@ -33,6 +28,11 @@ import status;
 import extra_ddl_info;
 import column_def;
 import internal_types;
+import base_entry;
+import txn_manager;
+import segment_entry;
+import block_entry;
+import table_index_meta;
 
 namespace infinity {
 
@@ -40,8 +40,10 @@ class IndexDef;
 struct TableIndexEntry;
 class IrsIndexEntry;
 class TableMeta;
+class Txn;
+struct NewCatalog;
 
-struct TableEntry : public BaseEntry {
+export struct TableEntry : public BaseEntry {
     friend struct NewCatalog;
 
 public:

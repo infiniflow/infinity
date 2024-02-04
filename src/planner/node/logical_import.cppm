@@ -21,10 +21,11 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 
-import catalog;
+
 import internal_types;
 import statement_common;
 import data_type;
+import table_entry;
 
 namespace infinity {
 

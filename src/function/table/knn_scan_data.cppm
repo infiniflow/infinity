@@ -22,7 +22,8 @@ import table_function;
 import global_block_id;
 import knn_distance; // delete this
 import block_index;
-import catalog;
+import block_column_entry;
+import segment_column_index_entry;
 import merge_knn;
 import bitmask;
 import data_block;

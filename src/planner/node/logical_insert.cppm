@@ -22,7 +22,7 @@ import column_binding;
 import logical_node;
 
 import base_expression;
-import catalog;
+import table_entry;
 import internal_types;
 import data_type;
 

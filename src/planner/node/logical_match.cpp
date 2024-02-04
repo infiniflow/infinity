@@ -26,7 +26,7 @@ import match_expression;
 
 import default_values;
 import third_party;
-import catalog;
+
 import logical_type;
 import internal_types;
 
