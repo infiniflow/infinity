@@ -14,9 +14,7 @@
 
 #pragma once
 
-#include "definition/column_def.h"
 #include "type/data_type.h"
-#include "type/logical_type.h"
 
 #include <string>
 #include <unordered_set>
@@ -74,7 +72,7 @@ public:
           constraints_(std::move(constraints)) {}
 
     ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
-        : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, std::move(type_info_ptr))) {}
+        : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
 
     inline ~ColumnDef() override = default;
 
