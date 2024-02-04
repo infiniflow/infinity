@@ -97,7 +97,6 @@ public:
 
     SizeT Size() const { return terms_.size(); }
 
-private:
     struct TermEq {
         using is_transparent = void;
         explicit TermEq(const Vector<TermPosting> &data) : data_{&data} {}
@@ -127,6 +126,8 @@ public:
 
     void Flush() override;
 
+    TermPostings *GetTermPostings() { return term_postings_.get(); }
+
 private:
     MemoryIndexer *memory_indexer_{nullptr};
     UniquePtr<TermPostings> term_postings_;
@@ -136,12 +137,19 @@ private:
     TermList terms_once_;
 };
 
-export struct ParallelColumnInverters : public InverterReference {
+export class ParallelColumnInverters : public InverterReference {
+public:
     ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size);
     virtual ~ParallelColumnInverters() {}
+
     u32 Size() { return size_; }
+
     void Commit() override;
+
     Vector<UniquePtr<ParallelColumnInverter>> inverters_;
+
+private:
+    MemoryIndexer *memory_indexer_{nullptr};
     u32 size_;
 };
 

@@ -167,8 +167,10 @@ void MemoryIndexer::SwitchActiveParallelInverters() {
 
 void MemoryIndexer::Commit() {
     if (index_config_.GetIndexingParallelism() > 1) {
-        SwitchActiveParallelInverters();
         invert_executor_->SyncAll();
+        SwitchActiveParallelInverters();
+        auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
+        commit_executor_->Execute(0, std::move(task));
     } else {
         auto task = MakeUnique<CommitTask>(inverter_.get());
         commit_executor_->Execute(0, std::move(task));

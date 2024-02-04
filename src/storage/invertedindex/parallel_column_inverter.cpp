@@ -74,13 +74,24 @@ void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector,
 
 void ParallelColumnInverter::Flush() {}
 
-ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : size_(size) {
-    inverters_.resize(size);
-    for (u32 i = 0; i < size; ++i) {
+ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
+    inverters_.resize(size_);
+    for (u32 i = 0; i < size_; ++i) {
         inverters_[i] = MakeUnique<ParallelColumnInverter>(memory_indexer);
     }
 }
 
-void ParallelColumnInverters::Commit() {}
+void ParallelColumnInverters::Commit() {
+    Vector<Vector<const TermPosting *>> all_postings(size_);
+    for (u32 i = 0; i < size_; ++i) {
+        TermPostings *term_postings_slice = inverters_[i]->GetTermPostings();
+        Vector<const TermPosting *> &term_postings = all_postings[i];
+        term_postings.resize(term_postings_slice->Size());
+        for (u32 j = 0; j < term_postings_slice->Size(); ++j) {
+            term_postings.push_back(&(term_postings_slice->postings_[i]));
+        }
+        term_postings_slice->GetSorted(term_postings);
+    }
+}
 
 } // namespace infinity
