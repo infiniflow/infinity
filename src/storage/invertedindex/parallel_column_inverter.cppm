@@ -149,6 +149,8 @@ public:
     Vector<UniquePtr<ParallelColumnInverter>> inverters_;
 
 private:
+    void DoMerge(Vector<const TermPosting *> &to_merge);
+
     MemoryIndexer *memory_indexer_{nullptr};
     u32 size_;
 };
