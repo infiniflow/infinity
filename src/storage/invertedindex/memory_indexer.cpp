@@ -73,13 +73,11 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
     if (index_config_.GetIndexingParallelism() > 1) {
         inverter_ = MakeUnique<SequentialColumnInverter>(this);
     } else {
-        parallel_inverters_.resize(index_config_.GetIndexingParallelism());
-        for (u32 i = 0; i < index_config_.GetIndexingParallelism(); ++i) {
-            parallel_inverters_[i] = MakeUnique<ParallelColumnInverter>(this);
-        }
+        parallel_inverter_ = MakeUnique<ParallelColumnInverters>(this, index_config_.GetIndexingParallelism());
     }
-    invert_executor_ = SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism());
-    commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1);
+    invert_executor_ =
+        SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism() * 1000);
+    commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1000);
 }
 
 MemoryIndexer::~MemoryIndexer() { Reset(); }
@@ -110,9 +108,10 @@ void MemoryIndexer::Insert(RowID row_id, String &data) {
 
 void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
     if (index_config_.GetIndexingParallelism() > 1) {
-        for (u32 i = 0; i < row_ids.size(); i += parallel_inverters_.size()) {
-            for (u32 j = 0; j < parallel_inverters_.size(); ++j) {
-                auto task = MakeUnique<InvertTask>(parallel_inverters_[j].get(), column_vector->ToString(i + j), RowID2DocID(row_ids[i + j]));
+        for (u32 i = 0; i < row_ids.size(); i += parallel_inverter_->Size()) {
+            for (u32 j = 0; j < parallel_inverter_->inverters_.size(); ++j) {
+                auto task =
+                    MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector->ToString(i + j), RowID2DocID(row_ids[i + j]));
                 invert_executor_->Execute(j, std::move(task));
             }
         }
@@ -145,25 +144,23 @@ void MemoryIndexer::SwitchActiveInverter() {
 }
 
 void MemoryIndexer::SwitchActiveParallelInverters() {
-    inflight_parallel_inverters_.emplace_back(std::move(parallel_inverters_));
-    while (!inflight_parallel_inverters_.empty()) {
+    inflight_parallel_inverters_.emplace_back(std::move(parallel_inverter_));
+    while (!inflight_parallel_inverters_.empty() && inflight_inverters_.front()->ZeroRefCount()) {
         free_parallel_inverters_.emplace_back(std::move(inflight_parallel_inverters_.front()));
         inflight_inverters_.pop_front();
     }
     if (!free_parallel_inverters_.empty()) {
-        parallel_inverters_ = std::move(free_parallel_inverters_.back());
+        parallel_inverter_ = std::move(free_parallel_inverters_.back());
         free_parallel_inverters_.pop_back();
         return;
     }
     if (num_inverters_ >= max_inverters_) {
-        parallel_inverters_ = std::move(inflight_parallel_inverters_.front());
+        parallel_inverter_ = std::move(inflight_parallel_inverters_.front());
         inflight_parallel_inverters_.pop_front();
         return;
     }
-    parallel_inverters_.resize(index_config_.GetIndexingParallelism());
-    for (u32 i = 0; i < index_config_.GetIndexingParallelism(); ++i) {
-        parallel_inverters_[i] = MakeUnique<ParallelColumnInverter>(this);
-    }
+
+    parallel_inverter_ = MakeUnique<ParallelColumnInverters>(this, index_config_.GetIndexingParallelism());
 
     ++num_inverters_;
 }

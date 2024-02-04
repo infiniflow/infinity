@@ -16,33 +16,6 @@ import index_defines;
 import memory_indexer;
 namespace infinity {
 
-RefCount::RefCount() : lock_(), cv_(), ref_count_(0u) {}
-
-RefCount::~RefCount() {}
-
-void RefCount::Retain() noexcept {
-    std::lock_guard<std::mutex> guard(lock_);
-    ++ref_count_;
-}
-
-void RefCount::Release() noexcept {
-    std::lock_guard<std::mutex> guard(lock_);
-    --ref_count_;
-    if (ref_count_ == 0u) {
-        cv_.notify_all();
-    }
-}
-
-void RefCount::WaitForZeroRefCount() {
-    std::unique_lock<std::mutex> guard(lock_);
-    cv_.wait(guard, [this] { return (ref_count_ == 0u); });
-}
-
-bool RefCount::ZeroRefCount() {
-    std::unique_lock<std::mutex> guard(lock_);
-    return (ref_count_ == 0u);
-}
-
 template <u32 T>
 static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);

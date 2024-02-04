@@ -125,8 +125,6 @@ public:
 
     void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Commit() override;
-
     void Flush() override;
 
 private:
@@ -136,6 +134,15 @@ private:
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;
     TermList terms_once_;
+};
+
+export struct ParallelColumnInverters : public InverterReference {
+    ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size);
+    virtual ~ParallelColumnInverters() {}
+    u32 Size() { return size_; }
+    void Commit() override;
+    Vector<UniquePtr<ParallelColumnInverter>> inverters_;
+    u32 size_;
 };
 
 } // namespace infinity

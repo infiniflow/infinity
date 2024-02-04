@@ -72,7 +72,15 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
 
 void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
 
-void ParallelColumnInverter::Commit() {}
-
 void ParallelColumnInverter::Flush() {}
+
+ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : size_(size) {
+    inverters_.resize(size);
+    for (u32 i = 0; i < size; ++i) {
+        inverters_[i] = MakeUnique<ParallelColumnInverter>(memory_indexer);
+    }
+}
+
+void ParallelColumnInverters::Commit() {}
+
 } // namespace infinity

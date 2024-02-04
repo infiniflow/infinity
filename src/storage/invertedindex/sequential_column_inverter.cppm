@@ -11,24 +11,10 @@ import term;
 import string_ref;
 import column_inverter;
 
-namespace infinity {
-
-class RefCount {
-    std::mutex lock_;
-    std::condition_variable cv_;
-    u32 ref_count_;
-
-public:
-    RefCount();
-    virtual ~RefCount();
-    void Retain() noexcept;
-    void Release() noexcept;
-    void WaitForZeroRefCount();
-    bool ZeroRefCount();
-};
+namespace infinity{
 
 class MemoryIndexer;
-export class SequentialColumnInverter : public ColumnInverter {
+export class SequentialColumnInverter : public ColumnInverter, public InverterReference {
 public:
     SequentialColumnInverter(MemoryIndexer *memory_indexer);
     SequentialColumnInverter(const SequentialColumnInverter &) = delete;
@@ -42,16 +28,6 @@ public:
     void InvertColumn(u32 doc_id, const String &val) override;
 
     void Commit() override;
-
-    void Retain() { ref_count_.Retain(); }
-
-    void Release() { ref_count_.Release(); }
-
-    bool ZeroRefCount() { return ref_count_.ZeroRefCount(); }
-
-    void WaitForZeroRefCount() { return ref_count_.WaitForZeroRefCount(); }
-
-    RefCount &GetRefCount() { return ref_count_; }
 
     struct PosInfo {
         u32 term_num_{0};
@@ -116,6 +92,5 @@ private:
     PosInfoVec positions_;
     U32Vec term_refs_;
     TermList terms_once_;
-    RefCount ref_count_;
 };
 } // namespace infinity
