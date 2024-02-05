@@ -45,6 +45,7 @@ public:
         }
         if (auto ret = block_iter_->Next(); ret) {
             auto &[vec, offset] = *ret;
+            // FIXME: segment_entry should store the block capacity
             return std::make_pair(std::move(vec), SegmentOffset(offset + block_idx_ * DEFAULT_BLOCK_CAPACITY));
         }
         block_idx_++;
@@ -54,7 +55,6 @@ public:
             block_iter_ = None;
             return None;
         }
-        // FIXME: segment_entry should store the block capacity
         block_iter_ = BlockIter<CheckTS>(block_entries[block_idx_].get(), buffer_mgr_, column_ids_, iterate_ts_);
         return Next();
     }

@@ -293,8 +293,8 @@ private:
 
 public:
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void InsertVecs(Iterator iter, SizeT insert_n) {
-        VertexType start_i = StoreData(iter, insert_n);
+    void InsertVecs(Iterator &&iter, SizeT insert_n) {
+        VertexType start_i = StoreData(std::move(iter), insert_n);
         for (VertexType vertex_i = start_i; vertex_i < VertexType(start_i + insert_n); ++vertex_i) {
             Build(vertex_i);
         }
@@ -309,8 +309,8 @@ public:
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    VertexType StoreData(Iterator iter, SizeT insert_n) {
-        return data_store_.AddVec(iter, insert_n);
+    VertexType StoreData(Iterator &&iter, SizeT insert_n) {
+        return data_store_.AddVec(std::move(iter), insert_n);
     }
 
     VertexType StoreDataRaw(const DataType *query, SizeT insert_n) {
