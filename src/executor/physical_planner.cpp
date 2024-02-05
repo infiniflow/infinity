@@ -119,6 +119,7 @@ import explain_physical_plan;
 import third_party;
 import status;
 import infinity_exception;
+import load_meta;
 
 namespace infinity {
 
@@ -550,6 +551,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAggregate(const SharedPtr<Logi
                                                   logical_aggregate->GetOutputNames(),
                                                   logical_aggregate->GetOutputTypes(),
                                                   logical_operator->load_metas());
+        // TODO: replace merge op load metas with MakeShared<Vector<LoadMeta>>() ?
     }
 }
 
@@ -661,7 +663,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                               std::move(child_limit_op),
                                               logical_limit->limit_expression_,
                                               logical_limit->offset_expression_,
-                                              logical_operator->load_metas());
+                                              MakeShared<Vector<LoadMeta>>());
     }
 }
 
@@ -715,7 +717,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
                                             merge_offset, // start from offset
                                             logical_operator_top->sort_expressions_,
                                             logical_operator_top->order_by_types_,
-                                            logical_operator_top->load_metas());
+                                            MakeShared<Vector<LoadMeta>>());
     }
 }
 
@@ -860,7 +862,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                             logical_knn_scan->GetOutputTypes(),
                                             logical_knn_scan->knn_expression_,
                                             logical_knn_scan->knn_table_index_,
-                                            logical_operator->load_metas());
+                                            MakeShared<Vector<LoadMeta>>());
     }
 }
 

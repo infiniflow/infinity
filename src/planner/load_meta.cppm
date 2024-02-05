@@ -26,6 +26,7 @@ export struct LoadMeta {
     ColumnBinding binding_{};
     SizeT index_{};
     SharedPtr<DataType> type_{};
+    String column_name_{};
 };
 
 } // namespace infinity

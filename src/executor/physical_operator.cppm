@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_operator;
+
 import stl;
 import physical_operator_type;
 import query_context;
@@ -22,18 +24,19 @@ import parser;
 import data_table;
 import base_table_ref;
 import load_meta;
-
-export module physical_operator;
+import column_binding;
 
 namespace infinity {
 
 export class PhysicalOperator : public EnableSharedFromThis<PhysicalOperator> {
 
 public:
-    inline explicit PhysicalOperator(PhysicalOperatorType type, UniquePtr<PhysicalOperator> left, UniquePtr<PhysicalOperator> right, u64 id, SharedPtr<Vector<LoadMeta>> &load_metas)
-        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)) {
-        load_metas_ = load_metas;
-    }
+    inline explicit PhysicalOperator(PhysicalOperatorType type,
+                                     UniquePtr<PhysicalOperator> left,
+                                     UniquePtr<PhysicalOperator> right,
+                                     u64 id,
+                                     SharedPtr<Vector<LoadMeta>> &load_metas)
+        : operator_id_(id), operator_type_(type), left_(std::move(left)), right_(std::move(right)), load_metas_(load_metas) {}
 
     virtual ~PhysicalOperator() = default;
 
@@ -41,9 +44,9 @@ public:
 
     virtual SizeT TaskletCount() = 0;
 
-    inline PhysicalOperator* left() const { return left_.get(); }
+    inline PhysicalOperator *left() const { return left_.get(); }
 
-    inline PhysicalOperator* right() const { return right_.get(); }
+    inline PhysicalOperator *right() const { return right_.get(); }
 
     u64 node_id() const { return operator_id_; }
 
@@ -63,6 +66,8 @@ public:
     void InputLoad(QueryContext *query_context, OperatorState *output_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs);
 
     virtual void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {}
+
+    const SharedPtr<Vector<LoadMeta>> &load_metas() const { return load_metas_; }
 
 protected:
     u64 operator_id_;
@@ -92,6 +97,13 @@ public:
     virtual bool ParallelSink() const { return false; }
 
     virtual bool SinkOrderMatters() const { return false; }
+};
+
+// three common implementations for physical operator member function when load_metas_ is applied
+// ref: src/executor/physical_operator.cpp:35
+export struct PhysicalCommonFunctionUsingLoadMeta {
+    static SharedPtr<Vector<String>> GetOutputNames(const PhysicalOperator &op);
+    static SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes(const PhysicalOperator &op);
 };
 
 } // namespace infinity

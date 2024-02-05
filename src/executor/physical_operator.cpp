@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module physical_operator;
 
 import stl;
@@ -82,6 +83,28 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             }
         }
     }
+}
+
+SharedPtr<Vector<String>> PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(const PhysicalOperator &op) {
+    auto prev_output_names = op.left()->GetOutputNames();
+    auto output_names = MakeShared<Vector<String>>(*prev_output_names);
+    if (auto &ptr = op.load_metas(); ptr) {
+        for (auto &load_meta : *ptr) {
+            output_names->insert(output_names->begin() + load_meta.index_, load_meta.column_name_);
+        }
+    }
+    return output_names;
+}
+
+SharedPtr<Vector<SharedPtr<DataType>>> PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(const PhysicalOperator &op) {
+    auto prev_output_types = op.left()->GetOutputTypes();
+    auto output_types = MakeShared<Vector<SharedPtr<DataType>>>(*prev_output_types);
+    if (auto &ptr = op.load_metas(); ptr) {
+        for (auto &load_meta : *ptr) {
+            output_types->insert(output_types->begin() + load_meta.index_, load_meta.type_);
+        }
+    }
+    return output_types;
 }
 
 } // namespace infinity

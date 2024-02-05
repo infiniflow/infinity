@@ -50,14 +50,23 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
     SizeT TaskletCount() override { return left_->TaskletCount(); }
 
-    // for OperatorState
+    // for OperatorState and Explain
     inline auto const &GetSortExpressions() const { return sort_expressions_; }
+
+    // for Explain
+    inline auto const &GetOrderbyTypes() const { return order_by_types_; }
+
+    // for Explain
+    inline auto GetLimit() const { return limit_; }
+
+    // for Explain
+    inline auto GetOffset() const { return offset_; }
 
     // for InputLoad
     // necessary because MergeTop may be the first operator in a pipeline

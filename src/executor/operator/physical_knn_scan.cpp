@@ -206,6 +206,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         // Fill the segment with index
         ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
+        // check index type
+        if (auto index_type = column_index_entry->index_base_ptr()->index_type_;
+            index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+            LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+            continue;
+        }
         const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
         index_entry_map.reserve(index_by_segment.size());
         for (auto &[segment_id, segment_column_index] : index_by_segment) {
