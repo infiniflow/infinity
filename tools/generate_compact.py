@@ -11,8 +11,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dml/compact"
-    csv_name = "/test_compact_big.csv"
-    slt_name = "/test_compact_big.slt"
+    csv_name = "/{}.csv".format(table_name)
+    slt_name = "/{}.slt".format(table_name)
 
     csv_path = csv_dir + csv_name
     slt_path = slt_dir + slt_name

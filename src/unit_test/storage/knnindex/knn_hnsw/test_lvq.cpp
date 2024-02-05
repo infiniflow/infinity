@@ -28,7 +28,8 @@ using namespace infinity;
 
 class HnswLVQTest : public BaseTest {
 public:
-    using LVQ8Store = LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>;
+    using LabelT = int;
+    using LVQ8Store = LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>;
     using LVQ8Data = LVQ8Store::StoreType;
 
     static constexpr size_t dim_ = 16;
@@ -94,7 +95,7 @@ TEST_F(HnswLVQTest, test1) {
     {
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_);
-        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+        EXPECT_EQ(ret, 0);
         CheckStore(lvq_store, data.get());
     }
 
@@ -102,11 +103,11 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+        EXPECT_EQ(ret, 0);
         idx += vec_n_ / 2;
 
         ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+        EXPECT_EQ(ret, vec_n_ / 2);
         CheckStore(lvq_store, data.get());
     }
 
@@ -114,22 +115,22 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+        EXPECT_EQ(ret, 0);
         idx += vec_n_ / 2;
 
         for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
             ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
-            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
-            ++idx;
+            EXPECT_EQ(ret, idx++);
         }
         ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-        EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+        EXPECT_EQ(ret, idx);
 
         CheckStore(lvq_store, data.get());
     }
 
     {
         std::string file_path = file_dir_ + "/lvq_store1.bin";
+
         LocalFileSystem fs;
         if (fs.Exists(file_dir_)) {
             fs.DeleteDirectory(file_dir_);
@@ -142,7 +143,7 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+            EXPECT_EQ(ret, 0);
 
             lvq_store.Save(*file_handler);
         }
@@ -167,13 +168,13 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+            EXPECT_EQ(ret, 0);
+
             idx += vec_n_ / 2;
 
             for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
                 ret = lvq_store.AddVec(data.get() + idx * dim_, 1);
-                EXPECT_NE(ret, LVQ8Store::ERR_IDX);
-                ++idx;
+                EXPECT_EQ(ret, idx++);
             }
             lvq_store.Save(*file_handler);
         }
@@ -184,7 +185,7 @@ TEST_F(HnswLVQTest, test1) {
             LVQ8Store lvq_store = LVQ8Store::Load(*file_handler, 0, buffer_size_);
 
             auto ret = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
-            EXPECT_NE(ret, LVQ8Store::ERR_IDX);
+            EXPECT_EQ(ret, idx);
 
             CheckStore(lvq_store, data.get());
         }

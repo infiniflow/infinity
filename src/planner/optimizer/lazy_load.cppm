@@ -25,7 +25,6 @@ import column_binding;
 import query_context;
 import column_expression;
 import optimizer_rule;
-
 import load_meta;
 import internal_types;
 import data_type;
@@ -41,6 +40,7 @@ private:
 
     HashMap<SizeT, Vector<ColumnBinding>> scan_bindings_{};
     HashMap<SizeT, SharedPtr<Vector<SharedPtr<DataType>>>> column_types_{};
+    HashMap<SizeT, SharedPtr<Vector<String>>> column_names_{};
 
     HashSet<ColumnBinding> unloaded_bindings_;
     Vector<LoadMeta> load_metas_;

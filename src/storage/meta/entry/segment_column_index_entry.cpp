@@ -134,7 +134,10 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                                    const ColumnDef *column_def,
                                                    const SegmentEntry *segment_entry,
                                                    Txn *txn,
-                                                   bool prepare) {
+                                                   bool prepare,
+                                                   bool check_ts) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
     auto *buffer_mgr = txn->GetBufferMgr();
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
@@ -181,23 +184,21 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             BufferHandle buffer_handle = GetIndex();
 
             auto InsertHnsw = [&](auto &hnsw_index) {
-                SegmentOffset segment_offset = 0;
-                Vector<SegmentOffset> segment_offsets;
-                for (const auto &block_entry : segment_entry->block_entries()) {
-                    SizeT block_row_cnt = block_entry->row_count();
-
-                    for (SizeT block_offset = 0; block_offset < block_row_cnt; ++block_offset) {
-                        segment_offsets.push_back(segment_offset + block_offset);
+                auto InsertHnswInner = [&](auto &iter) {
+                    if (!prepare) {
+                        // Single thread insert
+                        hnsw_index->InsertVecs(iter, segment_entry->row_count()); // estimate insert count
+                    } else {
+                        // Multi thread insert data, write file in the physical create index finish stage.
+                        hnsw_index->StoreData(iter, segment_entry->row_count());
                     }
-                    segment_offset += DEFAULT_BLOCK_CAPACITY;
-                }
-                OneColumnIterator<float> one_column_iter(segment_entry, column_id);
-                if (!prepare) {
-                    // Single thread insert
-                    hnsw_index->InsertVecs(one_column_iter, segment_offsets.data(), segment_offsets.size());
+                };
+                if (check_ts) {
+                    OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    InsertHnswInner(iter);
                 } else {
-                    // Multi thread insert data, write file in the physical create index finish stage.
-                    hnsw_index->StoreData(one_column_iter, segment_offsets.data(), segment_offsets.size());
+                    OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    InsertHnswInner(iter);
                 }
             };
 
@@ -207,13 +208,15 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                         case HnswEncodeType::kPlain: {
                             switch (index_hnsw->metric_type_) {
                                 case MetricType::kMerticInnerProduct: {
-                                    auto hnsw_index = static_cast<KnnHnsw<float, SegmentOffset, PlainStore<float>, PlainIPDist<float>> *>(
+                                    auto hnsw_index = static_cast<
+                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
                                     InsertHnsw(hnsw_index);
                                     break;
                                 }
                                 case MetricType::kMerticL2: {
-                                    auto hnsw_index = static_cast<KnnHnsw<float, SegmentOffset, PlainStore<float>, PlainL2Dist<float>> *>(
+                                    auto hnsw_index = static_cast<
+                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
                                         buffer_handle.GetDataMut());
                                     InsertHnsw(hnsw_index);
                                     break;
@@ -228,16 +231,18 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                             switch (index_hnsw->metric_type_) {
                                 case MetricType::kMerticInnerProduct: {
                                     // too long type. fix it.
-                                    auto hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, LVQStore<float, i8, LVQIPCache<float, i8>>, LVQIPDist<float, i8>> *>(
-                                        buffer_handle.GetDataMut());
+                                    auto hnsw_index = static_cast<KnnHnsw<float,
+                                                                          SegmentOffset,
+                                                                          LVQStore<float, SegmentOffset, i8, LVQIPCache<float, i8>>,
+                                                                          LVQIPDist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
                                     InsertHnsw(hnsw_index);
                                     break;
                                 }
                                 case MetricType::kMerticL2: {
-                                    auto hnsw_index = static_cast<
-                                        KnnHnsw<float, SegmentOffset, LVQStore<float, i8, LVQL2Cache<float, i8>>, LVQL2Dist<float, i8>> *>(
-                                        buffer_handle.GetDataMut());
+                                    auto hnsw_index = static_cast<KnnHnsw<float,
+                                                                          SegmentOffset,
+                                                                          LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,
+                                                                          LVQL2Dist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
                                     InsertHnsw(hnsw_index);
                                     break;
                                 }
@@ -341,14 +346,16 @@ Status SegmentColumnIndexEntry::CreateIndexDo(const IndexBase *index_base, const
                         case HnswEncodeType::kPlain: {
                             switch (index_hnsw->metric_type_) {
                                 case MetricType::kMerticInnerProduct: {
-                                    auto *hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainIPDist<float>> *>(buffer_handle.GetDataMut());
+                                    auto *hnsw_index = static_cast<
+                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainIPDist<float, SegmentOffset>> *>(
+                                        buffer_handle.GetDataMut());
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }
                                 case MetricType::kMerticL2: {
-                                    auto *hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, PlainStore<float>, PlainL2Dist<float>> *>(buffer_handle.GetDataMut());
+                                    auto *hnsw_index = static_cast<
+                                        KnnHnsw<float, SegmentOffset, PlainStore<float, SegmentOffset>, PlainL2Dist<float, SegmentOffset>> *>(
+                                        buffer_handle.GetDataMut());
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }
@@ -361,16 +368,18 @@ Status SegmentColumnIndexEntry::CreateIndexDo(const IndexBase *index_base, const
                         case HnswEncodeType::kLVQ: {
                             switch (index_hnsw->metric_type_) {
                                 case MetricType::kMerticInnerProduct: {
-                                    auto *hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQIPCache<float, i8>>, LVQIPDist<float, i8>> *>(
-                                            buffer_handle.GetDataMut());
+                                    auto *hnsw_index = static_cast<KnnHnsw<float,
+                                                                           SegmentOffset,
+                                                                           LVQStore<float, SegmentOffset, i8, LVQIPCache<float, i8>>,
+                                                                           LVQIPDist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }
                                 case MetricType::kMerticL2: {
-                                    auto *hnsw_index =
-                                        static_cast<KnnHnsw<float, u64, LVQStore<float, i8, LVQL2Cache<float, i8>>, LVQL2Dist<float, i8>> *>(
-                                            buffer_handle.GetDataMut());
+                                    auto *hnsw_index = static_cast<KnnHnsw<float,
+                                                                           SegmentOffset,
+                                                                           LVQStore<float, SegmentOffset, i8, LVQL2Cache<float, i8>>,
+                                                                           LVQL2Dist<float, SegmentOffset, i8>> *>(buffer_handle.GetDataMut());
                                     InsertHnswDo(hnsw_index, create_index_idx);
                                     break;
                                 }

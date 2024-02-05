@@ -44,13 +44,11 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return left_->GetOutputNames(); }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
-    SizeT TaskletCount() override {
-        return left_->TaskletCount();
-    }
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
 
     inline const SharedPtr<BaseExpression> &condition() const { return condition_; }
 

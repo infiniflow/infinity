@@ -212,6 +212,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
         // Fill the segment with index
         ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
+        // check index type
+        if (auto index_type = column_index_entry->index_base_ptr()->index_type_;
+            index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+            LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+            continue;
+        }
         const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
         index_entry_map.reserve(index_by_segment.size());
         for (auto &[segment_id, segment_column_index] : index_by_segment) {
@@ -445,13 +451,13 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     case HnswEncodeType::kPlain: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainIPDist<f32>>;
+                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                                 // Fixme: const_cast here. may have bug.
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainL2Dist<f32>>;
+                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
@@ -464,12 +470,18 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     case HnswEncodeType::kLVQ: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                                using Hnsw = KnnHnsw<f32,
+                                                     SegmentOffset,
+                                                     LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>,
+                                                     LVQIPDist<f32, SegmentOffset, i8>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                                using Hnsw = KnnHnsw<f32,
+                                                     SegmentOffset,
+                                                     LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>,
+                                                     LVQL2Dist<f32, SegmentOffset, i8>>;
                                 KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
                                 break;
                             }

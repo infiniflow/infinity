@@ -19,17 +19,17 @@ module;
 module logical_filter;
 
 import stl;
-
 import column_binding;
+import logical_node;
 import internal_types;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+Vector<ColumnBinding> LogicalFilter::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-SharedPtr<Vector<String>> LogicalFilter::GetOutputNames() const { return left_node_->GetOutputNames(); }
+SharedPtr<Vector<String>> LogicalFilter::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalFilter::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalFilter::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
 String LogicalFilter::ToString(i64 &space) const {
     std::stringstream ss;

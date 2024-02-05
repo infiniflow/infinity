@@ -23,7 +23,6 @@ using namespace infinity;
 
 class DistFuncTest2 : public BaseTest {};
 
-
 float F32IPTest(const float *v1, const float *v2, size_t dim) {
     float res = 0;
     for (size_t i = 0; i < dim; ++i) {
@@ -33,8 +32,9 @@ float F32IPTest(const float *v1, const float *v2, size_t dim) {
 }
 
 TEST_F(DistFuncTest2, test2) {
-    using LVQ8Store = LVQStore<float, int8_t, LVQIPCache<float, int8_t>>;
-    using Distance = LVQIPDist<float, int8_t>;
+    using LabelT = int;
+    using LVQ8Store = LVQStore<float, LabelT, int8_t, LVQIPCache<float, int8_t>>;
+    using Distance = LVQIPDist<float, LabelT, int8_t>;
     using LVQ8Data = LVQ8Store::StoreType;
 
     size_t dim = 128;
@@ -55,7 +55,9 @@ TEST_F(DistFuncTest2, test2) {
 
     auto lvq_store = LVQ8Store::Make(vec_n, dim, 0);
     Distance distance(lvq_store.dim());
-    lvq_store.AddVec(vecs1.get(), vec_n);
+
+    auto ret = lvq_store.AddVec(vecs1.get(), vec_n);
+    EXPECT_EQ(ret, 0);
 
     for (size_t i = 0; i < vec_n; ++i) {
         const float *v2 = vecs2.get() + i * dim;

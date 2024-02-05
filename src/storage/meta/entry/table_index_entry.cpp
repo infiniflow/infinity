@@ -232,7 +232,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
     return index_dir;
 }
 
-Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay) {
+Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     IrsIndexEntry *irs_index_entry = this->irs_index_entry_.get();
     if (irs_index_entry != nullptr) {
         auto *buffer_mgr = txn->GetBufferMgr();
@@ -243,7 +243,7 @@ Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *
         irs_index_entry->irs_index_->StopSchedule();
     }
     for (const auto &[column_id, column_index_entry] : column_index_map_) {
-        column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay);
+        column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay, check_ts);
     }
     return Status::OK();
 }

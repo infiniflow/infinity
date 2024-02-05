@@ -230,8 +230,13 @@ Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateInde
 
 String ColumnIndexEntry::IndexFileName(const String &index_name, u32 segment_id) { return fmt::format("seg{}.idx", segment_id, index_name); }
 
-Status
-ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, ColumnID column_id, Txn *txn, bool prepare, bool is_replay) {
+Status ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry,
+                                            BlockIndex *block_index,
+                                            ColumnID column_id,
+                                            Txn *txn,
+                                            bool prepare,
+                                            bool is_replay,
+                                            bool check_ts) {
     const auto *column_def = table_entry->GetColumnDefByID(column_id);
     auto *txn_store = txn->GetTxnTableStore(table_entry);
 
@@ -241,7 +246,7 @@ ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_
         SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
             SegmentColumnIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
         if (!is_replay) {
-            segment_column_index_entry->CreateIndexPrepare(index_base_.get(), column_id, column_def, segment_entry, txn, prepare);
+            segment_column_index_entry->CreateIndexPrepare(index_base_.get(), column_id, column_def, segment_entry, txn, prepare, check_ts);
         }
         txn_store->CreateIndexFile(table_index_entry_, column_id, segment_id, segment_column_index_entry);
         index_by_segment_.emplace(segment_id, segment_column_index_entry);

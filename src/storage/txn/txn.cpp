@@ -312,9 +312,9 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     return {table_index_entry, index_status};
 }
 
-Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare) {
+Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
-    table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false);
+    table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();

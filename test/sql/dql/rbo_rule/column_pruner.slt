@@ -59,7 +59,7 @@ EXPLAIN LOGICAL SELECT c1 + c2 FROM t1 where c4 > 1;
 ----
 PROJECT (4)
  - table index: #4
- - expressions: [c1 (#0) + c2 (#1)]
+ - expressions: [c1 (#1) + c2 (#2)]
 -> FILTER (3)
    - filter: CAST(c4 (#0) AS BigInt) > 1
    - output columns: [c4, __rowid]
@@ -93,8 +93,8 @@ PROJECT (6)
  - table index: #5
  - expressions: [c1 (#0), c2 (#1)]
 -> FILTER (5)
-   - filter: CAST(c4 (#1) AS BigInt) > 1
-   - output columns: [c1, __rowid, c2, __rowid]
+   - filter: CAST(c4 (#4) AS BigInt) > 1
+   - output columns: [c1, __rowid, c2, __rowid, c4]
   -> LEFT JOIN(4)
      - filters: [c1 (#0) = c2 (#1)
      - output columns: [c1, __rowid, c2, __rowid]

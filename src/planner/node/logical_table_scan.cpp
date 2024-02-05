@@ -62,12 +62,11 @@ SharedPtr<Vector<String>> LogicalTableScan::GetOutputNames() const {
 }
 
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalTableScan::GetOutputTypes() const {
-    Vector<SharedPtr<DataType>> result_types = *base_table_ref_->column_types_;
-    result_types.reserve(result_types.size() + 1);
+    auto result_types = MakeShared<Vector<SharedPtr<DataType>>>(*(base_table_ref_->column_types_)); // copy initialization
     if (add_row_id_) {
-        result_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+        result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     }
-    return MakeShared<Vector<SharedPtr<DataType>>>(result_types);
+    return result_types;
 }
 
 TableEntry *LogicalTableScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }

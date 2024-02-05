@@ -41,7 +41,8 @@ public:
                           SharedPtr<Vector<String>> column_names,
                           SharedPtr<Vector<SharedPtr<DataType>>> column_types)
         : TableRef(TableRefType::kTable, alias), table_entry_ptr_(table_entry_ptr), column_ids_(std::move(column_ids)),
-          block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)), table_index_(table_index) {}
+          block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)),
+          table_index_(table_index) {}
 
     static BaseTableRef FakeTableRef(TableEntry *table_entry, TxnTimeStamp ts) {
         SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(ts);
@@ -49,9 +50,9 @@ public:
     }
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {
-        replace_field<SizeT>(column_ids_, indices);
-        replace_field<String>(*column_names_, indices);
-        replace_field<SharedPtr<DataType>>(*column_types_, indices);
+        replace_field(column_ids_, indices);
+        replace_field(*column_names_, indices);
+        replace_field(*column_types_, indices);
     };
 
     SharedPtr<String> schema_name() const { return table_entry_ptr_->GetDBName(); }
@@ -68,14 +69,13 @@ public:
 
 private:
     template <typename T>
-    void replace_field(Vector<T> &field, const Vector<SizeT> &indices) {
+    inline static void replace_field(Vector<T> &field, const Vector<SizeT> &indices) {
         Vector<T> items;
         items.reserve(field.size());
-
-        for (const auto &i : indices) {
-            items.push_back(field[i]);
+        for (SizeT i : indices) {
+            items.emplace_back(std::move(field[i]));
         }
-        field = items;
+        field = std::move(items);
     }
 };
 

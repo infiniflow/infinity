@@ -65,7 +65,7 @@ public:
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
 public:
-    inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; }
+    inline const Vector<SharedPtr<BlockEntry>> &block_entries() const { return block_entries_; } //FIXME 240202
 
     TxnTimeStamp min_row_ts() {
         std::shared_lock lock(rw_locker_);
@@ -105,9 +105,9 @@ public:
 
     bool CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
-    bool CheckAnyDelete(TxnTimeStamp check_ts);
+    bool CheckAnyDelete(TxnTimeStamp check_ts) const;
 
-    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
+    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; } //FIXME 240202
 
     inline SizeT column_count() const { return column_count_; }
 
@@ -118,7 +118,7 @@ public:
     const String &segment_dir() { return *segment_dir_; }
 
 public:
-    // Used in WAL replay & Physical Import & SegmentCompaction
+    // Used in WAL replay & Physical Import & SegmentCompaction & Append
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
 private:
@@ -149,7 +149,7 @@ private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
 
     const TableEntry *table_entry_{};
     const SharedPtr<String> segment_dir_{};
