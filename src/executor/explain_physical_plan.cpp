@@ -252,6 +252,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kMergeTop: {
+            Explain((PhysicalMergeTop *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMergeSort: {
@@ -1659,10 +1660,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
-void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
-                                  SharedPtr<Vector<SharedPtr<String>>> &result,
-
-                                  i64 intent_size) {
+void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String explain_header_str;
     if (intent_size != 0) {
         explain_header_str = String(intent_size - 2, ' ') + "-> MERGE TOP ";
@@ -1671,6 +1669,52 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node,
     }
     explain_header_str += "(" + std::to_string(merge_top_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
+
+    {
+        String sort_expression_str = String(intent_size, ' ') + " - sort expressions: [";
+        auto &sort_expressions = merge_top_node->GetSortExpressions();
+        SizeT order_by_count = sort_expressions.size();
+        if (order_by_count == 0) {
+            UnrecoverableError("MERGE TOP without any sort expression.");
+        }
+        auto &order_by_types = merge_top_node->GetOrderbyTypes();
+        for (SizeT idx = 0; idx < order_by_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(sort_expressions[idx].get(), sort_expression_str);
+            sort_expression_str += " " + SelectStatement::ToString(order_by_types[idx]) + ", ";
+        }
+        ExplainLogicalPlan::Explain(sort_expressions.back().get(), sort_expression_str);
+        sort_expression_str += " " + SelectStatement::ToString(order_by_types.back()) + "]";
+        result->emplace_back(MakeShared<String>(sort_expression_str));
+    }
+
+    {
+        auto limit = merge_top_node->GetLimit();
+        static_assert(std::is_same_v<decltype(limit), u32>);
+        auto offset = merge_top_node->GetOffset();
+        static_assert(std::is_same_v<decltype(offset), u32>);
+        if (limit < offset) {
+            UnrecoverableError("MERGE TOP with limit < 0.");
+        }
+        auto limit_after_offset = limit - offset;
+        String limit_value_str = String(intent_size, ' ') + " - limit: " + std::to_string(limit_after_offset);
+        result->emplace_back(MakeShared<String>(limit_value_str));
+        if (offset) {
+            String offset_value_str = String(intent_size, ' ') + " - offset: " + std::to_string(offset);
+            result->emplace_back(MakeShared<String>(offset_value_str));
+        }
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = merge_top_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeSort *merge_sort_node,
