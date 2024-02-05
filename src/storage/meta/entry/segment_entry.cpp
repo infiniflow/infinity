@@ -169,7 +169,7 @@ bool SegmentEntry::CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check
     return block_entry->CheckVisible(block_offset, check_ts);
 }
 
-bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) {
+bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     return first_delete_ts_ < check_ts;
 }

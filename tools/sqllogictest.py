@@ -15,6 +15,7 @@ from generate_aggregate import generate as generate5
 from generate_top import generate as generate6
 from generate_top_varchar import generate as generate7
 from generate_compact import generate as generate8
+from generate_hnsw_with_delete import generate as generate9
 
 
 class SpinnerThread(threading.Thread):
@@ -164,6 +165,7 @@ if __name__ == "__main__":
     generate6(args.generate_if_exists, args.copy)
     generate7(args.generate_if_exists, args.copy)
     generate8(args.generate_if_exists, args.copy)
+    generate9(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     print("Start copying data...")

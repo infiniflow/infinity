@@ -150,7 +150,7 @@ public:
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
     // Get visible range of the BlockEntry since the given row number for a txn
-    Pair<u16, u16> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
+    Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
     bool CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
 

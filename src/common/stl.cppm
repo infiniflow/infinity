@@ -365,6 +365,11 @@ export {
         return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
 
+    template<typename T>
+    inline constexpr Optional<T> MakeOptional(T && value) {
+        return std::make_optional<T>(std::forward<T>(value));
+    }
+
     // Chrono
     using Clock = std::chrono::high_resolution_clock;
 
