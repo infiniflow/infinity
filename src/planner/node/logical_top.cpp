@@ -27,11 +27,11 @@ import base_expression;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalTop::GetColumnBindings() const { return left_node_->GetColumnBindings(); }
+Vector<ColumnBinding> LogicalTop::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
 
-SharedPtr<Vector<String>> LogicalTop::GetOutputNames() const { return left_node_->GetOutputNames(); }
+SharedPtr<Vector<String>> LogicalTop::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalTop::GetOutputTypes() const { return left_node_->GetOutputTypes(); }
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalTop::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
 
 String LogicalTop::ToString(i64 &space) const {
     std::stringstream ss;
