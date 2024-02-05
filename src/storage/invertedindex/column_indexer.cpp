@@ -13,6 +13,10 @@ import parser;
 import column_vector;
 import third_party;
 import indexer;
+import local_file_system;
+import file_writer;
+import posting_writer;
+import term_meta;
 
 namespace infinity {
 
@@ -40,6 +44,27 @@ void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> 
 
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 
-void ColumnIndexer::Dump() {}
+void ColumnIndexer::Dump() {
+    Path path = Path(index_name_) / std::to_string(current_segment_id_);
+    String index_prefix = path.string();
+    LocalFileSystem fs;
+    String posting_file = index_prefix + ".pos";
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128);
+    String dict_file = index_prefix + ".dic";
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, posting_file, 128);
+    MemoryIndexer::PostingTable *posting_table = active_memory_indexer_->GetPostingTable();
+    TermMetaDumper term_meta_dumpler(active_memory_indexer_->index_config_.GetPostingFormatOption());
+
+    if (posting_table) {
+        for (auto it = posting_table->begin(); it.valid(); ++it) {
+            const MemoryIndexer::PostingPtr posting_writer = it.getData();
+            TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
+            posting_writer->Write(posting_file_writer, term_meta);
+            /// TODO dict writer
+            term_meta_dumpler.Dump(dict_file_writer, term_meta);
+        }
+    }
+    active_memory_indexer_->Reset();
+}
 
 } // namespace infinity

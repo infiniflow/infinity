@@ -96,6 +96,8 @@ private:
     void SwitchActiveParallelInverters();
 
 private:
+    friend class ColumnIndexer;
+
     Indexer *indexer_{nullptr};
     ColumnIndexer *column_indexer_{nullptr};
     IndexMode index_mode_{NEAR_REAL_TIME};

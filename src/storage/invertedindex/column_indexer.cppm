@@ -41,6 +41,7 @@ private:
     UniquePtr<MemoryIndexer> active_memory_indexer_;
     String index_name_;
     Vector<Segment> segments_;
+    u32 current_segment_id_{0};
 };
 
 } // namespace infinity

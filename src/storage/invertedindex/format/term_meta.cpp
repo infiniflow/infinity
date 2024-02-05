@@ -14,10 +14,10 @@ namespace infinity {
 
 TermMetaLoader::TermMetaLoader(const PostingFormatOption &option) : option_(option) {}
 void TermMetaLoader::Load(ByteSliceReader *byte_slice_reader, TermMeta &term_meta) const {
-    df_t df = (df_t)byte_slice_reader->ReadVUInt32();
+    df_t df = (df_t)byte_slice_reader->ReadUInt32();
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
-        term_meta.SetTotalTermFreq((tf_t)byte_slice_reader->ReadVUInt32());
+        term_meta.SetTotalTermFreq((tf_t)byte_slice_reader->ReadUInt32());
     } else {
         term_meta.SetTotalTermFreq(df);
     }
@@ -31,10 +31,10 @@ void TermMetaLoader::Load(ByteSliceReader *byte_slice_reader, TermMeta &term_met
 }
 
 void TermMetaLoader::Load(const SharedPtr<FileReader> &reader, TermMeta &term_meta) const {
-    df_t df = (df_t)reader->ReadVInt();
+    df_t df = (df_t)reader->ReadInt();
     term_meta.SetDocFreq(df);
     if (option_.HasTermFrequency()) {
-        term_meta.SetTotalTermFreq((tf_t)reader->ReadVInt());
+        term_meta.SetTotalTermFreq((tf_t)reader->ReadInt());
     } else {
         term_meta.SetTotalTermFreq(df);
     }
@@ -79,9 +79,9 @@ u32 TermMetaDumper::CalculateStoreSize(const TermMeta &term_meta) const {
 }
 
 void TermMetaDumper::Dump(const SharedPtr<FileWriter> &file, const TermMeta &term_meta) const {
-    file->WriteVInt(term_meta.GetDocFreq());
+    file->WriteInt(term_meta.GetDocFreq());
     if (option_.HasTermFrequency()) {
-        file->WriteVInt(term_meta.GetTotalTermFreq());
+        file->WriteInt(term_meta.GetTotalTermFreq());
     }
     if (option_.HasTermPayload()) {
         termpayload_t payload = term_meta.GetPayload();
