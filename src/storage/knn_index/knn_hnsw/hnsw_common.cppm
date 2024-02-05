@@ -137,7 +137,7 @@ class DenseVectorIter {
     LabelType label_;
 
 public:
-    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset)
+    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
     Optional<Pair<const DataType *, LabelType>> Next() {

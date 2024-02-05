@@ -314,7 +314,7 @@ public:
     }
 
     VertexType StoreDataRaw(const DataType *query, SizeT insert_n) {
-        return StoreData(DenseVectorIter(query, data_store_.dim(), insert_n, data_store_.cur_vec_num()), insert_n);
+        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n), insert_n);
     }
 
     template <bool WithLock = true>

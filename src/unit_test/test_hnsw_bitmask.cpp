@@ -72,12 +72,12 @@ int main() {
     }
 
     using LabelT = u64;
-    using Hnsw = KnnHnsw<f32, LabelT, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+    using Hnsw = KnnHnsw<f32, LabelT, LVQStore<f32, LabelT, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, LabelT, i8>>;
     int M = 16;
     int ef_construction = 200;
     auto hnsw_index = Hnsw::Make(base_embedding_count, dimension, M, ef_construction, {});
 
-    hnsw_index->InsertVecs(base_embedding.get(), base_embedding_count);
+    hnsw_index->InsertVecsRaw(base_embedding.get(), base_embedding_count);
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
