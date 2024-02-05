@@ -29,6 +29,8 @@ public:
 
     inline DataType Type() const override { return func_.return_type(); }
 
+    [[nodiscard]] inline const String &ScalarFunctionName() const { return func_.name(); }
+
     String ToString() const override;
 
 public:

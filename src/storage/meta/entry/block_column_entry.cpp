@@ -74,7 +74,7 @@ BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, Colum
 
     DataType *column_type = column_entry->column_type_.get();
     SizeT row_capacity = block_entry->row_capacity();
-    SizeT total_data_size = row_capacity * column_type->Size();
+    SizeT total_data_size = (column_type->type() == kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
     auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
     column_entry->buffer_ = buffer_manager->Get(std::move(file_worker));
