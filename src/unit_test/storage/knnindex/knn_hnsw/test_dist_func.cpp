@@ -69,8 +69,9 @@ TEST_F(DistFuncTest, test1) {
 }
 
 TEST_F(DistFuncTest, test2) {
-    using LVQ8Store = LVQStore<float, int8_t, LVQL2Cache<float, int8_t>>;
-    using Distance = LVQL2Dist<float, int8_t>;
+    using LabelT = int;
+    using LVQ8Store = LVQStore<float, LabelT, int8_t, LVQL2Cache<float, int8_t>>;
+    using Distance = LVQL2Dist<float, LabelT, int8_t>;
     using LVQ8Data = LVQ8Store::StoreType;
 
     size_t dim = 200;
@@ -91,8 +92,9 @@ TEST_F(DistFuncTest, test2) {
 
     auto lvq_store = LVQ8Store::Make(vec_n, dim, 0);
     Distance distance(lvq_store.dim());
-    DenseVectorIter iter(vecs1.get(), dim, vec_n);
-    lvq_store.AddVec(std::move(iter), vec_n);
+    DenseVectorIter iter(vecs1.get(), dim, vec_n, 0);
+    auto ret = lvq_store.AddVec(std::move(iter), vec_n);
+    EXPECT_EQ(ret, 0);
 
     for (size_t i = 0; i < vec_n; ++i) {
         // const float *v1 = vecs1.get() + i * dim;

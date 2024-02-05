@@ -26,6 +26,9 @@ namespace infinity {
 export constexpr SizeT AlignTo(SizeT a, SizeT b) { return (a + b - 1) / b * b; }
 
 export using MeanType = double;
+export using VertexType = i32;
+export using VertexListSize = i32;
+export using LayerSize = i32;
 
 export template <typename Distance, typename DataType>
 concept DistanceConcept = requires(Distance d) {
@@ -53,7 +56,6 @@ concept DataStoreConcept = requires(DataStore s) {
     { s.Save(std::declval<FileHandler &>()) };
     { DataStore::Load(std::declval<FileHandler &>(), (SizeT)0, std::declval<typename DataStore::InitArgs>()) } -> std::same_as<DataStore>;
 
-    { DataStore::ERR_IDX };
     { s.cur_vec_num() } -> std::same_as<SizeT>;
     { s.dim() } -> std::same_as<SizeT>;
     { s.max_vec_num() } -> std::same_as<SizeT>;
@@ -63,38 +65,33 @@ concept DataStoreConcept = requires(DataStore s) {
     { s.GetVec((SizeT)0) } -> std::same_as<typename DataStore::StoreType>;
     { s.Prefetch((SizeT)0) };
     { s.MakeQuery((const DataType *)nullptr) } -> std::same_as<typename DataStore::QueryType>;
+    // { s.GetLabel(VertexType{}) } -> std::same_as<typename DataStore::LabelType>;
     { typename DataStore::StoreType(std::declval<const typename DataStore::QueryType &>()) };
 };
 
 export class DataStoreMeta {
-public:
-    static constexpr SizeT ERR_IDX = std::numeric_limits<SizeT>::max();
-
 private:
     SizeT cur_vec_num_;
-
-public:
-    const SizeT max_vec_num_;
-    const SizeT dim_;
+    SizeT max_vec_num_;
+    SizeT dim_;
 
 public:
     DataStoreMeta(SizeT max_vec_num, SizeT dim) : cur_vec_num_(0), max_vec_num_(max_vec_num), dim_(dim) {}
 
-    DataStoreMeta(DataStoreMeta &&other) = default;
-    DataStoreMeta &operator=(DataStoreMeta &&other) {
-        cur_vec_num_ = other.cur_vec_num_;
-        const_cast<SizeT &>(max_vec_num_) = other.max_vec_num_;
-        const_cast<SizeT &>(dim_) = other.dim_;
-        return *this;
-    }
-
     SizeT AllocateVec(SizeT alloc_n) {
         if (cur_vec_num_ + alloc_n > max_vec_num_) {
-            return ERR_IDX;
+            UnrecoverableError("exceed max vec num");
         }
         SizeT ret = cur_vec_num_;
         cur_vec_num_ += alloc_n;
         return ret;
+    }
+
+    void ReturnNotUsed(SizeT return_n) {
+        if (return_n > cur_vec_num_) {
+            UnrecoverableError("return vec num is larger than the current vec num");
+        }
+        cur_vec_num_ -= return_n;
     }
 
     void Save(FileHandler &file_handler) const {
@@ -121,34 +118,35 @@ public:
 
 public:
     SizeT cur_vec_num() const { return cur_vec_num_; }
+
+    SizeT max_vec_num() const { return max_vec_num_; }
+
+    SizeT dim() const { return dim_; }
 };
 
-export using VertexType = i32;
-export using VertexListSize = i32;
-export using LayerSize = i32;
-
-export template <typename Iterator, typename DataType>
+export template <typename Iterator, typename DataType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
-    { iter.Next() } -> std::same_as<Optional<DataType>>;
+    { iter.Next() } -> std::same_as<Optional<Pair<DataType, LabelType>>>;
 };
 
-export template <typename DataType>
+export template <typename DataType, typename LabelType>
 class DenseVectorIter {
     const DataType *ptr_;
     const SizeT dim_;
-    const SizeT vec_num_;
-    const DataType *ptr_end_;
+    const DataType *const ptr_end_;
+    LabelType label_;
 
 public:
-    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num) : ptr_(ptr), dim_(dim), vec_num_(vec_num), ptr_end_(ptr_ + dim * vec_num) {}
+    DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
+        : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
-    Optional<const DataType *> Next() {
+    Optional<Pair<const DataType *, LabelType>> Next() {
         auto ret = ptr_;
         if (ret == ptr_end_) {
             return None;
         }
         ptr_ += dim_;
-        return ret;
+        return std::make_pair(ret, label_++);
     }
 };
 

@@ -87,7 +87,8 @@ public:
     UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def);
 
 private:
-    Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, ColumnID column_id, Txn *txn, bool prepare, bool is_replay);
+    Status
+    CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, ColumnID column_id, Txn *txn, bool prepare, bool is_replay, bool check_ts);
 
     Status CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes);
 

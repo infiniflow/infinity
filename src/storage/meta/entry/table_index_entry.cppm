@@ -81,7 +81,7 @@ public:
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
 
-    Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay);
+    Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 

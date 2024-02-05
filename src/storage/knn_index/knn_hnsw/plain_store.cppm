@@ -20,22 +20,24 @@ module;
 import stl;
 import file_system;
 import hnsw_common;
+import infinity_exception;
 
 export module plain_store;
 
 namespace infinity {
 
-export template <typename DataType>
+export template <typename DataType, typename LabelType>
 class PlainStore {
 public:
-    using This = PlainStore<DataType>;
+    using This = PlainStore<DataType, LabelType>;
     using InitArgs = Tuple<>;
     using StoreType = const DataType *;
     using QueryType = StoreType;
 
 private:
     DataStoreMeta meta_;
-    const UniquePtr<DataType[]> ptr_;
+    UniquePtr<DataType[]> ptr_;
+    UniquePtr<LabelType[]> labels_;
 
 public:
     static This Make(SizeT max_vec_num, SizeT dim, This::InitArgs = {}) {
@@ -43,16 +45,9 @@ public:
         return This(std::move(data_store));
     }
 
-    PlainStore(DataStoreMeta meta) : meta_(std::move(meta)), ptr_(MakeUnique<DataType[]>(meta_.max_vec_num_ * meta_.dim_)) {}
-
-    PlainStore(This &&other) : meta_(std::move(other.meta_)), ptr_(std::move(const_cast<UniquePtr<DataType[]> &>(other.ptr_))) {}
-    PlainStore &operator=(This &&other) {
-        meta_ = std::move(other.meta_);
-        const_cast<UniquePtr<DataType[]> &>(ptr_) = std::move(const_cast<UniquePtr<DataType[]> &>(other.ptr_));
-        return *this;
-    }
-
-    ~PlainStore() = default;
+    PlainStore(DataStoreMeta meta)
+        : meta_(std::move(meta)), ptr_(MakeUnique<DataType[]>(meta_.max_vec_num() * meta_.dim())),
+          labels_(MakeUnique<LabelType[]>(meta_.max_vec_num())) {}
 
     void Save(FileHandler &file_handler) const {
         meta_.Save(file_handler);
@@ -67,27 +62,35 @@ public:
     }
 
 public:
-    static constexpr SizeT ERR_IDX = DataStoreMeta::ERR_IDX;
     SizeT cur_vec_num() const { return meta_.cur_vec_num(); }
-    SizeT max_vec_num() const { return meta_.max_vec_num_; }
-    SizeT dim() const { return meta_.dim_; }
+    SizeT max_vec_num() const { return meta_.max_vec_num(); }
+    SizeT dim() const { return meta_.dim(); }
 
 public:
     SizeT AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIterator(vec, dim()), vec_num); }
 
-    template <typename Iterator>
-        requires DataIteratorConcept<Iterator, const DataType *>
+    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
     SizeT AddVec(Iterator query_iter, SizeT vec_num) {
         SizeT new_idx = meta_.AllocateVec(vec_num);
-        if (new_idx != ERR_IDX) {
-            DataType *ptr = ptr_.get() + new_idx * dim();
-            while (vec_num--) {
-                // not check optional here. because vec_num already contains the number of elements in the iterator.
-                auto vec = *(query_iter.Next());
-                Copy(vec, vec + dim(), ptr);
-                ptr += dim();
+        DataType *ptr = ptr_.get() + new_idx * dim();
+
+        SizeT actual_size = 0;
+        while (true) {
+            auto vec_opt = query_iter.Next();
+            if (!vec_opt.has_value()) {
+                break;
+            }
+            const auto &[vec, label] = vec_opt.value();
+            Copy(vec, vec + dim(), ptr);
+            labels_[new_idx + actual_size] = label;
+            ptr += dim();
+            ++actual_size;
+            if (actual_size > vec_num) {
+                UnrecoverableError("vec_num is too small");
             }
         }
+        meta_.ReturnNotUsed(vec_num - actual_size);
+
         return new_idx;
     }
 
@@ -97,6 +100,13 @@ public:
     }
 
     QueryType MakeQuery(const DataType *vec) const { return vec; }
+
+    LabelType GetLabel(VertexType vec_i) const {
+        if ((SizeT)vec_i >= cur_vec_num()) {
+            UnrecoverableError("vec_i is out of range");
+        }
+        return labels_[vec_i];
+    }
 
     void Prefetch(SizeT vec_i) const { _mm_prefetch(reinterpret_cast<const char *>(GetVec(vec_i)), _MM_HINT_T0); }
 };

@@ -18,6 +18,7 @@ import infinity_exception;
 import stl;
 import index_file_worker;
 import hnsw_alg;
+import hnsw_common;
 import index_hnsw;
 import parser;
 import index_base;
@@ -63,12 +64,12 @@ void HnswFileWorker::AllocateInMemory() {
                 case HnswEncodeType::kPlain: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainIPDist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                             AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainL2Dist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
                             AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
                             break;
                         }
@@ -81,12 +82,14 @@ void HnswFileWorker::AllocateInMemory() {
                 case HnswEncodeType::kLVQ: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
                             AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
                             AllocateData(Hnsw::Make(max_element_, dimension, M, ef_c, {}).release());
                             break;
                         }
@@ -121,12 +124,12 @@ void HnswFileWorker::FreeInMemory() {
                 case HnswEncodeType::kPlain: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainIPDist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                             FreeData(static_cast<Hnsw *>(data_));
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainL2Dist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
                             FreeData(static_cast<Hnsw *>(data_));
                             break;
                         }
@@ -139,12 +142,14 @@ void HnswFileWorker::FreeInMemory() {
                 case HnswEncodeType::kLVQ: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
                             FreeData(static_cast<Hnsw *>(data_));
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
                             FreeData(static_cast<Hnsw *>(data_));
                             break;
                         }
@@ -162,7 +167,7 @@ void HnswFileWorker::FreeInMemory() {
         }
         default: {
             UnrecoverableError(fmt::format("Index should be created on float embedding column now, type: {}",
-                                                EmbeddingType::EmbeddingDataType2String(embedding_type)));
+                                           EmbeddingType::EmbeddingDataType2String(embedding_type)));
         }
     }
     data_ = nullptr;
@@ -180,12 +185,12 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
                 case HnswEncodeType::kPlain: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainIPDist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                             SaveData(static_cast<Hnsw *>(data_));
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainL2Dist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
                             SaveData(static_cast<Hnsw *>(data_));
                             break;
                         }
@@ -198,12 +203,14 @@ void HnswFileWorker::WriteToFileImpl(bool &prepare_success) {
                 case HnswEncodeType::kLVQ: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
                             SaveData(static_cast<Hnsw *>(data_));
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
                             SaveData(static_cast<Hnsw *>(data_));
                             break;
                         }
@@ -236,12 +243,12 @@ void HnswFileWorker::ReadFromFileImpl() {
                 case HnswEncodeType::kPlain: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainIPDist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                             LoadData(Hnsw::Load(*file_handler_, {}).release());
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32>, PlainL2Dist<f32>>;
+                            using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
                             LoadData(Hnsw::Load(*file_handler_, {}).release());
                             break;
                         }
@@ -254,12 +261,14 @@ void HnswFileWorker::ReadFromFileImpl() {
                 case HnswEncodeType::kLVQ: {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMerticInnerProduct: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>, LVQIPDist<f32, SegmentOffset, i8>>;
                             LoadData(Hnsw::Load(*file_handler_, {}).release());
                             break;
                         }
                         case MetricType::kMerticL2: {
-                            using Hnsw = KnnHnsw<f32, SegmentOffset, LVQStore<f32, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, i8>>;
+                            using Hnsw =
+                                KnnHnsw<f32, SegmentOffset, LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>, LVQL2Dist<f32, SegmentOffset, i8>>;
                             LoadData(Hnsw::Load(*file_handler_, {}).release());
                             break;
                         }

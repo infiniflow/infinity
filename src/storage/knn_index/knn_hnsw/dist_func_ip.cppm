@@ -27,10 +27,10 @@ export module dist_func_ip;
 
 namespace infinity {
 
-export template <typename DataType>
+export template <typename DataType, typename LabelType>
 class PlainIPDist {
 public:
-    using DataStore = PlainStore<DataType>;
+    using DataStore = PlainStore<DataType, LabelType>;
     using StoreType = typename DataStore::StoreType;
 
 private:
@@ -91,11 +91,11 @@ public:
     }
 };
 
-export template <typename DataType, typename CompressType>
+export template <typename DataType, typename LabelType, typename CompressType>
 class LVQIPDist {
 public:
-    using This = LVQIPDist<DataType, CompressType>;
-    using DataStore = LVQStore<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
+    using This = LVQIPDist<DataType, LabelType, CompressType>;
+    using DataStore = LVQStore<DataType, LabelType, CompressType, LVQIPCache<DataType, CompressType>>;
     using StoreType = typename DataStore::StoreType;
 
 private:
