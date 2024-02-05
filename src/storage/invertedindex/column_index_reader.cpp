@@ -14,14 +14,16 @@ import disk_index_segment_reader;
 import inmem_index_segment_reader;
 import indexer;
 import dict_reader;
-module index_reader;
+module column_index_reader;
 
 namespace infinity {
-void IndexReader::Open(const InvertedIndexConfig &index_config) {
+ColumnIndexReader::ColumnIndexReader(u64 column_id, Indexer *indexer) : column_id_(column_id), indexer_(indexer) {}
+
+void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
     index_config_ = index_config;
     root_dir_ = index_config.GetIndexName();
     Vector<Segment> segments;
-    GetSegments(index_config.GetIndexName(), segments);
+    GetSegments(segments);
     for (auto &segment : segments) {
         if (segment.GetSegmentStatus() == Segment::BUILT) {
             SharedPtr<DiskIndexSegmentReader> segment_reader = CreateDiskSegmentReader(segment);
@@ -35,20 +37,20 @@ void IndexReader::Open(const InvertedIndexConfig &index_config) {
     }
 }
 
-void IndexReader::GetSegments(const String &directory, Vector<Segment> &segments) {}
+void ColumnIndexReader::GetSegments(Vector<Segment> &segments) { return indexer_->GetSegments(column_id_, segments); }
 
-SharedPtr<DiskIndexSegmentReader> IndexReader::CreateDiskSegmentReader(const Segment &segment) {
+SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
     // dict_reader TODO
     SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(root_dir_);
     return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
-SharedPtr<InMemIndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &segment) {
+SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
     SharedPtr<Indexer> index_writer = segment.GetIndexWriter();
     return index_writer->CreateInMemSegmentReader(segment.GetColumnID());
 }
 
-PostingIterator *IndexReader::Lookup(const String &term, MemoryPool *session_pool) {
+PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;

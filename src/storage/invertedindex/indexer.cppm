@@ -12,7 +12,7 @@ import posting_writer;
 import data_block;
 import column_indexer;
 import third_party;
-import index_builder;
+import segment;
 export module indexer;
 
 namespace infinity {
@@ -38,9 +38,11 @@ public:
 
     bool NeedDump();
 
-    void Dump(IndexBuilder &builder);
-
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
+
+    String GetDirectory() { return directory_; }
+
+    void GetSegments(u64 column_id, Vector<Segment> &segments);
 
 private:
     InvertedIndexConfig index_config_;

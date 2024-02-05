@@ -9,8 +9,8 @@ import data_block;
 import parser;
 import column_vector;
 import third_party;
-import index_builder;
 import memory_indexer;
+import segment;
 
 namespace infinity {
 
@@ -33,10 +33,14 @@ public:
 
     void Commit();
 
-    void Dump(IndexBuilder &index_builder);
+    void Dump();
+
+    void GetSegments(Vector<Segment> &segments) { segments = segments_; }
 
 private:
     UniquePtr<MemoryIndexer> active_memory_indexer_;
+    String index_name_;
+    Vector<Segment> segments_;
 };
 
 } // namespace infinity

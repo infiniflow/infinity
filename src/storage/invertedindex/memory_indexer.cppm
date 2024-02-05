@@ -19,7 +19,6 @@ import parallel_column_inverter;
 import task_executor;
 import memory_posting;
 import third_party;
-import index_builder;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;
@@ -27,6 +26,7 @@ class MemoryPoolAllocator;
 
 namespace infinity {
 class Indexer;
+class ColumnIndexer;
 export class MemoryIndexer {
 public:
     using TermKey = String;
@@ -48,6 +48,7 @@ public:
     };
 
     MemoryIndexer(Indexer *indexer,
+                  ColumnIndexer *column_indexer,
                   u64 column_id,
                   const InvertedIndexConfig &index_config,
                   SharedPtr<MemoryPool> byte_slice_pool,
@@ -67,7 +68,7 @@ public:
 
     bool NeedDump();
 
-    void Dump(IndexBuilder &index_builder);
+    void Dump();
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
@@ -96,6 +97,7 @@ private:
 
 private:
     Indexer *indexer_{nullptr};
+    ColumnIndexer *column_indexer_{nullptr};
     IndexMode index_mode_{NEAR_REAL_TIME};
     u64 column_id_;
     InvertedIndexConfig index_config_;

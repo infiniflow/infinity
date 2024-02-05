@@ -40,7 +40,6 @@ import task_executor;
 import memory_posting;
 import indexer;
 import third_party;
-import index_builder;
 
 namespace infinity {
 
@@ -62,12 +61,13 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 // bool MemoryIndexer::KeyComp::operator()(const TermKey &lhs, const TermKey &rhs) const { return lhs < rhs; }
 
 MemoryIndexer::MemoryIndexer(Indexer *indexer,
+                             ColumnIndexer *column_indexer,
                              u64 column_id,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
                              SharedPtr<RecyclePool> buffer_pool)
-    : indexer_(indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool),
-      num_inverters_(1), max_inverters_(4) {
+    : indexer_(indexer), column_indexer_(column_indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool),
+      buffer_pool_(buffer_pool), num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
     if (index_config_.GetIndexingParallelism() > 1) {
@@ -167,9 +167,9 @@ void MemoryIndexer::SwitchActiveParallelInverters() {
 
 void MemoryIndexer::Commit() {
     if (index_config_.GetIndexingParallelism() > 1) {
-        invert_executor_->SyncAll();
-        SwitchActiveParallelInverters();
         auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
+        SwitchActiveParallelInverters();
+        invert_executor_->SyncAll();
         commit_executor_->Execute(0, std::move(task));
     } else {
         auto task = MakeUnique<CommitTask>(inverter_.get());
@@ -235,7 +235,7 @@ void MemoryIndexer::Reset() {
     }
 }
 
-void MemoryIndexer::Dump(IndexBuilder &index_builder) {}
+void MemoryIndexer::Dump() { column_indexer_->Dump(); }
 
 } // namespace infinity
 
