@@ -14,6 +14,8 @@
 
 module;
 
+export module lazy_load;
+
 import stl;
 import logical_node_visitor;
 import logical_node;
@@ -26,8 +28,6 @@ import optimizer_rule;
 import parser;
 import load_meta;
 
-export module lazy_load;
-
 namespace infinity {
 
 class RefencecColumnCollection : public LogicalNodeVisitor {
@@ -39,6 +39,7 @@ private:
 
     HashMap<SizeT, Vector<ColumnBinding>> scan_bindings_{};
     HashMap<SizeT, SharedPtr<Vector<SharedPtr<DataType>>>> column_types_{};
+    HashMap<SizeT, SharedPtr<Vector<String>>> column_names_{};
 
     HashSet<ColumnBinding> unloaded_bindings_;
     Vector<LoadMeta> load_metas_;
