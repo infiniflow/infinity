@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "column_def.h"
+#include "type/data_type.h"
 
 namespace infinity {
 
@@ -29,6 +30,9 @@ std::string ConstrainTypeToString(ConstraintType type) {
     }
     ParserError("Unexpected error.");
 }
+
+ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
+    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
 
 std::string ColumnDef::ToString() const {
     std::stringstream ss;
