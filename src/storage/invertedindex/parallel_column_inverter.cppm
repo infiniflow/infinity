@@ -14,6 +14,7 @@ import term;
 import index_defines;
 import third_party;
 import internal_types;
+import column_inverter;
 
 namespace infinity {
 
@@ -97,7 +98,6 @@ public:
 
     SizeT Size() const { return terms_.size(); }
 
-private:
     struct TermEq {
         using is_transparent = void;
         explicit TermEq(const Vector<TermPosting> &data) : data_{&data} {}
@@ -112,22 +112,22 @@ private:
     FlatHashSet<ValueRef, ValueRefHash, TermEq> terms_;
 };
 
-export class ParallelColumnInverter {
+export class ParallelColumnInverter : public ColumnInverter {
 public:
     explicit ParallelColumnInverter(MemoryIndexer *memory_indexer);
     ParallelColumnInverter(const ParallelColumnInverter &) = delete;
     ParallelColumnInverter(const ParallelColumnInverter &&) = delete;
     ParallelColumnInverter &operator=(const ParallelColumnInverter &) = delete;
     ParallelColumnInverter &operator=(const ParallelColumnInverter &&) = delete;
-    ~ParallelColumnInverter();
+    virtual ~ParallelColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) override;
 
-    void InvertColumn(u32 doc_id, const String &val);
+    void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Commit();
+    void Flush() override;
 
-    void Flush();
+    TermPostings *GetTermPostings() { return term_postings_.get(); }
 
 private:
     MemoryIndexer *memory_indexer_{nullptr};
@@ -136,6 +136,24 @@ private:
     bool jieba_specialize_{false};
     PoolAllocator<char> alloc_;
     TermList terms_once_;
+};
+
+export class ParallelColumnInverters : public InverterReference {
+public:
+    ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size);
+    virtual ~ParallelColumnInverters() {}
+
+    u32 Size() { return size_; }
+
+    void Commit() override;
+
+    Vector<UniquePtr<ParallelColumnInverter>> inverters_;
+
+private:
+    void DoMerge(Vector<const TermPosting *> &to_merge);
+
+    MemoryIndexer *memory_indexer_{nullptr};
+    u32 size_;
 };
 
 } // namespace infinity

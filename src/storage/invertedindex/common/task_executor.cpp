@@ -217,12 +217,7 @@ TaskExecutor::Task::ptr TaskExecutor::WaitForRoomOrPutInOverflowQueue(Lock &guar
 
 SequencedTaskExecutor::SequencedTaskExecutor(Vector<UniquePtr<TaskExecutor>> executors) : executors_(std::move(executors)) {}
 
-void SequencedTaskExecutor::Execute(u32 id, UniquePtr<TaskExecutor::Task> task) {
-    auto rejected_task = executors_[id]->Execute(std::move(task));
-    if (!rejected_task) {
-        UnrecoverableError("SequencedTaskExecutor execute error ");
-    }
-}
+void SequencedTaskExecutor::Execute(u32 id, UniquePtr<TaskExecutor::Task> task) { executors_[id]->Execute(std::move(task)); }
 
 UniquePtr<SequencedTaskExecutor> SequencedTaskExecutor::Create(Runnable::FuncT func, u32 threads, u32 task_limit) {
     auto executors = Vector<UniquePtr<TaskExecutor>>();
