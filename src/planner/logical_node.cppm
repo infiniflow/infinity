@@ -14,13 +14,12 @@
 
 module;
 
+export module logical_node;
 import stl;
 import logical_node_type;
 import column_binding;
 import load_meta;
 import parser;
-
-export module logical_node;
 
 namespace infinity {
 
@@ -83,6 +82,15 @@ public:
         // FIXME: Assert Check
         return reinterpret_cast<const TARGET &>(*this);
     }
+};
+
+// three common implementations for logical node member function when load_metas_ is applied
+export struct LogicalCommonFunctionUsingLoadMeta {
+    static Vector<ColumnBinding> GetColumnBindings(const LogicalNode &op);
+
+    static SharedPtr<Vector<String>> GetOutputNames(const LogicalNode &op);
+
+    static SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes(const LogicalNode &op);
 };
 
 } // namespace infinity

@@ -108,10 +108,10 @@ Vector<BlockRawIndex> MergeTwoIndexes(Vector<BlockRawIndex> &&indexes_a, Vector<
 }
 
 Vector<BlockRawIndex> MergeIndexes(Vector<Vector<BlockRawIndex>> &indexes_group, SizeT l, SizeT r, Comparator &comparator) {
+    if (l > r or r >= indexes_group.size())
+        return Vector<BlockRawIndex>();
     if (l == r)
         return indexes_group[l];
-    if (l > r)
-        return Vector<BlockRawIndex>();
     SizeT mid = (l + r) >> 1;
     return MergeTwoIndexes(MergeIndexes(indexes_group, l, mid, comparator), MergeIndexes(indexes_group, mid + 1, r, comparator), comparator);
 }

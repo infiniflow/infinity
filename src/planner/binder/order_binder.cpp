@@ -67,6 +67,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
     String binding_table_name = bind_context_ptr->project_table_name_;
     SizeT binding_table_index = bind_context_ptr->project_table_index_;
 
+    // TODO: fix "order by 1" statement
     // If the expr is from projection, then create a column reference from projection.
     if (expr.type_ == ParsedExprType::kConstant) {
         ConstantExpr &const_expr = (ConstantExpr &)expr;
@@ -93,6 +94,7 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
             column_id = bind_context_ptr->select_alias2index_[expr_name];
         }
 
+        // TODO: bug: create table tt2 (x int, y int); select y from tt2 order by x;
         if (bind_context_ptr->select_expr_name2index_.contains(expr_name)) {
             column_id = bind_context_ptr->select_expr_name2index_[expr_name];
         }

@@ -35,7 +35,10 @@ void BindingRemapper::VisitNode(LogicalNode &op) {
 
         if (load_metas.get() != nullptr) {
             for (SizeT i = 0; i < load_metas->size(); ++i) {
-                bindings_.insert(bindings_.begin() + (*load_metas)[i].index_, (*load_metas)[i].binding_);
+                auto &load_meta = (*load_metas)[i];
+                // fix index_ value (will be used in PhysicalOperator::InputLoad), now always append to the end
+                load_meta.index_ = bindings_.size();
+                bindings_.push_back(load_meta.binding_);
             }
         }
     };
@@ -87,9 +90,9 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
         }
     }
     LOG_ERROR(fmt::format("Can't bind column expression: {} [{}.{}]",
-                     expression->table_name(),
-                     expression->binding().table_idx,
-                     expression->binding().column_idx));
+                          expression->table_name(),
+                          expression->binding().table_idx,
+                          expression->binding().column_idx));
     return nullptr;
 }
 
