@@ -29,7 +29,7 @@ import infinity_exception;
 import column_vector;
 import third_party;
 import catalog;
-import segment_iter;
+import catalog_iterator;
 import buffer_manager;
 import secondary_index_pgm;
 import logger;

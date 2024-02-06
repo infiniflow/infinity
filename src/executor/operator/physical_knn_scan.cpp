@@ -34,6 +34,7 @@ import third_party;
 import txn;
 import infinity_exception;
 import catalog;
+import catalog_iterator;
 import default_values;
 
 import knn_expression;
@@ -226,8 +227,8 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         if (auto iter = index_entry_map.find(segment_entry->segment_id()); iter != index_entry_map.end()) {
             index_entries_->emplace_back(iter->second[0]);
         } else {
-            const auto &block_entries = segment_entry->block_entries();
-            for (auto &block_entry : block_entries) {
+            BlockEntryIter block_entry_iter(segment_entry);
+            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
                 block_column_entries_->emplace_back(block_column_entry);
             }
@@ -315,11 +316,11 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             auto &bool_column = knn_scan_function_data->bool_column_;
             // filter and build bitmask, if filter_expression_ != nullptr
             ExpressionEvaluator expr_evaluator;
-            const auto &block_entries = segment_entry->block_entries();
-            for (auto &block_entry : block_entries) {
+            auto block_entry_iter = BlockEntryIter(segment_entry);
+            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 auto row_count = block_entry->row_count();
                 db_for_filter->Reset(row_count);
-                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry.get(), base_table_ref_->column_ids_);
+                ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, base_table_ref_->column_ids_);
                 bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
                 expr_evaluator.Init(db_for_filter);
                 expr_evaluator.Execute(filter_expression_, filter_state_, bool_column);

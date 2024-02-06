@@ -16,7 +16,7 @@ module;
 
 #include <utility>
 
-export module block_column_iter;
+export module catalog_iterator:block_column_iter;
 
 import stl;
 import catalog;
@@ -29,8 +29,8 @@ export template <bool CheckTS = true>
 class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp iterate_ts)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(entry->GetColumnVector(buffer_mgr)), ele_size_(entry->column_type()->Size()),
-          iterate_ts_(iterate_ts), offset_(0), read_end_(0) {}
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+          ele_size_(entry->column_type()->Size()), iterate_ts_(iterate_ts), offset_(0), read_end_(0) {}
     // TODO: Does `ColumnVector` implements the move constructor?
 
     Optional<Pair<const void *, BlockOffset>> Next() {
@@ -43,13 +43,13 @@ public:
             read_end_ = end;
             offset_ = begin;
         }
-        auto ret = column_vector_.data() + offset_ * ele_size_;
+        auto ret = column_vector_->data() + offset_ * ele_size_;
         return std::make_pair(ret, offset_++);
     }
 
 private:
     const BlockEntry *const block_entry_;
-    const ColumnVector column_vector_;
+    const SharedPtr<ColumnVector> column_vector_;
     const SizeT ele_size_;
     const TxnTimeStamp iterate_ts_;
 
@@ -61,20 +61,20 @@ export template <>
 class BlockColumnIter<false> {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(entry->GetColumnVector(buffer_mgr)), ele_size_(entry->column_type()->Size()),
-          size_(block_entry_->row_count()), offset_(0) {}
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+          ele_size_(entry->column_type()->Size()), size_(block_entry_->row_count()), offset_(0) {}
 
     Optional<Pair<const void *, BlockOffset>> Next() {
         if (offset_ == size_) {
             return None;
         }
-        auto ret = column_vector_.data() + offset_ * ele_size_;
+        auto ret = column_vector_->data() + offset_ * ele_size_;
         return std::make_pair(ret, offset_++);
     }
 
 private:
     const BlockEntry *const block_entry_;
-    const ColumnVector column_vector_;
+    const SharedPtr<ColumnVector> column_vector_;
     const SizeT ele_size_;
     const BlockOffset size_;
 

@@ -53,6 +53,7 @@ import utility;
 import buffer_manager;
 import session_manager;
 import compilation_config;
+import catalog_iterator;
 
 namespace infinity {
 
@@ -681,6 +682,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
@@ -720,40 +722,36 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
 
     if (segment_id_.has_value() && block_id_.has_value()) {
-        auto iter = table_entry->segment_map().find(*segment_id_);
+        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+            auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_);
+            if (block_entry != nullptr) {
+                auto version_path = block_entry->VersionFilePath();
 
-        const auto &block_entries = iter->second->block_entries();
+                chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
+                SizeT column_count = table_entry->ColumnCount();
+                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+                    auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                    auto col_file_path = block_column_entry->FilePath();
 
-        if (iter != table_entry->segment_map().end() && block_entries.size() > *block_id_) {
-            auto block = block_entries[*block_id_];
-            auto version_path = block->VersionFilePath();
-
-            chuck_filling(LocalFileSystem::GetFileSizeByPath, version_path);
-            SizeT column_count = table_entry->ColumnCount();
-            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                auto block_column_entry = block->GetColumnBlockEntry(column_id);
-                auto col_file_path = block_column_entry->FilePath();
-
-                chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
-                for (auto &outline : block_column_entry->OutlinePaths()) {
-                    chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
+                    chuck_filling(LocalFileSystem::GetFileSizeByPath, col_file_path);
+                    for (auto &outline : block_column_entry->OutlinePaths()) {
+                        chuck_filling(LocalFileSystem::GetFileSizeByPath, outline);
+                    }
                 }
             }
         }
     } else if (segment_id_.has_value()) {
-        auto iter = table_entry->segment_map().find(*segment_id_);
-        const auto &block_entries = iter->second->block_entries();
-
-        if (iter != table_entry->segment_map().end()) {
-            for (auto &entry : block_entries) {
-                auto dir_path = entry->DirPath();
+        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+            auto block_entry_iter = BlockEntryIter(segment_entry);
+            for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                auto dir_path = block_entry->DirPath();
 
                 chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
             }
         }
     } else {
-        for (auto &[_, segment] : table_entry->segment_map()) {
-            const auto &dir_path = segment->segment_dir();
+        for (auto &[_, segment] : table_entry->segment_map()) { // FIXME: use table_ref here.
+            const auto &dir_path = *segment->segment_dir();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }

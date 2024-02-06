@@ -1,0 +1,53 @@
+statement ok
+DROP TABLE IF EXISTS test_compact_import_delete;
+
+statement ok
+CREATE TABLE test_compact_import_delete (c1 INT, c2 EMBEDDING(int, 3));
+
+query I
+COPY test_compact_import_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+----
+
+query I
+INSERT INTO test_compact_import_delete VALUES (13, [14,15,16]), (17, [18,19,20]);
+----
+
+query I
+COPY test_compact_import_delete FROM '/tmp/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+----
+
+query I
+INSERT INTO test_compact_import_delete VALUES (13, [14,15,16]), (17, [18,19,20]);
+----
+
+query II rowsort
+SELECT * FROM test_compact_import_delete;
+----
+1 2,3,4
+1 2,3,4
+13 14,15,16
+13 14,15,16
+17 18,19,20
+17 18,19,20
+5 6,7,8
+5 6,7,8
+9 10,11,12
+9 10,11,12
+
+query I
+COMPACT TABLE test_compact_import_delete;
+----
+
+query II rowsort
+SELECT * FROM test_compact_import_delete;
+----
+1 2,3,4
+1 2,3,4
+13 14,15,16
+13 14,15,16
+17 18,19,20
+17 18,19,20
+5 6,7,8
+5 6,7,8
+9 10,11,12
+9 10,11,12

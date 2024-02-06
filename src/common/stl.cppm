@@ -333,6 +333,7 @@ export {
     using ai64 = std::atomic_int64_t;
     using aptr = std::atomic_uintptr_t;
     using atomic_bool = std::atomic_bool;
+    using atomic_flag = std::atomic_flag;
 
     template <typename T>
     using Atomic = std::atomic<T>;

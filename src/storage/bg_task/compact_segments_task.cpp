@@ -35,6 +35,7 @@ import bg_task;
 import wal;
 import global_block_id;
 import block_index;
+import catalog_iterator;
 
 namespace infinity {
 
@@ -149,15 +150,15 @@ void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, 
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     for (auto &[new_segment, old_segments] : segment_data) {
-        new_segment->FlushData();
+        new_segment->FlushNewData();
         for (auto *old_segment : old_segments) {
             old_segment->SetNoDelete(begin_ts);
         }
 
-        u16 last_block_row_count = new_segment->block_entries().back()->row_count();
-        segment_infos.emplace_back(WalSegmentInfo{new_segment->segment_dir(),
+        const auto [block_cnt, last_block_row_count] = new_segment->GetWalInfo();
+        segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
                                                   new_segment->segment_id(),
-                                                  static_cast<u16>(new_segment->block_entries().size()),
+                                                  static_cast<u16>(block_cnt),
                                                   DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
                                                   last_block_row_count});
         for (auto *old_segment : old_segments) {
@@ -195,7 +196,7 @@ Vector<SegmentEntry *> CompactSegmentsTask::PickSegmentsToCompact() {
 
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments) {
     auto *table_entry = table_ref_->table_entry_ptr_;
-    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, NewCatalog::GetNextSegmentID(table_entry), txn_);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, NewCatalog::GetNextSegmentID(table_entry), txn_, true);
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry->ColumnCount();
@@ -203,7 +204,8 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper 
 
     auto new_block = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn_);
     for (auto *old_segment : segments) {
-        for (auto &old_block : old_segment->block_entries()) {
+        BlockEntryIter block_entry_iter(old_segment);
+        for (auto *old_block = block_entry_iter.Next(); old_block != nullptr; old_block = block_entry_iter.Next()) {
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
                 auto *column_block_entry = old_block->GetColumnBlockEntry(column_id);
@@ -231,8 +233,7 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper 
                     read_size -= read_size1;
                     new_segment->AppendBlockEntry(std::move(new_block));
 
-                    BlockID next_block_id = new_segment->block_entries().size();
-                    new_block = BlockEntry::NewBlockEntry(new_segment.get(), next_block_id, 0, column_count, txn_);
+                    new_block = BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0, column_count, txn_);
                 }
                 block_entry_append(row_begin, read_size);
             }
