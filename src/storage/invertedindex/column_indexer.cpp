@@ -40,7 +40,7 @@ ColumnIndexer::~ColumnIndexer() {}
 
 void ColumnIndexer::Insert(RowID row_id, String &data) { active_memory_indexer_->Insert(row_id, data); }
 
-void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) { active_memory_indexer_->Insert(column_vector, row_ids); }
+void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
 
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 

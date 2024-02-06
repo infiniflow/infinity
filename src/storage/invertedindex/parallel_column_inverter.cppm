@@ -120,7 +120,7 @@ public:
     ParallelColumnInverter &operator=(const ParallelColumnInverter &&) = delete;
     virtual ~ParallelColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) override;
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) override;
 
     void InvertColumn(u32 doc_id, const String &val) override;
 

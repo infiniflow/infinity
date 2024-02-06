@@ -62,7 +62,7 @@ public:
     // realtime insert
     void Insert(RowID row_id, String &data);
 
-    void Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id);
 
     void Commit();
 

@@ -70,7 +70,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     }
 }
 
-void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
+void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {}
 
 void ParallelColumnInverter::Flush() {}
 

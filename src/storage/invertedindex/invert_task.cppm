@@ -28,7 +28,7 @@ private:
 
 export class BatchInvertTask : public TaskExecutor::Task {
 public:
-    BatchInvertTask(ColumnInverter *inverter, SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    BatchInvertTask(ColumnInverter *inverter, SharedPtr<ColumnVector> column_vector, RowID start_row_id);
 
     ~BatchInvertTask() = default;
 
@@ -39,6 +39,6 @@ private:
 
     SharedPtr<ColumnVector> column_vector_;
 
-    Vector<RowID> &row_ids_;
+    RowID start_row_id_;
 };
 } // namespace infinity

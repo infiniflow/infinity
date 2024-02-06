@@ -13,6 +13,7 @@ import segment;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
 import indexer;
+import column_indexer;
 import dict_reader;
 module column_index_reader;
 
@@ -46,8 +47,8 @@ SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(con
 }
 
 SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
-    SharedPtr<Indexer> index_writer = segment.GetIndexWriter();
-    return index_writer->CreateInMemSegmentReader(segment.GetColumnID());
+    ColumnIndexer *index_writer = segment.GetIndexWriter();
+    return MakeShared<InMemIndexSegmentReader>(index_writer->GetMemoryIndexer());
 }
 
 PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
