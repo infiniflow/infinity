@@ -137,7 +137,7 @@ public:
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
 
-    Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
+    Tuple<SizeT, SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 

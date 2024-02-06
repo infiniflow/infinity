@@ -67,6 +67,8 @@ public:
 
     void Merge(const Bitmask &other);
 
+    void MergeOr(const Bitmask &other);
+
     [[nodiscard]] SizeT count() const { return count_; }
 
     bool operator==(const Bitmask &other) const;

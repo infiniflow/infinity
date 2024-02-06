@@ -51,7 +51,7 @@ private:
 
 export class ColumnPruner : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *, const SharedPtr<LogicalNode> &logical_plan) final {
+    inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final {
         auto logic_op_type = logical_plan->operator_type();
         switch (logic_op_type) {
             case LogicalNodeType::kDelete:

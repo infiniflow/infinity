@@ -37,6 +37,7 @@ import logical_top;
 import logical_insert;
 import logical_update;
 import logical_knn_scan;
+import logical_index_scan;
 
 import aggregate_expression;
 import between_expression;
@@ -135,9 +136,13 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         }
         case LogicalNodeType::kKnnScan: {
             auto &node = (LogicalKnnScan &)op;
-            if(node.filter_expression_) {
+            if (node.filter_expression_) {
                 VisitExpression(node.filter_expression_);
             }
+            break;
+        }
+        case LogicalNodeType::kIndexScan: {
+            // always keep the original expression
             break;
         }
         default: {

@@ -27,10 +27,14 @@ import default_values;
 namespace infinity {
 
 export struct CreateSecondaryIndexParam : public CreateIndexParam {
-    const u32 row_count_{};     // rows in the segment
-    const u32 part_capacity_{}; // split sorted index data into parts
-    CreateSecondaryIndexParam(const IndexBase *index_base, const ColumnDef *column_def, u32 row_count, u32 part_capacity)
-        : CreateIndexParam(index_base, column_def), row_count_(row_count), part_capacity_(part_capacity) {}
+    // when create index file worker, we should always use the row_count_
+    // because the actual_row_count_ will reduce when we delete rows
+    // which will cause the index file worker count to be inconsistent when we read the index file
+    const u32 row_count_{};        // rows in the segment, include the deleted rows
+    const u32 actual_row_count_{}; // rows in the segment, exclude the deleted rows
+    const u32 part_capacity_{};    // split sorted index data into parts
+    CreateSecondaryIndexParam(const IndexBase *index_base, const ColumnDef *column_def, u32 row_count, u32 actual_row_count, u32 part_capacity)
+        : CreateIndexParam(index_base, column_def), row_count_(row_count), actual_row_count_(actual_row_count), part_capacity_(part_capacity) {}
 };
 
 // SecondaryIndexFileWorker includes two types of data:
@@ -44,8 +48,10 @@ public:
                                       const ColumnDef *column_def,
                                       u32 worker_id,
                                       u32 row_count,
+                                      u32 actual_row_count,
                                       u32 part_capacity)
-        : IndexFileWorker(file_dir, file_name, index_base, column_def), worker_id_(worker_id), row_count_(row_count), part_capacity_(part_capacity) {}
+        : IndexFileWorker(file_dir, file_name, index_base, column_def), worker_id_(worker_id), row_count_(row_count),
+          actual_row_count_(actual_row_count), part_capacity_(part_capacity) {}
 
     virtual ~SecondaryIndexFileWorker() override final;
 
@@ -61,6 +67,7 @@ protected:
 
     const u32 worker_id_{};
     const u32 row_count_{};
+    const u32 actual_row_count_{};
     const u32 part_capacity_{};
 };
 

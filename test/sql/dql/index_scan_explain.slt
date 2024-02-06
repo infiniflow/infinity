@@ -1,0 +1,89 @@
+statement ok
+DROP TABLE IF EXISTS test_explain_index_scan;
+
+statement ok
+CREATE TABLE test_explain_index_scan (c1 integer, mod_256_min_128 tinyint, mod_7 tinyint);
+
+statement ok
+COPY test_explain_index_scan FROM '/tmp/infinity/test_data/test_big_index_scan.csv' WITH ( DELIMITER ',' );
+
+# create index on c1
+statement ok
+CREATE INDEX idx_c1_explain on test_explain_index_scan(c1);
+
+## index scan
+query I
+EXPLAIN SELECT * FROM test_explain_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+ -> SORT (4)
+    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - output columns: [c1, __rowid]
+   -> INDEX SCAN (7)
+      - table name: test_explain_index_scan(default.test_explain_index_scan)
+      - table index: #1
+      - filter: ((CAST(c1 (#1.0) AS BigInt) < 5) OR ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10005))) OR (CAST(c1 (#1.0) AS BigInt) = 19990)
+      - output_columns: [__rowid]
+
+# both index scan and ordinary filter
+query II
+EXPLAIN SELECT * FROM test_explain_index_scan where ((c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990) AND NOT mod_7 = 1 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#1), mod_256_min_128 (#2), mod_7 (#0)]
+ -> SORT (4)
+    - expressions: [test_explain_index_scan.0 (#1) ASC]
+    - output columns: [mod_7, c1, __rowid]
+   -> FILTER (3)
+      - filter: NOT(CAST(mod_7 (#0) AS BigInt) = 1)
+      - output columns: [mod_7, __rowid]
+     -> INDEX SCAN (7)
+        - table name: test_explain_index_scan(default.test_explain_index_scan)
+        - table index: #1
+        - filter: ((CAST(c1 (#1.0) AS BigInt) < 5) OR ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10005))) OR (CAST(c1 (#1.0) AS BigInt) = 19990)
+        - output_columns: [__rowid]
+
+# create index on mod_7
+statement ok
+CREATE INDEX idx_mod_7_explain on test_explain_index_scan(mod_7);
+
+# filter with "NOT" or "!=" is not supported in index scan
+query III
+EXPLAIN SELECT * FROM test_explain_index_scan where (NOT (c1 < 5)) AND ((c1 > 10000 AND c1 < 10005) OR c1 = 19990) AND NOT mod_7 = 1 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#2), mod_7 (#1)]
+ -> SORT (4)
+    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - output columns: [c1, mod_7, __rowid]
+   -> FILTER (3)
+      - filter: NOT(CAST(c1 (#0) AS BigInt) < 5) AND NOT(CAST(mod_7 (#1) AS BigInt) = 1)
+      - output columns: [c1, mod_7, __rowid]
+     -> INDEX SCAN (7)
+        - table name: test_explain_index_scan(default.test_explain_index_scan)
+        - table index: #1
+        - filter: ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10005)) OR (CAST(c1 (#1.0) AS BigInt) = 19990)
+        - output_columns: [__rowid]
+
+# index scan use two indexes on two columns
+query IV
+EXPLAIN SELECT * FROM test_explain_index_scan where ((c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990) AND mod_7 < 6 ORDER BY c1;
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+ -> SORT (4)
+    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - output columns: [c1, __rowid]
+   -> INDEX SCAN (7)
+      - table name: test_explain_index_scan(default.test_explain_index_scan)
+      - table index: #1
+      - filter: (((CAST(c1 (#1.0) AS BigInt) < 5) OR ((CAST(c1 (#1.0) AS BigInt) > 10000) AND (CAST(c1 (#1.0) AS BigInt) < 10005))) OR (CAST(c1 (#1.0) AS BigInt) = 19990)) AND (CAST(mod_7 (#1.2) AS BigInt) < 6)
+      - output_columns: [__rowid]
+
+statement ok
+DROP TABLE test_explain_index_scan;
