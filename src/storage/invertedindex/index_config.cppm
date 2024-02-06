@@ -44,6 +44,9 @@ public:
         }
     }
 
+    segmentid_t GetLastSegmentID() const { return last_segment_id_; }
+    void SetLastSegmentID(segmentid_t segment_id) { last_segment_id_ = segment_id; }
+
 private:
     String index_name_;
     u64 memory_quota_;
@@ -53,6 +56,7 @@ private:
     bool is_short_list_vbyte_compress_;
     String analyzer_;
     HashMap<u64, String> analyzers_;
+    segmentid_t last_segment_id_{INVALID_SEGMENTID};
 };
 
 } // namespace infinity

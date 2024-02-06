@@ -69,4 +69,26 @@ private:
     SegmentStatus segment_status_;
     ColumnIndexer *column_indexer_{nullptr};
 };
+
+export class IDGenerator {
+public:
+    IDGenerator() = default;
+    ~IDGenerator() = default;
+    IDGenerator(const IDGenerator &) = delete;
+    IDGenerator(const IDGenerator &&) = delete;
+
+    segmentid_t GetNextSegmentID() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return current_segment_id_ + 1;
+    }
+
+    void SetCurrentSegmentID(segmentid_t segment_id) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        current_segment_id_ = segment_id;
+    }
+
+private:
+    std::mutex mutex_;
+    segmentid_t current_segment_id_{INVALID_SEGMENTID};
+};
 } // namespace infinity

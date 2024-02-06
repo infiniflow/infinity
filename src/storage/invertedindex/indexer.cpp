@@ -41,6 +41,9 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
         u64 column_id = column_ids_[i];
         column_indexers_[column_id] = MakeUnique<ColumnIndexer>(this, column_id, index_config_, byte_slice_pool_, buffer_pool_);
     }
+
+    id_generator_ = MakeShared<IDGenerator>();
+    id_generator_->SetCurrentSegmentID(index_config_.GetLastSegmentID());
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -75,7 +78,10 @@ SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
-bool Indexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
+bool Indexer::NeedDump() {
+    // TODO, using a global resource manager to control the memory quota
+    return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota();
+}
 
 void Indexer::GetSegments(u64 column_id, Vector<Segment> &segments) { return column_indexers_[column_id]->GetSegments(segments); }
 } // namespace infinity

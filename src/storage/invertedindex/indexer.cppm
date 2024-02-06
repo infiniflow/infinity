@@ -51,5 +51,6 @@ private:
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
+    SharedPtr<IDGenerator> id_generator_;
 };
 } // namespace infinity
