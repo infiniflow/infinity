@@ -513,13 +513,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     table_entry->table_entry_dir_ = table_entry_dir;
 
     if (table_entry_json.contains("segments")) {
-        u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
-            max_segment_id = std::max(max_segment_id, segment_entry->segment_id());
         }
-        table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get(); // FIXME: bug
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
@@ -571,12 +568,8 @@ void TableEntry::MergeFrom(BaseEntry &other) {
 
     this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
     this->row_count_.store(std::max(this->row_count_, table_entry2->row_count_));
-    u32 max_segment_id = 0;
-    for (auto &[seg_id, sgement_entry] : this->segment_map_) {
-        max_segment_id = std::max(max_segment_id, seg_id);
-    }
+
     for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
-        max_segment_id = std::max(max_segment_id, seg_id);
         auto it = this->segment_map_.find(seg_id);
         if (it == this->segment_map_.end()) {
             sgement_entry2->table_entry_ = this;
@@ -584,14 +577,6 @@ void TableEntry::MergeFrom(BaseEntry &other) {
         } else {
             it->second->MergeFrom(*sgement_entry2.get());
         }
-    }
-
-    if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
-        auto seg_it = this->segment_map_.find(max_segment_id);
-        if (seg_it == this->segment_map_.end()) {
-            UnrecoverableError(fmt::format("max_segment_id {} is invalid", max_segment_id));
-        }
-        this->unsealed_segment_ = seg_it->second.get();
     }
 
     for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {

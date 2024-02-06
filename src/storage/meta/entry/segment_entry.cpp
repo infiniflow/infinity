@@ -187,7 +187,10 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_); // FIXME
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_); // FIXME: lock scope to large
+    if (this->sealed()) {
+        UnrecoverableError("AppendData to sealed segment");
+    }
     if (this->row_capacity_ - this->row_count_ <= 0)
         return 0;
     //    SizeT start_row = this->row_count_;
@@ -326,7 +329,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
                                                                      segment_entry_json["segment_id"],
                                                                      segment_entry_json["row_capacity"],
                                                                      segment_entry_json["column_count"],
-                                                                     false); // FIXME: bug
+                                                                     true);
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->deprecate_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
