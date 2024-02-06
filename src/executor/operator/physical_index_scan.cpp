@@ -35,6 +35,7 @@ import column_vector;
 import infinity_exception;
 import logger;
 import third_party;
+import txn;
 import data_block;
 import default_values;
 import buffer_handle;
@@ -431,84 +432,93 @@ public:
                    interval_range_variant);
     }
 
-    inline void Output(Vector<UniquePtr<DataBlock>> &output_data_blocks, SegmentID segment_id) const {
-        const u32 selected_row_num = SelectedNum();
+    inline void Output(Vector<UniquePtr<DataBlock>> &output_data_blocks, SegmentID segment_id, const DeleteFilter &delete_filter) const {
         const u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
-        const u32 output_block_num_candidate = (selected_row_num + block_capacity - 1) / block_capacity; // may be 0
-        const u32 output_block_num = output_block_num_candidate == 0 ? 1 : output_block_num_candidate;   // output block num need to be at least 1
-        // 1. prepare output blocks
-        {
-            // check if output_data_blocks is empty
-            if (!output_data_blocks.empty()) {
-                UnrecoverableError("FilterResult::Output(): output data block array should be empty.");
-            }
-            Vector<SharedPtr<DataType>> output_types;
-            output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
-            u32 row_idx = 0;
-            do {
-                auto data_block = DataBlock::MakeUniquePtr();
-                // u32 write_size = std::min(block_capacity, selected_row_num - row_idx);
-                // TODO: error: if Init with write_size != pow of 2, error will occur in Bitmask::Initialize()
-                data_block->Init(output_types);
-                output_data_blocks.emplace_back(std::move(data_block));
-                row_idx += block_capacity;
-            } while (row_idx < selected_row_num);
-            if (output_data_blocks.size() != output_block_num) {
-                UnrecoverableError("ExecuteInternal(): output data block number error.");
-            }
+        const u32 selected_row_num = SelectedNum(); // before delete filter
+        u32 output_rows = 0;
+        u32 invalid_rows = 0;
+        // check if output_data_blocks is empty
+        if (!output_data_blocks.empty()) {
+            UnrecoverableError("FilterResult::Output(): output data block array should be empty.");
         }
+        Vector<SharedPtr<DataType>> output_types;
+        output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+        // 1. prepare first output_data_block
+        auto append_data_block = [&]() {
+            auto data_block = DataBlock::MakeUniquePtr();
+            // u32 write_size = std::min(block_capacity, selected_row_num - row_idx);
+            // TODO: error: if Init with write_size != pow of 2, error will occur in Bitmask::Initialize()
+            data_block->Init(output_types);
+            output_data_blocks.emplace_back(std::move(data_block));
+        };
+        append_data_block();
         // 2. output
+        // delete_filter: return false if the row is deleted
         std::visit(Overload{[&](const Bitmask &bitmask) {
-                                u32 total_output_row_cnt = 0;
                                 u32 output_block_row_id = 0;
                                 u32 output_block_idx = 0;
-                                DataBlock *output_block_ptr = output_data_blocks[output_block_idx++].get();
+                                DataBlock *output_block_ptr = output_data_blocks.back().get();
                                 // TODO: 64 bit in a loop?
                                 const u32 segment_row_count = SegmentRowCount();
                                 for (u32 segment_offset = 0; segment_offset < segment_row_count; ++segment_offset) {
                                     if (bitmask.IsTrue(segment_offset)) {
+                                        if (!delete_filter(segment_offset)) {
+                                            // deleted
+                                            ++invalid_rows;
+                                            continue;
+                                        }
                                         if (output_block_row_id == block_capacity) {
                                             output_block_ptr->Finalize();
-                                            output_block_ptr = output_data_blocks[output_block_idx++].get();
+                                            append_data_block();
+                                            output_block_ptr = output_data_blocks.back().get();
                                             output_block_row_id = 0;
                                         }
                                         RowID row_id(segment_id, segment_offset);
                                         output_block_ptr->AppendValueByPtr(0, (ptr_t)&row_id);
                                         ++output_block_row_id;
-                                        ++total_output_row_cnt;
+                                        ++output_rows;
                                     }
                                 }
                                 output_block_ptr->Finalize();
-                                if (total_output_row_cnt != selected_row_num) {
+                                if (output_rows + invalid_rows != selected_row_num) {
                                     UnrecoverableError("FilterResult::Output(): output row num error.");
                                 }
                             },
                             [&](const Vector<u32> &selected_rows) {
-                                u32 total_output_row_cnt = 0;
                                 u32 output_block_row_id = 0;
                                 u32 output_block_idx = 0;
                                 DataBlock *output_block_ptr = output_data_blocks[output_block_idx++].get();
                                 for (u32 segment_offset : selected_rows) {
+                                    if (!delete_filter(segment_offset)) {
+                                        // deleted
+                                        ++invalid_rows;
+                                        continue;
+                                    }
                                     if (output_block_row_id == block_capacity) {
                                         output_block_ptr->Finalize();
-                                        output_block_ptr = output_data_blocks[output_block_idx++].get();
+                                        append_data_block();
+                                        output_block_ptr = output_data_blocks.back().get();
                                         output_block_row_id = 0;
                                     }
                                     RowID row_id(segment_id, segment_offset);
                                     output_block_ptr->AppendValueByPtr(0, (ptr_t)&row_id);
                                     ++output_block_row_id;
-                                    ++total_output_row_cnt;
+                                    ++output_rows;
                                 }
                                 output_block_ptr->Finalize();
-                                if (total_output_row_cnt != selected_row_num) {
+                                if (output_rows + invalid_rows != selected_row_num) {
                                     UnrecoverableError("FilterResult::Output(): output row num error.");
                                 }
                             }},
                    selected_rows_);
+        LOG_INFO(fmt::format("FilterResult::Output(): output rows: {}, invalid candidate rows: {}", output_rows, invalid_rows));
     }
 };
 
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
+    Txn *txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
     auto &output_data_blocks = index_scan_operator_state->data_block_array_;
     auto &segment_ids = *(index_scan_operator_state->segment_ids_);
     auto &next_idx = index_scan_operator_state->next_idx_;
@@ -571,9 +581,11 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     if (result_stack.size() != 1) {
         UnrecoverableError("ExecuteInternal(): filter result stack error.");
     }
+    // prepare filter for deleted rows
+    DeleteFilter delete_filter(segment_entry, begin_ts);
     // output
     auto &result = result_stack.back();
-    result.Output(output_data_blocks, segment_id);
+    result.Output(output_data_blocks, segment_id, delete_filter);
 
     LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}", next_idx, segment_ids.size()));
     // update next_idx

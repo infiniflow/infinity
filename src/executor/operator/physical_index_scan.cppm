@@ -28,6 +28,7 @@ import infinity_exception;
 import base_table_ref;
 import value;
 import catalog;
+import knn_filter;
 import secondary_index_data;
 import secondary_index_scan_execute_expression;
 
