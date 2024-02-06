@@ -35,6 +35,8 @@ public:
 
     u32 ReadVUInt32();
 
+    u32 ReadVUInt64();
+
     SizeT Read(void *value, SizeT len);
 
     SizeT ReadMayCopy(void *&value, SizeT len);
@@ -109,6 +111,19 @@ inline u32 ByteSliceReader::ReadVUInt32() {
     while (byte & 0x80) {
         byte = ReadByte();
         value |= ((byte & 0x7F) << shift);
+        shift += 7;
+    }
+    return value;
+}
+
+inline u32 ByteSliceReader::ReadVUInt64() {
+    u8 byte = ReadByte();
+    u32 value = byte & 0x7F;
+    int shift = 7;
+
+    while (byte & 0x80) {
+        byte = ReadByte();
+        value |= (((u64)byte & 0x7FL) << shift);
         shift += 7;
     }
     return value;
