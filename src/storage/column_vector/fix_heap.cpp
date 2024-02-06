@@ -32,7 +32,7 @@ namespace infinity {
 FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) { GlobalResourceUsage::IncrObjectCount(); }
 
 FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
-    : current_chunk_size_(chunk_size), current_chunk_idx_(block_column_entry->outline_buffers_.size()), buffer_mgr_(buffer_mgr),
+    : current_chunk_size_(chunk_size), current_chunk_idx_(block_column_entry->OutlineBufferCount()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
     GlobalResourceUsage::IncrObjectCount();
 }
@@ -51,7 +51,7 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
                                                       block_column_entry_->OutlineFilename(current_chunk_idx_),
                                                       current_chunk_size_);
         auto *buffer_obj = buffer_mgr_->Allocate(std::move(file_worker));
-        block_column_entry_->outline_buffers_.emplace_back(buffer_obj);
+        block_column_entry_->AppendOutlineBuffer(buffer_obj);
         return VectorHeapChunk(buffer_obj);
     }
 }
@@ -91,10 +91,10 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     if (auto iter = chunks_.find(chunk_id); iter != chunks_.end()) {
         return iter->second;
     }
-    if (buffer_mgr_ == nullptr || chunk_id >= block_column_entry_->outline_buffers_.size()) {
+    if (buffer_mgr_ == nullptr || chunk_id >= block_column_entry_->OutlineBufferCount()) {
         UnrecoverableError("No such chunk in heap");
     }
-    auto &outline_buffer = block_column_entry_->outline_buffers_[chunk_id];
+    auto *outline_buffer = block_column_entry_->GetOutlineBuffer(chunk_id);
     if (outline_buffer == nullptr) {
         auto filename = block_column_entry_->OutlineFilename(chunk_id);
         auto base_dir = block_column_entry_->base_dir();

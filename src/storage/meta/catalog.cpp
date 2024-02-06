@@ -602,7 +602,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                                                                           check_point_ts,
                                                                           check_point_row_count,
                                                                           buffer_mgr);
-                segment_entry->block_entries().push_back(std::move(block_entry));
+                segment_entry->AppendBlockEntry(std::move(block_entry)); // Untested: this add row count in segment
                 break;
             }
             case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {

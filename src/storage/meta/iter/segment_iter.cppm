@@ -18,24 +18,42 @@ module;
 
 export module segment_iter;
 
+import block_iter;
 import stl;
 import segment_entry;
 import block_iter;
 import buffer_manager;
 import default_values;
+import infinity_exception;
+import block_entry;
 
 namespace infinity {
 
-export template <bool CheckTS = true>
+export class BlockEntryIter {
+public:
+    BlockEntryIter(const SegmentEntry *segment) : segment_(segment), cur_block_idx_(0) {}
+
+    BlockEntry *Next();
+
+private:
+    const SegmentEntry *const segment_;
+
+    BlockID cur_block_idx_;
+};
+
+export template <bool CheckTS>
 class SegmentIter {
 public:
     SegmentIter(const SegmentEntry *entry, BufferManager *buffer_mgr, Vector<ColumnID> &&column_ids, TxnTimeStamp iterate_ts)
-        : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(column_ids), iterate_ts_(iterate_ts), block_idx_(0) {
-        const auto &block_entries = entry->block_entries();
-        if (block_entries.empty()) {
+        : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(std::move(column_ids)), iterate_ts_(iterate_ts), block_entry_iter_(entry) {
+        auto *block_entry = block_entry_iter_.Next();
+        if (block_entry->block_id() != 0) {
+            UnrecoverableError("First block id is not 0");
+        }
+        if (block_entry == nullptr) {
             block_iter_ = None;
         } else {
-            block_iter_ = BlockIter<CheckTS>(block_entries[block_idx_].get(), buffer_mgr, column_ids_, iterate_ts_);
+            block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr, column_ids_, iterate_ts_);
         }
     }
 
@@ -45,17 +63,19 @@ public:
         }
         if (auto ret = block_iter_->Next(); ret) {
             auto &[vec, offset] = *ret;
-            return std::make_pair(std::move(vec), SegmentOffset(offset + block_idx_ * DEFAULT_BLOCK_CAPACITY));
+            // FIXME: segment_entry should store the block capacity
+            return std::make_pair(std::move(vec), static_cast<SegmentOffset>(offset + block_idx_ * DEFAULT_BLOCK_CAPACITY));
         }
         block_idx_++;
-
-        const auto &block_entries = entry_->block_entries();
-        if (block_idx_ >= block_entries.size()) {
+        auto *block_entry = block_entry_iter_.Next();
+        if (block_entry == nullptr) {
             block_iter_ = None;
             return None;
         }
-        // FIXME: segment_entry should store the block capacity
-        block_iter_ = BlockIter<CheckTS>(block_entries[block_idx_].get(), buffer_mgr_, column_ids_, iterate_ts_);
+        if (block_entry->block_id() != block_idx_) {
+            UnrecoverableError("Block id is not continuous");
+        }
+        block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr_, column_ids_, iterate_ts_);
         return Next();
     }
 
@@ -65,7 +85,8 @@ private:
     const Vector<ColumnID> column_ids_;
     const TxnTimeStamp iterate_ts_;
 
-    BlockID block_idx_;
+    BlockEntryIter block_entry_iter_;
+    BlockID block_idx_ = 0;
     Optional<BlockIter<CheckTS>> block_iter_;
 };
 

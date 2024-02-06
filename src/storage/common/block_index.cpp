@@ -14,11 +14,13 @@
 
 module;
 
+module block_index;
+
 import stl;
 import segment_entry;
 import global_block_id;
-
-module block_index;
+import block_iter;
+import segment_iter;
 
 namespace infinity {
 
@@ -26,17 +28,12 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, boo
     if (!check_ts || (timestamp >= segment_entry->min_row_ts() && timestamp <= segment_entry->deprecate_ts())) {
         u32 segment_id = segment_entry->segment_id();
         segments_.emplace_back(segment_entry);
-        const auto &block_entries = segment_entry->block_entries();
         segment_index_.emplace(segment_id, segment_entry);
-        if (block_entries.empty()) {
-            return;
-        }
-        segment_block_index_[segment_id].reserve(block_entries.size());
-        SizeT block_count = block_entries.size();
-        for (SizeT idx = 0; idx < block_count; ++idx) {
-            const auto &block_entry = block_entries[idx];
+
+        auto block_entry_iter = BlockEntryIter(segment_entry);
+        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
             if (timestamp >= block_entry->min_row_ts()) {
-                segment_block_index_[segment_id].emplace(block_entry->block_id(), block_entry.get());
+                segment_block_index_[segment_id].emplace(block_entry->block_id(), block_entry);
                 global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
             }
         }

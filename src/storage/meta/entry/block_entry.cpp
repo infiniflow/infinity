@@ -201,6 +201,7 @@ Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts
 }
 
 bool BlockEntry::CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
     auto &block_version = this->block_version_;
     auto &deleted = block_version->deleted_;
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;

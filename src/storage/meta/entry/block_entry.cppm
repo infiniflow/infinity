@@ -98,9 +98,6 @@ public:
                                                             BufferManager *buffer_mgr);
 
 public:
-    // Used in physical import
-    void FlushData(i64 checkpoint_row_count);
-
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
@@ -119,8 +116,6 @@ protected:
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Flush(TxnTimeStamp checkpoint_ts);
-
-    void FlushVersion(BlockVersion &checkpoint_version);
 
     static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 
@@ -171,8 +166,13 @@ public:
     // Setter
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
+private:
+    void FlushData(i64 checkpoint_row_count);
+
+    void FlushVersion(BlockVersion &checkpoint_version);
+
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
     const SegmentEntry *segment_entry_{};
 
     BlockID block_id_{};

@@ -39,7 +39,6 @@ import plain_store;
 import catalog_delta_entry;
 import column_vector;
 import annivfflat_index_data;
-import segment_iter;
 import secondary_index_data;
 import type_info;
 import embedding_info;
@@ -47,6 +46,7 @@ import create_index_info;
 import column_def;
 import block_column_entry;
 import default_values;
+import segment_iter;
 
 namespace infinity {
 
@@ -155,7 +155,8 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     // TODO: How to select training data?
                     Vector<f32> segment_column_data;
                     segment_column_data.reserve(segment_entry->row_count() * dimension);
-                    for (const auto &block_entry : segment_entry->block_entries()) {
+                    auto iter = BlockEntryIter(segment_entry);
+                    for (auto *block_entry = iter.Next(); block_entry != nullptr; block_entry = iter.Next()) {
                         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
 
                         ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
@@ -198,6 +199,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
                     InsertHnswInner(iter);
                 } else {
+                    // Not check ts in uncommitted segment when compress segment
                     OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
                     InsertHnswInner(iter);
                 }

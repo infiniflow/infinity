@@ -19,6 +19,7 @@ module;
 
 export module block_iter;
 
+import block_column_iter;
 import stl;
 import block_entry;
 import block_column_iter;
