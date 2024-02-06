@@ -45,16 +45,22 @@ import catalog_iterator;
 
 namespace infinity {
 
-SegmentEntry::SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count)
+SegmentEntry::SegmentEntry(const TableEntry *table_entry,
+                           SharedPtr<String> segment_dir,
+                           SegmentID segment_id,
+                           SizeT row_capacity,
+                           SizeT column_count,
+                           bool sealed)
     : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
-      column_count_(column_count) {}
+      column_count_(column_count), sealed_(sealed) {}
 
-SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, bool sealed) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
                                                                      segment_id,
                                                                      DEFAULT_SEGMENT_CAPACITY,
-                                                                     table_entry->ColumnCount());
+                                                                     table_entry->ColumnCount(),
+                                                                     sealed);
     auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
@@ -66,7 +72,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
                                                             SegmentID segment_id,
                                                             const SharedPtr<String> &segment_dir,
                                                             TxnTimeStamp commit_ts) {
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount());
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount(), true);
     segment_entry->min_row_ts_ = commit_ts;
     return segment_entry;
 }
@@ -83,7 +89,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count);
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count, true);
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->commit_ts_ = commit_ts;
@@ -94,16 +100,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
     return segment_entry;
 }
 
-int SegmentEntry::Room() const {
-    std::shared_lock<std::shared_mutex> lck(rw_locker_);
-    return this->row_capacity_ - this->row_count_;
-}
-
-void SegmentEntry::FlushData() {
-    for (const auto &block_entry : this->block_entries_) {
-        block_entry->FlushData(block_entry->row_count());
-    }
-}
+int SegmentEntry::Room() const { return this->row_capacity_ - this->row_count(); }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts) {
     std::unique_lock lock(rw_locker_);
@@ -177,8 +174,10 @@ bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     return first_delete_ts_ < check_ts;
 }
 
+// called by one thread
 BlockID SegmentEntry::GetNextBlockID() const { return block_entries_.size(); }
 
+// called by one thread
 Pair<SizeT, BlockOffset> SegmentEntry::GetWalInfo() const { return {block_entries_.size(), block_entries_.back()->row_count()}; }
 
 void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
@@ -188,7 +187,7 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
 }
 
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> lck(this->rw_locker_); // FIXME
     if (this->row_capacity_ - this->row_count_ <= 0)
         return 0;
     //    SizeT start_row = this->row_count_;
@@ -235,15 +234,18 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
 }
 
 void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-        try {
-            BlockEntry *block_entry = block_entries_.at(block_id).get();
-            block_entry->DeleteData(txn_id, commit_ts, delete_rows);
-        } catch (const std::out_of_range &e) {
-            UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+        BlockEntry *block_entry = nullptr;
+        {
+            std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+            try {
+                block_entry = block_entries_.at(block_id).get();
+            } catch (const std::out_of_range &e) {
+                UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+            }
         }
+
+        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
     }
 }
 
@@ -254,27 +256,28 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
         if (this->min_row_ts_ == UNCOMMIT_TS) {
             this->min_row_ts_ = commit_ts;
         }
-        this->deprecate_ts_ = std::max(this->deprecate_ts_, commit_ts);
         block_entry = this->block_entries_[block_id];
     }
     block_entry->CommitAppend(txn_id, commit_ts);
 }
 
 void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-        BlockEntry *block_entry = block_entries_.at(block_id).get();
-        if (delete_rows.size() > block_entry->row_capacity()) {
-            UnrecoverableError("Delete rows exceed block capacity");
-        }
-        if (block_entry == nullptr) {
-            UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+        BlockEntry *block_entry = nullptr;
+        {
+            std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+            block_entry = block_entries_.at(block_id).get();
+            if (block_entry == nullptr) {
+                UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
+            }
+            if (delete_rows.size() > block_entry->row_capacity()) {
+                UnrecoverableError("Delete rows exceed block capacity");
+            }
+            DecreaseRemainRow(delete_rows.size());
+            this->first_delete_ts_ = std::min(this->first_delete_ts_, commit_ts);
         }
 
-        DecreaseRemainRow(delete_rows.size());
         block_entry->CommitDelete(txn_id, commit_ts);
-        this->first_delete_ts_ = std::min(this->first_delete_ts_, commit_ts);
     }
 }
 
@@ -292,12 +295,14 @@ BlockEntry *SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
 
+    // const field
+    json_res["segment_dir"] = *this->segment_dir_;
+    json_res["row_capacity"] = this->row_capacity_;
+    json_res["segment_id"] = this->segment_id_;
+    json_res["column_count"] = this->column_count_;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
-        json_res["segment_dir"] = *this->segment_dir_;
-        json_res["row_capacity"] = this->row_capacity_;
-        json_res["segment_id"] = this->segment_id_;
-        json_res["column_count"] = this->column_count_;
+
         json_res["min_row_ts"] = this->min_row_ts_;
         json_res["max_row_ts"] = this->deprecate_ts_;
         json_res["deleted"] = this->deleted_;
@@ -320,8 +325,8 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
                                                                      MakeShared<String>(segment_entry_json["segment_dir"]),
                                                                      segment_entry_json["segment_id"],
                                                                      segment_entry_json["row_capacity"],
-                                                                     segment_entry_json["column_count"]);
-
+                                                                     segment_entry_json["column_count"],
+                                                                     false); // FIXME: bug
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->deprecate_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
@@ -346,14 +351,15 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 }
 
 void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
     auto block_entry_iter = BlockEntryIter(this);
-    while (true) {
-        auto *block_entry = block_entry_iter.Next();
-        if (block_entry == nullptr) {
-            break;
-        }
+    for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
         block_entry->Flush(max_commit_ts);
+    }
+}
+
+void SegmentEntry::FlushNewData() {
+    for (const auto &block_entry : this->block_entries_) {
+        block_entry->FlushData(block_entry->row_count());
     }
 }
 

@@ -237,8 +237,9 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
+                new_segment->SetSealed();
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
@@ -372,6 +373,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 
 SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
     try {
+        std::shared_lock lock(rw_locker_);
         auto *segment = segment_map_.at(segment_id).get();
         if ( // TODO: read deprecate segment is allowed
              // segment->deprecate_ts() < ts ||
@@ -517,7 +519,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
             max_segment_id = std::max(max_segment_id, segment_entry->segment_id());
         }
-        table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get();
+        table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get(); // FIXME: bug
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];

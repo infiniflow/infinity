@@ -150,7 +150,7 @@ void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, 
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     for (auto &[new_segment, old_segments] : segment_data) {
-        new_segment->FlushData();
+        new_segment->FlushNewData();
         for (auto *old_segment : old_segments) {
             old_segment->SetNoDelete(begin_ts);
         }
@@ -196,7 +196,7 @@ Vector<SegmentEntry *> CompactSegmentsTask::PickSegmentsToCompact() {
 
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments) {
     auto *table_entry = table_ref_->table_entry_ptr_;
-    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, NewCatalog::GetNextSegmentID(table_entry), txn_);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, NewCatalog::GetNextSegmentID(table_entry), txn_, true);
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry->ColumnCount();

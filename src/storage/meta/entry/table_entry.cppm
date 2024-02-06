@@ -167,7 +167,7 @@ private:
 
     HashMap<String, ColumnID> column_name2column_id_;
 
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
 
     SharedPtr<String> table_entry_dir_{};
 

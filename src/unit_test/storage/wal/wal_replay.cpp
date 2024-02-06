@@ -531,7 +531,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4, false);
             EXPECT_EQ(segment_entry->segment_id(), 0);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn4);
             // auto last_block_entry = segment_entry->GetLastEntry();
@@ -611,10 +611,13 @@ TEST_F(WalReplayTest, WalReplayImport) {
         {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
+            TxnTimeStamp begin_ts = txn->BeginTS();
+
             Vector<ColumnID> column_ids{0, 1, 2};
             auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
-            auto segment_entry = table_entry->segment_map()[0].get();
+            auto *segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+            EXPECT_NE(segment_entry, nullptr);
             EXPECT_EQ(segment_entry->segment_id(), 0);
             auto *block_entry = segment_entry->GetBlockEntryByID(0);
             EXPECT_EQ(block_entry->block_id(), 0);
@@ -689,7 +692,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, false);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -749,16 +752,18 @@ TEST_F(WalReplayTest, WalReplayCompact) {
         {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
+            TxnTimeStamp begin_ts = txn->BeginTS();
 
             auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment = table_entry->segment_map()[0].get();
+                auto *segment = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(segment, nullptr);
                 EXPECT_NE(segment->deprecate_ts(), UNCOMMIT_TS);
             }
-            auto compact_segment = table_entry->segment_map()[test_segment_n].get();
+            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            EXPECT_NE(compact_segment, nullptr);
             EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
             EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
         }
@@ -775,7 +780,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_annivfflat (col1 embedding(float,128));
         {

@@ -52,7 +52,7 @@ protected:
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, true);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
@@ -126,18 +126,28 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
                 compact_task.Execute();
             }
             txn_mgr->CommitTxn(txn4);
+        }
+        {
+            auto txn5 = txn_mgr->CreateTxn();
+            txn5->Begin();
+            TxnTimeStamp begin_ts = txn5->BeginTS();
+            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            EXPECT_NE(table_entry, nullptr);
 
             size_t test_segment_n = segment_sizes.size();
             int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
-            for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->segment_map().at(i).get();
+            for (size_t i = 0; i < test_segment_n; ++i) {
+                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(segment_entry, nullptr);
                 EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
-            auto compact_segment = table_entry->segment_map().at(test_segment_n).get();
+            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            EXPECT_NE(compact_segment, nullptr);
             EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
             EXPECT_EQ(compact_segment->actual_row_count(), row_count);
+
+            txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -193,21 +203,31 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
                 compact_task.Execute();
             }
             txn_mgr->CommitTxn(txn4);
+        }
+        {
+            auto txn5 = txn_mgr->CreateTxn();
+            txn5->Begin();
+            TxnTimeStamp begin_ts = txn5->BeginTS();
+            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
 
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 2);
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->segment_map().at(i).get();
+                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(segment_entry, nullptr);
                 EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
-                auto *compact_segment = table_entry->segment_map().at(i).get();
+                auto *compact_segment = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(compact_segment, nullptr);
                 EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
                 cnt += compact_segment->actual_row_count();
             }
             EXPECT_EQ(cnt, row_count);
+
+            txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -287,18 +307,27 @@ TEST_F(CompactTaskTest, compact_with_delete) {
                 compact_task.Execute();
             }
             txn_mgr->CommitTxn(txn4);
+        }
+        {
+            auto txn5 = txn_mgr->CreateTxn();
+            txn5->Begin();
+            TxnTimeStamp begin_ts = txn5->BeginTS();
+            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
-
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->segment_map().at(i).get();
+                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(segment_entry, nullptr);
                 EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
-            auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
+            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            EXPECT_NE(compact_segment, nullptr);
             EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
+
+            txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -405,18 +434,27 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             }
 
             txn_mgr->CommitTxn(txn4);
+        }
+        {
+            auto txn5 = txn_mgr->CreateTxn();
+            txn5->Begin();
+            TxnTimeStamp begin_ts = txn5->BeginTS();
+            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
-
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->segment_map().at(i).get();
+                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                EXPECT_NE(segment_entry, nullptr);
                 EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
             }
-            auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
+            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            EXPECT_NE(compact_segment, nullptr);
             EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
+
+            txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -551,17 +589,27 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
             txn_mgr->CommitTxn(compact_txn);
 
-            int test_segment_n = segment_sizes.size();
+            {
+                auto txn5 = txn_mgr->CreateTxn();
+                txn5->Begin();
+                TxnTimeStamp begin_ts = txn5->BeginTS();
+                auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+                EXPECT_NE(table_entry, nullptr);
 
-            EXPECT_EQ(table_entry->segment_map().size(), test_segment_n + 1);
-            for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->segment_map().at(i).get();
-                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                int test_segment_n = segment_sizes.size();
+                for (int i = 0; i < test_segment_n; ++i) {
+                    auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                    EXPECT_NE(segment_entry, nullptr);
+                    EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                }
+                auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+                EXPECT_NE(compact_segment, nullptr);
+                EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+
+                EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
+
+                txn_mgr->CommitTxn(txn5);
             }
-            auto *compact_segment = table_entry->segment_map().at(test_segment_n).get();
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
-
-            EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();

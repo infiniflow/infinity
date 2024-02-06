@@ -41,9 +41,14 @@ public:
     friend struct TableEntry;
 
 public:
-    explicit SegmentEntry(const TableEntry *table_entry, SharedPtr<String> segment_dir, SegmentID segment_id, SizeT row_capacity, SizeT column_count);
+    explicit SegmentEntry(const TableEntry *table_entry,
+                          SharedPtr<String> segment_dir,
+                          SegmentID segment_id,
+                          SizeT row_capacity,
+                          SizeT column_count,
+                          bool sealed);
 
-    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, bool sealed);
 
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
@@ -77,11 +82,17 @@ public:
 
     bool sealed() const { return false; } // FIXME: implement sealed
 
+    void SetSealed() {
+        if (sealed_.test_and_set()) {
+            UnrecoverableError("SetSealed failed");
+        }
+    }
+
     BlockEntry *GetBlockEntryByID(BlockID block_id) const;
 
     int Room() const;
 
-    void FlushData();
+    void FlushNewData();
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -118,9 +129,15 @@ public:
     inline SizeT column_count() const { return column_count_; }
 
     // Getter, FIXME: lock?
-    inline SizeT row_count() const { return row_count_; }
+    inline SizeT row_count() const {
+        std::shared_lock lock(rw_locker_);
+        return row_count_;
+    }
 
-    SizeT actual_row_count() const { return actual_row_count_; }
+    SizeT actual_row_count() const {
+        std::shared_lock lock(rw_locker_);
+        return actual_row_count_;
+    }
 
     inline TxnTimeStamp max_row_ts() const { return deprecate_ts_; }
 
@@ -137,11 +154,13 @@ public:
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
+    // called when lock held
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
         actual_row_count_ += increased_row_count;
     }
 
+    // called when lock held
     inline void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             UnrecoverableError("Decrease row count exceed actual row count");
@@ -150,13 +169,14 @@ private:
     }
 
 private:
-    mutable std::shared_mutex rw_locker_{};
-
     const TableEntry *table_entry_{};
     const SharedPtr<String> segment_dir_{};
     const SegmentID segment_id_{};
     const SizeT row_capacity_{};
     const u64 column_count_{};
+    atomic_flag sealed_;
+
+    mutable std::shared_mutex rw_locker_{}; // protect following
 
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count

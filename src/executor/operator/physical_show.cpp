@@ -682,6 +682,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
 
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
@@ -721,8 +722,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
 
     if (segment_id_.has_value() && block_id_.has_value()) {
-        if (auto iter = table_entry->segment_map().find(*segment_id_); iter != table_entry->segment_map().end()) {
-            auto *segment_entry = iter->second.get();
+        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
             auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_);
             if (block_entry != nullptr) {
                 auto version_path = block_entry->VersionFilePath();
@@ -741,9 +741,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             }
         }
     } else if (segment_id_.has_value()) {
-        auto iter = table_entry->segment_map().find(*segment_id_);
-        if (iter != table_entry->segment_map().end()) {
-            auto block_entry_iter = BlockEntryIter(iter->second.get());
+        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+            auto block_entry_iter = BlockEntryIter(segment_entry);
             for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 auto dir_path = block_entry->DirPath();
 
@@ -751,7 +750,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             }
         }
     } else {
-        for (auto &[_, segment] : table_entry->segment_map()) {
+        for (auto &[_, segment] : table_entry->segment_map()) { // FIXME: use table_ref here.
             const auto &dir_path = *segment->segment_dir();
 
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
