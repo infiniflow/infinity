@@ -205,7 +205,7 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper 
     auto new_block = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn_);
     for (auto *old_segment : segments) {
         BlockEntryIter block_entry_iter(old_segment);
-        for (auto *old_block = block_entry_iter.Next(); old_block; old_block = block_entry_iter.Next()) {
+        for (auto *old_block = block_entry_iter.Next(); old_block != nullptr; old_block = block_entry_iter.Next()) {
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
                 auto *column_block_entry = old_block->GetColumnBlockEntry(column_id);

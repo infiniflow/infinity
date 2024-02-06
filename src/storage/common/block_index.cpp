@@ -30,11 +30,7 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, TxnTimeStamp timestamp, boo
         segment_index_.emplace(segment_id, segment_entry);
 
         auto block_entry_iter = BlockEntryIter(segment_entry);
-        while (true) {
-            auto *block_entry = block_entry_iter.Next();
-            if (block_entry == nullptr) {
-                break;
-            }
+        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
             if (timestamp >= block_entry->min_row_ts()) {
                 segment_block_index_[segment_id].emplace(block_entry->block_id(), block_entry);
                 global_blocks_.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
