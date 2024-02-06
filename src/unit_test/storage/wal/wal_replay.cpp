@@ -47,7 +47,7 @@ import default_values;
 import base_table_ref;
 
 class WalReplayTest : public BaseTest {
-    void SetUp() override {  system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
+    void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }
 
     void TearDown() override {
         system("tree  /tmp/infinity");
@@ -616,9 +616,8 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             auto segment_entry = table_entry->segment_map()[0].get();
             EXPECT_EQ(segment_entry->segment_id(), 0);
-            auto block_id = segment_entry->block_entries()[0]->block_id();
-            EXPECT_EQ(block_id, 0);
-            auto block_entry = segment_entry->block_entries()[0].get();
+            auto *block_entry = segment_entry->GetBlockEntryByID(0);
+            EXPECT_EQ(block_entry->block_id(), 0);
             EXPECT_EQ(block_entry->row_count(), 1);
 
             BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);

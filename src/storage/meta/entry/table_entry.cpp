@@ -246,7 +246,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
-        LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
+        LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
     }
 }
 
@@ -384,19 +384,6 @@ SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) 
     }
 }
 
-const BlockEntry *TableEntry::GetBlockEntryByID(SegmentID seg_id, BlockID block_id, TxnTimeStamp ts) const {
-    SegmentEntry *segment_entry = GetSegmentByID(seg_id, ts);
-    if (segment_entry == nullptr) {
-        UnrecoverableError(fmt::format("Cannot find segment, segment id: {}", seg_id));
-    }
-
-    BlockEntry *block_entry = segment_entry->GetBlockEntryByID(block_id);
-    if (block_entry == nullptr) {
-        UnrecoverableError(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
-    }
-    return block_entry;
-}
-
 Tuple<SizeT, SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
@@ -527,8 +514,8 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
         u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
-            table_entry->segment_map_.emplace(segment_entry->segment_id_, segment_entry);
-            max_segment_id = std::max(max_segment_id, segment_entry->segment_id_);
+            table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
+            max_segment_id = std::max(max_segment_id, segment_entry->segment_id());
         }
         table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get();
     }

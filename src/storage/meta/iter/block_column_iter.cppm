@@ -16,7 +16,7 @@ module;
 
 #include <utility>
 
-export module block_column_iter;
+export module catalog_iterator:block_column_iter;
 
 import stl;
 import catalog;

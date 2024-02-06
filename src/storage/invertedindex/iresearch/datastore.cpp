@@ -59,6 +59,7 @@ import local_file_system;
 import buffer_manager;
 import index_full_text;
 import infinity_exception;
+import catalog_iterator;
 
 module iresearch_datastore;
 
@@ -312,8 +313,8 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
         }
     }
 
-    const auto &block_entries = segment_entry->block_entries();
-    for (const auto &block_entry : block_entries) {
+    auto block_entry_iter = BlockEntryIter(segment_entry);
+    for (const auto *block_entry = block_entry_iter.Next(); block_entry; block_entry = block_entry_iter.Next()) {
         auto ctx = index_writer_->GetBatch();
         for (SizeT i = 0; i < block_entry->row_count(); ++i) {
             auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id(), i));

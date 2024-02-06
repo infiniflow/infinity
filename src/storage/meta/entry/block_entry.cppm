@@ -171,7 +171,7 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 protected:
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
     const SegmentEntry *segment_entry_{};
 
     BlockID block_id_{};

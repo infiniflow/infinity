@@ -125,8 +125,6 @@ public:
 
     SegmentEntry *GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
-    const BlockEntry *GetBlockEntryByID(SegmentID seg_id, BlockID block_id, TxnTimeStamp ts) const;
-
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
     inline SizeT ColumnCount() const { return columns_.size(); }
@@ -164,7 +162,7 @@ public:
 
     Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
 
-protected:
+private:
     TableMeta *table_meta_{};
 
     HashMap<String, ColumnID> column_name2column_id_;

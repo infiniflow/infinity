@@ -36,8 +36,8 @@ export struct BlockIndex {
     BlockEntry *GetBlockEntry(u32 segment_id, u16 block_id) const;
 
     Vector<SegmentEntry *> segments_;
-    HashMap<u32, SegmentEntry *> segment_index_;
-    HashMap<u32, HashMap<u16, BlockEntry *>> segment_block_index_;
+    HashMap<SegmentID, SegmentEntry *> segment_index_;
+    HashMap<SegmentID, HashMap<BlockID, BlockEntry *>> segment_block_index_;
     Vector<GlobalBlockID> global_blocks_;
 };
 

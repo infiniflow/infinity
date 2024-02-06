@@ -15,6 +15,7 @@
 module;
 
 #include <ctime>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@ import txn_store;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
+import catalog_iterator;
 
 namespace infinity {
 
@@ -53,7 +55,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
                                                                      segment_id,
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount());
-
     auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
@@ -93,7 +94,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
     return segment_entry;
 }
 
-int SegmentEntry::Room() {
+int SegmentEntry::Room() const {
     std::shared_lock<std::shared_mutex> lck(rw_locker_);
     return this->row_capacity_ - this->row_count_;
 }
@@ -176,6 +177,10 @@ bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     return first_delete_ts_ < check_ts;
 }
 
+BlockID SegmentEntry::GetNextBlockID() const { return block_entries_.size(); }
+
+Pair<SizeT, BlockOffset> SegmentEntry::GetWalInfo() const { return {block_entries_.size(), block_entries_.back()->row_count()}; }
+
 void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);
     IncreaseRowCount(block_entry->row_count());
@@ -233,12 +238,12 @@ void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, cons
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-        BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
-        if (block_entry == nullptr) {
+        try {
+            BlockEntry *block_entry = block_entries_.at(block_id).get();
+            block_entry->DeleteData(txn_id, commit_ts, delete_rows);
+        } catch (const std::out_of_range &e) {
             UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
         }
-
-        block_entry->DeleteData(txn_id, commit_ts, delete_rows);
     }
 }
 
@@ -259,8 +264,7 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-        // TODO: block_id is u16, GetBlockEntryByID need to be modified accordingly.
-        BlockEntry *block_entry = this->GetBlockEntryByID(block_id);
+        BlockEntry *block_entry = block_entries_.at(block_id).get();
         if (delete_rows.size() > block_entry->row_capacity()) {
             UnrecoverableError("Delete rows exceed block capacity");
         }
@@ -275,11 +279,14 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
 }
 
 BlockEntry *SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
-    if (block_id < block_entries_.size()) {
-        return block_entries_[block_id].get();
-    } else {
+    std::shared_lock<std::shared_mutex> lock;
+    if (!sealed()) {
+        lock = std::shared_lock(rw_locker_);
+    }
+    if (block_id >= block_entries_.size()) {
         return nullptr;
     }
+    return block_entries_[block_id].get();
 }
 
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
@@ -339,31 +346,14 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
 }
 
 void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    Vector<BlockEntry *> block_entries;
-    {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
-        for (auto &block_entry : this->block_entries()) {
-            if (is_full_checkpoint || max_commit_ts > block_entry->checkpoint_ts()) {
-                block_entries.push_back(static_cast<BlockEntry *>(block_entry.get()));
-            }
+    std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+    auto block_entry_iter = BlockEntryIter(this);
+    while (true) {
+        auto *block_entry = block_entry_iter.Next();
+        if (block_entry == nullptr) {
+            break;
         }
-
-        if (block_entries.empty()) {
-            return;
-        }
-        for (BlockEntry *block_entry : block_entries) {
-            LOG_TRACE(fmt::format("Before Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                                  block_entry->checkpoint_ts(),
-                                  block_entry->min_row_ts(),
-                                  block_entry->max_row_ts(),
-                                  max_commit_ts));
-            block_entry->Flush(max_commit_ts);
-            LOG_TRACE(fmt::format("Finish Flush: block_entry checkpoint ts: {}, min_row_ts: {}, max_row_ts: {} || max_commit_ts: {}",
-                                  block_entry->checkpoint_ts(),
-                                  block_entry->min_row_ts(),
-                                  block_entry->max_row_ts(),
-                                  max_commit_ts));
-        }
+        block_entry->Flush(max_commit_ts);
     }
 }
 

@@ -161,7 +161,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
                 segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry_->ColumnCount(), txn);
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
             buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         }
@@ -289,7 +289,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry_->ColumnCount(), txn);
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             column_vectors.clear();
             for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
                 auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
@@ -379,7 +379,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
             parser_context->segment_entry_ = segment_entry;
         }
 
-        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry->ColumnCount(), txn);
+        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry->ColumnCount(), txn);
         parser_context->column_vectors_.clear();
         for (SizeT i = 0; i < column_count; ++i) {
             auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
@@ -485,16 +485,15 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
     segment_entry->FlushData();
-    const auto &block_entries = segment_entry->block_entries();
-    u16 last_block_row_count = block_entries.back()->row_count();
+    const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
 
     const String &db_name = *txn_store->table_entry_->GetDBName();
     const String &table_name = *txn_store->table_entry_->GetTableName();
     txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                         table_name,
-                                                        WalSegmentInfo{segment_entry->segment_dir(),
+                                                        WalSegmentInfo{*segment_entry->segment_dir(),
                                                                        segment_entry->segment_id(),
-                                                                       static_cast<u16>(block_entries.size()),
+                                                                       static_cast<u16>(block_cnt),
                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
                                                                        last_block_row_count}));
 

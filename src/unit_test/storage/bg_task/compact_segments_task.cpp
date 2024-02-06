@@ -70,7 +70,7 @@ protected:
                 }
                 block_entry->AppendBlock(column_vectors, 0, write_size, buffer_mgr);
                 segment_entry->AppendBlockEntry(std::move(block_entry));
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, 1, txn);
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
             auto txn_store = txn->GetTxnTableStore(table_entry);
             PhysicalImport::SaveSegmentData(txn_store, segment_entry);
