@@ -25,19 +25,19 @@ import stl;
 import infinity_exception;
 import txn_manager;
 import buffer_manager;
-import wal;
+import wal_entry;
 import third_party;
 import logger;
 import data_block;
 import txn_store;
 import txn_state;
-import parser;
+
 import meta_state;
 import data_access_state;
 import status;
 import table_detail;
 import table_entry_type;
-import catalog;
+
 import database_detail;
 import status;
 import table_def;

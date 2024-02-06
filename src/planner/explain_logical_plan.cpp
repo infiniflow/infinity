@@ -16,6 +16,8 @@ module;
 
 #include <string>
 
+module explain_logical_plan;
+
 import stl;
 import logical_node;
 import logical_create_schema;
@@ -52,7 +54,7 @@ import base_expression;
 
 import logical_node_type;
 import third_party;
-import parser;
+
 import expression_type;
 import knn_expression;
 import aggregate_expression;
@@ -65,8 +67,15 @@ import in_expression;
 import value_expression;
 import reference_expression;
 import infinity_exception;
-
-module explain_logical_plan;
+import internal_types;
+import knn_expr;
+import select_statement;
+import extra_ddl_info;
+import column_def;
+import join_reference;
+import statement_common;
+import flush_statement;
+import optimize_statement;
 
 namespace infinity {
 

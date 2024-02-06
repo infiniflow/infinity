@@ -19,13 +19,13 @@ module;
 module physical_create_index_prepare;
 
 import stl;
-import parser;
+
 import physical_operator_type;
 import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-import catalog;
+
 import index_def;
 import status;
 import infinity_exception;
@@ -43,6 +43,7 @@ import dist_func_ip;
 import hnsw_alg;
 import lvq_store;
 import plain_store;
+import extra_ddl_info;
 
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,

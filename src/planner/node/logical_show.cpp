@@ -16,13 +16,13 @@ module;
 
 #include <sstream>
 
-import stl;
+module logical_show;
 
+import stl;
+import internal_types;
 import infinity_exception;
 import column_binding;
-import parser;
 
-module logical_show;
 
 namespace infinity {
 

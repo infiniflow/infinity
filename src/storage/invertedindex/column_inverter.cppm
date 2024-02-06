@@ -3,7 +3,7 @@ module;
 export module column_inverter;
 import stl;
 import column_vector;
-import parser;
+import internal_types;
 
 namespace infinity {
 

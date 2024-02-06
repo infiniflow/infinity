@@ -1,10 +1,10 @@
 module;
 
+export module memory_pool;
+
 import spinlock;
 import memory_chunk;
 import stl;
-
-export module memory_pool;
 
 namespace infinity {
 

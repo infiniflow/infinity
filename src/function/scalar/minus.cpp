@@ -14,16 +14,18 @@
 
 module;
 
+module minus;
+
 import stl;
 import catalog;
-
+import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-import parser;
-import third_party;
 
-module minus;
+import third_party;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

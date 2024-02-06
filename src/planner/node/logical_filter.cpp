@@ -15,11 +15,13 @@
 module;
 
 #include <sstream>
+
 module logical_filter;
+
 import stl;
-import parser;
 import column_binding;
 import logical_node;
+import internal_types;
 
 namespace infinity {
 

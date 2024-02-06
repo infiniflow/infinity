@@ -14,14 +14,18 @@
 
 module;
 
+export module logical_delete;
+
 import stl;
-import parser;
+
 import logical_node;
 import logical_node_type;
 import column_binding;
-import catalog;
 
-export module logical_delete;
+import internal_types;
+import data_type;
+
+import table_entry;
 
 namespace infinity {
 

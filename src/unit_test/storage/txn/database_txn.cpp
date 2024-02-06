@@ -22,14 +22,14 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import txn_manager;
 import txn;
 import status;
+import extra_ddl_info;
 
 class DBTxnTest : public BaseTest {
     void SetUp() override {

@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_cross_product;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -23,8 +25,8 @@ import physical_operator_type;
 import data_table;
 import load_meta;
 import infinity_exception;
-
-export module physical_cross_product;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

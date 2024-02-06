@@ -17,7 +17,7 @@ module;
 #include <cctype>
 
 import stl;
-import parser;
+
 import expression_type;
 import special_function;
 import third_party;

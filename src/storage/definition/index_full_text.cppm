@@ -14,13 +14,15 @@
 
 module;
 
+export module index_full_text;
+
 import stl;
 import index_def;
-import parser;
+
 import third_party;
 import index_base;
-
-export module index_full_text;
+import create_index_info;
+import statement_common;
 
 namespace infinity {
 

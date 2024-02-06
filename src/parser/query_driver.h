@@ -59,18 +59,18 @@ public:
     /**
      * parsing result
      */
-    std::unique_ptr<irs::filter> result = nullptr;
+    std::unique_ptr<irs::filter> result_{};
 
     /**
      * parsing options
      */
-    std::string default_field;
-    std::map<std::string, std::string> field2analyzer;
+    std::string default_field_;
+    std::map<std::string, std::string> field2analyzer_;
 
 private:
     int parse_helper(std::istream &stream);
-    std::unique_ptr<QueryParser> parser = nullptr;
-    std::unique_ptr<QueryScanner> scanner = nullptr;
+    std::unique_ptr<QueryParser> parser_{};
+    std::unique_ptr<QueryScanner> scanner_{};
 };
 
 } // namespace infinity

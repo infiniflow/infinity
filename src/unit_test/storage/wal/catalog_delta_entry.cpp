@@ -14,7 +14,7 @@
 
 #include "unit_test/base_test.h"
 
-import parser;
+
 import infinity_exception;
 import index_base;
 import index_def;
@@ -22,6 +22,7 @@ import logger;
 import third_party;
 import stl;
 import catalog_delta_entry;
+import column_def;
 
 class CatalogDeltaEntryTest : public BaseTest {};
 

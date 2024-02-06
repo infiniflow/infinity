@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module catalog;
+module block_entry;
 
 import stl;
 import default_values;
@@ -26,9 +26,10 @@ import defer_op;
 import local_file_system;
 import serialize;
 import catalog_delta_entry;
-
+import internal_types;
 import infinity_exception;
-import parser;
+import data_type;
+
 import column_vector;
 import bitmask;
 

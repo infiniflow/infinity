@@ -18,12 +18,12 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
-import catalog;
-import parser;
+
+
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -36,6 +36,7 @@ import cast_table;
 import column_vector;
 import bitmap_cast;
 import bound_cast_func;
+
 #if 0
 class BitmapCastTest : public BaseTest {};
 

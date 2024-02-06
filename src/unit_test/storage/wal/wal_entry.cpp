@@ -24,13 +24,18 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal;
+import wal_entry;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import index_ivfflat;
 import index_def;
+import logical_type;
+import internal_types;
+import column_def;
+import statement_common;
+import data_type;
 
 class WalEntryTest : public BaseTest {};
 

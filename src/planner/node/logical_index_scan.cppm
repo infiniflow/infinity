@@ -20,12 +20,13 @@ import stl;
 import logical_node_type;
 import logical_node;
 import column_binding;
-import parser;
 import base_table_ref;
-import catalog;
+import column_index_entry;
 import base_expression;
 import default_values;
 import secondary_index_scan_execute_expression;
+import data_type;
+import table_entry;
 
 namespace infinity {
 

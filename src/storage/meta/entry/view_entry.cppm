@@ -14,13 +14,14 @@
 
 module;
 
-export module catalog:view_entry;
+export module view_entry;
 
-import :base_entry;
-
+import base_entry;
+import internal_types;
 import stl;
-import parser;
-
+import data_type;
+import select_statement;
+import create_view_info;
 // FIXME: Not finished
 
 namespace infinity {

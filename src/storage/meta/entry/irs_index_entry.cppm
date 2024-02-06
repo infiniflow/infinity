@@ -14,13 +14,12 @@
 
 module;
 
-export module catalog:irs_index_entry;
-
-import :base_entry;
+export module irs_index_entry;
 
 import stl;
 import index_base;
 import third_party;
+import base_entry;
 
 namespace infinity {
 

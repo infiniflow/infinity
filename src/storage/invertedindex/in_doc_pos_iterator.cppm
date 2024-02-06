@@ -1,10 +1,11 @@
 module;
 
+export module in_doc_pos_iterator;
+
 import stl;
 import in_doc_pos_state;
 import pos_list_format_option;
 import index_defines;
-export module in_doc_pos_iterator;
 
 namespace infinity {
 export class InDocPositionIterator {

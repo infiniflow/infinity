@@ -14,14 +14,16 @@
 
 module;
 
+export module logical_sort;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+import data_type;
 import base_expression;
-
-export module logical_sort;
+import internal_types;
+import select_statement;
 
 namespace infinity {
 

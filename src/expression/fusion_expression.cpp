@@ -15,15 +15,16 @@
 module;
 
 #include <sstream>
-import stl;
-import expression_type;
-import parser;
-import scalar_function;
-
-import infinity_exception;
-import third_party;
 
 module fusion_expression;
+
+import stl;
+import expression_type;
+
+import scalar_function;
+import search_options;
+import infinity_exception;
+import third_party;
 
 namespace infinity {
 

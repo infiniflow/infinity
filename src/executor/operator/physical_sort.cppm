@@ -17,7 +17,7 @@ module;
 export module physical_sort;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import expression_evaluator;
@@ -29,6 +29,9 @@ import data_block;
 import load_meta;
 import infinity_exception;
 import physical_top;
+import internal_types;
+import select_statement;
+import data_type;
 
 namespace infinity {
 

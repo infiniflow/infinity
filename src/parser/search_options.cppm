@@ -11,8 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+module;
 
-export module wal;
+#include "search_options.h"
 
-export import :wal_entry;
-export import :wal_manager;
+export module search_options;
+
+namespace infinity {
+
+export using infinity::SearchOptions;
+
+}

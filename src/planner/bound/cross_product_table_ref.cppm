@@ -14,11 +14,12 @@
 
 module;
 
-import stl;
-import parser;
-import table_ref;
-
 export module cross_product_table_ref;
+
+import stl;
+
+import table_ref;
+import table_reference;
 
 namespace infinity {
 

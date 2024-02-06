@@ -62,13 +62,14 @@ import infinity_exception;
 import expression_transformer;
 import expression_type;
 
-import parser;
+
 import base_table_ref;
 import subquery_table_ref;
 import cross_product_table_ref;
 import join_table_ref;
 import knn_expression;
 import third_party;
+import table_reference;
 
 namespace infinity {
 

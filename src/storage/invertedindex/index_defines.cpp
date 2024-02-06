@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import parser;
+
 import default_values;
 
 module index_defines;

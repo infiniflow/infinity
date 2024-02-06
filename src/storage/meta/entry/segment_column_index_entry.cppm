@@ -14,23 +14,21 @@
 
 module;
 
-export module catalog:segment_column_index_entry;
-
-import :base_entry;
+export module segment_column_index_entry;
 
 import stl;
 import buffer_handle;
 import third_party;
 import buffer_obj;
-import parser;
+import base_entry;
 import index_file_worker;
 import status;
 import index_base;
+import column_def;
 
 namespace infinity {
 
-export struct ColumnIndexEntry;
-
+struct ColumnIndexEntry;
 class Txn;
 struct TableEntry;
 class FaissIndexPtr;

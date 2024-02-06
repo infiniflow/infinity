@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_merge_limit;
+
 import stl;
-import parser;
+
 import base_expression;
 import query_context;
 import operator_state;
@@ -24,8 +26,8 @@ import physical_limit;
 import physical_operator_type;
 import load_meta;
 import infinity_exception;
-
-export module physical_merge_limit;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_table_scan;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -23,11 +25,11 @@ import physical_operator_type;
 import global_block_id;
 import table_function;
 import base_table_ref;
-import catalog;
+import table_entry;
 import block_index;
 import load_meta;
-
-export module physical_table_scan;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

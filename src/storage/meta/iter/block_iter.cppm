@@ -17,12 +17,12 @@ module;
 #include <utility>
 #include <vector>
 
-export module catalog_iterator:block_iter;
+export module block_iter;
 
-import :block_column_iter;
-
+import block_column_iter;
 import stl;
-import catalog;
+import block_entry;
+import block_column_iter;
 import buffer_manager;
 import infinity_exception;
 

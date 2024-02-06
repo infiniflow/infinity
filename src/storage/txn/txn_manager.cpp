@@ -22,9 +22,8 @@ module txn_manager;
 import txn;
 import txn_state;
 import stl;
-import catalog;
+
 import infinity_exception;
-import wal;
 import logger;
 import buffer_manager;
 import backgroud_process;

@@ -16,15 +16,16 @@ module;
 
 #include <sstream>
 
+module logical_fusion;
+
 import stl;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
 import fusion_expression;
-import parser;
-import default_values;
 
-module logical_fusion;
+import default_values;
+import internal_types;
 
 namespace infinity {
 

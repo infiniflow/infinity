@@ -22,11 +22,12 @@ export module binary_operator;
 import stl;
 import column_vector;
 import vector_buffer;
-import parser;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
 import third_party;
+import internal_types;
 
 namespace infinity {
 

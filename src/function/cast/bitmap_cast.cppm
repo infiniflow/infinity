@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import column_vector_cast;
 
 import infinity_exception;

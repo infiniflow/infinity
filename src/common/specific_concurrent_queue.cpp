@@ -2,10 +2,10 @@ module;
 
 #include "concurrentqueue.h"
 
+module specific_concurrent_queue;
+
 import stl;
 import buffer_obj;
-
-module specific_concurrent_queue;
 
 namespace infinity {
 

@@ -18,12 +18,12 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
-import catalog;
-import parser;
+
+
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -34,6 +34,7 @@ import default_values;
 import data_block;
 import cast_table;
 import column_vector;
+import logical_type;
 
 class CastTableTest : public BaseTest {};
 

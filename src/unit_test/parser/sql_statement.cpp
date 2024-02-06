@@ -18,10 +18,29 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+import sql_parser;
 import logger;
 import stl;
 import infinity_context;
+import base_statement;
+import create_statement;
+import drop_statement;
+import copy_statement;
+import show_statement;
+import select_statement;
+import update_statement;
+import insert_statement;
+import column_expr;
+import function_expr;
+import constant_expr;
+import extra_ddl_info;
+import create_index_info;
+import create_table_info;
+import drop_table_info;
+import drop_index_info;
+import table_reference;
+import parser_result;
+import statement_common;
 
 class StatementParsingTest : public BaseTest {};
 

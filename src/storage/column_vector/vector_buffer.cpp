@@ -20,7 +20,7 @@ import buffer_obj;
 import buffer_manager;
 import buffer_handle;
 import infinity_exception;
-import catalog;
+import block_column_entry;
 
 module vector_buffer;
 

@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module pg_message;
+
+import stl;
 
 export namespace infinity {
 

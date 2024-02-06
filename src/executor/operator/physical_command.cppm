@@ -14,18 +14,20 @@
 
 module;
 
-import stl;
+export module physical_command;
 
+import stl;
+import internal_types;
 import physical_operator;
 import physical_operator_type;
 import query_context;
-import parser;
+
 import operator_state;
 import load_meta;
 import infinity_exception;
 import base_table_ref;
-
-export module physical_command;
+import command_statement;
+import data_type;
 
 namespace infinity {
 

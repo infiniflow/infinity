@@ -14,13 +14,15 @@
 
 module;
 
+export module logical_explain;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
-
-export module logical_explain;
+import data_type;
+import internal_types;
+import explain_statement;
 
 namespace infinity {
 

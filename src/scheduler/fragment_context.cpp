@@ -19,7 +19,7 @@ module;
 module fragment_context;
 
 import stl;
-import parser;
+
 import fragment_task;
 
 import infinity_exception;
@@ -58,6 +58,8 @@ import task_scheduler;
 import plan_fragment;
 import aggregate_expression;
 import expression_state;
+import column_def;
+import explain_statement;
 
 namespace infinity {
 

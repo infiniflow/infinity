@@ -18,7 +18,7 @@ module;
 
 module value;
 
-import parser;
+
 import stl;
 import global_resource_usage;
 import logger;
@@ -30,6 +30,7 @@ import cast_function;
 import column_vector;
 import default_values;
 import status;
+import type_info;
 
 namespace infinity {
 

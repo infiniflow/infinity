@@ -15,16 +15,19 @@
 module;
 
 #include <vector>
-import stl;
-import table_ref;
-import catalog;
-import parser;
-import table_function;
-import block_index;
-
-import infinity_exception;
 
 export module base_table_ref;
+
+import stl;
+import table_ref;
+import table_entry;
+
+import table_function;
+import block_index;
+import internal_types;
+import infinity_exception;
+import table_reference;
+import data_type;
 
 namespace infinity {
 

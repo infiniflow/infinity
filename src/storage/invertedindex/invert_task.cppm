@@ -6,7 +6,8 @@ import stl;
 import task_executor;
 import column_inverter;
 import column_vector;
-import parser;
+
+import internal_types;
 
 namespace infinity {
 

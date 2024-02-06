@@ -14,11 +14,13 @@
 
 module;
 
-import stl;
-import parser;
-import column_binding;
-
 export module load_meta;
+
+import stl;
+
+import column_binding;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

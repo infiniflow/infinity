@@ -20,7 +20,7 @@ module physical_sink;
 
 import stl;
 import query_context;
-import parser;
+
 import operator_state;
 import physical_operator_type;
 import fragment_context;
@@ -30,6 +30,8 @@ import data_block;
 import status;
 import infinity_exception;
 import logger;
+import logical_type;
+import column_def;
 
 namespace infinity {
 

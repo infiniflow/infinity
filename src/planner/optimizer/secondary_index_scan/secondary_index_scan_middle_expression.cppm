@@ -14,11 +14,9 @@
 
 module;
 
-#include <variant>
 export module secondary_index_scan_middle_expression;
 
 import stl;
-import parser;
 import base_expression;
 import expression_type;
 import value;

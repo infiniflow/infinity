@@ -19,11 +19,16 @@ export module annivfflat_index_file_worker;
 import stl;
 import index_file_worker;
 import file_worker;
-import parser;
+
 import index_base;
 import annivfflat_index_data;
 import infinity_exception;
 import index_ivfflat;
+import logical_type;
+import embedding_info;
+import create_index_info;
+import knn_expr;
+import column_def;
 
 namespace infinity {
 

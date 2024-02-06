@@ -18,11 +18,11 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+
 import scalar_function;
 import scalar_function_set;
 import function_set;
@@ -35,6 +35,10 @@ import base_expression;
 import column_vector;
 import value_expression;
 import substract;
+import logical_type;
+import internal_types;
+import data_type;
+import catalog;
 
 class SubtractFunctionsTest : public BaseTest {};
 

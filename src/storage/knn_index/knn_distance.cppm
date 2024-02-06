@@ -14,11 +14,13 @@
 
 module;
 
-import stl;
-import parser;
-import bitmask;
-
 export module knn_distance;
+
+import stl;
+
+import bitmask;
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 

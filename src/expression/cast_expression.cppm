@@ -14,14 +14,16 @@
 
 module;
 
+export module cast_expression;
+
 import column_binding;
-import parser;
+
 import stl;
 import expression_type;
 import bound_cast_func;
 import base_expression;
-
-export module cast_expression;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

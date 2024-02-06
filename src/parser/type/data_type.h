@@ -14,68 +14,14 @@
 
 #pragma once
 
-#include "type/complex/embedding_type.h"
-#include "type/complex/row_id.h"
-#include "type/complex/varchar.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include "internal_types.h"
 
 #include <memory>
 #include <vector>
 
 namespace infinity {
-
-struct Value;
-
-// Bool
-using BooleanT = bool;
-
-// Numeric
-using TinyIntT = int8_t;
-using SmallIntT = int16_t;
-using IntegerT = int32_t;
-using BigIntT = int64_t;
-using HugeIntT = HugeInt;
-
-using FloatT = float;
-using DoubleT = double;
-
-using DecimalT = DecimalType;
-
-// std::string
-//using VarcharT = VarcharType;
-using VarcharT = Varchar;
-
-// Date and Time
-using DateT = DateType;
-using TimeT = TimeType;
-using DateTimeT = DateTimeType;
-using TimestampT = TimestampType;
-using IntervalT = IntervalType;
-
-// Nest types
-using ArrayT = std::vector<Value>;
-using TupleT = std::vector<Value>;
-// using ArrayT = ArrayType;
-// using TupleT = TupleType;
-
-// Geography
-using PointT = PointType;
-using LineT = LineType;
-using LineSegT = LineSegmentType;
-using BoxT = BoxType;
-//using PathT = PathType;
-//using PolygonT = PolygonType;
-using CircleT = CircleType;
-
-// Other
-//using BitmapT = BitmapType;
-using UuidT = UuidType;
-//using BlobT = BlobType;
-using EmbeddingT = EmbeddingType;
-
-// Heterogeneous
-using MixedT = MixedType;
 
 class DataType {
 public:

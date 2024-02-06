@@ -18,11 +18,12 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import null_value;
 import stl;
 import infinity_context;
+import internal_types;
 
 class NullValueTest : public BaseTest {};
 

@@ -15,14 +15,16 @@
 module;
 
 #include <type_traits>
+
+export module unary_operator;
+
 import stl;
 import column_vector;
-import parser;
+
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
-
-export module unary_operator;
+import internal_types;
 
 namespace infinity {
 

@@ -27,16 +27,20 @@ import local_file_system;
 import third_party;
 import catalog;
 import table_entry_type;
-import parser;
+
 import txn_store;
 import data_access_state;
 import status;
 import bg_task;
+import extra_ddl_info;
 
 import infinity_exception;
+
+import block_entry;
+import segment_entry;
 // #include "statement/extra/extra_ddl_info.h"
 
-module wal;
+module wal_manager;
 
 namespace infinity {
 

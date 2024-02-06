@@ -23,11 +23,15 @@ import logger;
 import data_table;
 import table_def;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import column_vector;
 import infinity_context;
+import internal_types;
+import logical_type;
+import column_def;
+import data_type;
 
 class TableTest : public BaseTest {};
 

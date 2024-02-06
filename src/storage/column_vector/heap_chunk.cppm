@@ -14,12 +14,11 @@
 
 module;
 
+export module heap_chunk;
+
 import global_resource_usage;
 import stl;
 import allocator;
-
-export module heap_chunk;
-
 
 namespace infinity {
 

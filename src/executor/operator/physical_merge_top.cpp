@@ -20,7 +20,7 @@ module;
 module physical_merge_top;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import base_expression;

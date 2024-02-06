@@ -14,15 +14,33 @@
 
 module;
 
+export module logical_planner;
+
 import stl;
-import parser;
+
 import query_context;
 import bind_context;
 import load_meta;
 import logical_node;
 import status;
-
-export module logical_planner;
+import internal_types;
+import base_statement;
+import select_statement;
+import copy_statement;
+import insert_statement;
+import create_statement;
+import drop_statement;
+import show_statement;
+import flush_statement;
+import optimize_statement;
+import update_statement;
+import delete_statement;
+import prepare_statement;
+import execute_statement;
+import alter_statement;
+import explain_statement;
+import command_statement;
+import data_type;
 
 namespace infinity {
 

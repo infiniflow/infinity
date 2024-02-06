@@ -13,8 +13,10 @@
 // limitations under the License.
 module;
 
+export module txn;
+
 import stl;
-import parser;
+
 import table_detail;
 import table_def;
 import index_def;
@@ -27,8 +29,8 @@ import txn_context;
 import txn_store;
 import database_detail;
 import status;
-
-export module txn;
+import extra_ddl_info;
+import internal_types;
 
 namespace infinity {
 

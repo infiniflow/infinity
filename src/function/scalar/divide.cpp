@@ -18,13 +18,15 @@ module divide;
 
 import stl;
 import catalog;
-
+import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-import parser;
+
 import third_party;
 import status;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

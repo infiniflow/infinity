@@ -23,7 +23,7 @@ import stl;
 import catalog;
 import default_values;
 import infinity_exception;
-import parser;
+
 import data_access_state;
 import column_vector;
 import buffer_manager;
@@ -32,10 +32,12 @@ import txn_state;
 import txn_manager;
 import infinity_exception;
 import bg_task;
-import wal;
+import wal_manager;
+import wal_entry;
 import global_block_id;
 import block_index;
-import catalog_iterator;
+import segment_iter;
+import block_entry;
 
 namespace infinity {
 

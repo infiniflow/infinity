@@ -19,7 +19,7 @@ import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import operator_state;
 
 module physical_drop_view;

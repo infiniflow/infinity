@@ -20,8 +20,12 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import infinity_context;
+import internal_types;
+import logical_type;
+import column_def;
+import data_type;
 
 class ColumnDefTest : public BaseTest {};
 

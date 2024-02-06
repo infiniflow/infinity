@@ -6,11 +6,12 @@ import memory_pool;
 import index_defines;
 import index_config;
 import data_block;
-import parser;
+
 import column_vector;
 import third_party;
 import memory_indexer;
 import segment;
+import internal_types;
 
 namespace infinity {
 

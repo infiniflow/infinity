@@ -14,16 +14,15 @@
 
 module;
 
-export module catalog:table_index_meta;
+export module table_index_meta;
 
-import :table_index_entry;
-import :base_entry;
-
+import table_index_entry;
+import base_entry;
 import stl;
-import parser;
 import third_party;
 import index_def;
 import status;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -32,7 +31,7 @@ class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
-class TableIndexMeta {
+export class TableIndexMeta {
     friend struct TableEntry;
 
 public:

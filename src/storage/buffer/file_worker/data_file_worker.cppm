@@ -14,10 +14,10 @@
 
 module;
 
+export module data_file_worker;
+
 import stl;
 import file_worker;
-
-export module data_file_worker;
 
 namespace infinity {
 

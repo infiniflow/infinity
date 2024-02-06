@@ -16,7 +16,7 @@ module;
 
 #include <sstream>
 import stl;
-import parser;
+
 import expression_type;
 import scalar_function;
 import match_expression;

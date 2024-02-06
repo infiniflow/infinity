@@ -18,7 +18,7 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
@@ -32,6 +32,9 @@ import column_expression;
 import value;
 import default_values;
 import data_block;
+import internal_types;
+import logical_type;
+import data_type;
 
 class MaxFunctionTest : public BaseTest {};
 

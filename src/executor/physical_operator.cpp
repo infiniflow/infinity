@@ -23,11 +23,14 @@ import default_values;
 import operator_state;
 import column_vector;
 import query_context;
-import parser;
+
 import base_table_ref;
 import third_party;
 import infinity_exception;
-import catalog;
+import block_entry;
+import block_column_entry;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

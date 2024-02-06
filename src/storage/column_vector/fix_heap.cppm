@@ -14,13 +14,14 @@
 
 module;
 
+export module fix_heap;
+
 import global_resource_usage;
 import stl;
 import vector_heap_chunk;
 import default_values;
-import parser;
 
-export module fix_heap;
+import internal_types;
 
 namespace infinity {
 

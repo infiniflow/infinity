@@ -22,14 +22,18 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import txn_manager;
 import txn;
 import status;
+import internal_types;
+import logical_type;
+import extra_ddl_info;
+import column_def;
+import data_type;
 
 class TableTxnTest : public BaseTest {
     void SetUp() override {

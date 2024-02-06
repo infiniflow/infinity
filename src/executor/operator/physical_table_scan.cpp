@@ -15,12 +15,15 @@
 module;
 
 #include <string>
+
+module physical_table_scan;
+
 import stl;
 import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import global_block_id;
@@ -28,7 +31,7 @@ import data_block;
 import table_scan_function_data;
 import base_table_ref;
 import block_index;
-import catalog;
+
 import default_values;
 import infinity_exception;
 import infinity_exception;
@@ -36,8 +39,9 @@ import third_party;
 import logger;
 import column_vector;
 import infinity_exception;
+import logical_type;
 
-module physical_table_scan;
+import block_entry;
 
 namespace infinity {
 

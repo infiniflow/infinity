@@ -14,14 +14,17 @@
 
 module;
 
+export module logical_command;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
-import base_table_ref;
 
-export module logical_command;
+import base_table_ref;
+import internal_types;
+import command_statement;
+import data_type;
 
 namespace infinity {
 

@@ -21,19 +21,25 @@
 #include <unordered_set>
 
 import compilation_config;
-
+import internal_types;
 import infinity;
 import database;
 import table;
+import logical_type;
 
-import parser;
 import profiler;
 import local_file_system;
 import third_party;
 import logical_node_type;
-
+import embedding_info;
+import create_index_info;
 import query_options;
 import query_result;
+import extra_ddl_info;
+import knn_expr;
+import column_def;
+import statement_common;
+import data_type;
 
 using namespace infinity;
 

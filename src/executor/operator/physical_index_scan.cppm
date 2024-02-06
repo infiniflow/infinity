@@ -17,7 +17,7 @@ module;
 export module physical_index_scan;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -25,12 +25,14 @@ import physical_operator_type;
 import base_expression;
 import load_meta;
 import infinity_exception;
+import internal_types;
+import data_type;
 import base_table_ref;
 import value;
-import catalog;
 import knn_filter;
 import secondary_index_data;
 import secondary_index_scan_execute_expression;
+import column_index_entry;
 
 namespace infinity {
 

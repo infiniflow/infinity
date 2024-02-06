@@ -14,17 +14,21 @@
 
 module;
 
-export module catalog:db_meta;
-import :db_entry;
-import :base_entry;
+export module db_meta;
 
 import stl;
-import parser;
+
 import buffer_manager;
 import third_party;
 import status;
+import extra_ddl_info;
+import db_entry;
+import base_entry;
+import txn_manager;
 
 namespace infinity {
+
+struct NewCatalog;
 
 export struct DBMeta {
 

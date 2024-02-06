@@ -14,6 +14,9 @@
 
 module;
 
+export module column_remapper;
+
+import internal_types;
 import stl;
 import logical_node_visitor;
 import logical_node;
@@ -21,11 +24,10 @@ import base_expression;
 import column_binding;
 import query_context;
 import column_expression;
-import parser;
+import data_type;
+
 import optimizer_rule;
 import logical_node_type;
-
-export module column_remapper;
 
 namespace infinity {
 

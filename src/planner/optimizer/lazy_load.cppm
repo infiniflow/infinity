@@ -25,8 +25,9 @@ import column_binding;
 import query_context;
 import column_expression;
 import optimizer_rule;
-import parser;
 import load_meta;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

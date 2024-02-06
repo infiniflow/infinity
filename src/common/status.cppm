@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module status;
+
+import stl;
 
 namespace infinity {
 

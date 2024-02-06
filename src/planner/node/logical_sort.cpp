@@ -15,14 +15,17 @@
 module;
 
 #include <sstream>
+
+module logical_sort;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
-import base_expression;
 
-module logical_sort;
+import base_expression;
+import internal_types;
+import select_statement;
 
 namespace infinity {
 

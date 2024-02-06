@@ -14,22 +14,25 @@
 
 module;
 
-export module catalog:db_entry;
-
-import :table_meta;
-import :base_entry;
+export module db_entry;
 
 import stl;
 import table_entry_type;
-import parser;
+import table_meta;
+import base_entry;
+import table_entry;
 import third_party;
 import table_detail;
 import buffer_manager;
 import status;
+import extra_ddl_info;
+import column_def;
 
 namespace infinity {
 
-class DBEntry : public BaseEntry {
+class TxnManager;
+
+export class DBEntry : public BaseEntry {
     friend struct NewCatalog;
 
 public:

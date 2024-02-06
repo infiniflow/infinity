@@ -14,12 +14,13 @@
 
 module;
 
+export module between_expression;
+
 import column_binding;
 import base_expression;
-import parser;
+import data_type;
 import stl;
-
-export module between_expression;
+import internal_types;
 
 namespace infinity {
 

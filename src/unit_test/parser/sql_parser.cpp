@@ -18,10 +18,23 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+import sql_parser;
 import logger;
 import stl;
 import infinity_context;
+import internal_types;
+import logical_type;
+import type_info;
+import decimal_info;
+import embedding_info;
+import base_statement;
+import create_statement;
+import extra_ddl_info;
+import create_table_info;
+import create_index_info;
+import column_def;
+import parser_result;
+import data_type;
 
 class SQLParserTest : public BaseTest {};
 

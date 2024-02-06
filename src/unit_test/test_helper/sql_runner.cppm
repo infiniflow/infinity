@@ -14,10 +14,10 @@
 
 module;
 
+export module sql_runner;
+
 import stl;
 import data_table;
-
-export module sql_runner;
 
 namespace infinity {
 

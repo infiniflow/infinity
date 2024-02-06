@@ -20,13 +20,25 @@ import table_def;
 import index_def;
 import data_block;
 import stl;
-import parser;
+
 import infinity_exception;
+import db_meta;
+import db_entry;
+import table_entry;
+import table_meta;
+import segment_entry;
+import block_entry;
+import block_column_entry;
+import table_index_entry;
+import irs_index_entry;
+import column_index_entry;
+import segment_column_index_entry;
 import catalog;
 import serialize;
 import third_party;
 import table_entry_type;
 import index_base;
+import column_def;
 
 namespace infinity {
 

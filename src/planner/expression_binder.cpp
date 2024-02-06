@@ -19,13 +19,14 @@ module;
 module expression_binder;
 
 import stl;
-import parser;
 
+import type_info;
 import infinity_exception;
 import bind_context;
 import third_party;
 import value;
-
+import logical_type;
+import internal_types;
 import base_expression;
 import aggregate_expression;
 import column_expression;
@@ -54,9 +55,26 @@ import scalar_function_set;
 import scalar_function;
 import special_function;
 import status;
-import catalog;
+
 import query_context;
 import logger;
+import embedding_info;
+import parsed_expr;
+import function_expr;
+import constant_expr;
+import column_expr;
+import case_expr;
+import in_expr;
+import knn_expr;
+import search_expr;
+import cast_expr;
+import between_expr;
+import subquery_expr;
+import match_expr;
+import data_type;
+
+import catalog;
+import table_entry;
 
 namespace infinity {
 

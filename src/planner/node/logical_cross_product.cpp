@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
+module logical_cross_product;
+
 import stl;
 import column_binding;
 import logical_node_type;
-import parser;
 
-module logical_cross_product;
+import internal_types;
 
 namespace infinity {
 

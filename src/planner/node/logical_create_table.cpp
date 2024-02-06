@@ -16,11 +16,13 @@ module;
 
 #include <sstream>
 
+module logical_create_table;
+
 import stl;
 import column_binding;
-import parser;
 
-module logical_create_table;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

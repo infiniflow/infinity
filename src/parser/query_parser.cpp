@@ -861,7 +861,7 @@ namespace infinity {
   case 2: // topLevelQuery: query "end of file"
 #line 103 "query_parser.y"
             {
-    driver.result = std::move(yystack_[1].value.as < std::unique_ptr<irs::filter> > ());
+    driver.result_ = std::move(yystack_[1].value.as < std::unique_ptr<irs::filter> > ());
 }
 #line 867 "query_parser.cpp"
     break;
@@ -971,7 +971,7 @@ namespace infinity {
   case 14: // basic_filter: STRING
 #line 163 "query_parser.y"
          {
-    std::string &field = driver.default_field;
+    std::string &field = driver.default_field_;
     if(field.empty()){
         error(yystack_[0].location, "driver.default_field is empty");
         YYERROR;

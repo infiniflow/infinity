@@ -19,7 +19,7 @@ import infinity_exception;
 import logger;
 import column_vector;
 import value;
-import parser;
+
 import default_values;
 import third_party;
 import stl;
@@ -27,6 +27,8 @@ import selection;
 import vector_buffer;
 import infinity_context;
 import global_resource_usage;
+import internal_types;
+import logical_type;
 #if 0
 class ColumnVectorBlobTest : public BaseTest {};
 

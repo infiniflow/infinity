@@ -18,7 +18,7 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
@@ -40,6 +40,9 @@ import storage;
 import resource_manager;
 import query_context;
 import session_manager;
+import logical_type;
+import internal_types;
+import data_type;
 
 class TableScanTest : public BaseTest {
     void SetUp() override {

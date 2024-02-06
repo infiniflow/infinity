@@ -29,7 +29,7 @@ public:
 
     inline ErrorCode ErrorCode() const { return status_.code(); }
 
-    inline StringView ErrorMessage() const { return status_.message(); }
+    inline std::string_view ErrorMessage() const { return status_.message(); }
 
 private:
     Status status_;

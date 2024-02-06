@@ -21,10 +21,10 @@ import options;
 
 namespace infinity {
 
-export constexpr StringView profile_history_capacity_name = "profile_history_capacity";
-export constexpr StringView enable_profiling_name = "enable_profile";
-export constexpr StringView worker_cpu_limit = "cpu_count";
-export constexpr StringView log_level = "log_level";
+export constexpr std::string_view profile_history_capacity_name = "profile_history_capacity";
+export constexpr std::string_view enable_profiling_name = "enable_profile";
+export constexpr std::string_view worker_cpu_limit = "cpu_count";
+export constexpr std::string_view log_level = "log_level";
 
 export struct Config {
 public:

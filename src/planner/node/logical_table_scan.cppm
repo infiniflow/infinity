@@ -18,9 +18,11 @@ import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import base_table_ref;
-import catalog;
+import table_entry;
+import internal_types;
+import data_type;
 
 export module logical_table_scan;
 

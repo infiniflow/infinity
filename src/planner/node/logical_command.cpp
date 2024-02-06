@@ -16,14 +16,15 @@ module;
 
 #include <sstream>
 
+module logical_command;
+
 import stl;
 import column_binding;
 import logical_node_type;
-import parser;
 
+import logical_type;
 import infinity_exception;
-
-module logical_command;
+import internal_types;
 
 namespace infinity {
 
@@ -96,6 +97,11 @@ String LogicalCommand::ToString(i64 &space) const {
         case CommandType::kCheckTable: {
             CheckTable *check_table_info = (CheckTable *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Check table: " << check_table_info->table_name();
+            break;
+        }
+        case CommandType::kCompactTable: {
+            CompactTable *compact_table_info = (CompactTable *)(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Compact table: " << compact_table_info->table_name();
             break;
         }
         case CommandType::kInvalid: {

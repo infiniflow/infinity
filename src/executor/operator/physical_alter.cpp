@@ -14,10 +14,11 @@
 
 module;
 
+module physical_alter;
+
 import query_context;
 import operator_state;
 
-module physical_alter;
 
 namespace infinity {
 

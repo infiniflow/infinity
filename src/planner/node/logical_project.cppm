@@ -14,15 +14,16 @@
 
 module;
 
+export module logical_project;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+import data_type;
 import third_party;
 import base_expression;
-
-export module logical_project;
+import internal_types;
 
 namespace infinity {
 

@@ -11,7 +11,7 @@ import index_config;
 import index_segment_reader;
 import posting_writer;
 import data_block;
-import parser;
+
 import column_vector;
 import analyzer;
 import sequential_column_inverter;
@@ -19,6 +19,7 @@ import parallel_column_inverter;
 import task_executor;
 import memory_posting;
 import third_party;
+import internal_types;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;

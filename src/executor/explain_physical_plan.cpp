@@ -19,7 +19,7 @@ module;
 module explain_physical_plan;
 
 import stl;
-
+import internal_types;
 import physical_operator;
 import physical_union_all;
 import physical_index_scan;
@@ -70,14 +70,22 @@ import physical_match;
 import physical_fusion;
 import status;
 import physical_operator_type;
-import parser;
+
 import explain_logical_plan;
 import logical_show;
 import infinity_exception;
-import catalog;
+
 import base_expression;
 import knn_expression;
 import third_party;
+import select_statement;
+import knn_expr;
+import extra_ddl_info;
+import column_def;
+import statement_common;
+import flush_statement;
+
+import table_entry;
 
 namespace infinity {
 

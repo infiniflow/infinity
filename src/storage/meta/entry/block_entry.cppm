@@ -14,24 +14,25 @@
 
 module;
 
-export module catalog:block_entry;
-
-import :block_column_entry;
-import :base_entry;
+export module block_entry;
 
 import stl;
 import default_values;
 import third_party;
-import parser;
+import data_type;
 import local_file_system;
 import column_vector;
 import bitmask;
+import internal_types;
+import base_entry;
+import block_column_entry;
 
 namespace infinity {
 
 class BufferManager;
 class Txn;
 struct SegmentEntry;
+struct TableEntry;
 class DataBlock;
 
 #pragma pack(4)
@@ -63,7 +64,7 @@ export struct BlockVersion {
 };
 
 /// class BlockEntry
-struct BlockEntry : public BaseEntry {
+export struct BlockEntry : public BaseEntry {
     friend struct TableEntry;
     friend struct SegmentEntry;
 

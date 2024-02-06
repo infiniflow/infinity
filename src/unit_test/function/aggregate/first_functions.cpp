@@ -18,11 +18,11 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
-import catalog;
+
 import first;
 import function_set;
 import aggregate_function_set;
@@ -32,6 +32,8 @@ import column_expression;
 import value;
 import default_values;
 import data_block;
+import internal_types;
+import logical_type;
 #if 0
 class FirstFunctionTest : public BaseTest {};
 

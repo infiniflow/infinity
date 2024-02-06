@@ -14,17 +14,19 @@
 
 module;
 
+export module logical_fusion;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import fusion_expression;
 import match_expression;
 import base_table_ref;
-import catalog;
 
-export module logical_fusion;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

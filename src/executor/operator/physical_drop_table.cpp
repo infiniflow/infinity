@@ -14,18 +14,20 @@
 
 module;
 
+module physical_drop_table;
+
 import stl;
 import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import status;
 import infinity_exception;
-
-module physical_drop_table;
+import logical_type;
+import column_def;
 
 namespace infinity {
 

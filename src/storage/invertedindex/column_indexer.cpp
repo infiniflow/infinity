@@ -9,10 +9,11 @@ import stl;
 import memory_pool;
 import index_defines;
 import index_config;
-import parser;
+
 import column_vector;
 import third_party;
 import indexer;
+import internal_types;
 import local_file_system;
 import file_writer;
 import posting_writer;

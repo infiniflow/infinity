@@ -13,10 +13,10 @@
 // limitations under the License.
 module;
 
+export module session_manager;
+
 import stl;
 import session;
-
-export module session_manager;
 
 namespace infinity {
 

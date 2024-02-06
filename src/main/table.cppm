@@ -17,9 +17,14 @@ export module table;
 import stl;
 import query_options;
 import value;
-import parser;
+
 import session;
 import query_result;
+import parsed_expr;
+import search_expr;
+import update_statement;
+import create_index_info;
+import explain_statement;
 
 namespace infinity {
 

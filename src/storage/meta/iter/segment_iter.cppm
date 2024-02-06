@@ -16,15 +16,16 @@ module;
 
 #include <utility>
 
-export module catalog_iterator:segment_iter;
+export module segment_iter;
 
-import :block_iter;
-
+import block_iter;
 import stl;
-import catalog;
+import segment_entry;
+import block_iter;
 import buffer_manager;
 import default_values;
 import infinity_exception;
+import block_entry;
 
 namespace infinity {
 

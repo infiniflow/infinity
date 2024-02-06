@@ -10,7 +10,7 @@
  * QUERY('_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~)')
  * QUERY('dune god', 'default_operator=and;default_field=name');
  */
-#include "expr.h"
+#include "parsed_expr.h"
 
 #include <memory>
 #include <string>

@@ -14,7 +14,7 @@
 
 module;
 
-module catalog_iterator;
+module segment_iter;
 
 import stl;
 import catalog;

@@ -5,7 +5,8 @@ module invert_task;
 import stl;
 import column_inverter;
 import column_vector;
-import parser;
+
+import internal_types;
 
 namespace infinity {
 

@@ -18,10 +18,31 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+import sql_parser;
 import logger;
 import stl;
 import infinity_context;
+import logical_type;
+import internal_types;
+import base_statement;
+import select_statement;
+import parsed_expr;
+import column_expr;
+import constant_expr;
+import function_expr;
+import knn_expr;
+import match_expr;
+import search_expr;
+import case_expr;
+import subquery_expr;
+import between_expr;
+import cast_expr;
+import knn_expr;
+import table_reference;
+import join_reference;
+import cross_product_reference;
+import subquery_reference;
+import parser_result;
 
 class SelectStatementParsingTest : public BaseTest {};
 

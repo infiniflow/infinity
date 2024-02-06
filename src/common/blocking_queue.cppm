@@ -14,10 +14,10 @@
 
 module;
 
+export module blocking_queue;
+
 import stl;
 import default_values;
-
-export module blocking_queue;
 
 namespace infinity {
 

@@ -20,7 +20,7 @@ import compact_segments_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
-import wal;
+import wal_manager;
 import third_party;
 
 namespace infinity {

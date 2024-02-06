@@ -16,11 +16,12 @@ module;
 
 #include <sstream>
 
+module logical_dummy_scan;
+
 import stl;
 import column_binding;
-import parser;
-
-module logical_dummy_scan;
+import data_type;
+import internal_types;
 
 namespace infinity {
 

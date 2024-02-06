@@ -15,12 +15,14 @@
 module;
 
 #include <sstream>
+
+module subquery_expression;
+
 import stl;
 import bound_select_statement;
 import expression_type;
-import parser;
 
-module subquery_expression;
+import logical_type;
 
 namespace infinity {
 

@@ -15,11 +15,10 @@
 module;
 
 #include <bit>
-#include <variant>
 #include <vector>
+
 module physical_index_scan;
 
-import parser;
 import query_context;
 import operator_state;
 import default_values;
@@ -40,6 +39,9 @@ import data_block;
 import default_values;
 import buffer_handle;
 import secondary_index_scan_execute_expression;
+import logical_type;
+import segment_column_index_entry;
+import segment_entry;
 // TODO:use bitset
 import bitmask;
 

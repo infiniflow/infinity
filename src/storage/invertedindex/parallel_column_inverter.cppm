@@ -6,22 +6,23 @@ module;
 export module parallel_column_inverter;
 import stl;
 import analyzer;
-import parser;
+
 import column_vector;
 import memory_pool;
 import pool_allocator;
 import term;
 import index_defines;
 import third_party;
+import internal_types;
 import column_inverter;
 
 namespace infinity {
 
 struct Hasher {
-    SizeT operator()(const StringView &value) const { return std::hash<StringView>{}(value); }
+    SizeT operator()(const std::string_view &value) const { return std::hash<std::string_view>{}(value); }
 };
 
-export inline bool StringViewCompare(StringView lhs, StringView rhs) {
+export inline bool StringViewCompare(std::string_view lhs, std::string_view rhs) {
     const SizeT size = std::min(lhs.size(), rhs.size());
     const auto res = ::memcmp(lhs.data(), rhs.data(), size);
 
@@ -32,10 +33,10 @@ export inline bool StringViewCompare(StringView lhs, StringView rhs) {
     return res < 0;
 }
 
-export struct HashedStringView : public StringView {
-    explicit HashedStringView(StringView ref, const Hasher &hasher = Hasher{}) : HashedStringView{ref, hasher(ref)} {}
+export struct HashedStringView : public std::string_view {
+    explicit HashedStringView(std::string_view ref, const Hasher &hasher = Hasher{}) : HashedStringView{ref, hasher(ref)} {}
 
-    HashedStringView(StringView ref, SizeT hash) : StringView(ref), hash_(hash) {}
+    HashedStringView(std::string_view ref, SizeT hash) : std::string_view(ref), hash_(hash) {}
 
     SizeT hash_;
 };
@@ -69,7 +70,7 @@ export struct TermPosting {
             return term_pos_ < rhs.term_pos_;
         }
     };
-    StringView term_;
+    std::string_view term_;
     Vector<PosInfo> values_;
 };
 
@@ -91,7 +92,7 @@ public:
 
     void GetSorted(Vector<const TermPosting *> &term_postings);
 
-    TermPosting *Emplace(StringView term);
+    TermPosting *Emplace(std::string_view term);
 
     bool Empty() const { return terms_.empty(); }
 

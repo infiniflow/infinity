@@ -14,12 +14,14 @@
 
 module;
 
-import stl;
-import parser;
-import block_index;
-import catalog;
-
 export module binding;
+
+import stl;
+import block_index;
+
+import internal_types;
+import data_type;
+import table_entry;
 
 namespace infinity {
 

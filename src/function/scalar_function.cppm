@@ -14,13 +14,15 @@
 
 module;
 
+export module scalar_function;
+
 import stl;
 import function;
 import function_data;
 import column_vector;
-
+import internal_types;
 import infinity_exception;
-import parser;
+import data_type;
 import data_block;
 import bitmask;
 import unary_operator;
@@ -28,8 +30,6 @@ import binary_operator;
 import ternary_operator;
 import base_expression;
 import null_value;
-
-export module scalar_function;
 
 namespace infinity {
 

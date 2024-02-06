@@ -16,11 +16,11 @@ module;
 
 #include <string>
 
-module catalog;
+module block_column_entry;
 
 import stl;
 import buffer_manager;
-import parser;
+
 import buffer_obj;
 import buffer_handle;
 import column_vector;
@@ -33,6 +33,8 @@ import varchar_layout;
 import logger;
 import data_file_worker;
 import catalog_delta_entry;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

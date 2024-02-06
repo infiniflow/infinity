@@ -14,16 +14,18 @@
 
 module;
 
+export module logical_match;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import match_expression;
 import base_table_ref;
-import catalog;
-
-export module logical_match;
+import table_entry;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

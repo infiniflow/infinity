@@ -114,13 +114,16 @@ import logical_command;
 import logical_match;
 import logical_fusion;
 
-import parser;
+
 import value;
 import value_expression;
 import explain_physical_plan;
 import third_party;
 import status;
 import infinity_exception;
+import create_index_info;
+import command_statement;
+import explain_statement;
 import load_meta;
 
 namespace infinity {

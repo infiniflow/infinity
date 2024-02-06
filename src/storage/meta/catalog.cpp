@@ -16,10 +16,11 @@ module;
 
 #include <fstream>
 #include <vector>
+
 module catalog;
 
 import stl;
-import parser;
+
 import txn_manager;
 import logger;
 import third_party;
@@ -41,6 +42,16 @@ import txn_store;
 import data_access_state;
 import catalog_delta_entry;
 import file_writer;
+import extra_ddl_info;
+
+import table_meta;
+import table_index_meta;
+import base_entry;
+import block_entry;
+import block_column_entry;
+import irs_index_entry;
+import column_index_entry;
+import segment_column_index_entry;
 
 namespace infinity {
 

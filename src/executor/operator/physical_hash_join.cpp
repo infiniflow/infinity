@@ -18,7 +18,7 @@ module;
 import query_context;
 import operator_state;
 import stl;
-import parser;
+
 
 module physical_hash_join;
 

@@ -10,15 +10,14 @@
  * QUERY('_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~)')
  * QUERY('dune god', 'default_operator=and;default_field=name');
  */
-#include "expr.h"
+#include "parsed_expr.h"
+#include "search_options.h"
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace infinity {
-
-class SearchOptions;
 
 class FusionExpr : public ParsedExpr {
 public:
