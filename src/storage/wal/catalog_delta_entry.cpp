@@ -386,7 +386,7 @@ void AddSegmentEntryOp::SaveSate() {
     this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
     this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
-    this->segment_dir_ = this->segment_entry_->segment_dir();
+    this->segment_dir_ = *this->segment_entry_->segment_dir();
     this->min_row_ts_ = this->segment_entry_->min_row_ts();
     this->max_row_ts_ = this->segment_entry_->max_row_ts();
     this->row_capacity_ = this->segment_entry_->row_capacity();
@@ -421,7 +421,7 @@ void AddColumnEntryOp::SaveSate() {
     this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
     this->block_id_ = this->column_entry_->GetBlockEntry()->block_id();
     this->column_id_ = this->column_entry_->column_id();
-    this->next_outline_idx_ = this->column_entry_->outline_buffers_.size();
+    this->next_outline_idx_ = this->column_entry_->OutlineBufferCount();
     is_saved_sate_ = true;
 }
 

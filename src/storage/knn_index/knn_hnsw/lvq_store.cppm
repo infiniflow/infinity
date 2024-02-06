@@ -211,7 +211,7 @@ private:
 
     // TODO SIMD optimization here
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    SizeT MergeCompress(Iterator query_iter, SizeT vec_num) {
+    SizeT MergeCompress(Iterator &&query_iter, SizeT vec_num) {
         SizeT compress_n = meta_.cur_vec_num();
         if (auto ret = meta_.AllocateVec(vec_num + plain_data_.cur_vec_num()); ret > max_vec_num()) {
             UnrecoverableError("exceed max vec num");
@@ -230,7 +230,7 @@ private:
                 mean[j] += buffer_vecs[j];
             }
         }
-        Iterator query_iter1 = query_iter;
+        Iterator query_iter1 = query_iter; // copy here
 
         SizeT actual_size = 0;
         while (true) {
@@ -276,11 +276,12 @@ public:
     }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    SizeT AddVec(Iterator query_iter, SizeT vec_num) {
+    SizeT AddVec(Iterator &&query_iter, SizeT vec_num) {
+        Iterator query_iter1 = query_iter; // copy here
         try {
-            return meta_.cur_vec_num() + plain_data_.AddVec(query_iter, vec_num);
+            return meta_.cur_vec_num() + plain_data_.AddVec(std::move(query_iter), vec_num);
         } catch (const UnrecoverableException &) {
-            return MergeCompress(std::move(query_iter), vec_num);
+            return MergeCompress(std::move(query_iter1), vec_num);
         }
     }
 

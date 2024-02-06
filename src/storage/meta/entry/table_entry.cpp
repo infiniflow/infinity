@@ -237,8 +237,9 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
+                new_segment->SetSealed();
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
@@ -246,7 +247,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
-        LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id_, actual_appended));
+        LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
     }
 }
 
@@ -372,6 +373,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 
 SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
     try {
+        std::shared_lock lock(rw_locker_);
         auto *segment = segment_map_.at(segment_id).get();
         if ( // TODO: read deprecate segment is allowed
              // segment->deprecate_ts() < ts ||
@@ -382,19 +384,6 @@ SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) 
     } catch (const std::out_of_range &e) {
         return nullptr;
     }
-}
-
-const BlockEntry *TableEntry::GetBlockEntryByID(SegmentID seg_id, BlockID block_id, TxnTimeStamp ts) const {
-    SegmentEntry *segment_entry = GetSegmentByID(seg_id, ts);
-    if (segment_entry == nullptr) {
-        UnrecoverableError(fmt::format("Cannot find segment, segment id: {}", seg_id));
-    }
-
-    BlockEntry *block_entry = segment_entry->GetBlockEntryByID(block_id);
-    if (block_entry == nullptr) {
-        UnrecoverableError(fmt::format("Cannot find block, segment id: {}, block id: {}", seg_id, block_id));
-    }
-    return block_entry;
 }
 
 Tuple<SizeT, SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
@@ -524,13 +513,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     table_entry->table_entry_dir_ = table_entry_dir;
 
     if (table_entry_json.contains("segments")) {
-        u32 max_segment_id = 0;
         for (const auto &segment_json : table_entry_json["segments"]) {
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
-            table_entry->segment_map_.emplace(segment_entry->segment_id_, segment_entry);
-            max_segment_id = std::max(max_segment_id, segment_entry->segment_id_);
+            table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
-        table_entry->unsealed_segment_ = table_entry->segment_map_[max_segment_id].get();
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];
@@ -582,12 +568,8 @@ void TableEntry::MergeFrom(BaseEntry &other) {
 
     this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
     this->row_count_.store(std::max(this->row_count_, table_entry2->row_count_));
-    u32 max_segment_id = 0;
-    for (auto &[seg_id, sgement_entry] : this->segment_map_) {
-        max_segment_id = std::max(max_segment_id, seg_id);
-    }
+
     for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
-        max_segment_id = std::max(max_segment_id, seg_id);
         auto it = this->segment_map_.find(seg_id);
         if (it == this->segment_map_.end()) {
             sgement_entry2->table_entry_ = this;
@@ -595,14 +577,6 @@ void TableEntry::MergeFrom(BaseEntry &other) {
         } else {
             it->second->MergeFrom(*sgement_entry2.get());
         }
-    }
-
-    if (this->unsealed_segment_ == nullptr && !this->segment_map_.empty()) {
-        auto seg_it = this->segment_map_.find(max_segment_id);
-        if (seg_it == this->segment_map_.end()) {
-            UnrecoverableError(fmt::format("max_segment_id {} is invalid", max_segment_id));
-        }
-        this->unsealed_segment_ = seg_it->second.get();
     }
 
     for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {

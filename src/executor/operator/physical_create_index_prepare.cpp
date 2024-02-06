@@ -31,7 +31,6 @@ import status;
 import infinity_exception;
 import index_base;
 import index_file_worker;
-import segment_iter;
 import buffer_manager;
 import buffer_handle;
 import index_hnsw;

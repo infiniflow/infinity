@@ -70,7 +70,7 @@ public:
     SizeT AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIterator(vec, dim()), vec_num); }
 
     template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    SizeT AddVec(Iterator query_iter, SizeT vec_num) {
+    SizeT AddVec(Iterator &&query_iter, SizeT vec_num) {
         SizeT new_idx = meta_.AllocateVec(vec_num);
         DataType *ptr = ptr_.get() + new_idx * dim();
 

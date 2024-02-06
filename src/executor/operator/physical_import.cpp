@@ -129,7 +129,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
 
     SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn(), true);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
     BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
     SizeT row_idx = 0;
@@ -158,10 +158,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
                 SaveSegmentData(txn_store, segment_entry);
 
                 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn(), true);
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry_->ColumnCount(), txn);
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
             buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
         }
@@ -185,7 +185,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         Txn *txn = query_context->GetTxn();
         auto *buffer_mgr = txn->GetBufferMgr();
         u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
         UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
         Vector<ColumnVector> column_vectors;
         int column_count = table_entry_->ColumnCount();
@@ -252,7 +252,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     Txn *txn = query_context->GetTxn();
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
     u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
 
     SizeT start_pos = 0;
@@ -286,10 +286,10 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
                 SaveSegmentData(txn_store, segment_entry);
                 u64 segment_id = NewCatalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry_->ColumnCount(), txn);
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             column_vectors.clear();
             for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
                 auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
@@ -375,11 +375,11 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (segment_entry->Room() <= 0) {
             SaveSegmentData(txn_store, segment_entry);
             u64 segment_id = NewCatalog::GetNextSegmentID(parser_context->table_entry_);
-            segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, true);
             parser_context->segment_entry_ = segment_entry;
         }
 
-        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->block_entries().size(), 0, table_entry->ColumnCount(), txn);
+        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry->ColumnCount(), txn);
         parser_context->column_vectors_.clear();
         for (SizeT i = 0; i < column_count; ++i) {
             auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
@@ -484,17 +484,16 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
-    segment_entry->FlushData();
-    const auto &block_entries = segment_entry->block_entries();
-    u16 last_block_row_count = block_entries.back()->row_count();
+    segment_entry->FlushNewData();
+    const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
 
     const String &db_name = *txn_store->table_entry_->GetDBName();
     const String &table_name = *txn_store->table_entry_->GetTableName();
     txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
                                                         table_name,
-                                                        WalSegmentInfo{segment_entry->segment_dir(),
+                                                        WalSegmentInfo{*segment_entry->segment_dir(),
                                                                        segment_entry->segment_id(),
-                                                                       static_cast<u16>(block_entries.size()),
+                                                                       static_cast<u16>(block_cnt),
                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
                                                                        last_block_row_count}));
 

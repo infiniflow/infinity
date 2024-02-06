@@ -64,12 +64,27 @@ public:
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
+    void AppendOutlineBuffer(BufferObj *buffer) {
+        std::unique_lock lock(mutex_);
+        outline_buffers_.emplace_back(buffer);
+    }
+
+    BufferObj *GetOutlineBuffer(SizeT idx) const {
+        std::shared_lock lock(mutex_);
+        return outline_buffers_[idx];
+    }
+
+    SizeT OutlineBufferCount() const {
+        std::shared_lock lock(mutex_);
+        return outline_buffers_.size();
+    }
+
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
-protected:
+private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
     SharedPtr<DataType> column_type_{};
@@ -78,7 +93,7 @@ protected:
     SharedPtr<String> base_dir_{};
     SharedPtr<String> file_name_{};
 
-public:
+    mutable std::shared_mutex mutex_{};
     Vector<BufferObj *> outline_buffers_{};
 };
 
