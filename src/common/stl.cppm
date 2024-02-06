@@ -184,6 +184,17 @@ using std::hash;
 
 using std::string_view;
 using std::streamsize;
+
+using std::variant;
+using std::holds_alternative;
+using std::get;
+using std::visit;
+
+using std::is_integral_v;
+using std::is_floating_point_v;
+
+using std::monostate;
+
 } // namespace std
 
 namespace infinity {

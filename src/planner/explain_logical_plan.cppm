@@ -33,6 +33,7 @@ import logical_update;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
+import logical_index_scan;
 import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
@@ -84,6 +85,8 @@ public:
     static void Explain(const LogicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const LogicalIndexScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

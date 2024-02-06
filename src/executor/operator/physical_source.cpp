@@ -43,6 +43,7 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         }
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
+        case SourceStateType::kIndexScan:
         case SourceStateType::kEmpty: {
             return true;
         }

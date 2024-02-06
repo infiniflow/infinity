@@ -30,6 +30,7 @@ import physical_operator_type;
 import table_scan_function_data;
 import knn_scan_data;
 import physical_table_scan;
+import physical_index_scan;
 import physical_knn_scan;
 import physical_aggregate;
 import physical_explain;
@@ -90,6 +91,15 @@ UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_sc
                                                                                            table_scan_source_state->global_ids_,
                                                                                            physical_table_scan->ColumnIDs());
     return operator_state;
+}
+
+UniquePtr<OperatorState> MakeIndexScanState(PhysicalIndexScan *physical_index_scan, FragmentTask *task) {
+    SourceState *source_state = task->source_state_.get();
+    if (source_state->state_type_ != SourceStateType::kIndexScan) {
+        UnrecoverableError("Expect index scan source state");
+    }
+    auto *index_scan_source_state = static_cast<IndexScanSourceState *>(source_state);
+    return MakeUnique<IndexScanOperatorState>(std::move(index_scan_source_state->segment_ids_));
 }
 
 UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, FragmentTask *task, FragmentContext *fragment_ctx) {
@@ -217,9 +227,16 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
             return MakeTaskStateTemplate<FilterOperatorState>(physical_ops[operator_id]);
         }
         case PhysicalOperatorType::kIndexScan: {
-            return MakeTaskStateTemplate<IndexScanOperatorState>(physical_ops[operator_id]);
-        }
+            if (operator_id != physical_ops.size() - 1) {
+                UnrecoverableError("Table scan operator must be the first operator of the fragment.");
+            }
 
+            if (operator_id == 0) {
+                UnrecoverableError("Table scan shouldn't be the last operator of the fragment.");
+            }
+            auto physical_index_scan = static_cast<PhysicalIndexScan *>(physical_ops[operator_id]);
+            return MakeIndexScanState(physical_index_scan, task);
+        }
         case PhysicalOperatorType::kMergeKnn: {
             auto physical_merge_knn = static_cast<PhysicalMergeKnn *>(physical_ops[operator_id]);
             return MakeMergeKnnState(physical_merge_knn, task);
@@ -640,7 +657,6 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         case PhysicalOperatorType::kIntersect:
         case PhysicalOperatorType::kExcept:
         case PhysicalOperatorType::kDummyScan:
-        case PhysicalOperatorType::kIndexScan:
         case PhysicalOperatorType::kJoinHash:
         case PhysicalOperatorType::kJoinNestedLoop:
         case PhysicalOperatorType::kJoinMerge:
@@ -659,6 +675,19 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = table_scan_operator->PlanBlockEntries(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<TableScanSourceState>(blocks_group[task_id]);
+            }
+            break;
+        }
+        case PhysicalOperatorType::kIndexScan: {
+            if ((i64)tasks_.size() != parallel_count) {
+                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(first_operator->operator_type())));
+            }
+
+            // Partition the hash range to each source state
+            auto *index_scan_operator = (PhysicalIndexScan *)first_operator;
+            Vector<UniquePtr<Vector<SegmentID>>> segment_ids = index_scan_operator->PlanSegments(parallel_count);
+            for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
+                tasks_[task_id]->source_state_ = MakeUnique<IndexScanSourceState>(std::move(segment_ids[task_id]));
             }
             break;
         }
@@ -727,8 +756,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                UnrecoverableError(
-                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -745,8 +773,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kHash: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                UnrecoverableError(
-                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -764,8 +791,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kLimit: {
             if (fragment_type_ != FragmentType::kParallelStream) {
-                UnrecoverableError(
-                    fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
+                UnrecoverableError(fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type())));
             }
 
             if ((i64)tasks_.size() != parallel_count) {
@@ -974,6 +1000,14 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         case PhysicalOperatorType::kTableScan: {
             auto *table_scan_operator = static_cast<PhysicalTableScan *>(first_operator);
             parallel_count = std::min(parallel_count, (i64)(table_scan_operator->TaskletCount()));
+            if (parallel_count == 0) {
+                parallel_count = 1;
+            }
+            break;
+        }
+        case PhysicalOperatorType::kIndexScan: {
+            auto *index_scan_operator = static_cast<PhysicalIndexScan *>(first_operator);
+            parallel_count = std::min(parallel_count, (i64)(index_scan_operator->TaskletCount()));
             if (parallel_count == 0) {
                 parallel_count = 1;
             }

@@ -14,8 +14,6 @@
 
 module;
 
-#include <variant>
-
 export module vector_buffer;
 
 import stl;

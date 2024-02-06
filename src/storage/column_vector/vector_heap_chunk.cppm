@@ -14,16 +14,14 @@
 
 module;
 
+export module vector_heap_chunk;
+
 import stl;
 import global_resource_usage;
 import allocator;
 import buffer_obj;
 import buffer_handle;
 import infinity_exception;
-
-#include <variant>
-
-export module vector_heap_chunk;
 
 namespace infinity {
 

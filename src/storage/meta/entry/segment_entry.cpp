@@ -162,8 +162,10 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
 }
 
 bool SegmentEntry::CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const {
-    BlockID block_id = segment_offset / row_capacity();
-    BlockOffset block_offset = segment_offset % row_capacity();
+    // FIXME: get the block_capacity from config?
+    u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
+    BlockID block_id = segment_offset / block_capacity;
+    BlockOffset block_offset = segment_offset % block_capacity;
 
     auto *block_entry = GetBlockEntryByID(block_id);
     return block_entry->CheckVisible(block_offset, check_ts);

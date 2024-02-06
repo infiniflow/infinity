@@ -121,9 +121,13 @@ export struct MergeKnnOperatorState : public OperatorState {
 export struct FilterOperatorState : public OperatorState {
     inline explicit FilterOperatorState() : OperatorState(PhysicalOperatorType::kFilter) {}
 };
+
 // IndexScan
 export struct IndexScanOperatorState : public OperatorState {
-    inline explicit IndexScanOperatorState() : OperatorState(PhysicalOperatorType::kIndexScan) {}
+    inline explicit IndexScanOperatorState(UniquePtr<Vector<SegmentID>> &&segment_ids)
+        : OperatorState(PhysicalOperatorType::kIndexScan), segment_ids_(std::move(segment_ids)) {}
+    UniquePtr<Vector<SegmentID>> segment_ids_; // moved from IndexScanSourceState
+    u32 next_idx_{};
 };
 
 // Hash
@@ -356,7 +360,7 @@ export struct FusionOperatorState : public OperatorState {
 };
 
 // Source
-export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kKnnScan, kEmpty };
+export enum class SourceStateType { kInvalid, kQueue, kAggregate, kTableScan, kIndexScan, kKnnScan, kEmpty };
 
 export struct SourceState {
     inline explicit SourceState(SourceStateType state_type) : state_type_(state_type) {}
@@ -406,6 +410,13 @@ export struct TableScanSourceState : public SourceState {
         : SourceState(SourceStateType::kTableScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
+};
+
+export struct IndexScanSourceState : public SourceState {
+    explicit IndexScanSourceState(UniquePtr<Vector<SegmentID>> &&segment_ids)
+        : SourceState(SourceStateType::kIndexScan), segment_ids_(std::move(segment_ids)) {}
+
+    UniquePtr<Vector<SegmentID>> segment_ids_; // will be moved into IndexScanOperatorState
 };
 
 export struct KnnScanSourceState : public SourceState {

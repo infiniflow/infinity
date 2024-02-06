@@ -35,6 +35,7 @@ import logical_update;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
+import logical_index_scan;
 import logical_knn_scan;
 import logical_aggregate;
 import logical_sort;
@@ -188,6 +189,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kTableScan: {
             Explain((LogicalTableScan *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kIndexScan: {
+            Explain((LogicalIndexScan *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kKnnScan: {
@@ -774,6 +779,60 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     output_columns += table_scan_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
+}
+
+void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String index_scan_header;
+    if (intent_size != 0) {
+        index_scan_header = String(intent_size - 2, ' ');
+        index_scan_header += "-> INDEX SCAN ";
+    } else {
+        index_scan_header = "INDEX SCAN ";
+    }
+
+    index_scan_header += fmt::format("({})", index_scan_node->node_id());
+    result->emplace_back(MakeShared<String>(index_scan_header));
+
+    // Table alias and name
+    String table_name = String(intent_size, ' ');
+    table_name += " - table name: ";
+    table_name += index_scan_node->TableAlias();
+    table_name += "(";
+
+    table_name += *index_scan_node->table_collection_ptr()->GetDBName();
+    table_name += ".";
+    table_name += *index_scan_node->table_collection_ptr()->GetTableName();
+    table_name += ")";
+    result->emplace_back(MakeShared<String>(table_name));
+
+    // Table index
+    String table_index = String(intent_size, ' ');
+    table_index += " - table index: #";
+    table_index += std::to_string(index_scan_node->TableIndex());
+    result->emplace_back(MakeShared<String>(table_index));
+
+    // filter expression
+    String filter_str = String(intent_size, ' ');
+    filter_str += " - filter: ";
+    Explain(index_scan_node->index_filter_qualified_.get(), filter_str);
+    result->emplace_back(MakeShared<String>(filter_str));
+
+    // Output columns
+    String output_columns = String(intent_size, ' ');
+    output_columns += " - output columns: [";
+    SizeT column_count = index_scan_node->GetOutputNames()->size();
+    if (column_count == 0) {
+        UnrecoverableError(fmt::format("No column in table: {}.", index_scan_node->TableAlias()));
+    }
+    for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+        output_columns += index_scan_node->GetOutputNames()->at(idx);
+        output_columns += ", ";
+    }
+    output_columns += index_scan_node->GetOutputNames()->back();
+    output_columns += "]";
+    result->emplace_back(MakeShared<String>(output_columns));
+
+    // TODO: load meta
 }
 
 void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

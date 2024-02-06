@@ -91,12 +91,13 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewReplaySegmentInde
                                                                                        TxnTimeStamp commit_ts,
                                                                                        bool is_delete) {
 
-    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+    auto [segment_row_count, actual_segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     ColumnID column_id = column_index_entry->column_id();
-    auto create_index_param = column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
+    auto create_index_param =
+        column_index_entry->GetCreateIndexParam(segment_row_count, actual_segment_row_count, table_entry->GetColumnDefByID(column_id));
     auto vector_file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
@@ -127,7 +128,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(Colum
 
 BufferHandle SegmentColumnIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
-BufferHandle SegmentColumnIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx]->Load(); }
+BufferHandle SegmentColumnIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
 
 Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                                    ColumnID column_id,
@@ -276,21 +277,16 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                 UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
             }
             // 1. build secondary index by merge sort
-            u32 input_block_max_row = DEFAULT_BLOCK_CAPACITY;
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), input_block_max_row, part_capacity);
-            for (const auto &block_entry : segment_entry->block_entries()) {
-                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                BufferHandle block_column_buffer_handle = block_column_entry->buffer()->Load();
-                auto block_column_data_ptr = reinterpret_cast<const void *>(block_column_buffer_handle.GetData());
-                u32 block_row_cnt = block_entry->row_count();
-                secondary_index_builder->AppendColumnVector(block_column_data_ptr, block_row_cnt);
-            }
+            // fetch the actual_row_count from segment_entry
+            auto secondary_index_builder =
+                GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), segment_entry->actual_row_count(), part_capacity);
+            secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_id, begin_ts, check_ts);
             secondary_index_builder->StartOutput();
             // 2. output into SecondaryIndexDataPart
             {
                 u32 part_num = GetIndexPartNum();
-                for (u32 part_id = 1; part_id <= part_num; ++part_id) {
+                for (u32 part_id = 0; part_id < part_num; ++part_id) {
                     BufferHandle buffer_handle_part = GetIndexPartAt(part_id);
                     auto secondary_index_part = static_cast<SecondaryIndexDataPart *>(buffer_handle_part.GetDataMut());
                     secondary_index_builder->OutputToPart(secondary_index_part);
@@ -459,7 +455,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
                                                                         BufferManager *buffer_mgr,
                                                                         TableEntry *table_entry) {
     u32 segment_id = index_entry_json["segment_id"];
-    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+    auto [segment_row_count, actual_segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -467,7 +463,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
     }
     u64 column_id = column_index_entry->column_id();
     UniquePtr<CreateIndexParam> create_index_param =
-        column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
+        column_index_entry->GetCreateIndexParam(segment_row_count, actual_segment_row_count, table_entry->GetColumnDefByID(column_id));
     // TODO: need to get create index param;
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());

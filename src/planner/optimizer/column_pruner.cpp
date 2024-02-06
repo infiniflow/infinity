@@ -26,6 +26,7 @@ import logical_aggregate;
 import logical_project;
 import logical_filter;
 import logical_table_scan;
+import logical_index_scan;
 import logical_match;
 
 import base_table_ref;
@@ -135,6 +136,13 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         case LogicalNodeType::kDummyScan:
             break;
+        case LogicalNodeType::kIndexScan: {
+            // do not visit node expression
+            auto &scan = op.Cast<LogicalIndexScan>();
+            Vector<SizeT> project_indices = ClearUnusedExpressions(scan.base_table_ref_->column_ids_, scan.TableIndex());
+            scan.base_table_ref_->RetainColumnByIndices(std::move(project_indices));
+            return;
+        }
         case LogicalNodeType::kKnnScan:
             // TODO
             break;

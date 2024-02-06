@@ -20,7 +20,7 @@ import logical_explain;
 import column_remapper;
 import column_pruner;
 import lazy_load;
-
+import secondary_index_scan_builder;
 import explain_logical_plan;
 import optimizer_rule;
 import bound_delete_statement;
@@ -33,6 +33,8 @@ module optimizer;
 namespace infinity {
 
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
+    // TODO: need an equivalent expression optimizer
+    AddRule(MakeUnique<SecondaryIndexScanBuilder>()); // put it before ColumnPruner, because some columns for index scan does not need to be loaded
     AddRule(MakeUnique<ColumnPruner>());
     AddRule(MakeUnique<LazyLoad>());
     AddRule(MakeUnique<ColumnRemapper>());

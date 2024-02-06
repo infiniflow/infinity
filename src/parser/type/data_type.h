@@ -92,8 +92,8 @@ public:
             case kDouble:
             case kDate:
             case kTime:
-            case kDateTime:  // need to be converted to uint64 and keep order
-            case kTimestamp: // need to be converted to uint64 and keep order
+            case kDateTime:  // need to be converted to int64 and keep order
+            case kTimestamp: // need to be converted to int64 and keep order
             {
                 return true;
             }
