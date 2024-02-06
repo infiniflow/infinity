@@ -58,7 +58,7 @@ private:
 
 export class LazyLoad : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *query_context_ptr, const SharedPtr<LogicalNode> &logical_plan) final {
+    inline void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) final {
         auto logic_op_type = logical_plan->operator_type();
         switch (logic_op_type) {
             case LogicalNodeType::kDelete:

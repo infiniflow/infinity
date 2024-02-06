@@ -102,6 +102,8 @@ private:
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildTableScan(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildIndexScan(const SharedPtr<LogicalNode> &logical_operator) const;
+
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildViewScan(const SharedPtr<LogicalNode> &logical_operator) const;
 
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildDummyScan(const SharedPtr<LogicalNode> &logical_operator) const;

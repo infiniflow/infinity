@@ -24,6 +24,7 @@ import base_expression;
 import column_expression;
 import logical_node_type;
 import logical_table_scan;
+import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
 import base_table_ref;
@@ -37,6 +38,11 @@ Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
             auto table_scan = dynamic_cast<LogicalTableScan &>(op);
 
             return table_scan.base_table_ref_.get();
+        }
+        case LogicalNodeType::kIndexScan: {
+            auto index_scan = dynamic_cast<LogicalIndexScan &>(op);
+
+            return index_scan.base_table_ref_.get();
         }
         case LogicalNodeType::kKnnScan: {
             auto knn_scan = dynamic_cast<LogicalKnnScan &>(op);
@@ -134,6 +140,12 @@ void CleanScan::VisitNode(LogicalNode &op) {
             Vector<SizeT> project_idxs = LoadedColumn(&knn_scan_columns, knn_scan.base_table_ref_.get());
             scan_table_indexes_.push_back(knn_scan.base_table_ref_->table_index_);
             knn_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
+            break;
+        }
+        case LogicalNodeType::kIndexScan: {
+            auto index_scan = dynamic_cast<LogicalIndexScan &>(op);
+            Vector<SizeT> project_idxs; // empty output
+            index_scan.base_table_ref_->RetainColumnByIndices(std::move(project_idxs));
             break;
         }
         case LogicalNodeType::kMatch: {
