@@ -31,7 +31,7 @@ import knn_filter;
 import vector_buffer;
 import knn_distance;
 import third_party;
-
+import txn;
 import infinity_exception;
 import catalog;
 import default_values;

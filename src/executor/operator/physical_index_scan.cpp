@@ -121,6 +121,7 @@ public:
     [[nodiscard]] inline u32 SegmentRowCount() const { return segment_row_count_; }
 
     // count of rows in segment, exclude deleted rows
+    // NOTICE: this number can only be used to output logs, because it may keep reducing
     [[nodiscard]] inline u32 SegmentRowActualCount() const { return segment_row_actual_count_; }
 
     // result after consider if_reverse_select_
@@ -239,7 +240,13 @@ public:
         auto index_part_num = index->GetPartNum();
         auto index_data_num = index->GetDataNum();
         if (index_data_num != SegmentRowActualCount()) {
-            UnrecoverableError("FilterResult::ExecuteSingleRange(): index_data_num error.");
+            if (index_data_num < SegmentRowActualCount()) {
+                UnrecoverableError("FilterResult::ExecuteSingleRange(): index_data_num < SegmentRowActualCount(). index error.");
+            } else {
+                LOG_INFO(fmt::format("FilterResult::ExecuteSingleRange(): index_data_num: {}, SegmentRowActualCount(): {}. Some rows are deleted.",
+                                     index_data_num,
+                                     SegmentRowActualCount()));
+            }
         }
         auto [begin_val, end_val] = interval_range.GetRange();
         // 1. search PGM and get approximate search range

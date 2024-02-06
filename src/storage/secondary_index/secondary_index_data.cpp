@@ -160,7 +160,15 @@ public:
             UnrecoverableError("OutputToPart(): error: unexpected index_part->part_id_ value");
         }
         if (index_part->part_size_ != std::min(output_part_capacity_, data_num_ - output_row_progress_)) {
-            UnrecoverableError("OutputToPart(): error: index_part->part_size_");
+            auto expect_size = std::min(output_part_capacity_, data_num_ - output_row_progress_);
+            if (index_part->part_size_ < expect_size) {
+                UnrecoverableError("OutputToPart(): error: index_part->part_size_");
+            } else {
+                LOG_INFO(fmt::format("OutputToPart(): index_part->part_size_: {}, expect_size: {}. Maybe some rows are deleted.",
+                                     index_part->part_size_,
+                                     expect_size));
+                index_part->part_size_ = expect_size;
+            }
         }
         // check empty part
         if (index_part->part_size_ == 0) {
