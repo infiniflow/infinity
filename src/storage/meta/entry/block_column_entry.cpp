@@ -143,6 +143,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
                 block_column_entry->buffer_->Sync();
                 block_column_entry->buffer_->CloseFile();
             }
+            std::shared_lock lock(block_column_entry->mutex_);
             for (auto *outline_buffer : block_column_entry->outline_buffers_) {
                 if (outline_buffer && outline_buffer->Save()) {
                     outline_buffer->Sync();
@@ -172,7 +173,10 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;
-    json_res["next_outline_idx"] = outline_buffers_.size();
+    {
+        std::shared_lock lock(mutex_);
+        json_res["next_outline_idx"] = outline_buffers_.size();
+    }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
     json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
@@ -195,7 +199,11 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 
 Vector<String> BlockColumnEntry::OutlinePaths() const {
     Vector<String> outline_paths;
-    SizeT outline_file_count = outline_buffers_.size();
+    SizeT outline_file_count = 0;
+    {
+        std::shared_lock lock(mutex_);
+        outline_file_count = outline_buffers_.size();
+    }
     for (SizeT i = 0; i < outline_file_count; ++i) {
         auto outline_file = OutlineFilename(i);
 

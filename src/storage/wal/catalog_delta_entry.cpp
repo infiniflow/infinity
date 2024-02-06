@@ -421,7 +421,7 @@ void AddColumnEntryOp::SaveSate() {
     this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
     this->block_id_ = this->column_entry_->GetBlockEntry()->block_id();
     this->column_id_ = this->column_entry_->column_id();
-    this->next_outline_idx_ = this->column_entry_->outline_buffers_.size();
+    this->next_outline_idx_ = this->column_entry_->OutlineBufferCount();
     is_saved_sate_ = true;
 }
 
