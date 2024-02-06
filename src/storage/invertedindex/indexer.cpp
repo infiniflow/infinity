@@ -21,7 +21,6 @@ import third_party;
 import column_indexer;
 
 import logical_type;
-import index_builder;
 import internal_types;
 
 
