@@ -20,7 +20,7 @@ module;
 module secondary_index_data;
 
 import stl;
-import parser;
+
 import default_values;
 import index_base;
 import file_system;
@@ -28,8 +28,7 @@ import file_system_type;
 import infinity_exception;
 import column_vector;
 import third_party;
-import catalog;
-import catalog_iterator;
+import segment_iter;
 import buffer_manager;
 import secondary_index_pgm;
 import logger;

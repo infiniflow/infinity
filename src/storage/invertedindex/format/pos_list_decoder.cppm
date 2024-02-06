@@ -1,5 +1,7 @@
 module;
 
+export module pos_list_decoder;
+
 import stl;
 import byte_slice;
 import byte_slice_reader;
@@ -9,7 +11,6 @@ import pos_list_format_option;
 import posting_value;
 import index_defines;
 import position_bitmap_reader;
-export module pos_list_decoder;
 
 namespace infinity {
 

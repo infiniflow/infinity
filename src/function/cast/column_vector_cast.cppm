@@ -14,16 +14,19 @@
 
 module;
 
+export module column_vector_cast;
+
 import column_vector;
 import stl;
-import parser;
+
 import bitmask;
 import bound_cast_func;
 import unary_operator;
 import embedding_unary_operator;
 import null_value;
-
-export module column_vector_cast;
+import logical_type;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

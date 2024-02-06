@@ -23,17 +23,21 @@ import boost;
 import stl;
 import session;
 import infinity_exception;
-
+import internal_types;
 import pg_message;
 import logger;
 import query_context;
 import infinity_context;
 import third_party;
 import data_table;
-import parser;
+
 import logical_node_type;
 import query_result;
 import session_manager;
+import type_info;
+import logical_type;
+import embedding_info;
+import data_type;
 
 namespace infinity {
 

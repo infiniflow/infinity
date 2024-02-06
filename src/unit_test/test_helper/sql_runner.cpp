@@ -15,6 +15,9 @@
 module;
 
 #include <memory>
+
+module sql_runner;
+
 import stl;
 import data_table;
 import logger;
@@ -22,7 +25,7 @@ import session;
 import query_context;
 import infinity_context;
 import third_party;
-import parser;
+import sql_parser;
 import logical_planner;
 import optimizer;
 import physical_planner;
@@ -40,8 +43,8 @@ import resource_manager;
 import storage;
 import query_result;
 import session_manager;
-
-module sql_runner;
+import base_statement;
+import parser_result;
 
 namespace infinity {
 

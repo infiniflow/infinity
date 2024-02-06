@@ -17,10 +17,10 @@ module;
 #include <stdexcept>
 #include <string>
 
-module catalog;
+module table_entry;
 
 import stl;
-import parser;
+
 import table_entry_type;
 import third_party;
 import txn;
@@ -28,7 +28,7 @@ import buffer_manager;
 import index_def;
 import block_index;
 import data_access_state;
-
+import internal_types;
 import logger;
 import txn_store;
 import status;
@@ -39,6 +39,10 @@ import iresearch_datastore;
 import index_base;
 import index_full_text;
 import catalog_delta_entry;
+import extra_ddl_info;
+import create_index_info;
+import column_def;
+import data_type;
 
 namespace infinity {
 

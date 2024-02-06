@@ -14,11 +14,11 @@
 
 module;
 
+export module fragment_task;
+
 import stl;
 import profiler;
 import operator_state;
-
-export module fragment_task;
 
 namespace infinity {
 

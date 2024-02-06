@@ -14,15 +14,16 @@
 
 module;
 
+export module merge_knn;
+
 import stl;
-import parser;
+
 import knn_result_handler;
 
 import infinity_exception;
 import bitmask;
 import default_values;
-
-export module merge_knn;
+import internal_types;
 
 namespace infinity {
 

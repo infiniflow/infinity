@@ -4,9 +4,9 @@
 
 module;
 
-import stl;
-
 export module crc;
+
+import stl;
 
 export namespace infinity {
 

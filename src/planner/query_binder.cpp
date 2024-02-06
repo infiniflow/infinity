@@ -19,9 +19,9 @@ module;
 module query_binder;
 
 import stl;
-
+import internal_types;
 import infinity_exception;
-import parser;
+
 import bind_context;
 import join_table_ref;
 import base_table_ref;
@@ -47,13 +47,30 @@ import project_binder;
 import limit_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
-import catalog;
+
 import table_entry_type;
 import block_index;
 import cast_expression;
 import search_expression;
 import status;
 import default_values;
+import base_statement;
+import select_statement;
+import delete_statement;
+import update_statement;
+import parsed_expr;
+import column_expr;
+import knn_expr;
+import column_def;
+import base_table_reference;
+import table_reference;
+import subquery_reference;
+import join_reference;
+import cross_product_reference;
+import data_type;
+
+import base_entry;
+import view_entry;
 
 namespace infinity {
 

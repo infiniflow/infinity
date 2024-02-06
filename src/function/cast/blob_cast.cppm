@@ -18,7 +18,7 @@ import stl;
 import column_vector;
 import vector_buffer;
 import bound_cast_func;
-import parser;
+
 import column_vector_cast;
 
 import infinity_exception;

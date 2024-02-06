@@ -16,21 +16,21 @@ module;
 
 #include <vector>
 
-module catalog;
+module table_index_entry;
 
-import parser;
 import third_party;
 import local_file_system;
 import default_values;
 import random;
 import index_def;
 import index_base;
-import parser;
+
 import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;
 import base_table_ref;
 import iresearch_datastore;
+import create_index_info;
 
 namespace infinity {
 

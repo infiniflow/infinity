@@ -16,17 +16,19 @@ module;
 
 #include <sstream>
 
+module logical_match;
+
 import stl;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
 import match_expression;
-import parser;
+
 import default_values;
 import third_party;
-import catalog;
 
-module logical_match;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

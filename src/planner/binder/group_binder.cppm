@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import base_expression;
 import subquery_expression;
 import bind_context;
@@ -23,6 +23,12 @@ import expression_binder;
 import query_context;
 import function;
 import bind_alias_proxy;
+import parsed_expr;
+import column_expr;
+import constant_expr;
+import function_expr;
+import knn_expr;
+import subquery_expr;
 
 export module group_binder;
 

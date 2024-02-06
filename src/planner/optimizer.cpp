@@ -21,12 +21,12 @@ import column_remapper;
 import column_pruner;
 import lazy_load;
 import secondary_index_scan_builder;
-import parser;
 import explain_logical_plan;
 import optimizer_rule;
 import bound_delete_statement;
 import bound_update_statement;
 import logical_node;
+import explain_statement;
 
 module optimizer;
 

@@ -14,25 +14,25 @@
 
 module;
 
-export module catalog:block_column_entry;
-
-import :base_entry;
+export module block_column_entry;
 
 import stl;
 import buffer_obj;
-import parser;
+import data_type;
 import third_party;
 import buffer_manager;
 import column_vector;
 import local_file_system;
 import vector_buffer;
 import txn;
+import internal_types;
+import base_entry;
 
 namespace infinity {
 
-export struct BlockEntry;
-export struct TableEntry;
-export struct SegmentEntry;
+struct BlockEntry;
+struct TableEntry;
+struct SegmentEntry;
 
 export struct BlockColumnEntry : public BaseEntry {
     friend struct BlockEntry;

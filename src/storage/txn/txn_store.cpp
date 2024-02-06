@@ -20,7 +20,7 @@ module txn_store;
 
 import stl;
 import third_party;
-import parser;
+
 import status;
 import infinity_exception;
 import data_block;
@@ -28,7 +28,10 @@ import logger;
 import data_access_state;
 import txn;
 import default_values;
+import table_entry;
 import catalog;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

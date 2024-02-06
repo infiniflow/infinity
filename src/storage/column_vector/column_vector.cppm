@@ -18,8 +18,9 @@ module;
 #include <concepts>
 #include <sstream>
 
+export module column_vector;
+
 import stl;
-import parser;
 import global_resource_usage;
 import vector_buffer;
 import bitmask;
@@ -29,8 +30,8 @@ import value;
 import third_party;
 import infinity_exception;
 import fix_heap;
-
-export module column_vector;
+import internal_types;
+import data_type;
 
 namespace infinity {
 
@@ -163,7 +164,7 @@ public:
 
     void AppendByPtr(const_ptr_t value_ptr);
 
-    void AppendByStringView(StringView sv, char delimiter);
+    void AppendByStringView(std::string_view sv, char delimiter);
 
     void AppendWith(const ColumnVector &other, SizeT start_row, SizeT count);
 
@@ -200,7 +201,7 @@ private:
     }
 
     template <typename T>
-    void AppendEmbedding(const Vector<StringView> &ele_str_views, SizeT dst_off) {
+    void AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
         for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
             T value = DataType::StringToValue<T>(ele_str_view);
             ((T *)(data_ptr_ + dst_off))[i] = value;

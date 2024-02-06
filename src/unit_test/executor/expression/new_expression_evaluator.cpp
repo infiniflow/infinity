@@ -18,7 +18,7 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
@@ -41,6 +41,10 @@ import data_table;
 import table_def;
 import data_block;
 import default_values;
+import logical_type;
+import internal_types;
+import column_def;
+import data_type;
 
 class ExpressionEvaluatorTest : public BaseTest {};
 

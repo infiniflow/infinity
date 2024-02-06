@@ -23,11 +23,12 @@ import selection;
 import status;
 import infinity_exception;
 import column_vector;
-import parser;
+
 import value;
 import third_party;
 import default_values;
 import serialize;
+import logical_type;
 
 namespace infinity {
 

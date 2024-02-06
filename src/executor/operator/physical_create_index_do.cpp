@@ -15,8 +15,8 @@
 module;
 
 import stl;
-import parser;
-import catalog;
+
+
 import physical_operator_type;
 import physical_operator;
 import query_context;

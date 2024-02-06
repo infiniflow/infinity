@@ -14,17 +14,20 @@
 
 module;
 
+export module physical_drop_index;
+
 import stl;
 
 import physical_operator;
 import physical_operator_type;
 import query_context;
-import parser;
+
 import operator_state;
 import load_meta;
 import infinity_exception;
-
-export module physical_drop_index;
+import internal_types;
+import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

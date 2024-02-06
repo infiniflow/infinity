@@ -19,10 +19,11 @@ export module secondary_index_file_worker;
 import stl;
 import index_file_worker;
 import file_worker;
-import parser;
+
 import index_base;
 import infinity_exception;
 import default_values;
+import column_def;
 
 namespace infinity {
 

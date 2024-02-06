@@ -21,7 +21,7 @@ module;
 module physical_top;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import base_expression;
@@ -35,6 +35,8 @@ import default_values;
 import expression_type;
 import third_party;
 import status;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

@@ -14,24 +14,25 @@
 
 module;
 
+export module analyzer_pool;
+
 import stl;
 import singleton;
 import third_party;
 import analyzer;
-export module analyzer_pool;
 
 namespace infinity {
 
 export class AnalyzerPool : public Singleton<AnalyzerPool> {
 public:
-    using CacheType = FlatHashMap<StringView, UniquePtr<Analyzer>>;
+    using CacheType = FlatHashMap<std::string_view, UniquePtr<Analyzer>>;
 
-    UniquePtr<Analyzer> Get(const StringView &name);
+    UniquePtr<Analyzer> Get(const std::string_view &name);
 
-    void Set(const StringView &name);
+    void Set(const std::string_view &name);
 
 private:
-    CacheType cache_;
+    CacheType cache_{};
 };
 
 } // namespace infinity

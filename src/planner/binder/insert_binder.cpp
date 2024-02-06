@@ -18,7 +18,7 @@ module insert_binder;
 
 import stl;
 import base_expression;
-import parser;
+
 import bind_context;
 import column_expression;
 import function;

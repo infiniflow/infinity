@@ -16,12 +16,15 @@ module;
 
 #include <utility>
 
-export module catalog_iterator:block_column_iter;
+export module block_column_iter;
 
 import stl;
+import buffer_handle;
+import block_column_entry;
 import catalog;
 import buffer_manager;
 import column_vector;
+import block_entry;
 
 namespace infinity {
 

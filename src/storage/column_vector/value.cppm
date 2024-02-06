@@ -13,13 +13,16 @@
 // limitations under the License.
 module;
 
-import parser;
-import stl;
-
-import infinity_exception;
-
 export module value;
 
+
+import stl;
+import type_info;
+import logical_type;
+import infinity_exception;
+import internal_types;
+import embedding_info;
+import data_type;
 
 namespace infinity {
 

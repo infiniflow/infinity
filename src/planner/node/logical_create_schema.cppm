@@ -14,14 +14,15 @@
 
 module;
 
+export module logical_create_schema;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
-
-export module logical_create_schema;
-
+import data_type;
+import internal_types;
+import extra_ddl_info;
 
 namespace infinity {
 

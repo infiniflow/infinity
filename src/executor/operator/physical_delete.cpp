@@ -17,7 +17,7 @@ module;
 #include <string>
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -25,9 +25,10 @@ import physical_operator_type;
 import query_context;
 // import data_table;
 import operator_state;
-
+import logical_type;
 import data_block;
 import column_vector;
+import internal_types;
 
 module physical_delete;
 

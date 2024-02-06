@@ -14,12 +14,13 @@
 
 module;
 
-import stl;
-import catalog;
-import global_block_id;
-import catalog_iterator;
-
 module block_index;
+
+import stl;
+import segment_entry;
+import global_block_id;
+import block_iter;
+import segment_iter;
 
 namespace infinity {
 

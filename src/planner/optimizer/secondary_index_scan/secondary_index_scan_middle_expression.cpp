@@ -17,11 +17,10 @@ module;
 #include <cmath>
 #include <memory>
 #include <string>
-#include <variant>
+
 module secondary_index_scan_middle_expression;
 
 import stl;
-import parser;
 import base_expression;
 import expression_type;
 import expression_state;
@@ -34,6 +33,9 @@ import infinity_exception;
 import value;
 import third_party;
 import secondary_index_data;
+import internal_types;
+import data_type;
+import logical_type;
 
 namespace infinity {
 

@@ -18,7 +18,7 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
@@ -34,6 +34,9 @@ import default_values;
 import data_block;
 import base_expression;
 import column_vector;
+import logical_type;
+import internal_types;
+import data_type;
 
 class GreaterEqualsFunctionsTest : public BaseTest {};
 

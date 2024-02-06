@@ -16,12 +16,9 @@ module;
 
 #include <vector>
 
-module catalog;
-
-import :base_entry;
+module db_meta;
 
 import stl;
-import parser;
 import txn_manager;
 import logger;
 import third_party;

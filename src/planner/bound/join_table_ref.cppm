@@ -14,12 +14,14 @@
 
 module;
 
+export module join_table_ref;
+
 import stl;
-import parser;
+
 import table_ref;
 import base_expression;
-
-export module join_table_ref;
+import table_reference;
+import join_reference;
 
 namespace infinity {
 

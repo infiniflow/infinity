@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_merge_knn;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -26,8 +28,8 @@ import base_table_ref;
 import load_meta;
 import knn_expression;
 import infinity_exception;
-
-export module physical_merge_knn;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

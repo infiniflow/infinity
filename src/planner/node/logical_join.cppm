@@ -14,14 +14,16 @@
 
 module;
 
+export module logical_join;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+import data_type;
 import base_expression;
-
-export module logical_join;
+import internal_types;
+import join_reference;
 
 namespace infinity {
 

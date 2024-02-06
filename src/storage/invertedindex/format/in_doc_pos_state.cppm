@@ -1,9 +1,10 @@
 module;
 
+export module in_doc_pos_state;
+
 import stl;
 import pos_list_format_option;
 import index_defines;
-export module in_doc_pos_state;
 
 namespace infinity {
 

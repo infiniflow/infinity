@@ -1,11 +1,12 @@
 module;
 
+export module pair_value_skiplist_reader;
+
 import stl;
 import byte_slice;
 import byte_slice_reader;
 import skiplist_reader;
 import index_defines;
-export module pair_value_skiplist_reader;
 
 namespace infinity {
 export class PairValueSkipListReader : public SkipListReader {

@@ -14,10 +14,11 @@
 
 module;
 
-import bound_cast_func;
-import parser;
-
 export module cast_function;
+
+import bound_cast_func;
+import data_type;
+import internal_types;
 
 namespace infinity {
 

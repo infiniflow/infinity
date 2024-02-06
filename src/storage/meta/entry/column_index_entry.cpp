@@ -17,7 +17,7 @@ module;
 #include <ctime>
 #include <string>
 
-module catalog;
+module column_index_entry;
 
 import stl;
 import index_base;
@@ -28,12 +28,15 @@ import random;
 import buffer_manager;
 import infinity_exception;
 import index_file_worker;
-import parser;
+
 import catalog_delta_entry;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
 import logger;
+import embedding_info;
+import create_index_info;
+import column_def;
 
 namespace infinity {
 

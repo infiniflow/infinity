@@ -21,7 +21,7 @@ module physical_show;
 import stl;
 import txn;
 import query_context;
-import parser;
+
 import profiler;
 import operator_state;
 import data_block;
@@ -31,7 +31,7 @@ import table_entry_type;
 import value_expression;
 import logical_show;
 import table_detail;
-import catalog;
+
 import value;
 import table_def;
 import data_table;
@@ -53,7 +53,10 @@ import utility;
 import buffer_manager;
 import session_manager;
 import compilation_config;
-import catalog_iterator;
+import logical_type;
+import create_index_info;
+import column_index_entry;
+import segment_iter;
 
 namespace infinity {
 

@@ -14,8 +14,10 @@
 
 module;
 
+export module bind_context;
+
 import stl;
-import parser;
+
 import column_binding;
 import third_party;
 
@@ -25,9 +27,12 @@ import column_identifer;
 import binding;
 import base_expression;
 import block_index;
-import catalog;
-
-export module bind_context;
+import table_entry;
+import internal_types;
+import select_statement;
+import parsed_expr;
+import search_expr;
+import data_type;
 
 namespace infinity {
 

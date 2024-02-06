@@ -14,10 +14,11 @@
 module;
 
 #include <sstream>
-import stl;
-import third_party;
 
 export module profiler;
+
+import stl;
+import third_party;
 
 namespace infinity {
 

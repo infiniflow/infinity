@@ -18,12 +18,16 @@ module order_binder;
 
 import stl;
 import base_expression;
-import parser;
+
 import bind_context;
 import column_expression;
 import third_party;
 import status;
 import infinity_exception;
+import parsed_expr;
+import constant_expr;
+import knn_expr;
+import function_expr;
 
 namespace infinity {
 

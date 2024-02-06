@@ -14,16 +14,18 @@
 
 module;
 
+export module physical_create_index_finish;
+
 import stl;
-import parser;
+
 import physical_operator_type;
 import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
 import index_def;
-
-export module physical_create_index_finish;
+import internal_types;
+import data_type;
 
 namespace infinity {
 export class PhysicalCreateIndexFinish : public PhysicalOperator {

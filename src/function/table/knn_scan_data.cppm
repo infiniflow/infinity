@@ -14,23 +14,25 @@
 
 module;
 
+export module knn_scan_data;
+
 import stl;
 import table_function;
-import parser;
+
 import global_block_id;
 import knn_distance; // delete this
 import block_index;
-import catalog;
+import block_column_entry;
+import segment_column_index_entry;
 import merge_knn;
 import bitmask;
 import data_block;
 import column_vector;
 import base_expression;
 import expression_state;
-
+import knn_expr;
+import statement_common;
 import base_table_ref;
-
-export module knn_scan_data;
 
 namespace infinity {
 

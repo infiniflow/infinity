@@ -25,14 +25,14 @@ import config;
 import stl;
 import buffer_manager;
 import default_values;
-import wal;
+import wal_manager;
 import catalog;
 import txn_manager;
 import builtin_functions;
 import local_file_system;
 import third_party;
 import logger;
-import parser;
+
 import txn;
 import infinity_exception;
 import status;

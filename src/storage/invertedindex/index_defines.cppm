@@ -1,10 +1,11 @@
 module;
 
-import stl;
-import parser;
-import default_values;
-
 export module index_defines;
+
+import stl;
+
+import default_values;
+import internal_types;
 
 namespace infinity {
 

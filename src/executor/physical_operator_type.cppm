@@ -14,9 +14,9 @@
 
 module;
 
-import stl;
-
 export module physical_operator_type;
+
+import stl;
 
 namespace infinity {
 

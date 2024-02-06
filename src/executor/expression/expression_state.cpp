@@ -19,12 +19,11 @@ module;
 module expression_state;
 
 import infinity_exception;
-
 import stl;
 import third_party;
 import column_vector;
 import expression_type;
-
+import logical_type;
 import aggregate_expression;
 import base_expression;
 import case_expression;
@@ -35,8 +34,10 @@ import in_expression;
 import reference_expression;
 import value_expression;
 import status;
-import parser;
+
 import default_values;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

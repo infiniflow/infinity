@@ -14,10 +14,14 @@
 
 module;
 
-import parser;
-import stl;
-
 export module view;
+
+
+import stl;
+import internal_types;
+import select_statement;
+import create_view_info;
+import data_type;
 
 // A view means a logical plan
 namespace infinity {

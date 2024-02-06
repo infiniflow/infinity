@@ -18,7 +18,7 @@ export module ann_ivf_flat;
 
 import stl;
 import knn_distance;
-import parser;
+
 import infinity_exception;
 import index_base;
 import annivfflat_index_data;
@@ -27,6 +27,8 @@ import vector_distance;
 import search_top_k;
 import knn_result_handler;
 import bitmask;
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 

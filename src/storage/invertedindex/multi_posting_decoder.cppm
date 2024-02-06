@@ -1,5 +1,7 @@
 module;
 
+export module multi_posting_decoder;
+
 import stl;
 import byte_slice_reader;
 import memory_pool;
@@ -10,7 +12,6 @@ import in_doc_state_keeper;
 import segment_posting;
 import index_defines;
 import posting_list_format;
-export module multi_posting_decoder;
 
 namespace infinity {
 export class MultiPostingDecoder {

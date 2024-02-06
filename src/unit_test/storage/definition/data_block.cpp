@@ -20,13 +20,20 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import table_def;
 import data_block;
 import default_values;
 import profiler;
 import value;
 import infinity_context;
+import internal_types;
+import logical_type;
+import decimal_info;
+import embedding_info;
+import array_info;
+import knn_expr;
+import data_type;
 
 class DataBlockTest : public BaseTest {};
 

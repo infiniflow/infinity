@@ -26,11 +26,12 @@ import physical_explain;
 import physical_knn_scan;
 import status;
 import infinity_exception;
-import parser;
+
 import explain_fragment;
 import fragment_context;
 import logger;
 import third_party;
+import explain_statement;
 
 namespace infinity {
 

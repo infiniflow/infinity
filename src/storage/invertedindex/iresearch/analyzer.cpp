@@ -28,7 +28,7 @@ constexpr u64 prime = 0x100000001B3ull;
 
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
-void AnalyzerPool::Set(const StringView &name) {
+void AnalyzerPool::Set(const std::string_view &name) {
     IRSAnalyzer *try_analyzer = cache_[name].get();
     if (!try_analyzer) {
         switch (Str2Int(name.data())) {
@@ -50,7 +50,7 @@ void AnalyzerPool::Set(const StringView &name) {
     }
 }
 
-UniquePtr<IRSAnalyzer> AnalyzerPool::Get(const StringView &name) {
+UniquePtr<IRSAnalyzer> AnalyzerPool::Get(const std::string_view &name) {
     IRSAnalyzer *analyzer = cache_[name].get();
     if (!analyzer)
         return nullptr;

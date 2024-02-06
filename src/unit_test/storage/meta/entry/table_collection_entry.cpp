@@ -23,19 +23,25 @@ import global_resource_usage;
 import third_party;
 import logger;
 import table_def;
-import wal;
 import value;
-import parser;
+
 import data_block;
 import default_values;
 import txn_manager;
 import txn;
-import catalog;
+
 import buffer_manager;
 import column_vector;
 import table_entry_type;
 import meta_state;
 import status;
+import internal_types;
+import logical_type;
+import extra_ddl_info;
+import column_def;
+import data_type;
+
+import table_entry;
 
 class TableEntryTest : public BaseTest {
     void SetUp() override {

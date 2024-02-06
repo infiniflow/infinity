@@ -19,10 +19,34 @@ module;
 module explain_ast;
 
 import stl;
-import parser;
+
 import status;
 import infinity_exception;
-
+import base_statement;
+import select_statement;
+import copy_statement;
+import insert_statement;
+import create_statement;
+import drop_statement;
+import show_statement;
+import flush_statement;
+import optimize_statement;
+import parsed_expr;
+import extra_ddl_info;
+import create_schema_info;
+import create_table_info;
+import create_index_info;
+import create_collection_info;
+import drop_collection_info;
+//import drop_index_info;
+import drop_schema_info;
+import drop_table_info;
+import base_table_reference;
+import cross_product_reference;
+import join_reference;
+import subquery_reference;
+import table_reference;
+import statement_common;
 
 namespace infinity {
 

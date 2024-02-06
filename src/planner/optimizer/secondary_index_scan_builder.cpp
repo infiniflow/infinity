@@ -41,8 +41,9 @@ import scalar_function_set;
 import catalog;
 import cast_expression;
 import column_expression;
-import parser;
 import secondary_index_scan_execute_expression;
+import column_index_entry;
+import create_index_info;
 
 namespace infinity {
 

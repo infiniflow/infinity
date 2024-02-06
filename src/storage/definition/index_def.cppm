@@ -14,11 +14,11 @@
 
 module;
 
+export module index_def;
+
 import stl;
 import third_party;
 import index_base;
-
-export module index_def;
 
 namespace infinity {
 

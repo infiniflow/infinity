@@ -14,18 +14,19 @@
 
 module;
 
+export module interval_cast;
+
 import stl;
 import column_vector;
 import vector_buffer;
 import bound_cast_func;
-import parser;
 import column_vector_cast;
-
+import logical_type;
 import infinity_exception;
 import third_party;
 // import logger;
-
-export module interval_cast;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

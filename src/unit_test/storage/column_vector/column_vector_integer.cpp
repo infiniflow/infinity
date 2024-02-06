@@ -15,11 +15,12 @@
 #include "unit_test/base_test.h"
 
 import infinity_exception;
-
+import internal_types;
+import logical_type;
 import logger;
 import column_vector;
 import value;
-import parser;
+
 import default_values;
 import third_party;
 import stl;
@@ -27,6 +28,7 @@ import selection;
 import vector_buffer;
 import global_resource_usage;
 import infinity_context;
+import data_type;
 
 class ColumnVectorIntegerTest : public BaseTest {};
 

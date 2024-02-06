@@ -14,11 +14,12 @@
 
 module;
 
-import parser;
+export module hash_table;
+
 import stl;
 import column_vector;
-
-export module hash_table;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

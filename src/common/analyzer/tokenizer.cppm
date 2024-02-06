@@ -14,9 +14,10 @@
 
 module;
 
+export module tokenizer;
+
 import stl;
 import term;
-export module tokenizer;
 
 namespace infinity {
 constexpr unsigned BYTE_MAX = 255;

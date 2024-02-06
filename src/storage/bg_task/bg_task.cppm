@@ -18,7 +18,7 @@ import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
-import parser;
+
 
 export module bg_task;
 

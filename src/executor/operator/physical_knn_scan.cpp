@@ -20,7 +20,7 @@ module physical_knn_scan;
 
 import stl;
 import query_context;
-import parser;
+
 import logger;
 import operator_state;
 import global_block_id;
@@ -33,10 +33,8 @@ import knn_distance;
 import third_party;
 import txn;
 import infinity_exception;
-import catalog;
-import catalog_iterator;
 import default_values;
-
+import segment_iter;
 import knn_expression;
 import column_expression;
 
@@ -65,6 +63,12 @@ import knn_expression;
 import value;
 import status;
 import buffer_obj;
+import create_index_info;
+import knn_expr;
+
+import block_entry;
+import column_index_entry;
+import segment_entry;
 
 namespace infinity {
 

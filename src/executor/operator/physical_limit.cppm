@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -25,6 +25,8 @@ import value_expression;
 import data_table;
 import load_meta;
 import infinity_exception;
+import internal_types;
+import data_type;
 
 export module physical_limit;
 

@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_import;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -23,13 +25,16 @@ import physical_operator_type;
 import third_party;
 import txn;
 import txn_store;
-import catalog;
+import table_entry;
+import segment_entry;
+import block_entry;
 import zsv;
 import load_meta;
 import infinity_exception;
 import column_vector;
-
-export module physical_import;
+import internal_types;
+import statement_common;
+import data_type;
 
 namespace infinity {
 

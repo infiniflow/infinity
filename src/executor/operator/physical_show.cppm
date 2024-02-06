@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_show;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -24,8 +26,9 @@ import base_expression;
 import logical_show;
 import load_meta;
 import infinity_exception;
-
-export module physical_show;
+import internal_types;
+import column_def;
+import data_type;
 
 namespace infinity {
 

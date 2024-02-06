@@ -14,16 +14,15 @@
 
 module;
 
-#include <variant>
 export module secondary_index_scan_execute_expression;
 
 import stl;
-import parser;
 import value;
 import base_expression;
 import infinity_exception;
 import secondary_index_data;
 import secondary_index_scan_middle_expression;
+import internal_types;
 import third_party;
 
 namespace infinity {

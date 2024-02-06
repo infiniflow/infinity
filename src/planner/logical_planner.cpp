@@ -20,7 +20,7 @@ module logical_planner;
 
 import stl;
 import bind_context;
-import parser;
+
 
 import infinity_exception;
 import query_binder;
@@ -60,7 +60,7 @@ import explain_logical_plan;
 import explain_ast;
 
 import local_file_system;
-import parser;
+
 import index_def;
 import status;
 import default_values;
@@ -71,7 +71,20 @@ import index_secondary;
 import index_full_text;
 import base_table_ref;
 import table_ref;
-import catalog;
+import logical_type;
+
+import extra_ddl_info;
+import create_schema_info;
+import create_table_info;
+import create_index_info;
+import create_collection_info;
+import create_view_info;
+import drop_collection_info;
+import drop_index_info;
+import drop_schema_info;
+import drop_table_info;
+import drop_view_info;
+import column_def;
 
 namespace {
 

@@ -16,16 +16,18 @@ module;
 
 #include <sstream>
 
+module logical_knn_scan;
+
 import stl;
 import base_table_ref;
 import column_binding;
 import logical_node_type;
 import knn_expression;
-import parser;
-import default_values;
-import catalog;
 
-module logical_knn_scan;
+import default_values;
+
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

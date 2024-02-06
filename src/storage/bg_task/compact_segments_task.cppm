@@ -18,13 +18,14 @@ export module compact_segments_task;
 
 import stl;
 import bg_task;
-import catalog;
-import parser;
+import segment_entry;
+
 import default_values;
 import infinity_exception;
 import txn;
 import global_block_id;
 import base_table_ref;
+import internal_types;
 
 namespace infinity {
 

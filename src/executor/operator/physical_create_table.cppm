@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_create_table;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -24,8 +26,9 @@ import index_def;
 import table_def;
 import load_meta;
 import infinity_exception;
-
-export module physical_create_table;
+import internal_types;
+import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

@@ -17,14 +17,15 @@ module;
 export module create_index_data;
 
 import stl;
-import catalog;
+import segment_entry;
 import block_index;
 
 namespace infinity {
 
 export struct CreateIndexSharedData {
-    CreateIndexSharedData(BlockIndex *block_index)  {
-        for (auto i = 0; i < block_index->segments_.size(); ++i) {
+    explicit CreateIndexSharedData(BlockIndex *block_index) {
+        SizeT segment_count = block_index->segments_.size();
+        for (SizeT i = 0; i < segment_count; ++i) {
             create_index_idxes_.emplace(block_index->segments_[i]->segment_id(), 0);
         }
     }

@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_create_view;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -23,8 +25,9 @@ import physical_operator_type;
 import index_def;
 import load_meta;
 import infinity_exception;
-
-export module physical_create_view;
+import internal_types;
+import create_view_info;
+import data_type;
 
 namespace infinity {
 

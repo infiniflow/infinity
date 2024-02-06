@@ -16,10 +16,13 @@ module;
 
 #include "type/complex/varchar.h"
 #include <sstream>
+
+module column_vector;
+
 import stl;
 import selection;
-import parser;
 
+import type_info;
 import infinity_exception;
 import default_values;
 import bitmask;
@@ -29,11 +32,13 @@ import serialize;
 import third_party;
 import logger;
 import value;
-import catalog;
+
 import buffer_manager;
 import status;
+import logical_type;
+import embedding_info;
 
-module column_vector;
+import block_column_entry;
 
 namespace infinity {
 
@@ -1163,12 +1168,12 @@ void ColumnVector::AppendByPtr(const_ptr_t value_ptr) {
 }
 
 namespace {
-Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
+Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
         RecoverableError(Status::ImportFileFormatError("Embedding data must be surrounded by [ and ]"));
     }
-    Vector<StringView> ret;
+    Vector<std::string_view> ret;
     SizeT i = 1, j = 1;
     while (true) {
         if (data[i] == delimiter || data[i] == ' ' || i == data_size - 1) {
@@ -1187,7 +1192,7 @@ Vector<StringView> SplitArrayElement(StringView data, char delimiter) {
 
 } // namespace
 
-void ColumnVector::AppendByStringView(StringView sv, char delimiter) {
+void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
     SizeT index = tail_index_++;
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1236,7 +1241,7 @@ void ColumnVector::AppendByStringView(StringView sv, char delimiter) {
         }
         case kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
-            Vector<StringView> ele_str_views = SplitArrayElement(sv, delimiter);
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             if (embedding_info->Dimension() < ele_str_views.size()) {
                 RecoverableError(Status::ImportFileFormatError("Embedding data size exceeds dimension."));
             }

@@ -16,7 +16,7 @@ module;
 
 import logical_node;
 import stl;
-import parser;
+
 import query_context;
 import bound_select_statement;
 import bind_context;
@@ -26,6 +26,16 @@ import binding;
 import bind_alias_proxy;
 import bound_delete_statement;
 import bound_update_statement;
+import select_statement;
+import delete_statement;
+import update_statement;
+import parsed_expr;
+import knn_expr;
+import table_reference;
+import base_table_reference;
+import subquery_reference;
+import join_reference;
+import cross_product_reference;
 
 export module query_binder;
 

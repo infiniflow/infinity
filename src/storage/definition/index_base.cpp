@@ -26,8 +26,9 @@ import index_hnsw;
 import index_full_text;
 import index_secondary;
 import third_party;
-import parser;
+
 import infinity_exception;
+import create_index_info;
 
 namespace infinity {
 

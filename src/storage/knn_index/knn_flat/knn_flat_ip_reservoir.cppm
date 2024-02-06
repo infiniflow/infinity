@@ -14,17 +14,19 @@
 
 module;
 
+export module knn_flat_ip_reservoir;
+
 import stl;
 import knn_result_handler;
 import bitmask;
 import knn_distance;
-import parser;
+
 
 import infinity_exception;
 import default_values;
 import vector_distance;
-
-export module knn_flat_ip_reservoir;
+import knn_expr;
+import internal_types;
 
 namespace infinity {
 

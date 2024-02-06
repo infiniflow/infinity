@@ -14,21 +14,26 @@
 
 module;
 
+export module having_binder;
+
 import stl;
-import parser;
+
 import base_expression;
 import bind_context;
 import expression_binder;
 import query_context;
 import bind_alias_proxy;
-
-export module having_binder;
+import parsed_expr;
+import column_expr;
+import function_expr;
+import knn_expr;
 
 namespace infinity {
 
 export class HavingBinder final : public ExpressionBinder {
 public:
-    explicit HavingBinder(QueryContext *query_context, const SharedPtr<BindAliasProxy> &bind_alias_proxy)
+    explicit
+        HavingBinder(QueryContext *query_context, const SharedPtr<BindAliasProxy> &bind_alias_proxy)
         : ExpressionBinder(query_context), bind_alias_proxy_(bind_alias_proxy) {}
 
     // Bind expression entry

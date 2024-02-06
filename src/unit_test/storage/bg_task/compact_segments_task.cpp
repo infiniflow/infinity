@@ -27,13 +27,20 @@ import txn;
 import buffer_manager;
 import txn_manager;
 import column_vector;
-import parser;
+
 import table_def;
 import value;
 import physical_import;
 import default_values;
 import infinity_exception;
 import base_table_ref;
+import logical_type;
+import internal_types;
+import extra_ddl_info;
+import column_def;
+import data_type;
+import segment_entry;
+import block_entry;
 
 using namespace infinity;
 

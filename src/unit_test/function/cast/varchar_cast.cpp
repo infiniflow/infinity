@@ -18,12 +18,12 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
-import catalog;
-import parser;
+
+
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -33,6 +33,9 @@ import value;
 import default_values;
 import data_block;
 import varchar_cast;
+import internal_types;
+import logical_type;
+import data_type;
 
 class VarcharTest : public BaseTest {};
 

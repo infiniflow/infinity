@@ -19,10 +19,14 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
+import embedding_info;
+import knn_expr;
+import parser_assert;
+import parser_defaults;
 
 class EmbeddingInfoTest : public BaseTest {};
 

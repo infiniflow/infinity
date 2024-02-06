@@ -16,7 +16,7 @@ module;
 
 #include <fstream>
 
-module wal;
+module wal_entry;
 
 import crc;
 import serialize;
@@ -26,8 +26,9 @@ import index_def;
 import infinity_exception;
 
 import stl;
-import parser;
+
 import third_party;
+import internal_types;
 
 namespace infinity {
 

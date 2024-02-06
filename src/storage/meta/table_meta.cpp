@@ -16,13 +16,11 @@ module;
 
 #include <vector>
 
-module catalog;
-
-import :base_entry;
+module table_meta;
 
 import stl;
 import table_entry_type;
-import parser;
+
 import logger;
 import default_values;
 import third_party;
@@ -34,6 +32,7 @@ import catalog_delta_entry;
 import third_party;
 import status;
 import infinity_exception;
+import column_def;
 
 namespace infinity {
 

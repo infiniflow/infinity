@@ -14,7 +14,7 @@
 
 #include "data_type.h"
 #include "info/bitmap_info.h"
-#include "serializable.h"
+#include "serialize.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"

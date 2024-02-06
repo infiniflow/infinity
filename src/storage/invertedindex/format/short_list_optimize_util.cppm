@@ -1,8 +1,9 @@
 module;
 
+export module short_list_optimize_util;
+
 import index_defines;
 import stl;
-export module short_list_optimize_util;
 
 namespace infinity {
 export class ShortListOptimizeUtil {

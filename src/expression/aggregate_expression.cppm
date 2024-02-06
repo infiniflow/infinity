@@ -14,13 +14,14 @@
 
 module;
 
+export module aggregate_expression;
+
 import column_binding;
 import base_expression;
-import parser;
+import data_type;
 import stl;
 import aggregate_function;
-
-export module aggregate_expression;
+import internal_types;
 
 namespace infinity {
 

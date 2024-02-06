@@ -14,16 +14,17 @@
 
 module;
 
-import stl;
-import parser;
-import column_vector_cast;
+export module time_cast;
 
+import stl;
+import column_vector_cast;
+import logical_type;
 import infinity_exception;
 import bound_cast_func;
 import column_vector;
 import third_party;
-
-export module time_cast;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

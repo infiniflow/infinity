@@ -14,17 +14,20 @@
 
 module;
 
+module physical_create_collection;
+
 import stl;
 import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import load_meta;
-
-module physical_create_collection;
+import internal_types;
+import extra_ddl_info;
+import data_type;
 
 namespace infinity {
 

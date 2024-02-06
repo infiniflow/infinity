@@ -16,11 +16,13 @@ module;
 
 #include <sstream>
 
+module logical_drop_view;
+
 import stl;
 import column_binding;
-import parser;
 
-module logical_drop_view;
+import logical_type;
+import internal_types;
 
 namespace infinity {
 

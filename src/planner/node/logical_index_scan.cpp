@@ -23,7 +23,6 @@ import stl;
 import logical_node_type;
 import logical_node;
 import column_binding;
-import parser;
 import base_table_ref;
 import catalog;
 import default_values;
@@ -31,6 +30,7 @@ import base_expression;
 import function_expression;
 import cast_expression;
 import column_expression;
+import logical_type;
 
 namespace infinity {
 

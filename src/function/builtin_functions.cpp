@@ -14,6 +14,8 @@
 
 module;
 
+module builtin_functions;
+
 import stl;
 import catalog;
 import avg;
@@ -47,10 +49,10 @@ import substring;
 import substract;
 
 import special_function;
+import internal_types;
+import data_type;
 
-import parser;
-
-module builtin_functions;
+import logical_type;
 
 namespace infinity {
 

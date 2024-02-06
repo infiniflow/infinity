@@ -15,7 +15,8 @@
 module;
 
 #include <vector>
-module catalog;
+
+module segment_column_index_entry;
 
 import stl;
 import buffer_manager;
@@ -24,7 +25,7 @@ import buffer_obj;
 import logger;
 import third_party;
 import infinity_exception;
-
+import logical_type;
 import index_file_worker;
 import status;
 import index_base;
@@ -39,7 +40,13 @@ import catalog_delta_entry;
 import column_vector;
 import annivfflat_index_data;
 import secondary_index_data;
-import catalog_iterator;
+import type_info;
+import embedding_info;
+import create_index_info;
+import column_def;
+import block_column_entry;
+import default_values;
+import segment_iter;
 
 namespace infinity {
 

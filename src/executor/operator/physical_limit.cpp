@@ -25,7 +25,7 @@ import query_context;
 import table_def;
 import data_table;
 import default_values;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import data_block;

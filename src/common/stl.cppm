@@ -181,6 +181,20 @@ using std::unordered_set;
 
 using std::back_inserter;
 using std::hash;
+
+using std::string_view;
+using std::streamsize;
+
+using std::variant;
+using std::holds_alternative;
+using std::get;
+using std::visit;
+
+using std::is_integral_v;
+using std::is_floating_point_v;
+
+using std::monostate;
+
 } // namespace std
 
 namespace infinity {
@@ -249,8 +263,6 @@ export {
 
     using String = std::basic_string<char>;
 
-    using StringView = std::string_view;
-
     inline bool IsEqual(const String &s1, const String &s2) { return s1 == s2; }
 
     inline bool IsEqual(const String &s1, const char *s2) { return s1 == s2; }
@@ -307,8 +319,6 @@ export {
     using const_ptr_t = const char *;
     using char_t = char;
     using SizeT = u64;
-
-    using StreamSize = std::streamsize;
 
     // Transactions
     using TxnTimeStamp = uint64_t;

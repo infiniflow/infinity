@@ -16,14 +16,15 @@ module;
 
 #include <typeinfo>
 
-export module wal:wal_entry;
+export module wal_entry;
 
 import table_def;
 import index_def;
 import data_block;
 import stl;
-import parser;
+
 import infinity_exception;
+import internal_types;
 
 namespace infinity {
 
@@ -299,10 +300,10 @@ public:
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    WalEntryIterator(Vector<char> &&buf, StreamSize wal_size) : buf_(std::move(buf)), wal_size_(wal_size) { end_ = buf_.data() + wal_size_; }
+    WalEntryIterator(Vector<char> &&buf, std::streamsize wal_size) : buf_(std::move(buf)), wal_size_(wal_size) { end_ = buf_.data() + wal_size_; }
 
     Vector<char> buf_{};
-    StreamSize wal_size_{};
+    std::streamsize wal_size_{};
     char *end_{};
 };
 

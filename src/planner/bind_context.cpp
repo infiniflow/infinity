@@ -17,7 +17,7 @@ module;
 module bind_context;
 
 import stl;
-import parser;
+
 import binding;
 import third_party;
 import status;
@@ -25,8 +25,9 @@ import infinity_exception;
 import base_expression;
 import column_expression;
 import column_identifer;
-import catalog;
+
 import block_index;
+import column_expr;
 
 namespace infinity {
 

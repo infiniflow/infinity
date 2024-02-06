@@ -17,7 +17,7 @@ module;
 #include <sstream>
 import stl;
 import function;
-import parser;
+
 import query_context;
 
 module table_function;

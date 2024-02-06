@@ -16,9 +16,11 @@
 
 import infinity_exception;
 import stl;
-import parser;
+
 import ann_ivf_flat;
 import bitmask;
+import knn_expr;
+import internal_types;
 
 class AnnIVFFlatL2Test : public BaseTest {};
 

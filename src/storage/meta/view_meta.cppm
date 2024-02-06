@@ -14,13 +14,12 @@
 
 module;
 
-export module catalog:view_meta;
-
-import :base_entry;
+export module view_meta;
 
 import stl;
-import parser;
+import base_entry;
 import status;
+import column_def;
 
 namespace infinity {
 
@@ -34,15 +33,13 @@ public:
 
 public:
     static Status CreateNewEntry(ViewMeta *table_meta,
-                                      const SharedPtr<String> &view_name,
-                                      const Vector<SharedPtr<ColumnDef>> &columns,
-                                      TransactionID txn_id,
-                                      TxnTimeStamp begin_ts,
-                                      TxnManager *txn_mgr);
+                                 const SharedPtr<String> &view_name,
+                                 const Vector<SharedPtr<ColumnDef>> &columns,
+                                 TransactionID txn_id,
+                                 TxnTimeStamp begin_ts,
+                                 TxnManager *txn_mgr);
 
     static SharedPtr<String> ToString(ViewMeta *table_meta);
-
-
 
 private:
     Status DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name);
@@ -52,7 +49,7 @@ private:
     Status GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     inline void *GetDBEntry() { return this->db_entry_; }
-    
+
 private:
     std::shared_mutex rw_locker_{};
     SharedPtr<String> view_name_{};

@@ -14,18 +14,20 @@
 
 module;
 
+export module physical_update;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import catalog;
+import table_entry;
 import base_expression;
 import load_meta;
 import infinity_exception;
-
-export module physical_update;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

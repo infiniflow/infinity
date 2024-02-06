@@ -20,10 +20,12 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import knn_flat_ip;
 import infinity_context;
 import bitmask;
+import knn_expr;
+import internal_types;
 
 class KnnFlatIpTest : public BaseTest {};
 

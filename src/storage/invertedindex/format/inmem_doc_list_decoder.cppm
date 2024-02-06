@@ -1,5 +1,7 @@
 module;
 
+export module inmem_doc_list_decoder;
+
 import stl;
 import memory_pool;
 import buffered_byte_slice;
@@ -7,8 +9,6 @@ import buffered_byte_slice_reader;
 import index_decoder;
 import skiplist_reader;
 import index_defines;
-
-export module inmem_doc_list_decoder;
 
 namespace infinity {
 

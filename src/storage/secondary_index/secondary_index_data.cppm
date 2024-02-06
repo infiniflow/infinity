@@ -19,16 +19,19 @@ module;
 export module secondary_index_data;
 
 import stl;
-import parser;
+
 import default_values;
 import file_system;
 import file_system_type;
 import infinity_exception;
 import column_vector;
 import third_party;
-import catalog;
 import buffer_manager;
 import secondary_index_pgm;
+import logical_type;
+import internal_types;
+import data_type;
+import segment_entry;
 
 namespace infinity {
 

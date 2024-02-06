@@ -15,11 +15,13 @@
 module;
 
 #include <sstream>
-import stl;
-import expression_type;
-import parser;
 
 module correlated_column_expression;
+
+import stl;
+import expression_type;
+import data_type;
+import internal_types;
 
 namespace infinity {
 

@@ -18,10 +18,19 @@ import infinity_exception;
 
 import global_resource_usage;
 import third_party;
-import parser;
+
 import logger;
 import stl;
 import infinity_context;
+import internal_types;
+import logical_type;
+import type_info;
+import bitmap_info;
+import decimal_info;
+import embedding_info;
+import knn_expr;
+import internal_types;
+import data_type;
 
 class DataTypeTest : public BaseTest {};
 

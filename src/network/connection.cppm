@@ -14,6 +14,8 @@
 
 module;
 
+export module connection;
+
 import boost;
 import stl;
 import session;
@@ -21,8 +23,6 @@ import pg_protocol_handler;
 import query_context;
 import data_table;
 import query_result;
-
-export module connection;
 
 namespace infinity {
 

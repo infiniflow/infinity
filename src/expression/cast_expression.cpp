@@ -14,16 +14,16 @@
 
 module;
 
-import parser;
-import base_expression;
+module cast_expression;
 
+
+import base_expression;
+import logical_type;
 import infinity_exception;
 import bound_cast_func;
 import stl;
 import third_party;
 import cast_function;
-
-module cast_expression;
 
 namespace infinity {
 

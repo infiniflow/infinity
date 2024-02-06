@@ -19,7 +19,7 @@ import stl;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import operator_state;
 import expression_evaluator;
 import expression_state;

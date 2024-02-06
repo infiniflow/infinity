@@ -19,7 +19,7 @@ module physical_merge_knn;
 import stl;
 import txn;
 import query_context;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import logger;
@@ -31,7 +31,7 @@ import merge_knn;
 import block_index;
 import buffer_manager;
 import third_party;
-import catalog;
+import block_entry;
 import default_values;
 import data_block;
 import knn_expression;

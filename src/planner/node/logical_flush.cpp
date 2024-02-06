@@ -16,11 +16,12 @@ module;
 
 #include <sstream>
 
-import stl;
-import parser;
-import column_binding;
-
 module logical_flush;
+
+import stl;
+
+import column_binding;
+import internal_types;
 
 namespace infinity {
 

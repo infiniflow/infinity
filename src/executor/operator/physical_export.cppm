@@ -14,16 +14,19 @@
 
 module;
 
+export module physical_export;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
 import load_meta;
 import infinity_exception;
-
-export module physical_export;
+import internal_types;
+import statement_common;
+import data_type;
 
 namespace infinity {
 

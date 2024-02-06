@@ -15,12 +15,23 @@
 module;
 
 import stl;
-import parser;
+
 import function;
 import bind_context;
 import base_expression;
 import query_context;
 import subquery_expression;
+import parsed_expr;
+import column_expr;
+import constant_expr;
+import between_expr;
+import function_expr;
+import case_expr;
+import in_expr;
+import knn_expr;
+import search_expr;
+import subquery_expr;
+import cast_expr;
 
 export module expression_binder;
 

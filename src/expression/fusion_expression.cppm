@@ -14,11 +14,14 @@
 
 module;
 
+export module fusion_expression;
+
 import stl;
 import base_expression;
-import parser;
-
-export module fusion_expression;
+import data_type;
+import logical_type;
+import internal_types;
+import search_options;
 
 namespace infinity {
 
@@ -26,7 +29,7 @@ export class FusionExpression : public BaseExpression {
 public:
     FusionExpression(const String &method, SharedPtr<SearchOptions> options);
 
-    inline DataType Type() const override { return DataType(LogicalType::kFloat); }
+    [[nodiscard]] inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
     String ToString() const override;
 

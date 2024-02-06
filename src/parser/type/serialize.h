@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include <concepts>
 #include <cstdint>
 #include <cstring>
@@ -20,7 +22,7 @@
 #include <vector>
 
 namespace infinity {
-using String = std::string;
+//using String = std::string;
 
 template <typename T>
 concept POD = std::is_trivial_v<T> && std::is_standard_layout_v<T>;
@@ -32,7 +34,7 @@ inline int32_t GetSizeInBytes(const T &) {
 }
 
 template <>
-inline int32_t GetSizeInBytes(const String &value) {
+inline int32_t GetSizeInBytes(const std::string &value) {
     return sizeof(int32_t) + value.length();
 }
 
@@ -54,16 +56,16 @@ inline T ReadBufAdv(char *&buf) {
 }
 
 template <>
-inline String ReadBuf<String>(char *const buf) {
+inline std::string ReadBuf<std::string>(char *const buf) {
     int32_t size = ReadBuf<int32_t>(buf);
-    String str(buf + sizeof(int32_t), size);
+    std::string str(buf + sizeof(int32_t), size);
     return str;
 }
 
 template <>
-inline String ReadBufAdv<String>(char *&buf) {
+inline std::string ReadBufAdv<std::string>(char *&buf) {
     int32_t size = ReadBufAdv<int32_t>(buf);
-    String str(buf, size);
+    std::string str(buf, size);
     buf += size;
     return str;
 }
@@ -84,14 +86,14 @@ inline void WriteBufAdv(char *&buf, const T &value) {
 }
 
 template <>
-inline void WriteBuf<String>(char *const buf, const String &value) {
+inline void WriteBuf<std::string>(char *const buf, const std::string &value) {
     int32_t len = value.length();
     WriteBuf(buf, len);
     memcpy(buf + len, value.c_str(), len);
 }
 
 template <>
-inline void WriteBufAdv<String>(char *&buf, const String &value) {
+inline void WriteBufAdv<std::string>(char *&buf, const std::string &value) {
     int32_t len = value.length();
     WriteBufAdv(buf, len);
     memcpy(buf, value.c_str(), len);

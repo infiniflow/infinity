@@ -14,8 +14,12 @@
 
 module;
 
-export module catalog_iterator;
+#include "column_expr.h"
 
-export import :segment_iter;
-export import :block_iter;
-export import :block_column_iter;
+export module column_expr;
+
+namespace infinity {
+
+export using infinity::ColumnExpr;
+
+}

@@ -14,8 +14,10 @@
 
 module;
 
+export module physical_insert;
+
 import stl;
-import parser;
+
 import query_context;
 import operator_state;
 import physical_operator;
@@ -23,9 +25,9 @@ import physical_operator_type;
 import base_expression;
 import load_meta;
 import infinity_exception;
-import catalog;
-
-export module physical_insert;
+import table_entry;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

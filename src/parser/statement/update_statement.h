@@ -15,7 +15,7 @@
 #pragma once
 
 #include "base_statement.h"
-#include "expr/expr.h"
+#include "expr/parsed_expr.h"
 #include <vector>
 
 namespace infinity {

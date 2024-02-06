@@ -14,16 +14,18 @@
 
 module;
 
+export module plan_fragment;
+
 import stl;
-import parser;
+
 import data_table;
 import fragment_context;
 import physical_operator;
 import physical_source;
 import physical_sink;
 import query_context;
-
-export module plan_fragment;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

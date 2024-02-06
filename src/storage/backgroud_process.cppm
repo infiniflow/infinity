@@ -14,7 +14,7 @@
 
 module;
 
-import wal;
+import wal_manager;
 import blocking_queue;
 import bg_task;
 import stl;

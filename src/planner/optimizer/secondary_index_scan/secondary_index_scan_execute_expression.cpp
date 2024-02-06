@@ -15,18 +15,18 @@
 module;
 
 #include <concepts>
-#include <variant>
 #include <vector>
+
 module secondary_index_scan_execute_expression;
 
 import stl;
-import parser;
 import value;
 import base_expression;
 import infinity_exception;
 import secondary_index_data;
 import secondary_index_scan_middle_expression;
 import third_party;
+import logical_type;
 
 namespace infinity {
 

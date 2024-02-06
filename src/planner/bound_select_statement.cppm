@@ -21,10 +21,11 @@ import stl;
 import bind_context;
 import logical_node;
 import table_ref;
-import parser;
+
 import query_context;
 import search_expression;
 import knn_expression;
+import select_statement;
 
 export module bound_select_statement;
 

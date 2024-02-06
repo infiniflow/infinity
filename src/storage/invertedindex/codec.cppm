@@ -1,8 +1,8 @@
 module;
 
-import stl;
-
 export module codec;
+
+import stl;
 
 namespace infinity {
 

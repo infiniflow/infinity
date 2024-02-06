@@ -20,9 +20,11 @@ import stl;
 import global_resource_usage;
 import third_party;
 import logger;
-import parser;
+
 import knn_flat_l2_reservoir;
 import infinity_context;
+import knn_expr;
+import internal_types;
 
 class KnnFlatL2ReservoirTest : public BaseTest {};
 

@@ -19,7 +19,7 @@ module;
 #include <string>
 #include <vector>
 
-module catalog;
+module segment_entry;
 
 import stl;
 import third_party;
@@ -35,13 +35,12 @@ import buffer_handle;
 import logger;
 import local_file_system;
 import random;
-import parser;
-import txn_store;
 
+import txn_store;
+import segment_iter;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
-import catalog_iterator;
 
 namespace infinity {
 

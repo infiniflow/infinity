@@ -1,10 +1,10 @@
 module;
 
+export module specific_concurrent_queue;
+
 import stl;
 import buffer_obj;
 import third_party;
-
-export module specific_concurrent_queue;
 
 namespace infinity {
 

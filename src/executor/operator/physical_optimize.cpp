@@ -21,7 +21,7 @@ module physical_optimize;
 import stl;
 import txn;
 import query_context;
-import parser;
+
 import operator_state;
 import infinity_exception;
 import table_def;
@@ -30,7 +30,7 @@ import status;
 import logger;
 import iresearch_datastore;
 import base_table_ref;
-import catalog;
+import irs_index_entry;
 
 namespace infinity {
 

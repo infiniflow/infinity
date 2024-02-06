@@ -23,8 +23,8 @@
 #include "search/boolean_filter.hpp"
 
 namespace infinity {
-QueryDriver::QueryDriver(const std::map<std::string, std::string> &field2analyzer_, const std::string &default_field_)
-    : default_field(default_field_), field2analyzer(field2analyzer_) {}
+QueryDriver::QueryDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
+    : default_field_(default_field), field2analyzer_(field2analyzer) {}
 
 QueryDriver::~QueryDriver() = default;
 
@@ -72,22 +72,22 @@ int QueryDriver::ParseSingleWithFields(const std::string &fields_str, const std:
         return -1;
     } else if (fields.size() == 1) {
         auto it = fields.begin();
-        default_field = it->first;
+        default_field_ = it->first;
         rc = ParseSingle(query);
         if (rc != 0)
             return rc;
-        result->boost(it->second);
+        result_->boost(it->second);
     } else {
         auto flt = std::make_unique<irs::Or>();
         for (auto &field_boost : fields) {
-            default_field = field_boost.first;
+            default_field_ = field_boost.first;
             rc = ParseSingle(query);
             if (rc != 0)
                 return rc;
-            result->boost(field_boost.second);
-            flt->add(std::move(result));
+            result_->boost(field_boost.second);
+            flt->add(std::move(result_));
         }
-        result = std::move(flt);
+        result_ = std::move(flt);
     }
     return 0;
 }
@@ -124,15 +124,15 @@ int QueryDriver::ParseSingle(const std::string &query) {
 
 int QueryDriver::parse_helper(std::istream &stream) {
     try {
-        scanner = std::make_unique<QueryScanner>(&stream);
-        parser = std::make_unique<QueryParser>((*scanner) /* scanner */, (*this) /* driver */);
+        scanner_ = std::make_unique<QueryScanner>(&stream);
+        parser_ = std::make_unique<QueryParser>((*scanner_) /* scanner */, (*this) /* driver */);
     } catch (std::bad_alloc &ba) {
         std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
         return -1;
     }
 
     const int accept(0);
-    if (parser->parse() != accept) {
+    if (parser_->parse() != accept) {
         return -1;
     }
     return 0;
@@ -143,8 +143,8 @@ void QueryDriver::Analyze(const std::string &field, const std::string &text, std
         terms.push_back(text);
         return;
     }
-    auto it = field2analyzer.find(field);
-    if (it == field2analyzer.end()) {
+    auto it = field2analyzer_.find(field);
+    if (it == field2analyzer_.end()) {
         terms.push_back(text);
         return;
     }

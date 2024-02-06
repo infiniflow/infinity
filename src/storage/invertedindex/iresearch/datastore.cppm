@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import parser;
+
 import iresearch_document;
 import iresearch_analyzer;
 import third_party;
@@ -24,9 +24,12 @@ import operator_state;
 import column_vector;
 import query_context;
 import index_def;
-import catalog;
+import table_entry;
+import segment_entry;
 import buffer_manager;
 import default_values;
+import internal_types;
+import match_expr;
 
 export module iresearch_datastore;
 

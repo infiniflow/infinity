@@ -16,12 +16,13 @@ module;
 
 #include <sstream>
 
+module logical_insert;
+
 import stl;
 import column_binding;
-import parser;
-import catalog;
 
-module logical_insert;
+
+import internal_types;
 
 namespace infinity {
 

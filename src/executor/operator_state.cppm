@@ -24,12 +24,15 @@ import data_block;
 import table_scan_function_data;
 import knn_scan_data;
 import table_def;
-import parser;
+
 import merge_knn_data;
 import create_index_data;
 import blocking_queue;
 import expression_state;
 import status;
+import internal_types;
+import column_def;
+import data_type;
 
 namespace infinity {
 

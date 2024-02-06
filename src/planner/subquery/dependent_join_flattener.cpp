@@ -17,7 +17,7 @@ module dependent_join_flattener;
 
 import status;
 import stl;
-import parser;
+
 import logical_node;
 import logical_node_type;
 import third_party;
@@ -42,6 +42,9 @@ import scalar_function;
 import scalar_function_set;
 import corrlated_expr_detector;
 import rewrite_correlated_expression;
+import internal_types;
+import join_reference;
+import data_type;
 
 namespace infinity {
 

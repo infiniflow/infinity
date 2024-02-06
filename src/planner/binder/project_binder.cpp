@@ -14,18 +14,20 @@
 
 module;
 
+module project_binder;
+
 import stl;
 import base_expression;
-import parser;
+
 import bind_context;
 import function;
 import function_set;
 import column_expression;
 import third_party;
-
+import function_expr;
+import parsed_expr;
+import column_expr;
 import infinity_exception;
-
-module project_binder;
 
 namespace {
 

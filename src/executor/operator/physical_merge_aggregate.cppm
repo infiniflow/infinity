@@ -14,6 +14,8 @@
 
 module;
 
+export module physical_merge_aggregate;
+
 import base_table_ref;
 import load_meta;
 import query_context;
@@ -25,9 +27,9 @@ import infinity_exception;
 import value;
 import data_block;
 import stl;
-import parser;
 
-export module physical_merge_aggregate;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

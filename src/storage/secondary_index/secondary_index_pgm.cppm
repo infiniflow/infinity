@@ -17,7 +17,7 @@ module;
 export module secondary_index_pgm;
 
 import stl;
-import parser;
+
 import third_party;
 import file_system;
 import infinity_exception;

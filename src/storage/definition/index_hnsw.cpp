@@ -20,13 +20,15 @@ module;
 module index_hnsw;
 
 import stl;
-import parser;
+
 import index_def;
 import third_party;
 import infinity_exception;
 import serialize;
 import default_values;
 import index_base;
+import logical_type;
+import statement_common;
 
 namespace infinity {
 

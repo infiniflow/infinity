@@ -20,9 +20,12 @@ import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import base_expression;
 import base_table_ref;
+import internal_types;
+import select_statement;
+import data_type;
 
 namespace infinity {
 

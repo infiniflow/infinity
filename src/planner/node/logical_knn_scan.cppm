@@ -14,17 +14,19 @@
 
 module;
 
+export module logical_knn_scan;
+
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
-import parser;
+
 import base_expression;
 import knn_expression;
 import base_table_ref;
-import catalog;
-
-export module logical_knn_scan;
+import table_entry;
+import internal_types;
+import data_type;
 
 namespace infinity {
 

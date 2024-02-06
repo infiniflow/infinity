@@ -23,7 +23,7 @@ import stl;
 import infinity;
 import database;
 import table;
-import parser;
+
 import query_options;
 import thrift;
 

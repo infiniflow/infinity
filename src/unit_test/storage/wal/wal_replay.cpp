@@ -15,11 +15,12 @@
 #include "type/complex/embedding_type.h"
 #include "unit_test/base_test.h"
 #include <memory>
+
 import stl;
 import global_resource_usage;
 import storage;
 import infinity_context;
-import parser;
+
 import txn_manager;
 import table_def;
 import data_block;
@@ -27,7 +28,7 @@ import value;
 import txn_store;
 import buffer_manager;
 import meta_state;
-import wal;
+import wal_entry;
 import infinity_exception;
 import status;
 import column_vector;
@@ -45,6 +46,20 @@ import backgroud_process;
 import compact_segments_task;
 import default_values;
 import base_table_ref;
+import internal_types;
+import logical_type;
+import embedding_info;
+import extra_ddl_info;
+import knn_expr;
+import column_def;
+import statement_common;
+import data_type;
+
+import segment_entry;
+import block_entry;
+import block_column_entry;
+import table_index_entry;
+import base_entry;
 
 class WalReplayTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal"); }

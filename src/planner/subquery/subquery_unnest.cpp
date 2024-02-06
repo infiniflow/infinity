@@ -23,13 +23,13 @@ import base_expression;
 import subquery_expression;
 import column_expression;
 import status;
-import parser;
+
 import query_context;
 import bind_context;
 import expression_type;
 import value;
 import dependent_join_flattener;
-
+import internal_types;
 import value_expression;
 import function_expression;
 import aggregate_expression;
@@ -52,8 +52,10 @@ import cast_table;
 
 import catalog;
 import third_party;
-
+import subquery_expr;
 import infinity_exception;
+import join_reference;
+import data_type;
 
 namespace infinity {
 

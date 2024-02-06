@@ -23,7 +23,7 @@ import txn;
 import query_context;
 import table_def;
 import data_table;
-import parser;
+
 import physical_operator_type;
 import operator_state;
 import expression_state;
@@ -34,7 +34,8 @@ import base_expression;
 import default_values;
 import status;
 import infinity_exception;
-import catalog;
+
+import column_def;
 
 namespace infinity {
 
