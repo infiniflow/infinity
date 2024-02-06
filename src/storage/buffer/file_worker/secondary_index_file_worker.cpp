@@ -42,7 +42,7 @@ void SecondaryIndexFileWorker::AllocateInMemory() {
         UnrecoverableError("AllocateInMemory: Already allocated.");
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         if (worker_id_ == 0) {
-            data_ = static_cast<void *>(new SecondaryIndexDataHead(part_capacity_, row_count_, data_type));
+            data_ = static_cast<void *>(new SecondaryIndexDataHead(part_capacity_, row_count_, actual_row_count_, data_type));
         } else {
             if (u32 previous_rows = (worker_id_ - 1) * part_capacity_; previous_rows < row_count_) [[likely]] {
                 auto part_size = std::min<u32>(part_capacity_, row_count_ - previous_rows);

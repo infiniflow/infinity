@@ -397,15 +397,15 @@ const BlockEntry *TableEntry::GetBlockEntryByID(SegmentID seg_id, BlockID block_
     return block_entry;
 }
 
-Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
+Tuple<SizeT, SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
     auto iter = this->segment_map_.find(seg_id);
     if (iter != this->segment_map_.end()) {
-        return {iter->second->row_count(), Status::OK()};
+        return {iter->second->row_count(), iter->second->actual_row_count(), Status::OK()};
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
         LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
-        return {0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
+        return {0, 0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
     }
 }
 

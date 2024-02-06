@@ -124,60 +124,13 @@ public:
     virtual void OutputToPart(SecondaryIndexDataPart *index_part) = 0;
 };
 
-// usage:
-//  1. AppendColumnVector(): merge sort, collect all values of the column in the segment
-//  2.1. OutputToPart(): copy sorted (key, offset) pairs into several SecondaryIndexDataPart structures.
-//  2.2. OutputToHeader(): create PGM index in SecondaryIndexDataHead.
-template <typename RawValueType>
-class SecondaryIndexDataBuilder final : public SecondaryIndexDataBuilderBase {
-public:
-    using KeyType = ConvertToOrderedType<RawValueType>;
-    using OffsetType = SegmentOffset;
-    using KeyOffsetPair = Pair<KeyType, OffsetType>;
-
-    explicit SecondaryIndexDataBuilder(u32 data_num, u32 part_capacity) : data_num_(data_num), output_part_capacity_(part_capacity) {
-        output_part_num_ = (data_num_ + output_part_capacity_ - 1) / output_part_capacity_;
-        index_key_type_ = GetLogicalType<KeyType>;
-        output_offset_type_ = LogicalType::kInteger; // used to store u32 offsets
-        sorted_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(data_num_);
-    }
-
-    ~SecondaryIndexDataBuilder() override final = default;
-
-    void LoadSegmentData(const SegmentEntry *segment_entry,
-                         BufferManager *buffer_mgr,
-                         ColumnID column_id,
-                         TxnTimeStamp begin_ts,
-                         bool check_ts) override final;
-
-    void StartOutput() override final;
-
-    void EndOutput() override final;
-
-    void OutputToHeader(SecondaryIndexDataHead *index_head) override final;
-
-    void OutputToPart(SecondaryIndexDataPart *index_part) override final;
-
-private:
-    const u32 data_num_{};                               // number of rows in the segment, except those deleted
-    LogicalType index_key_type_ = LogicalType::kInvalid; // type of ordered keys stored in the raw index
-    UniquePtr<KeyOffsetPair[]> sorted_key_offset_pair_;  // size: data_num_. Will be destroyed in OutputToHeader().
-private:
-    // record output progress
-    u32 output_part_capacity_{};                             // number of rows in each full output part
-    u32 output_part_num_{};                                  // number of output parts
-    u32 output_row_progress_{};                              // record output progress
-    u32 output_part_progress_{};                             // record output progress
-    LogicalType output_offset_type_ = LogicalType::kInvalid; // type of offset stored in the output part
-    UniquePtr<KeyType[]> sorted_keys_;                       // for pgm. Will be created in StartOutput().
-};
-
 // create a secondary index on each segment
 // now only support index for single column
 // now only support create index for POD type with size <= sizeof(i64)
 // need to convert values in column into ordered number type
 // data_num : number of rows in the segment, except those deleted
-export UniquePtr<SecondaryIndexDataBuilderBase> GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 data_num, u32 part_capacity);
+export UniquePtr<SecondaryIndexDataBuilderBase>
+GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 data_num, u32 part_capacity);
 
 // includes: metadata and PGM index
 class SecondaryIndexDataHead {
@@ -189,7 +142,8 @@ private:
     bool loaded_{false};  // whether data of this part is in memory
     u32 part_capacity_{}; // number of rows in each full part
     u32 part_num_{};      // number of parts
-    u32 data_num_{};      // number of rows in the segment
+    u32 full_data_num_{}; // number of rows in the segment (include those deleted)
+    u32 data_num_{};      // number of rows in the segment (except those deleted) when the index is created
     // sorted values in segment
     LogicalType data_type_raw_ = LogicalType::kInvalid; // type of original data
     LogicalType data_type_key_ = LogicalType::kInvalid; // type of data stored in the raw index
@@ -206,9 +160,9 @@ public:
 
     // will be called when a new index is created
     // used in SecondaryIndexFileWorker::AllocateInMemory()
-    explicit SecondaryIndexDataHead(u32 part_capacity, u32 data_num, const SharedPtr<DataType> &data_type)
-        : part_capacity_(part_capacity), data_num_(data_num) {
-        part_num_ = (data_num_ + part_capacity_ - 1) / part_capacity_;
+    explicit SecondaryIndexDataHead(u32 part_capacity, u32 full_data_num, u32 data_num, const SharedPtr<DataType> &data_type)
+        : part_capacity_(part_capacity), full_data_num_(full_data_num), data_num_(data_num) {
+        part_num_ = (full_data_num + part_capacity_ - 1) / part_capacity_;
         data_type_raw_ = data_type->type();
     }
 
