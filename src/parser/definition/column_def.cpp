@@ -31,6 +31,10 @@ std::string ConstrainTypeToString(ConstraintType type) {
     ParserError("Unexpected error.");
 }
 
+ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::string column_name, std::unordered_set<ConstraintType> constraints)
+    : TableElement(TableElementType::kColumn), id_(id), column_type_(std::move(column_type)), name_(std::move(column_name)),
+      constraints_(std::move(constraints)) {}
+
 ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
     : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
 
