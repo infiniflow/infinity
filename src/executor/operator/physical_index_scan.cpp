@@ -22,22 +22,12 @@ module physical_index_scan;
 import query_context;
 import operator_state;
 import default_values;
-import base_expression;
-import expression_type;
-import value_expression;
-import column_expression;
-import cast_expression;
-import function_expression;
-import expression_evaluator;
-import expression_state;
-import column_vector;
+import buffer_handle;
 import infinity_exception;
 import logger;
 import third_party;
 import txn;
 import data_block;
-import default_values;
-import buffer_handle;
 import secondary_index_scan_execute_expression;
 import logical_type;
 import segment_column_index_entry;
@@ -465,7 +455,6 @@ public:
         // delete_filter: return false if the row is deleted
         std::visit(Overload{[&](const Bitmask &bitmask) {
                                 u32 output_block_row_id = 0;
-                                u32 output_block_idx = 0;
                                 DataBlock *output_block_ptr = output_data_blocks.back().get();
                                 // TODO: 64 bit in a loop?
                                 const u32 segment_row_count = SegmentRowCount();
@@ -495,8 +484,7 @@ public:
                             },
                             [&](const Vector<u32> &selected_rows) {
                                 u32 output_block_row_id = 0;
-                                u32 output_block_idx = 0;
-                                DataBlock *output_block_ptr = output_data_blocks[output_block_idx++].get();
+                                DataBlock *output_block_ptr = output_data_blocks.back().get();
                                 for (u32 segment_offset : selected_rows) {
                                     if (!delete_filter(segment_offset)) {
                                         // deleted

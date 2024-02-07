@@ -24,8 +24,6 @@ import physical_operator;
 import physical_operator_type;
 import base_expression;
 import data_table;
-import expression_evaluator;
-import expression_selector;
 import load_meta;
 import infinity_exception;
 import internal_types;
@@ -54,9 +52,6 @@ public:
 
 private:
     SharedPtr<BaseExpression> condition_;
-
-    ExpressionEvaluator executor_;
-    ExpressionSelector selector_;
 
     SharedPtr<DataTable> input_table_{};
 };

@@ -32,7 +32,6 @@ import data_type;
 
 import infinity_exception;
 
-
 namespace infinity {
 
 SizeT ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
@@ -48,8 +47,8 @@ SizeT ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
 
     Select(expr, state, count, input_select, output_true_select, output_false_select);
 
-    output_data_block->UnInit();
     // Shrink the input data block into output data block
+    // this Init function will throw if output_data_block is already initialized before
     output_data_block->Init(input_data_block, output_true_select);
     return output_true_select->Size();
 }
