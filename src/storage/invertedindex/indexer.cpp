@@ -53,6 +53,12 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
     id_generator_->SetCurrentSegmentID(index_config_.GetLastSegmentID());
 
     index_config_.GetSegments(segments_);
+    segmentid_t next_segment_id = GetNextSegmentID();
+    segments_.push_back(Segment(Segment::BUILDING));
+    Segment &segment = segments_.back();
+    segment.SetSegmentId(next_segment_id);
+
+    dump_ref_count_ = column_ids_.size();
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -69,10 +75,19 @@ void Indexer::Add(DataBlock *data_block) {
         }
     }
     RowID start_row_id = row_ids[0]; // TODO: interface requires to be optimized
+    UpdateSegment(start_row_id);
     for (SizeT i = 0; i < column_vectors.size(); ++i) {
         /// TODO column_id ?
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Insert(column_vectors[i], start_row_id);
+    }
+}
+
+void Indexer::Insert(RowID row_id, String &data) {
+    UpdateSegment(row_id);
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Insert(row_id, data);
     }
 }
 
@@ -84,7 +99,6 @@ void Indexer::Commit() {
 }
 
 void Indexer::Dump() {
-    segmentid_t next_segment_id = GetNextSegmentID();
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Dump();
@@ -95,9 +109,16 @@ SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
-bool Indexer::NeedDump() {
-    // TODO, using a global resource manager to control the memory quota
-    return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota();
+void Indexer::TryDump() {
+    dump_ref_count_.fetch_sub(1, std::memory_order_acq_rel);
+
+    if (dump_ref_count_ == 0) {
+        // TODO, using a global resource manager to control the memory quota
+        if (byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota()) {
+            Dump();
+        }
+        dump_ref_count_ = column_ids_.size();
+    }
 }
 
 void Indexer::GetSegments(Vector<Segment> &segments) { segments_ = segments; }

@@ -67,9 +67,7 @@ public:
 
     void Commit();
 
-    bool NeedDump();
-
-    void Dump();
+    void TryDump();
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 

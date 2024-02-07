@@ -176,7 +176,7 @@ void MemoryIndexer::Commit() {
     }
 }
 
-bool MemoryIndexer::NeedDump() { return indexer_->NeedDump(); }
+void MemoryIndexer::TryDump() { indexer_->TryDump(); }
 
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
     MemoryIndexer::PostingTable::Iterator iter = posting_store_->find(term);
@@ -232,8 +232,6 @@ void MemoryIndexer::Reset() {
         rt_posting_store_->clear();
     }
 }
-
-void MemoryIndexer::Dump() { column_indexer_->Dump(); }
 
 } // namespace infinity
 

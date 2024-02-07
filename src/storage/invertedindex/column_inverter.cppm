@@ -21,7 +21,7 @@ public:
     bool ZeroRefCount();
 };
 
-export struct InverterReference {
+export struct ColumnCommitter {
 
     void Retain() { ref_count_.Retain(); }
 
@@ -44,6 +44,6 @@ public:
 
     virtual void InvertColumn(u32 doc_id, const String &val) = 0;
 
-    virtual void Flush() = 0;
+    virtual void Dump() = 0;
 };
 } // namespace infinity

@@ -73,7 +73,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
 
 void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {}
 
-void ParallelColumnInverter::Flush() {}
+void ParallelColumnInverter::Dump() {}
 
 ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
     inverters_.resize(size_);
@@ -129,9 +129,7 @@ void ParallelColumnInverters::Commit() {
         inverters_[i]->GetTermPostings()->Clear();
     }
 
-    if (memory_indexer_->NeedDump()) {
-        memory_indexer_->Dump();
-    }
+    memory_indexer_->TryDump();
 }
 
 void ParallelColumnInverters::DoMerge(Vector<const TermPosting *> &to_merge) {

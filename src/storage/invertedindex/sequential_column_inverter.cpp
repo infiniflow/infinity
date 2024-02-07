@@ -120,10 +120,7 @@ void SequentialColumnInverter::Commit() {
     } else {
         DoInsert();
     }
-    if (memory_indexer_->NeedDump()) {
-        Flush();
-        memory_indexer_->Reset();
-    }
+    memory_indexer_->TryDump();
 }
 
 void SequentialColumnInverter::DoInsert() {
@@ -176,5 +173,5 @@ void SequentialColumnInverter::DoRTInsert() {
     }
 }
 
-void SequentialColumnInverter::Flush() {}
+void SequentialColumnInverter::Dump() {}
 } // namespace infinity
