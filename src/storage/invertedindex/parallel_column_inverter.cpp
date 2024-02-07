@@ -71,7 +71,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     }
 }
 
-void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {}
+void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {}
 
 void ParallelColumnInverter::Flush() {}
 
@@ -124,6 +124,14 @@ void ParallelColumnInverters::Commit() {
         }
     }
     DoMerge(to_merge);
+
+    for (u32 i = 0; i < size_; ++i) {
+        inverters_[i]->GetTermPostings()->Clear();
+    }
+
+    if (memory_indexer_->NeedDump()) {
+        memory_indexer_->Dump();
+    }
 }
 
 void ParallelColumnInverters::DoMerge(Vector<const TermPosting *> &to_merge) {
@@ -138,9 +146,23 @@ void ParallelColumnInverters::DoMerge(Vector<const TermPosting *> &to_merge) {
         memcpy(ptr, to_merge[i]->values_.data(), to_merge[i]->values_.size() * sizeof(TermPosting::PosInfo));
         ptr += to_merge[i]->values_.size();
     }
-    std::sort(values.begin(), values.end());
+    std::sort(values.begin(), values.end(), [](const auto lhs, const auto rhs) {
+        if (lhs.doc_id_ != rhs.doc_id_) {
+            return lhs.doc_id_ < rhs.doc_id_;
+        }
+        return lhs.term_pos_ < rhs.term_pos_;
+    });
 
     MemoryIndexer::PostingPtr posting = memory_indexer_->GetOrAddPosting(String(to_merge[0]->term_));
+    docid_t curr_doc_id = values[0].doc_id_;
+    for (u32 i = 0; i < values.size(); ++i) {
+        if (values[i].doc_id_ != curr_doc_id) {
+            posting->EndDocument(curr_doc_id, 0);
+            curr_doc_id = values[i].doc_id_;
+        }
+        posting->AddPosition(values[i].term_pos_);
+    }
+    posting->EndDocument(curr_doc_id, 0);
 }
 
 } // namespace infinity

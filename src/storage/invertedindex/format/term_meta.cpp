@@ -28,6 +28,10 @@ void TermMetaLoader::Load(ByteSliceReader *byte_slice_reader, TermMeta &term_met
     } else {
         term_meta.SetPayload(0);
     }
+    term_meta.doc_start_ = byte_slice_reader->ReadVUInt64();
+    term_meta.pos_start_ = byte_slice_reader->ReadVUInt64();
+    term_meta.pos_end_ = byte_slice_reader->ReadVUInt64();
+    term_meta.skip_start_ = byte_slice_reader->ReadVUInt64();
 }
 
 void TermMetaLoader::Load(const SharedPtr<FileReader> &reader, TermMeta &term_meta) const {
@@ -45,6 +49,10 @@ void TermMetaLoader::Load(const SharedPtr<FileReader> &reader, TermMeta &term_me
     } else {
         term_meta.SetPayload(0);
     }
+    term_meta.doc_start_ = reader->ReadVLong();
+    term_meta.pos_start_ = reader->ReadVLong();
+    term_meta.pos_end_ = reader->ReadVLong();
+    term_meta.skip_start_ = reader->ReadVLong();
 }
 
 void TermMetaLoader::Load(u8 *&data_cursor, SizeT &left_size, TermMeta &term_meta) const {
@@ -65,6 +73,10 @@ void TermMetaLoader::Load(u8 *&data_cursor, SizeT &left_size, TermMeta &term_met
     } else {
         term_meta.SetPayload(0);
     }
+    term_meta.doc_start_ = VByteCompressor::DecodeVInt64(data_cursor, (u32 &)left_size);
+    term_meta.pos_start_ = VByteCompressor::DecodeVInt64(data_cursor, (u32 &)left_size);
+    term_meta.pos_end_ = VByteCompressor::DecodeVInt64(data_cursor, (u32 &)left_size);
+    term_meta.skip_start_ = VByteCompressor::DecodeVInt64(data_cursor, (u32 &)left_size);
 }
 
 u32 TermMetaDumper::CalculateStoreSize(const TermMeta &term_meta) const {
@@ -75,6 +87,10 @@ u32 TermMetaDumper::CalculateStoreSize(const TermMeta &term_meta) const {
     if (option_.HasTermPayload()) {
         len += sizeof(termpayload_t);
     }
+    len += VByteCompressor::GetVInt64Length(term_meta.doc_start_);
+    len += VByteCompressor::GetVInt64Length(term_meta.pos_start_);
+    len += VByteCompressor::GetVInt64Length(term_meta.pos_end_);
+    len += VByteCompressor::GetVInt64Length(term_meta.skip_start_);
     return len;
 }
 
@@ -87,6 +103,10 @@ void TermMetaDumper::Dump(const SharedPtr<FileWriter> &file, const TermMeta &ter
         termpayload_t payload = term_meta.GetPayload();
         file->Write((char *)(&payload), sizeof(payload));
     }
+    file->WriteVLong(term_meta.doc_start_);
+    file->WriteVLong(term_meta.pos_start_);
+    file->WriteVLong(term_meta.pos_end_);
+    file->WriteVLong(term_meta.skip_start_);
 }
 
 } // namespace infinity

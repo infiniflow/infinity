@@ -9,8 +9,8 @@ import data_block;
 
 import column_vector;
 import third_party;
-import index_builder;
 import memory_indexer;
+import segment;
 import internal_types;
 
 namespace infinity {
@@ -30,14 +30,16 @@ public:
     // realtime insert
     void Insert(RowID row_id, String &data);
 
-    void Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids);
+    void Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id);
 
     void Commit();
 
-    void Dump(IndexBuilder &index_builder);
+    void Dump();
 
 private:
     UniquePtr<MemoryIndexer> active_memory_indexer_;
+    String index_name_;
+    u32 current_segment_id_{0};
 };
 
 } // namespace infinity

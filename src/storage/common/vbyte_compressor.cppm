@@ -12,7 +12,13 @@ public:
 
     static i32 DecodeVInt32(u8 *&input_byte, u32 &input_byte_length);
 
+    static u32 EncodeVInt64(u8 *output_byte, i64 value);
+
+    static i64 DecodeVInt64(u8 *&input_byte, u32 &input_byte_length);
+
     static u32 GetVInt32Length(i32 value);
+
+    static u32 GetVInt64Length(i64 value);
 
     static void WriteVUInt32(u32 value, char *&cursor);
 
@@ -36,6 +42,16 @@ inline void VByteCompressor::WriteByte(u8 *output_byte, u32 &pos, u8 value) { ou
 inline u32 VByteCompressor::GetVInt32Length(i32 value) {
     u8 l = 1;
     u32 ui = value;
+    while ((ui & ~0x7F) != 0) {
+        l++;
+        ui >>= 7;
+    }
+    return l;
+}
+
+inline u32 VByteCompressor::GetVInt64Length(i64 value) {
+    u8 l = 1;
+    u64 ui = value;
     while ((ui & ~0x7F) != 0) {
         l++;
         ui >>= 7;
@@ -75,6 +91,17 @@ inline u32 VByteCompressor::EncodeVInt32(u8 *output_byte, i32 value) {
     return l;
 }
 
+inline u32 VByteCompressor::EncodeVInt64(u8 *output_byte, i64 value) {
+    u32 l = 0;
+    u64 ui = value;
+    while ((ui & ~0x7F) != 0) {
+        WriteByte(output_byte, l, (u8)((ui & 0x7f) | 0x80));
+        ui >>= 7;
+    }
+    WriteByte(output_byte, l, (u8)ui);
+    return l;
+}
+
 inline i32 VByteCompressor::DecodeVInt32(u8 *&input_byte, u32 &input_byte_length) {
     u32 l = 0;
     auto b = ReadByte(input_byte, l);
@@ -82,6 +109,19 @@ inline i32 VByteCompressor::DecodeVInt32(u8 *&input_byte, u32 &input_byte_length
     for (i32 shift = 7; (b & 0x80) != 0; shift += 7) {
         b = ReadByte(input_byte, l);
         i |= (b & 0x7FL) << shift;
+    }
+    input_byte += l;
+    input_byte_length -= l;
+    return i;
+}
+
+inline i64 VByteCompressor::DecodeVInt64(u8 *&input_byte, u32 &input_byte_length) {
+    u32 l = 0;
+    auto b = ReadByte(input_byte, l);
+    u64 i = (u64)b & 0x7FL;
+    for (i32 shift = 7; (b & 0x80) != 0; shift += 7) {
+        b = ReadByte(input_byte, l);
+        i |= ((u64)b & 0x7FL) << shift;
     }
     input_byte += l;
     input_byte_length -= l;
