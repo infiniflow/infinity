@@ -54,11 +54,9 @@ public:
     ColumnIndexer *GetColumnIndexer(u64 column_id) { return column_indexers_[column_id].get(); }
 
 private:
-    void UpdateSegment(RowID row_id) {
-        if (segments_.back().GetBaseDocId() == INVALID_DOCID) {
-            segments_.back().SetBaseDocId(RowID2DocID(row_id));
-        }
-    }
+    void AddSegment();
+
+    void UpdateSegment(RowID row_id);
 
     InvertedIndexConfig index_config_;
     String directory_;
@@ -68,6 +66,8 @@ private:
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
     SharedPtr<IDGenerator> id_generator_;
     Vector<Segment> segments_;
+    Atomic<Segment *> active_segment_;
     Atomic<u32> dump_ref_count_;
+    mutable std::shared_mutex flush_mutex_;
 };
 } // namespace infinity

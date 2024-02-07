@@ -173,5 +173,4 @@ void SequentialColumnInverter::DoRTInsert() {
     }
 }
 
-void SequentialColumnInverter::Dump() {}
 } // namespace infinity

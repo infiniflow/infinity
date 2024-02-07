@@ -125,8 +125,6 @@ public:
 
     void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Dump() override;
-
     TermPostings *GetTermPostings() { return term_postings_.get(); }
 
 private:

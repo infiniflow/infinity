@@ -60,6 +60,7 @@ public:
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }
     void SetTimestamp(i64 timestamp) { segment_meta_.timestamp_ = timestamp; }
     SegmentStatus GetSegmentStatus() const { return segment_status_; }
+    void SetSegmentStatus(SegmentStatus status) { segment_status_ = status; }
     Indexer *GetIndexWriter() const { return indexer_; }
     void SetIndexWriter(Indexer *indexer) { indexer_ = indexer; }
 
