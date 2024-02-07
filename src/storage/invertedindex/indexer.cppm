@@ -12,7 +12,7 @@ import posting_writer;
 import data_block;
 import column_indexer;
 import third_party;
-import index_builder;
+import segment;
 export module indexer;
 
 namespace infinity {
@@ -38,9 +38,17 @@ public:
 
     bool NeedDump();
 
-    void Dump(IndexBuilder &builder);
+    void Dump();
 
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
+
+    String GetDirectory() { return directory_; }
+
+    void GetSegments(Vector<Segment> &segments);
+
+    segmentid_t GetNextSegmentID() { return id_generator_->GetNextSegmentID(); }
+
+    ColumnIndexer *GetColumnIndexer(u64 column_id) { return column_indexers_[column_id].get(); }
 
 private:
     InvertedIndexConfig index_config_;
@@ -49,5 +57,7 @@ private:
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
+    SharedPtr<IDGenerator> id_generator_;
+    Vector<Segment> segments_;
 };
 } // namespace infinity
