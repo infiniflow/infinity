@@ -69,6 +69,8 @@ public:
 
     virtual void Close(FileHandler &file_handler) = 0;
 
+    virtual void AppendFile(const String &dst_path, const String &src_path) = 0;
+
     // Directory related methods
     virtual bool Exists(const String &path) = 0; // if file or directory exists
 

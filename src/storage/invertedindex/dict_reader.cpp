@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 import stl;
 import term_meta;
 import posting_list_format;
@@ -26,9 +27,7 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
 DictionaryReader::~DictionaryReader() {
     if (data_ptr_ != nullptr) {
         int rc = MunmapFile(data_ptr_, data_len_);
-        if (rc < 0) {
-            throw UnrecoverableException("MunmapFile failed");
-        }
+        assert(rc == 0);
     }
 }
 
