@@ -14,6 +14,8 @@
 
 module;
 
+module physical_filter;
+
 import stl;
 import txn;
 import query_context;
@@ -23,13 +25,12 @@ import data_table;
 import physical_operator_type;
 import operator_state;
 import expression_state;
+import expression_selector;
 import data_block;
 import logger;
 import third_party;
 
 import infinity_exception;
-
-module physical_filter;
 
 namespace infinity {
 
@@ -66,19 +67,17 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
 
     for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
 
+        // create uninitialized data block for output
         UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
-        data_block->Init(*GetOutputTypes());
         DataBlock* output_data_block = data_block.get();
         operator_state->data_block_array_.emplace_back(std::move(data_block));
 
         SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
         DataBlock* input_data_block = prev_op_state->data_block_array_[block_idx].get();
 
-        SizeT selected_count = selector_.Select(condition_,
-                                                condition_state,
-                                                input_data_block,
-                                                output_data_block,
-                                                input_data_block->row_count());
+        // selector contains a pointer to input data, which should not be shared by multiple tasks
+        ExpressionSelector selector;
+        SizeT selected_count = selector.Select(condition_, condition_state, input_data_block, output_data_block, input_data_block->row_count());
 
         LOG_TRACE(fmt::format("{} rows after filter", selected_count));
     }
