@@ -42,7 +42,7 @@ SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(con
     Path path = Path(root_dir_) / std::to_string(segment.GetSegmentID());
     String dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file);
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
     return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
