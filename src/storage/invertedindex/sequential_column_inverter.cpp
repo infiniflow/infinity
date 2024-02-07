@@ -29,10 +29,11 @@ SequentialColumnInverter::~SequentialColumnInverter() {}
 
 bool SequentialColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void SequentialColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
+void SequentialColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
+    docid_t start_doc_id = RowID2DocID(start_row_id);
     for (SizeT i = 0; i < column_vector->Size(); ++i) {
         String data = column_vector->ToString(i);
-        InvertColumn(RowID2DocID(row_ids[i]), data);
+        InvertColumn(start_doc_id + i, data);
     }
 }
 

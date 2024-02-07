@@ -10,19 +10,18 @@ import index_config;
 import segment;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
-export module index_reader;
+export module column_index_reader;
 
 namespace infinity {
-export class IndexReader {
+class Indexer;
+export class ColumnIndexReader {
 public:
-    IndexReader() = default;
-    virtual ~IndexReader() = default;
+    ColumnIndexReader(u64 column_id, Indexer *indexer);
+    virtual ~ColumnIndexReader() = default;
 
     void Open(const InvertedIndexConfig &index_config);
 
     PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
-
-    void GetSegments(const String &directory, Vector<Segment> &segments);
 
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
@@ -32,8 +31,10 @@ private:
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(Segment &segment);
 
 private:
+    u64 column_id_;
     String root_dir_;
     InvertedIndexConfig index_config_;
+    Indexer *indexer_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Vector<docid_t> base_doc_ids_;
 };

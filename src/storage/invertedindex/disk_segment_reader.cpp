@@ -10,6 +10,7 @@ import index_config;
 import segment;
 import file_reader;
 import dict_reader;
+import term_meta;
 import posting_list_format;
 
 namespace infinity {
@@ -25,8 +26,8 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &root_path,
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {}
 
 bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const {
-    u64 dict_value;
-    if (!dict_reader_.get() || !dict_reader_->Lookup(term, dict_value))
+    TermMeta term_meta;
+    if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta))
         return false;
     /// TODO
     return true;
