@@ -63,6 +63,23 @@ explain select y from explain2 order by y + x;
       - table index: #1
       - output_columns: [y, x, __rowid]
 
+query V
+explain select row_id(), x from explain2 where y > 3 order by x, row_id();
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [ROW_ID (#2), x (#1)]
+ -> SORT (4)
+    - expressions: [x (#1) ASC, ROW_ID (#2) ASC]
+    - output columns: [y, x, __rowid]
+   -> FILTER (3)
+      - filter: CAST(y (#0) AS BigInt) > 3
+      - output columns: [y, __rowid]
+     -> TABLE SCAN (2)
+        - table name: explain2(default.explain2)
+        - table index: #1
+        - output_columns: [y, __rowid]
+
 # Cleanup
 statement ok
 DROP TABLE explain2;
