@@ -1,0 +1,85 @@
+# name: test/sql/explain/explain_sort.slt
+# description: Test explain on various statements
+# group: [explain]
+statement ok
+DROP TABLE IF EXISTS explain2;
+
+statement ok
+CREATE TABLE explain2 (x INTEGER, y INTEGER);
+
+query I
+explain select x from explain2 order by y;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [x (#1)]
+ -> SORT (3)
+    - expressions: [y (#0) ASC]
+    - output columns: [y, __rowid]
+   -> TABLE SCAN (2)
+      - table name: explain2(default.explain2)
+      - table index: #1
+      - output_columns: [y, __rowid]
+
+query II
+explain select y from explain2 order by x;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [y (#1)]
+ -> SORT (3)
+    - expressions: [x (#0) ASC]
+    - output columns: [x, __rowid]
+   -> TABLE SCAN (2)
+      - table name: explain2(default.explain2)
+      - table index: #1
+      - output_columns: [x, __rowid]
+
+query III
+explain select y + x from explain2 order by x + y;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [y (#1) + x (#0)]
+ -> SORT (3)
+    - expressions: [x (#0) + y (#1) ASC]
+    - output columns: [x, y, __rowid]
+   -> TABLE SCAN (2)
+      - table name: explain2(default.explain2)
+      - table index: #1
+      - output_columns: [x, y, __rowid]
+
+query IV
+explain select y from explain2 order by y + x;
+----
+ PROJECT (4)
+  - table index: #4
+  - expressions: [y (#0)]
+ -> SORT (3)
+    - expressions: [y (#0) + x (#1) ASC]
+    - output columns: [y, x, __rowid]
+   -> TABLE SCAN (2)
+      - table name: explain2(default.explain2)
+      - table index: #1
+      - output_columns: [y, x, __rowid]
+
+query V
+explain select row_id(), x from explain2 where y > 3 order by x, row_id();
+----
+ PROJECT (5)
+  - table index: #4
+  - expressions: [ROW_ID (#2), x (#1)]
+ -> SORT (4)
+    - expressions: [x (#1) ASC, ROW_ID (#2) ASC]
+    - output columns: [y, x, __rowid]
+   -> FILTER (3)
+      - filter: CAST(y (#0) AS BigInt) > 3
+      - output columns: [y, __rowid]
+     -> TABLE SCAN (2)
+        - table name: explain2(default.explain2)
+        - table index: #1
+        - output_columns: [y, __rowid]
+
+# Cleanup
+statement ok
+DROP TABLE explain2;

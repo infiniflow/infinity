@@ -60,8 +60,8 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
 }
 
 SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
-    if (expr.type_ == ParsedExprType::kFunction) {
-        return ExpressionBinder::BuildFuncExpr((FunctionExpr &)expr, bind_context_ptr, depth, root);
+    if (expr.type_ == ParsedExprType::kFunction or expr.type_ == ParsedExprType::kColumn) {
+        return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     }
     if (expr.type_ == ParsedExprType::kKnn) {
         return ExpressionBinder::BuildKnnExpr((KnnExpr &)expr, bind_context_ptr, depth, root);
@@ -77,15 +77,19 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         ConstantExpr &const_expr = (ConstantExpr &)expr;
         if (const_expr.literal_type_ == LiteralType::kInteger) {
             column_id = const_expr.integer_value_;
-            if (column_id >= (i64)bind_context_ptr->project_exprs_.size()) {
+            if (column_id <= 0 or column_id > (i64)bind_context_ptr->project_exprs_.size()) {
                 RecoverableError(Status::SyntaxError("Order by are going to use nonexistent column from select list."));
             }
             --column_id;
+            //TODO: If we do not have a projection before sort, expression will need to be evaluated twice
+            // now return shared_ptr of the chosen project_expr
+            return bind_context_ptr->project_exprs_[column_id];
         } else {
             RecoverableError(Status::SyntaxError("Order by non-integer constant value."));
         }
     } else {
         String expr_name = expr.GetName();
+        UnrecoverableError(fmt::format("Need to add support for {} in order_binder.", expr_name));
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
             auto table_name = bind_context_ptr->binding_names_by_column_[expr_name][0];

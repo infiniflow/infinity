@@ -19,7 +19,7 @@ EXPLAIN SELECT * FROM test_explain_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND 
   - table index: #4
   - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
  -> SORT (4)
-    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - expressions: [c1 (#0) ASC]
     - output columns: [c1, __rowid]
    -> INDEX SCAN (7)
       - table name: test_explain_index_scan(default.test_explain_index_scan)
@@ -35,7 +35,7 @@ EXPLAIN SELECT * FROM test_explain_index_scan where ((c1 < 5) OR (c1 > 10000 AND
   - table index: #4
   - expressions: [c1 (#1), mod_256_min_128 (#2), mod_7 (#0)]
  -> SORT (4)
-    - expressions: [test_explain_index_scan.0 (#1) ASC]
+    - expressions: [c1 (#1) ASC]
     - output columns: [mod_7, c1, __rowid]
    -> FILTER (3)
       - filter: NOT(CAST(mod_7 (#0) AS BigInt) = 1)
@@ -58,7 +58,7 @@ EXPLAIN SELECT * FROM test_explain_index_scan where (NOT (c1 < 5)) AND ((c1 > 10
   - table index: #4
   - expressions: [c1 (#0), mod_256_min_128 (#2), mod_7 (#1)]
  -> SORT (4)
-    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - expressions: [c1 (#0) ASC]
     - output columns: [c1, mod_7, __rowid]
    -> FILTER (3)
       - filter: NOT(CAST(c1 (#0) AS BigInt) < 5) AND NOT(CAST(mod_7 (#1) AS BigInt) = 1)
@@ -77,7 +77,7 @@ EXPLAIN SELECT * FROM test_explain_index_scan where ((c1 < 5) OR (c1 > 10000 AND
   - table index: #4
   - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
  -> SORT (4)
-    - expressions: [test_explain_index_scan.0 (#0) ASC]
+    - expressions: [c1 (#0) ASC]
     - output columns: [c1, __rowid]
    -> INDEX SCAN (7)
       - table name: test_explain_index_scan(default.test_explain_index_scan)

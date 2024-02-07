@@ -32,8 +32,10 @@ namespace infinity {
 void BindingRemapper::VisitNode(LogicalNode &op) {
     auto load_func = [&]() {
         auto load_metas = op.load_metas();
+        column_cnt_ = output_types_? output_types_->size() : 0;
 
         if (load_metas.get() != nullptr) {
+            column_cnt_ += load_metas->size();
             for (SizeT i = 0; i < load_metas->size(); ++i) {
                 auto &load_meta = (*load_metas)[i];
                 // fix index_ value (will be used in PhysicalOperator::InputLoad), now always append to the end
@@ -67,7 +69,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->table_name(),
                                                  expression->column_name(),
                                                  expression->alias_,
-                                                 output_types_->size() - 1);
+                                                 column_cnt_ - 1);
             }
             case SpecialType::kScore:
             case SpecialType::kDistance: {
@@ -75,7 +77,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->table_name(),
                                                  expression->column_name(),
                                                  expression->alias_,
-                                                 output_types_->size() - 2);
+                                                 column_cnt_ - 2);
             }
             default: {
                 LOG_ERROR(fmt::format("Unknown special function: {}", expression->Name()));

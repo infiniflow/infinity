@@ -154,15 +154,16 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             }
 
             String select_expr_name = select_expr->ToString();
+            if ((not bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) and
+                bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
+                select_expr_name = fmt::format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
+            }
             if (bind_context_ptr_->select_expr_name2index_.contains(select_expr_name)) {
                 LOG_TRACE(fmt::format("Same expression: {} had already been found in select list index: {}",
                                       select_expr_name,
                                       bind_context_ptr_->select_expr_name2index_[select_expr_name]));
                 // TODO: create an map from secondary expression to the primary one.
             } else {
-                if (bind_context_ptr_->binding_names_by_column_.contains(select_expr_name)) {
-                    select_expr_name = fmt::format("{}.{}", bind_context_ptr_->binding_names_by_column_[select_expr_name][0], select_expr_name);
-                }
                 bind_context_ptr_->select_expr_name2index_[select_expr_name] = column_index;
             }
         }
@@ -196,10 +197,11 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // 10. DISTINCT
     bound_select_statement->distinct_ = statement.select_distinct_;
 
-    // Push order by expression to projection
-    if (statement.order_by_list != nullptr) {
-        PushOrderByToProject(query_context_ptr_, statement);
-    }
+    // TODO: Add projection before sort, limit?
+    //    // Push order by expression to projection
+    //    if (statement.order_by_list != nullptr) {
+    //        PushOrderByToProject(query_context_ptr_, statement);
+    //    }
 
     // 11. SELECT (not flatten subquery)
     BuildSelectList(query_context_ptr_, bound_select_statement);
@@ -217,8 +219,9 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // Trying to check if order by import new invisible column in project
     if (select_column_count < bound_select_statement->projection_expressions_.size()) {
-        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
-        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
+        UnrecoverableError("Projection expressions more than expected!");
+        //        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
+        //        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
     } else {
         // Last table index is the project table index
         bind_context_ptr_->result_index_ = bind_context_ptr_->project_table_index_;
@@ -426,10 +429,10 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
-    auto table_ref = MakeShared<BaseTableRef>(table_entry, columns, std::move(block_index), alias, table_index, names_ptr, types_ptr);
+    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);
 
     // Insert the table in the binding context
-    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, types_ptr, names_ptr, block_index);
+    this->bind_context_ptr_->AddTableBinding(alias, table_index, table_entry, std::move(types_ptr), std::move(names_ptr), std::move(block_index));
 
     return table_ref;
 }
