@@ -40,6 +40,7 @@ private:
 
     Vector<ColumnBinding> bindings_;
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
+    u32 column_cnt_{};
 };
 
 export class ColumnRemapper : public OptimizerRule {
