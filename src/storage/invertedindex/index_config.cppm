@@ -3,6 +3,7 @@ module;
 import stl;
 import index_defines;
 import posting_list_format;
+import segment;
 export module index_config;
 
 namespace infinity {
@@ -47,6 +48,9 @@ public:
     segmentid_t GetLastSegmentID() const { return last_segment_id_; }
     void SetLastSegmentID(segmentid_t segment_id) { last_segment_id_ = segment_id; }
 
+    void GetSegments(Vector<Segment> &segments) const { segments = segments_; }
+    void SetSegments(Vector<Segment> &segments) { segments_ = segments; }
+
 private:
     String index_name_;
     u64 memory_quota_;
@@ -56,6 +60,7 @@ private:
     bool is_short_list_vbyte_compress_;
     String analyzer_;
     HashMap<u64, String> analyzers_;
+    Vector<Segment> segments_;
     segmentid_t last_segment_id_{INVALID_SEGMENTID};
 };
 

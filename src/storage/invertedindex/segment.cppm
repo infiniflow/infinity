@@ -9,13 +9,14 @@ export module segment;
 
 namespace infinity {
 
+// Segment is a logical concept for indices overall all columns
+// We need to let indices of all columns flushed and merged together
 export struct SegmentMeta {
     SegmentMeta() : segment_id_(INVALID_SEGMENTID) {}
     SegmentMeta(segmentid_t segment_id) : segment_id_(segment_id) {}
     ~SegmentMeta() = default;
 
     void Load(const SharedPtr<FileReader> &reader) {
-        column_id_ = (u64)reader->ReadVLong();
         segment_id_ = (u32)reader->ReadVInt();
         base_doc_id_ = (u32)reader->ReadVInt();
         doc_count_ = (u32)reader->ReadVInt();
@@ -23,21 +24,19 @@ export struct SegmentMeta {
     }
 
     void Store(const SharedPtr<FileWriter> &file) {
-        file->WriteVLong(column_id_);
         file->WriteVInt(segment_id_);
         file->WriteVInt(base_doc_id_);
         file->WriteVInt(doc_count_);
         file->WriteVLong(timestamp_);
     }
 
-    u64 column_id_;
     segmentid_t segment_id_;
     docid_t base_doc_id_;
     u64 doc_count_{0};
     i64 timestamp_;
 };
 
-class ColumnIndexer;
+class Indexer;
 export class Segment {
 public:
     enum SegmentStatus {
@@ -52,7 +51,6 @@ public:
 public:
     static constexpr segmentid_t MERGED_SEGMENT_ID_MASK = (segmentid_t)0x0;
 
-    u64 GetColumnID() const { return segment_meta_.column_id_; }
     segmentid_t GetSegmentID() const { return segment_meta_.segment_id_; }
     bool IsMergedSegmentId(segmentid_t segment_id) { return segment_id != INVALID_SEGMENTID && (segment_id & MERGED_SEGMENT_ID_MASK) == 0; }
     docid_t GetBaseDocId() const { return segment_meta_.base_doc_id_; }
@@ -61,13 +59,13 @@ public:
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }
     void SetTimestamp(i64 timestamp) { segment_meta_.timestamp_ = timestamp; }
     SegmentStatus GetSegmentStatus() const { return segment_status_; }
-    ColumnIndexer *GetIndexWriter() const { return column_indexer_; }
-    void SetIndexWriter(ColumnIndexer *column_indexer) { column_indexer_ = column_indexer; }
+    Indexer *GetIndexWriter() const { return indexer_; }
+    void SetIndexWriter(Indexer *indexer) { indexer_ = indexer; }
 
 private:
     SegmentMeta segment_meta_;
     SegmentStatus segment_status_;
-    ColumnIndexer *column_indexer_{nullptr};
+    Indexer *indexer_{nullptr};
 };
 
 export class IDGenerator {

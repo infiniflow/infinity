@@ -51,6 +51,8 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
 
     id_generator_ = MakeShared<IDGenerator>();
     id_generator_->SetCurrentSegmentID(index_config_.GetLastSegmentID());
+
+    index_config_.GetSegments(segments_);
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -81,6 +83,14 @@ void Indexer::Commit() {
     }
 }
 
+void Indexer::Dump() {
+    segmentid_t next_segment_id = GetNextSegmentID();
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Dump();
+    }
+}
+
 SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
@@ -90,5 +100,5 @@ bool Indexer::NeedDump() {
     return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota();
 }
 
-void Indexer::GetSegments(u64 column_id, Vector<Segment> &segments) { return column_indexers_[column_id]->GetSegments(segments); }
+void Indexer::GetSegments(Vector<Segment> &segments) { segments_ = segments; }
 } // namespace infinity

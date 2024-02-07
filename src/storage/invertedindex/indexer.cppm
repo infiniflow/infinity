@@ -38,11 +38,17 @@ public:
 
     bool NeedDump();
 
+    void Dump();
+
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
 
     String GetDirectory() { return directory_; }
 
-    void GetSegments(u64 column_id, Vector<Segment> &segments);
+    void GetSegments(Vector<Segment> &segments);
+
+    segmentid_t GetNextSegmentID() { return id_generator_->GetNextSegmentID(); }
+
+    ColumnIndexer *GetColumnIndexer(u64 column_id) { return column_indexers_[column_id].get(); }
 
 private:
     InvertedIndexConfig index_config_;
@@ -52,5 +58,6 @@ private:
     SharedPtr<RecyclePool> buffer_pool_;
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
     SharedPtr<IDGenerator> id_generator_;
+    Vector<Segment> segments_;
 };
 } // namespace infinity

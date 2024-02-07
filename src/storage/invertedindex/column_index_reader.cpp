@@ -24,7 +24,7 @@ void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
     index_config_ = index_config;
     root_dir_ = index_config.GetIndexName();
     Vector<Segment> segments;
-    GetSegments(segments);
+    indexer_->GetSegments(segments);
     for (auto &segment : segments) {
         if (segment.GetSegmentStatus() == Segment::BUILT) {
             SharedPtr<DiskIndexSegmentReader> segment_reader = CreateDiskSegmentReader(segment);
@@ -38,17 +38,17 @@ void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
     }
 }
 
-void ColumnIndexReader::GetSegments(Vector<Segment> &segments) { return indexer_->GetSegments(column_id_, segments); }
-
 SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    // dict_reader TODO
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(root_dir_);
+    Path path = Path(root_dir_) / std::to_string(segment.GetSegmentID());
+    String dict_file = path.string();
+    dict_file.append(DICT_SUFFIX);
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file);
     return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
 SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
-    ColumnIndexer *index_writer = segment.GetIndexWriter();
-    return MakeShared<InMemIndexSegmentReader>(index_writer->GetMemoryIndexer());
+    ColumnIndexer *column_Indexer = indexer_->GetColumnIndexer(column_id_);
+    return MakeShared<InMemIndexSegmentReader>(column_Indexer->GetMemoryIndexer());
 }
 
 PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {

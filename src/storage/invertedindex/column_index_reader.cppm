@@ -23,8 +23,6 @@ public:
 
     PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
 
-    void GetSegments(Vector<Segment> &segments);
-
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
 private:

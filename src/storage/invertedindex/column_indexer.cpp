@@ -49,10 +49,10 @@ void ColumnIndexer::Dump() {
     Path path = Path(index_name_) / std::to_string(current_segment_id_);
     String index_prefix = path.string();
     LocalFileSystem fs;
-    String posting_file = index_prefix + ".pos";
+    String posting_file = index_prefix + POSTING_SUFFIX;
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128);
-    String dict_file = index_prefix + ".dic";
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, posting_file, 128);
+    String dict_file = index_prefix + DICT_SUFFIX;
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128);
     MemoryIndexer::PostingTable *posting_table = active_memory_indexer_->GetPostingTable();
     TermMetaDumper term_meta_dumpler(active_memory_indexer_->index_config_.GetPostingFormatOption());
 
