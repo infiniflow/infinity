@@ -96,7 +96,7 @@ static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function
 void RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
     String func_name = ">=";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateGreaterEqualsFunction<TinyIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
     GenerateGreaterEqualsFunction<SmallIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));

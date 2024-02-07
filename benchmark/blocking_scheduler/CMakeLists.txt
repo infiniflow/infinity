@@ -23,4 +23,5 @@ target_include_directories(blocking_scheduler_benchmark PUBLIC "${CMAKE_SOURCE_D
 target_link_libraries(
         blocking_scheduler_benchmark
         benchmark_profiler
+        c++.a
 )

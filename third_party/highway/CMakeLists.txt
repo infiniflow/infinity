@@ -61,10 +61,10 @@ set(HWY_CMAKE_ARM7 OFF CACHE BOOL "Set copts for Armv7 with NEON (requires vfpv4
 # arise due to compiler/platform changes. Enable this in CI/tests.
 set(HWY_WARNINGS_ARE_ERRORS OFF CACHE BOOL "Add -Werror flag?")
 
-set(HWY_ENABLE_CONTRIB ON CACHE BOOL "Include contrib/")
-set(HWY_ENABLE_EXAMPLES ON CACHE BOOL "Build examples")
+set(HWY_ENABLE_CONTRIB OFF CACHE BOOL "Include contrib/")
+set(HWY_ENABLE_EXAMPLES OFF CACHE BOOL "Build examples")
 set(HWY_ENABLE_INSTALL ON CACHE BOOL "Install library")
-set(HWY_ENABLE_TESTS ON CACHE BOOL "Enable HWY tests")
+set(HWY_ENABLE_TESTS OFF CACHE BOOL "Enable HWY tests")
 
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles(
@@ -315,24 +315,24 @@ if(UNIX AND NOT APPLE)
     LINK_FLAGS " -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/hwy/hwy.version")
 endif()
 
-if (HWY_ENABLE_CONTRIB)
-add_library(hwy_contrib ${HWY_LIBRARY_TYPE} ${HWY_CONTRIB_SOURCES})
-target_link_libraries(hwy_contrib hwy)
-target_compile_options(hwy_contrib PRIVATE ${HWY_FLAGS})
-set_property(TARGET hwy_contrib PROPERTY POSITION_INDEPENDENT_CODE ON)
-set_target_properties(hwy_contrib PROPERTIES VERSION ${LIBRARY_VERSION} SOVERSION ${LIBRARY_SOVERSION})
-target_include_directories(hwy_contrib PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_features(hwy_contrib PUBLIC cxx_std_11)
-set_target_properties(hwy_contrib PROPERTIES
-  LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/hwy/hwy.version)
-# not supported by MSVC/Clang, safe to skip (we use DLLEXPORT annotations)
-if(UNIX AND NOT APPLE)
-  set_property(TARGET hwy_contrib APPEND_STRING PROPERTY
-    LINK_FLAGS " -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/hwy/hwy.version")
-endif()
-endif()  # HWY_ENABLE_CONTRIB
+#if (HWY_ENABLE_CONTRIB)
+#add_library(hwy_contrib ${HWY_LIBRARY_TYPE} ${HWY_CONTRIB_SOURCES})
+#target_link_libraries(hwy_contrib hwy)
+#target_compile_options(hwy_contrib PRIVATE ${HWY_FLAGS})
+#set_property(TARGET hwy_contrib PROPERTY POSITION_INDEPENDENT_CODE ON)
+#set_target_properties(hwy_contrib PROPERTIES VERSION ${LIBRARY_VERSION} SOVERSION ${LIBRARY_SOVERSION})
+#target_include_directories(hwy_contrib PUBLIC
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+#    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+#target_compile_features(hwy_contrib PUBLIC cxx_std_11)
+#set_target_properties(hwy_contrib PROPERTIES
+#  LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/hwy/hwy.version)
+## not supported by MSVC/Clang, safe to skip (we use DLLEXPORT annotations)
+#if(UNIX AND NOT APPLE)
+#  set_property(TARGET hwy_contrib APPEND_STRING PROPERTY
+#    LINK_FLAGS " -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/hwy/hwy.version")
+#endif()
+#endif()  # HWY_ENABLE_CONTRIB
 
 # --------------------------------------------------------
 # Allow skipping the following sections for projects that do not need them:
@@ -355,42 +355,42 @@ foreach (source ${HWY_SOURCES})
   endif()
 endforeach()
 
-if (HWY_ENABLE_CONTRIB)
-install(TARGETS hwy_contrib EXPORT hwy_targets
-  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-# Install all the headers keeping the relative path to the current directory
-# when installing them.
-foreach (source ${HWY_CONTRIB_SOURCES})
-  if ("${source}" MATCHES "\.h$")
-    get_filename_component(dirname "${source}" DIRECTORY)
-    install(FILES "${source}"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${dirname}")
-  endif()
-endforeach()
-endif()  # HWY_ENABLE_CONTRIB
+#if (HWY_ENABLE_CONTRIB)
+#install(TARGETS hwy_contrib EXPORT hwy_targets
+#  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+#  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+#  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+## Install all the headers keeping the relative path to the current directory
+## when installing them.
+#foreach (source ${HWY_CONTRIB_SOURCES})
+#  if ("${source}" MATCHES "\.h$")
+#    get_filename_component(dirname "${source}" DIRECTORY)
+#    install(FILES "${source}"
+#        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${dirname}")
+#  endif()
+#endforeach()
+#endif()  # HWY_ENABLE_CONTRIB
 
 endif()  # HWY_ENABLE_INSTALL
 # -------------------------------------------------------- Examples
-if (HWY_ENABLE_EXAMPLES)
-
-# Avoids mismatch between GTest's static CRT and our dynamic.
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# Programming exercise with integrated benchmark
-add_executable(hwy_benchmark hwy/examples/benchmark.cc)
-target_sources(hwy_benchmark PRIVATE
-    hwy/nanobenchmark.h)
-# Try adding one of -DHWY_COMPILE_ONLY_SCALAR, -DHWY_COMPILE_ONLY_EMU128 or
-# -DHWY_COMPILE_ONLY_STATIC to observe the difference in targets printed.
-target_compile_options(hwy_benchmark PRIVATE ${HWY_FLAGS})
-target_link_libraries(hwy_benchmark PRIVATE hwy)
-target_link_libraries(hwy_benchmark PRIVATE ${ATOMICS_LIBRARIES})
-set_target_properties(hwy_benchmark
-    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "examples/")
-
-endif()  # HWY_ENABLE_EXAMPLES
+#if (HWY_ENABLE_EXAMPLES)
+#
+## Avoids mismatch between GTest's static CRT and our dynamic.
+#set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+#
+## Programming exercise with integrated benchmark
+#add_executable(hwy_benchmark hwy/examples/benchmark.cc)
+#target_sources(hwy_benchmark PRIVATE
+#    hwy/nanobenchmark.h)
+## Try adding one of -DHWY_COMPILE_ONLY_SCALAR, -DHWY_COMPILE_ONLY_EMU128 or
+## -DHWY_COMPILE_ONLY_STATIC to observe the difference in targets printed.
+#target_compile_options(hwy_benchmark PRIVATE ${HWY_FLAGS})
+#target_link_libraries(hwy_benchmark PRIVATE hwy)
+#target_link_libraries(hwy_benchmark PRIVATE ${ATOMICS_LIBRARIES})
+#set_target_properties(hwy_benchmark
+#    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "examples/")
+#
+#endif()  # HWY_ENABLE_EXAMPLES
 # -------------------------------------------------------- Tests
 
 include(CTest)
@@ -468,19 +468,19 @@ set(HWY_TEST_FILES
 
 set(HWY_TEST_LIBS hwy hwy_test)
 
-if (HWY_ENABLE_CONTRIB)
-list(APPEND HWY_TEST_LIBS hwy_contrib)
-
-list(APPEND HWY_TEST_FILES
-  hwy/contrib/dot/dot_test.cc
-  hwy/contrib/image/image_test.cc
-  # Disabled due to SIGILL in clang7 debug build during gtest discovery phase,
-  # not reproducible locally. Still tested via bazel build.
-  # hwy/contrib/math/math_test.cc
-  hwy/contrib/sort/sort_test.cc
-  hwy/contrib/sort/bench_sort.cc
-)
-endif()  # HWY_ENABLE_CONTRIB
+#if (HWY_ENABLE_CONTRIB)
+#list(APPEND HWY_TEST_LIBS hwy_contrib)
+#
+#list(APPEND HWY_TEST_FILES
+#  hwy/contrib/dot/dot_test.cc
+#  hwy/contrib/image/image_test.cc
+#  # Disabled due to SIGILL in clang7 debug build during gtest discovery phase,
+#  # not reproducible locally. Still tested via bazel build.
+#  # hwy/contrib/math/math_test.cc
+#  hwy/contrib/sort/sort_test.cc
+#  hwy/contrib/sort/bench_sort.cc
+#)
+#endif()  # HWY_ENABLE_CONTRIB
 
 if(HWY_SYSTEM_GTEST)
   if (CMAKE_VERSION VERSION_LESS 3.20)

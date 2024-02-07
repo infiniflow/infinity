@@ -228,6 +228,7 @@ target_link_libraries(infinity
         atomic.a
         event.a
         vespalib
+        c++.a
 #        profiler
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -348,6 +349,7 @@ target_link_libraries(unit_test
 #        profiler
         thrift.a
         vespalib
+        c++.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -379,6 +381,7 @@ add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
 
 target_link_libraries(test_hnsw
     infinity_core
+    c++.a
 )
 
 add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw_bitmask.cpp")
@@ -402,5 +405,6 @@ target_link_libraries(test_hnsw_bitmask
     atomic.a
     event.a
     vespalib
+    c++.a
     #        profiler
 )

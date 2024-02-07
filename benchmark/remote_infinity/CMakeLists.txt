@@ -23,4 +23,5 @@ target_link_libraries(
         lz4.a
         atomic.a
         thrift.a
+        c++.a
 )

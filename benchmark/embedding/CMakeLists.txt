@@ -9,6 +9,7 @@ target_link_libraries(
     infinity_core
     sql_parser
     benchmark_profiler
+    c++.a
 )
 
 add_executable(ann_ivfflat_benchmark
@@ -27,4 +28,5 @@ target_link_libraries(
         iresearch
         atomic.a
         lz4.a
+        c++.a
 )

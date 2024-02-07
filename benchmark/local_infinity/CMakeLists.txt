@@ -14,6 +14,7 @@ target_link_libraries(
     iresearch
     lz4.a
     atomic.a
+    c++.a
 )
 
 # ########################################
@@ -34,6 +35,7 @@ target_link_libraries(
     iresearch
     lz4.a
     atomic.a
+    c++.a
 )
 
 # query benchmark
@@ -52,6 +54,7 @@ target_link_libraries(
     iresearch
     lz4.a
     atomic.a
+    c++.a
 )
 
 # ########################################
@@ -72,6 +75,7 @@ target_link_libraries(
     iresearch
     lz4.a
     atomic.a
+    c++.a
 )
 
 # query benchmark
@@ -90,4 +94,5 @@ target_link_libraries(
     iresearch
     lz4.a
     atomic.a
+    c++.a
 )
