@@ -133,6 +133,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!pruned_expression_.empty()) {
+            UnrecoverableError("Projection method changed!");
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
             pruned_project->set_left_node(root);
             root = pruned_project;
