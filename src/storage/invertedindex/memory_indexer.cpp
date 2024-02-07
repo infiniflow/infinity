@@ -40,7 +40,6 @@ import task_executor;
 import memory_posting;
 import indexer;
 import third_party;
-import index_builder;
 
 namespace infinity {
 
@@ -62,12 +61,13 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 // bool MemoryIndexer::KeyComp::operator()(const TermKey &lhs, const TermKey &rhs) const { return lhs < rhs; }
 
 MemoryIndexer::MemoryIndexer(Indexer *indexer,
+                             ColumnIndexer *column_indexer,
                              u64 column_id,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
                              SharedPtr<RecyclePool> buffer_pool)
-    : indexer_(indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool),
-      num_inverters_(1), max_inverters_(4) {
+    : indexer_(indexer), column_indexer_(column_indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool),
+      buffer_pool_(buffer_pool), num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
     SetAnalyzer();
     if (index_config_.GetIndexingParallelism() > 1) {
@@ -100,23 +100,21 @@ void MemoryIndexer::SetAnalyzer() {
     jieba_specialize_ = analyzer.compare("chinese") == 0 ? true : false;
 }
 
-void MemoryIndexer::Insert(RowID row_id, String &data) {
-    SequentialColumnInverter inverter(this);
-    inverter.InvertColumn(RowID2DocID(row_id), data);
-    inverter.Commit();
-}
+void MemoryIndexer::Insert(RowID row_id, String &data) { inverter_->InvertColumn(RowID2DocID(row_id), data); }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, Vector<RowID> &row_ids) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
     if (index_config_.GetIndexingParallelism() > 1) {
-        for (u32 i = 0; i < row_ids.size(); i += parallel_inverter_->Size()) {
+        docid_t start_doc_id = RowID2DocID(start_row_id);
+
+        u32 row_size = column_vector->Size();
+        for (u32 i = 0; i < row_size; i += parallel_inverter_->Size()) {
             for (u32 j = 0; j < parallel_inverter_->inverters_.size(); ++j) {
-                auto task =
-                    MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector->ToString(i + j), RowID2DocID(row_ids[i + j]));
+                auto task = MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector->ToString(i + j), start_doc_id + i + j);
                 invert_executor_->Execute(j, std::move(task));
             }
         }
     } else {
-        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, row_ids);
+        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, start_row_id);
         invert_executor_->Execute(0, std::move(task));
     }
 }
@@ -167,9 +165,9 @@ void MemoryIndexer::SwitchActiveParallelInverters() {
 
 void MemoryIndexer::Commit() {
     if (index_config_.GetIndexingParallelism() > 1) {
-        invert_executor_->SyncAll();
-        SwitchActiveParallelInverters();
         auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
+        SwitchActiveParallelInverters();
+        invert_executor_->SyncAll();
         commit_executor_->Execute(0, std::move(task));
     } else {
         auto task = MakeUnique<CommitTask>(inverter_.get());
@@ -235,7 +233,7 @@ void MemoryIndexer::Reset() {
     }
 }
 
-void MemoryIndexer::Dump(IndexBuilder &index_builder) {}
+void MemoryIndexer::Dump() { column_indexer_->Dump(); }
 
 } // namespace infinity
 

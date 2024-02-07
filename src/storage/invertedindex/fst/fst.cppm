@@ -198,6 +198,7 @@ export struct Bound {
     Vector<u8> key_;
 
     Bound() : ty_(kUnbounded){};
+    Bound(BoundType ty) : ty_(ty){};
     Bound(BoundType ty, u8 *key_ptr, SizeT key_len) : ty_(ty), key_(key_ptr, key_ptr + key_len) {}
 
     bool ExceededBy(u8 *inp_ptr, SizeT inp_len) {
@@ -235,6 +236,22 @@ private:
 
 public:
     FstStream(Fst &fst, Bound min = Bound(), Bound max = Bound()) : fst_(fst), end_at_(max) { SeekMin(min); }
+    FstStream(Fst &fst, u8 *prefix_ptr, SizeT prefix_len) : fst_(fst) {
+        Bound min(Bound::kIncluded, prefix_ptr, prefix_len);
+        Bound max(Bound::kExcluded, prefix_ptr, prefix_len);
+        int i;
+        for (i = prefix_len - 1; i >= 0; i--) {
+            prefix_ptr[i]++;
+            if (prefix_ptr[i] != 0x00) {
+                break;
+            }
+        }
+        if (i < 0) {
+            max = Bound();
+        }
+        end_at_ = max;
+        SeekMin(min);
+    }
 
     void Reset(Bound min = Bound(), Bound max = Bound()) {
         end_at_ = max;

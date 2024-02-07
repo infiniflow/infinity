@@ -37,7 +37,7 @@ u32 ReadU32LE(const u8 *ptr) {
 }
 
 /// Read a u64 in little endian format from the beginning of the given slice.
-u64 ReadU64LE(const u8 *ptr) {
+export u64 ReadU64LE(const u8 *ptr) {
 #ifdef HAVE_EFFICIENT_UNALIGNED_ACCESS
     u64 result = *(u64 *)ptr;
 #else

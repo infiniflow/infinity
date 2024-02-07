@@ -14,13 +14,15 @@ import index_config;
 import inmem_index_segment_reader;
 import posting_writer;
 import data_block;
+import segment;
 
 import column_vector;
 import third_party;
 import column_indexer;
+
 import logical_type;
-import index_builder;
 import internal_types;
+
 
 namespace infinity {
 
@@ -46,6 +48,11 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
         u64 column_id = column_ids_[i];
         column_indexers_[column_id] = MakeUnique<ColumnIndexer>(this, column_id, index_config_, byte_slice_pool_, buffer_pool_);
     }
+
+    id_generator_ = MakeShared<IDGenerator>();
+    id_generator_->SetCurrentSegmentID(index_config_.GetLastSegmentID());
+
+    index_config_.GetSegments(segments_);
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -61,10 +68,11 @@ void Indexer::Add(DataBlock *data_block) {
             column_vectors.push_back(column_vector);
         }
     }
+    RowID start_row_id = row_ids[0]; // TODO: interface requires to be optimized
     for (SizeT i = 0; i < column_vectors.size(); ++i) {
         /// TODO column_id ?
         u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Insert(column_vectors[i], row_ids);
+        column_indexers_[column_id]->Insert(column_vectors[i], start_row_id);
     }
 }
 
@@ -75,17 +83,22 @@ void Indexer::Commit() {
     }
 }
 
+void Indexer::Dump() {
+    segmentid_t next_segment_id = GetNextSegmentID();
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Dump();
+    }
+}
+
 SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
-bool Indexer::NeedDump() { return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota(); }
-
-void Indexer::Dump(IndexBuilder &builder) {
-    for (SizeT i = 0; i < column_ids_.size(); ++i) {
-        u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Dump(builder);
-    }
+bool Indexer::NeedDump() {
+    // TODO, using a global resource manager to control the memory quota
+    return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota();
 }
 
+void Indexer::GetSegments(Vector<Segment> &segments) { segments_ = segments; }
 } // namespace infinity

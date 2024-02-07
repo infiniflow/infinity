@@ -71,6 +71,9 @@ export {
     constexpr u32 MAX_UNCOMPRESSED_POS_LIST_SIZE = 5;
     constexpr u32 MAX_UNCOMPRESSED_SKIP_LIST_SIZE = 10;
     constexpr u8 SKIP_LIST_BUFFER_SIZE = 32;
+
+    constexpr const char *DICT_SUFFIX = "dic";
+    constexpr const char *POSTING_SUFFIX = "pos";
 }
 
 export docid_t RowID2DocID(const RowID &row_id);

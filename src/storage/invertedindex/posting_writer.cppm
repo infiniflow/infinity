@@ -10,6 +10,7 @@ import inmem_posting_decoder;
 import pos_list_encoder;
 import posting_list_format;
 import index_defines;
+import term_meta;
 
 namespace infinity {
 export class PostingWriter {
@@ -32,7 +33,7 @@ public:
 
     tf_t GetCurrentTF() const;
 
-    void Write(const SharedPtr<FileWriter> &file_writer);
+    void Write(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
 
     InMemPostingDecoder *CreateInMemPostingDecoder(MemoryPool *session_pool) const;
 

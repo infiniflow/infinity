@@ -10,6 +10,7 @@ import inmem_doc_list_decoder;
 import pos_list_encoder;
 import posting_list_format;
 import index_defines;
+import term_meta;
 module posting_writer;
 
 namespace infinity {
@@ -53,10 +54,13 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
-void PostingWriter::Write(const SharedPtr<FileWriter> &file_writer) {
+void PostingWriter::Write(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
+    term_meta.doc_start_ = file_writer->GetFileSize();
     doc_list_encoder_->Dump(file_writer);
     if (position_list_encoder_) {
+        term_meta.pos_start_ = file_writer->GetFileSize();
         position_list_encoder_->Dump(file_writer);
+        term_meta.pos_end_ = file_writer->GetFileSize();
     }
 }
 

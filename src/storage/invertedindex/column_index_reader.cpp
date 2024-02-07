@@ -13,15 +13,18 @@ import segment;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
 import indexer;
+import column_indexer;
 import dict_reader;
-module index_reader;
+module column_index_reader;
 
 namespace infinity {
-void IndexReader::Open(const InvertedIndexConfig &index_config) {
+ColumnIndexReader::ColumnIndexReader(u64 column_id, Indexer *indexer) : column_id_(column_id), indexer_(indexer) {}
+
+void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
     index_config_ = index_config;
     root_dir_ = index_config.GetIndexName();
     Vector<Segment> segments;
-    GetSegments(index_config.GetIndexName(), segments);
+    indexer_->GetSegments(segments);
     for (auto &segment : segments) {
         if (segment.GetSegmentStatus() == Segment::BUILT) {
             SharedPtr<DiskIndexSegmentReader> segment_reader = CreateDiskSegmentReader(segment);
@@ -35,20 +38,20 @@ void IndexReader::Open(const InvertedIndexConfig &index_config) {
     }
 }
 
-void IndexReader::GetSegments(const String &directory, Vector<Segment> &segments) {}
-
-SharedPtr<DiskIndexSegmentReader> IndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    // dict_reader TODO
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(root_dir_);
+SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
+    Path path = Path(root_dir_) / std::to_string(segment.GetSegmentID());
+    String dict_file = path.string();
+    dict_file.append(DICT_SUFFIX);
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
     return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
 }
 
-SharedPtr<InMemIndexSegmentReader> IndexReader::CreateInMemSegmentReader(Segment &segment) {
-    SharedPtr<Indexer> index_writer = segment.GetIndexWriter();
-    return index_writer->CreateInMemSegmentReader(segment.GetColumnID());
+SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
+    ColumnIndexer *column_Indexer = indexer_->GetColumnIndexer(column_id_);
+    return MakeShared<InMemIndexSegmentReader>(column_Indexer->GetMemoryIndexer());
 }
 
-PostingIterator *IndexReader::Lookup(const String &term, MemoryPool *session_pool) {
+PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
