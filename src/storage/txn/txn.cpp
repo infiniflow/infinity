@@ -458,7 +458,7 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-void Txn::CommitBottom() {
+void Txn::CommitBottom() noexcept {
 
     // prepare to commit txn local data into table
     for (const auto &name_table_pair : txn_tables_store_) {

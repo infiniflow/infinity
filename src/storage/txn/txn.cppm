@@ -77,7 +77,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    void CommitBottom();
+    void CommitBottom() noexcept;
 
     void CancelCommitBottom();
 

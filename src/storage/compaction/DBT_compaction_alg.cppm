@@ -54,35 +54,13 @@ public:
 
     void AddSegmentInfo(SegmentEntry *segment_entry) { segments_.emplace_back(segment_entry); }
 
-    Vector<SegmentEntry *> SetAllCompacting(TransactionID txn_id) {
-        Vector<SegmentEntry *> ret = segments_; // copy here
-        compacting_segments_map_.emplace(txn_id, std::move(segments_));
-        return ret;
-    }
+    Vector<SegmentEntry *> SetAllCompacting(TransactionID txn_id);
 
-    void SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id) {
-        SegmentID segment_id = segment_entry->segment_id();
-        auto erase_begin =
-            std::remove_if(segments_.begin(), segments_.end(), [&](SegmentEntry *segment) { return segment->segment_id() == segment_id; });
-        if (segments_.end() - erase_begin != 1) {
-            UnrecoverableError("Segment not found in layer");
-        }
-        segments_.erase(erase_begin, segments_.end());
-        compacting_segments_map_.emplace(txn_id, Vector<SegmentEntry *>{segment_entry});
-    }
+    void SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id);
 
     void CommitCompact(TransactionID txn_id) { compacting_segments_map_.erase(txn_id); }
 
-    void RollbackCompact(TransactionID txn_id) {
-        auto range = compacting_segments_map_.equal_range(txn_id);
-        for (auto iter = range.first; iter != range.second; ++iter) {
-            auto &compacting_segments = iter->second;
-            for (auto *rollback_segment : compacting_segments) {
-                AddSegmentInfo(rollback_segment);
-            }
-        }
-        compacting_segments_map_.erase(txn_id);
-    }
+    void RollbackCompact(TransactionID txn_id);
 
     SizeT LayerSize() const { return segments_.size(); }
 
@@ -96,122 +74,28 @@ public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity) : config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)) {}
 
     // init with exisiting segments, should called before any compact
-    virtual void Init(Vector<SegmentEntry *> segment_entries) final {
-        for (auto *segment : segment_entries) {
-            if (!segment->sealed()) {
-                UnrecoverableError("Segment must be sealed before compaction");
-            }
-            AddSegmentInner(segment); // TODO: check if the segment will trigger compaction
-        }
-    }
+    virtual void AddInitSegments(Vector<SegmentEntry *> segment_entries) final;
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) final {
-        auto layer_opt = AddSegmentInner(new_segment);
-        if (!layer_opt.has_value()) {
-            return None;
-        }
-        int layer = *layer_opt;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) final;
 
-        Txn *txn = generate_txn();
-        TransactionID txn_id = txn->TxnID();
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentEntry *shrink_segment, StdFunction<Txn *()> generate_txn) final;
 
-        Vector<SegmentEntry *> compact_segments = segment_layers_[layer].SetAllCompacting(txn_id);
-        AddSegmentToHigher(compact_segments, layer + 1, txn_id);
+    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) final;
 
-        if (compact_segments.size() <= 1) {
-            UnrecoverableError("Algorithm bug.");
-        }
-        return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
-    }
-
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentEntry *shrink_segment, StdFunction<Txn *()> generate_txn) final {
-        SegmentID segment_id = shrink_segment->segment_id();
-        auto iter = segment_layer_map_.find(segment_id);
-        if (iter == segment_layer_map_.end()) { // the segment has been compacted and not committed
-            return None;
-        }
-        int old_layer = iter->second;
-        SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
-        int new_layer = config_.CalculateLayer(new_row_cnt);
-        if (old_layer == new_layer) {
-            return None;
-        }
-        if (new_layer >= old_layer) {
-            UnrecoverableError("Shrink segment has less rows than before");
-        }
-
-        Txn *txn = generate_txn();
-        TransactionID txn_id = txn->TxnID();
-
-        SegmentLayer &old_segment_layer = segment_layers_[old_layer];
-        old_segment_layer.SetOneCompacting(shrink_segment, txn_id);
-
-        Vector<SegmentEntry *> compact_segments{shrink_segment};
-        AddSegmentToHigher(compact_segments, new_layer, txn_id);
-
-        if (compact_segments.size() == 1) {
-            this->CommitCompact(compact_segments, txn_id);
-            return MakePair(Vector<SegmentEntry *>(), std::move(txn));
-        } else if (compact_segments.empty()) {
-            UnrecoverableError("Algorithm bug.");
-        }
-        return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
-    }
-
-    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) final {
-        for (auto &segment_layer : segment_layers_) {
-            segment_layer.CommitCompact(commit_txn_id);
-        }
-        for (auto *new_segment : new_segments) {
-            AddSegmentInner(new_segment);
-        }
-    }
-
-    virtual void RollbackCompact(TransactionID rollback_txn_id) final {
-        for (auto &segment_layer : segment_layers_) {
-            segment_layer.RollbackCompact(rollback_txn_id);
-        }
-    }
+    virtual void RollbackCompact(TransactionID rollback_txn_id) final;
 
 private:
     // Add the segment in layer, return the layer if it triggers compaction
-    Optional<int> AddSegmentInner(SegmentEntry *new_segment) {
-        SegmentOffset new_row_cnt = new_segment->actual_row_count();
-        int layer = config_.CalculateLayer(new_row_cnt);
-        if (layer >= (int)segment_layers_.size()) {
-            segment_layers_.resize(layer + 1);
-        }
-        SegmentLayer &segment_layer = segment_layers_[layer];
-        segment_layer_map_.emplace(new_segment->segment_id(), layer);
-        segment_layer.AddSegmentInfo(new_segment);
+    Optional<int> AddSegmentInner(SegmentEntry *new_segment);
 
-        if (layer == max_layer_ // the filled segment will not be merged
-            || segment_layer.LayerSize() < config_.m_) {
-            return None;
-        }
-        return layer;
-    }
-
-    void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id) {
-        while (true) {
-            if (layer >= (int)segment_layers_.size()) {
-                segment_layers_.emplace_back();
-            }
-            SegmentLayer &segment_layer = segment_layers_[layer];
-            if (segment_layer.LayerSize() + 1 < config_.m_) {
-                break;
-            }
-            auto compact_segments1 = segment_layer.SetAllCompacting(txn_id);
-            compact_segments.insert(compact_segments.end(), compact_segments1.begin(), compact_segments1.end());
-            ++layer;
-        }
-    }
+    void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
 private:
-    DBTConfig config_;
+    const DBTConfig config_;
     const int max_layer_;
 
+    std::mutex mtx_;
     HashMap<SegmentID, int> segment_layer_map_;
     Vector<SegmentLayer> segment_layers_;
 };

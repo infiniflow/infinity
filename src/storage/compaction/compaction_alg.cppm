@@ -30,14 +30,16 @@ namespace infinity {
     Call `CommitCompact` after compaction is done.
     Or the compaction failed, call `RollbackCompact` to restore the structure.
 
-    The algorithm should be used in single thread.
+    `AddSegment` and `DeleteInSegment` is called when adding segments or delete rows in commit thread
+    `CommitCompact` and `RollbackCompact` is called in background thread
+    So lock is needed
 */
 
 export class CompactionAlg {
 public:
     virtual ~CompactionAlg() = default;
 
-    virtual void Init(Vector<SegmentEntry *> segment_entries) = 0;
+    virtual void AddInitSegments(Vector<SegmentEntry *> segment_entries) = 0;
 
     // Add a new segment, return the segments to be compacted, and the transaction to commit or rollback
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) = 0;

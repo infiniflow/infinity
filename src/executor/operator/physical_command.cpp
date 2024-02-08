@@ -139,7 +139,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kCompactTable: {
             auto *txn = query_context->GetTxn();
-            CompactSegmentsTask compact_task(table_ref_.get(), txn);
+            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref_, txn); // copy the table ref shared_ptr here
             compact_task.Execute();
             break;
         }

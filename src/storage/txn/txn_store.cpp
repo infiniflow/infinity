@@ -146,7 +146,7 @@ void TxnTableStore::PrepareCommit() {
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
-        const auto &uncommitted = uncommitted_segments_[seg_idx];
+        const SharedPtr<SegmentEntry> &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
         NewCatalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
