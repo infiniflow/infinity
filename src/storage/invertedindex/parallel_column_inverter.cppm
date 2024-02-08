@@ -125,8 +125,6 @@ public:
 
     void InvertColumn(u32 doc_id, const String &val) override;
 
-    void Flush() override;
-
     TermPostings *GetTermPostings() { return term_postings_.get(); }
 
 private:
@@ -138,7 +136,7 @@ private:
     TermList terms_once_;
 };
 
-export class ParallelColumnInverters : public InverterReference {
+export class ParallelColumnInverters : public ColumnCommitter {
 public:
     ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size);
     virtual ~ParallelColumnInverters() {}

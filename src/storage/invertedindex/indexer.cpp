@@ -53,6 +53,26 @@ void Indexer::Open(const InvertedIndexConfig &index_config, const String &direct
     id_generator_->SetCurrentSegmentID(index_config_.GetLastSegmentID());
 
     index_config_.GetSegments(segments_);
+
+    AddSegment();
+    dump_ref_count_ = column_ids_.size();
+}
+
+void Indexer::AddSegment() {
+    segmentid_t next_segment_id = GetNextSegmentID();
+    segments_.push_back(Segment(Segment::BUILDING));
+    Segment &segment = segments_.back();
+    segment.SetSegmentId(next_segment_id);
+    active_segment_.store(&segment, std::memory_order_acq_rel);
+}
+
+void Indexer::UpdateSegment(RowID row_id, u64 inc_count) {
+    std::shared_lock<std::shared_mutex> lock(flush_mutex_);
+    auto *ctx = active_segment_.load(std::memory_order_relaxed);
+    if (ctx->GetBaseDocId() == INVALID_DOCID) {
+        ctx->SetBaseDocId(RowID2DocID(row_id));
+    }
+    ctx->IncDocCount(inc_count);
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -74,9 +94,29 @@ void Indexer::Add(DataBlock *data_block) {
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Insert(column_vectors[i], start_row_id);
     }
+    UpdateSegment(start_row_id, row_ids.size());
+}
+
+void Indexer::Insert(RowID row_id, String &data) {
+    UpdateSegment(row_id);
+    for (SizeT i = 0; i < column_ids_.size(); ++i) {
+        u64 column_id = column_ids_[i];
+        column_indexers_[column_id]->Insert(row_id, data);
+    }
 }
 
 void Indexer::Commit() {
+    // Commit is called in a dedicate thread periodically
+    {
+        // PreCommit is used to switch internal inverters such that all
+        // data after the Commit is called from other threads will not
+        // be out of sync
+        std::unique_lock<std::shared_mutex> lock(flush_mutex_);
+        for (SizeT i = 0; i < column_ids_.size(); ++i) {
+            u64 column_id = column_ids_[i];
+            column_indexers_[column_id]->PreCommit();
+        }
+    }
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Commit();
@@ -84,20 +124,31 @@ void Indexer::Commit() {
 }
 
 void Indexer::Dump() {
-    segmentid_t next_segment_id = GetNextSegmentID();
+    auto *flush_segment = active_segment_.load(std::memory_order_relaxed);
+    AddSegment();
+    flush_segment->SetSegmentStatus(Segment::DUMPLING);
+
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Dump();
     }
+    flush_segment->SetSegmentStatus(Segment::BUILT);
 }
 
 SharedPtr<InMemIndexSegmentReader> Indexer::CreateInMemSegmentReader(u64 column_id) {
     return MakeShared<InMemIndexSegmentReader>(column_indexers_[column_id]->GetMemoryIndexer());
 }
 
-bool Indexer::NeedDump() {
-    // TODO, using a global resource manager to control the memory quota
-    return byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota();
+void Indexer::TryDump() {
+    dump_ref_count_.fetch_sub(1, std::memory_order_acq_rel);
+
+    if (dump_ref_count_ == 0) {
+        // TODO, using a global resource manager to control the memory quota
+        if (byte_slice_pool_->GetUsedBytes() >= index_config_.GetMemoryQuota()) {
+            Dump();
+        }
+        dump_ref_count_ = column_ids_.size();
+    }
 }
 
 void Indexer::GetSegments(Vector<Segment> &segments) { segments_ = segments; }

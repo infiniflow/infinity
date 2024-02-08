@@ -49,7 +49,7 @@ struct CreateField {
 #pragma pack()
 
 export struct BlockVersion {
-    constexpr static String PATH = "version";
+    constexpr static std::string_view PATH = "version";
 
     explicit BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
     bool operator==(const BlockVersion &rhs) const;
@@ -156,7 +156,7 @@ public:
 
     const String &DirPath() { return *block_dir_; }
 
-    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, BlockVersion::PATH); }
+    String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, String(BlockVersion::PATH)); }
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 

@@ -9,13 +9,13 @@ import column_inverter;
 namespace infinity {
 export class CommitTask : public TaskExecutor::Task {
 public:
-    CommitTask(InverterReference *inverter);
+    CommitTask(ColumnCommitter *inverter);
 
     ~CommitTask();
 
     void Run() override;
 
 private:
-    InverterReference *inverter_{nullptr};
+    ColumnCommitter *inverter_{nullptr};
 };
 } // namespace infinity

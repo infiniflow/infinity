@@ -16,7 +16,7 @@ import column_inverter;
 namespace infinity{
 
 class MemoryIndexer;
-export class SequentialColumnInverter : public ColumnInverter, public InverterReference {
+export class SequentialColumnInverter : public ColumnInverter, public ColumnCommitter {
 public:
     SequentialColumnInverter(MemoryIndexer *memory_indexer);
     SequentialColumnInverter(const SequentialColumnInverter &) = delete;
@@ -46,8 +46,6 @@ public:
             return term_pos_ < rhs.term_pos_;
         }
     };
-
-    void Flush() override;
 
 private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;

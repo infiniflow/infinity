@@ -43,6 +43,8 @@ void ColumnIndexer::Insert(RowID row_id, String &data) { active_memory_indexer_-
 
 void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
 
+void ColumnIndexer::PreCommit() { active_memory_indexer_->PreCommit(); }
+
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 
 void ColumnIndexer::Dump() {

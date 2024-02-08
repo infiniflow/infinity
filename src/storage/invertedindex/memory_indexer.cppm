@@ -20,6 +20,7 @@ import task_executor;
 import memory_posting;
 import third_party;
 import internal_types;
+import commit_task;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;
@@ -65,11 +66,11 @@ public:
 
     void Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id);
 
+    void PreCommit();
+
     void Commit();
 
-    bool NeedDump();
-
-    void Dump();
+    void TryDump();
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
@@ -119,6 +120,8 @@ private:
     UniquePtr<ParallelColumnInverters> parallel_inverter_;
     Vector<UniquePtr<ParallelColumnInverters>> free_parallel_inverters_;
     Deque<UniquePtr<ParallelColumnInverters>> inflight_parallel_inverters_;
+
+    UniquePtr<CommitTask> inflight_commit_task_;
 
     u32 num_inverters_;
     u32 max_inverters_;
