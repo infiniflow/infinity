@@ -56,7 +56,7 @@ public:
     bool IsMergedSegmentId(segmentid_t segment_id) { return segment_id != INVALID_SEGMENTID && (segment_id & MERGED_SEGMENT_ID_MASK) == 0; }
     docid_t GetBaseDocId() const { return segment_meta_.base_doc_id_; }
     void SetBaseDocId(docid_t base_doc) { segment_meta_.base_doc_id_ = base_doc; }
-    void IncDocCount() { segment_meta_.doc_count_++; }
+    void IncDocCount(u64 doc_count) { segment_meta_.doc_count_ += doc_count; }
     void SetDocCount(u64 doc_count) { segment_meta_.doc_count_ = doc_count; }
     void SetSegmentMeta(const SegmentMeta &segment_meta) { segment_meta_ = segment_meta; }
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }

@@ -58,7 +58,7 @@ public:
 private:
     void AddSegment();
 
-    void UpdateSegment(RowID row_id);
+    void UpdateSegment(RowID row_id, u64 inc_count = 1);
 
     InvertedIndexConfig index_config_;
     String directory_;

@@ -66,13 +66,13 @@ void Indexer::AddSegment() {
     active_segment_.store(&segment, std::memory_order_acq_rel);
 }
 
-void Indexer::UpdateSegment(RowID row_id) {
+void Indexer::UpdateSegment(RowID row_id, u64 inc_count = 1) {
     std::shared_lock<std::shared_mutex> lock(flush_mutex_);
     auto *ctx = active_segment_.load(std::memory_order_relaxed);
     if (ctx->GetBaseDocId() == INVALID_DOCID) {
         ctx->SetBaseDocId(RowID2DocID(row_id));
     }
-    ctx->IncDocCount();
+    ctx->IncDocCount(inc_count);
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -89,12 +89,12 @@ void Indexer::Add(DataBlock *data_block) {
         }
     }
     RowID start_row_id = row_ids[0]; // TODO: interface requires to be optimized
-    UpdateSegment(start_row_id);
     for (SizeT i = 0; i < column_vectors.size(); ++i) {
         /// TODO column_id ?
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Insert(column_vectors[i], start_row_id);
     }
+    UpdateSegment(start_row_id, row_ids.size());
 }
 
 void Indexer::Insert(RowID row_id, String &data) {
