@@ -17,6 +17,7 @@ from generate_top_varchar import generate as generate7
 from generate_compact import generate as generate8
 from generate_hnsw_with_delete import generate as generate9
 from generate_index_scan import generate as generate10
+from generate_many_import import generate as generate11
 
 
 class SpinnerThread(threading.Thread):
@@ -25,13 +26,14 @@ class SpinnerThread(threading.Thread):
         self.stop = False
 
     def run(self):
-        spinner = itertools.cycle(['-', '/', '|', '\\'])
+        spinner = itertools.cycle(["-", "/", "|", "\\"])
         while not self.stop:
-            print(next(spinner), end='\r')
+            print(next(spinner), end="\r")
             time.sleep(0.1)
 
     def stop_spinner(self):
         self.stop = True
+
 
 def python_skd_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
@@ -43,11 +45,15 @@ def python_skd_test(python_test_dir: str):
     os.system("cd python && python setup.py install")
     # run test
     print("start pysdk test...")
-    process = subprocess.Popen(["python", "-m", "pytest", f"{python_test_dir}/test"], stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, universal_newlines=True)
+    process = subprocess.Popen(
+        ["python", "-m", "pytest", f"{python_test_dir}/test"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
 
     def reader(pipe, func):
-        for line in iter(pipe.readline, ''):
+        for line in iter(pipe.readline, ""):
             func(line.strip())
 
     threading.Thread(target=reader, args=[process.stdout, print]).start()
@@ -74,11 +80,15 @@ def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
             #     continue
 
             print("Start running test file: " + file)
-            process = subprocess.run([sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.run(
+                [sqllogictest_bin, file], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
             output, error = process.stdout, process.stderr
             print(f"Output: {output.decode()}")  # Prints the output.
             if process.returncode != 0:
-                raise Exception(f"An error occurred: {error.decode()}")  # Prints the error message.
+                raise Exception(
+                    f"An error occurred: {error.decode()}"
+                )  # Prints the error message.
             print("=" * 99)
             test_cnt += 1
 
@@ -168,6 +178,7 @@ if __name__ == "__main__":
     generate8(args.generate_if_exists, args.copy)
     generate9(args.generate_if_exists, args.copy)
     generate10(args.generate_if_exists, args.copy)
+    generate11(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     print("Start copying data...")

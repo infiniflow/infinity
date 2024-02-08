@@ -177,6 +177,8 @@ public:
 
     void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
 
+    TxnManager *txn_mgr() const { return txn_mgr_; }
+
 private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal

@@ -28,15 +28,15 @@ import compaction_alg;
 namespace infinity {
 
 Vector<SegmentEntry *> SegmentLayer::SetAllCompacting(TransactionID txn_id) {
-    Vector<SegmentEntry *> ret = segments_; // copy here
-    compacting_segments_map_.emplace(txn_id, std::move(segments_));
+    Vector<SegmentEntry *> ret = segments_;                         // copy here
+    compacting_segments_map_.emplace(txn_id, std::move(segments_)); // move makes segment_ empty
     return ret;
 }
 
 void SegmentLayer::SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id) {
     SegmentID segment_id = segment_entry->segment_id();
     auto erase_begin = std::remove_if(segments_.begin(), segments_.end(), [&](SegmentEntry *segment) { return segment->segment_id() == segment_id; });
-    if (segments_.end() - erase_begin != 1) {
+    if (int find_n = segments_.end() - erase_begin; find_n != 1) {
         UnrecoverableError("Segment not found in layer");
     }
     segments_.erase(erase_begin, segments_.end());
@@ -52,6 +52,16 @@ void SegmentLayer::RollbackCompact(TransactionID txn_id) {
         }
     }
     compacting_segments_map_.erase(txn_id);
+}
+
+SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
+    SegmentEntry *segment = nullptr;
+    for (auto *segment : segments_) {
+        if (segment->segment_id() == segment_id) {
+            return segment;
+        }
+    }
+    return segment;
 }
 
 void DBTCompactionAlg::AddInitSegments(Vector<SegmentEntry *> segment_entries) {
@@ -85,11 +95,10 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    auto iter = segment_layer_map_.find(segment_id);
-    if (iter == segment_layer_map_.end()) { // the segment has been compacted and not committed
+    auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
+    if (shrink_segment == nullptr) {
         return None;
     }
-    auto [shrink_segment, old_layer] = iter->second;
     SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
     int new_layer = config_.CalculateLayer(new_row_cnt);
     if (old_layer == new_layer) {
@@ -143,7 +152,7 @@ Optional<int> DBTCompactionAlg::AddSegmentInner(SegmentEntry *new_segment) {
         segment_layers_.resize(layer + 1);
     }
     SegmentLayer &segment_layer = segment_layers_[layer];
-    segment_layer_map_.emplace(new_segment->segment_id(), Pair<SegmentEntry *, int>{new_segment, layer});
+    // segment_layer_map_.emplace(new_segment->segment_id(), Pair<SegmentEntry *, int>{new_segment, layer});
     segment_layer.AddSegmentInfo(new_segment);
 
     // Now: prohibit the top layer to merge
@@ -167,6 +176,20 @@ void DBTCompactionAlg::AddSegmentToHigher(Vector<SegmentEntry *> &compact_segmen
         compact_segments.insert(compact_segments.end(), compact_segments1.begin(), compact_segments1.end());
         ++layer;
     }
+}
+
+// FIXME: use brute force to find the segment, for simple reason.
+// NOTE: When implement a more efficient way, such as hashmap, you should rollback the hashmap when rollback compact
+Pair<SegmentEntry *, int> DBTCompactionAlg::FindSegmentAndLayer(SegmentID segment_id) {
+    for (int layer = 0; layer < (int)segment_layers_.size(); ++layer) {
+        auto &segment_layer = segment_layers_[layer];
+        if (auto segment = segment_layer.FindSegment(segment_id); segment != nullptr) {
+            return std::make_pair(segment, layer);
+        }
+    }
+    // the may happen because the segment is compacting. Ignore it
+    // FIXME: do something
+    return {nullptr, -1};
 }
 
 } // namespace infinity

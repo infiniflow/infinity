@@ -99,12 +99,8 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
         UnrecoverableError("No segment to compact");
     }
     auto block_index = MakeShared<BlockIndex>();
-    TxnTimeStamp begin_ts = txn->BeginTS();
     for (auto *segment : segments) {
-        block_index->Insert(segment, begin_ts, true);
-    }
-    if (segments.size() != block_index->segments_.size()) {
-        UnrecoverableError("Input segments error");
+        block_index->Insert(segment, UNCOMMIT_TS, false);
     }
     auto mock_table_ref = MakeShared<BaseTableRef>(table_entry, std::move(block_index));
     return MakeShared<CompactSegmentsTask>(mock_table_ref, txn, CompactSegmentsTaskType::kCompactPickedSegments);

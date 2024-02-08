@@ -93,6 +93,10 @@ public:
 public:
     String ToString() const override { return "Compact segments task"; }
 
+    void BeginTxn() { txn_->Begin(); }
+
+    void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); };
+
     void Execute();
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in

@@ -67,8 +67,8 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
-    SetCompactionAlg(nullptr);
-    // SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
+    // SetCompactionAlg(nullptr);
+    SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,

@@ -64,6 +64,8 @@ public:
 
     SizeT LayerSize() const { return segments_.size(); }
 
+    SegmentEntry *FindSegment(SegmentID segment_id);
+
 private:
     Vector<SegmentEntry *> segments_;
     MultiHashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
@@ -91,12 +93,13 @@ private:
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
+    Pair<SegmentEntry *, int> FindSegmentAndLayer(SegmentID segment_id);
+
 private:
     const DBTConfig config_;
     const int max_layer_;
 
     std::mutex mtx_;
-    HashMap<SegmentID, Pair<SegmentEntry *, int>> segment_layer_map_;
     Vector<SegmentLayer> segment_layers_;
 };
 
