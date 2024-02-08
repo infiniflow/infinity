@@ -46,7 +46,15 @@ void TaskScheduler::Init(const Config *config_ptr) {
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
     u64 cpu_count = Thread::hardware_concurrency();
-    for (u64 cpu_id = 0; cpu_id < worker_count_; ++cpu_id) {
+
+    u64 cpu_select_step = cpu_count / worker_count_;
+    if(cpu_select_step >= 2) {
+        cpu_select_step = 2;
+    } else {
+        cpu_select_step = 1;
+    }
+
+    for (u64 cpu_id = 0; cpu_id < worker_count_; cpu_id += cpu_select_step) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
         // Pin the thread to specific cpu
@@ -77,8 +85,9 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     u64 min_workload = worker_workloads_[0];
     u64 min_workload_worker_id = 0;
     for (u64 worker_id = 1; worker_id < worker_count_ && min_workload; ++worker_id) {
-        if (worker_workloads_[worker_id] < min_workload) {
-            min_workload = worker_workloads_[worker_id];
+        u64 current_worker_load = worker_workloads_[worker_id];
+        if (current_worker_load < min_workload) {
+            min_workload = current_worker_load;
             min_workload_worker_id = worker_id;
         }
     }
@@ -112,8 +121,8 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
 
     auto [fragments, task_n] = GetStartFragments(plan_fragment);
     plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
-    for (auto *plan_fragment : fragments) {
-        auto &tasks = plan_fragment->GetContext()->Tasks();
+    for (auto *sub_fragment : fragments) {
+        auto &tasks = sub_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
