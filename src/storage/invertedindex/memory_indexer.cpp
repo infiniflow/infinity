@@ -163,16 +163,21 @@ void MemoryIndexer::SwitchActiveParallelInverters() {
     ++num_inverters_;
 }
 
-void MemoryIndexer::Commit() {
+void MemoryIndexer::PreCommit() {
     if (index_config_.GetIndexingParallelism() > 1) {
-        auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
+        inflight_commit_task_ = MakeUnique<CommitTask>(parallel_inverter_.get());
         SwitchActiveParallelInverters();
-        invert_executor_->SyncAll();
-        commit_executor_->Execute(0, std::move(task));
     } else {
         auto task = MakeUnique<CommitTask>(inverter_.get());
         commit_executor_->Execute(0, std::move(task));
         SwitchActiveInverter();
+    }
+}
+
+void MemoryIndexer::Commit() {
+    if (index_config_.GetIndexingParallelism() > 1) {
+        invert_executor_->SyncAll();
+        commit_executor_->Execute(0, std::move(inflight_commit_task_));
     }
 }
 

@@ -53,6 +53,8 @@ public:
 
     ColumnIndexer *GetColumnIndexer(u64 column_id) { return column_indexers_[column_id].get(); }
 
+    std::shared_mutex &GetMutex() { return flush_mutex_; }
+
 private:
     void AddSegment();
 

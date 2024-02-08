@@ -32,6 +32,8 @@ public:
 
     void Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id);
 
+    void PreCommit();
+
     void Commit();
 
     void Dump();

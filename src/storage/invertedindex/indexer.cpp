@@ -105,6 +105,16 @@ void Indexer::Insert(RowID row_id, String &data) {
 }
 
 void Indexer::Commit() {
+    {
+        // PreCommit is used to switch internal inverters such that all
+        // data after the Commit is called from other threads will not
+        // be out of sync
+        std::unique_lock<std::shared_mutex> lock(flush_mutex_);
+        for (SizeT i = 0; i < column_ids_.size(); ++i) {
+            u64 column_id = column_ids_[i];
+            column_indexers_[column_id]->PreCommit();
+        }
+    }
     for (SizeT i = 0; i < column_ids_.size(); ++i) {
         u64 column_id = column_ids_[i];
         column_indexers_[column_id]->Commit();
