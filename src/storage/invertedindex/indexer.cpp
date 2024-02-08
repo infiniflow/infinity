@@ -72,6 +72,7 @@ void Indexer::UpdateSegment(RowID row_id) {
     if (ctx->GetBaseDocId() == INVALID_DOCID) {
         ctx->SetBaseDocId(RowID2DocID(row_id));
     }
+    ctx->IncDocCount();
 }
 
 void Indexer::Add(DataBlock *data_block) {
@@ -105,6 +106,7 @@ void Indexer::Insert(RowID row_id, String &data) {
 }
 
 void Indexer::Commit() {
+    // Commit is called in a dedicate thread periodically
     {
         // PreCommit is used to switch internal inverters such that all
         // data after the Commit is called from other threads will not
