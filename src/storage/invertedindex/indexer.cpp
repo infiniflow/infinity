@@ -66,7 +66,7 @@ void Indexer::AddSegment() {
     active_segment_.store(&segment, std::memory_order_acq_rel);
 }
 
-void Indexer::UpdateSegment(RowID row_id, u64 inc_count = 1) {
+void Indexer::UpdateSegment(RowID row_id, u64 inc_count) {
     std::shared_lock<std::shared_mutex> lock(flush_mutex_);
     auto *ctx = active_segment_.load(std::memory_order_relaxed);
     if (ctx->GetBaseDocId() == INVALID_DOCID) {
