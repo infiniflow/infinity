@@ -1,5 +1,4 @@
 #include "unit_test/base_test.h"
-#include <iostream>
 
 import stl;
 import memory_pool;
