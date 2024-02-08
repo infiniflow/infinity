@@ -80,7 +80,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
-    std::vector<std::jthread> threads;
+    std::vector<std::thread> threads;
     threads.reserve(numThreads);
     size_t avg_cnt = (end - start) / numThreads;
     size_t extra_cnt = (end - start) % numThreads;
@@ -88,6 +88,9 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
         threads.emplace_back([id_begin, id_end, threadId, fn, table_name] { LoopFor(id_begin, id_end, threadId, fn, table_name); });
         id_begin = id_end;
+    }
+    for(auto& thread: threads) {
+        thread.join();
     }
 }
 

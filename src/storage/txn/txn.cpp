@@ -426,7 +426,7 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
 
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetTimestamp();
-    LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
     txn_context_.BeginCommit(ts);
 }
 

@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module logical_planner;
 
