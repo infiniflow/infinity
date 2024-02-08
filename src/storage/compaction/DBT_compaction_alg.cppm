@@ -62,9 +62,12 @@ public:
 
     void SetOneCompacting(SegmentEntry *segment_entry, TransactionID txn_id) {
         SegmentID segment_id = segment_entry->segment_id();
-        segments_.erase(
-            std::remove_if(segments_.begin(), segments_.end(), [&](SegmentEntry *segment) { return segment->segment_id() == segment_id; }),
-            segments_.end());
+        auto erase_begin =
+            std::remove_if(segments_.begin(), segments_.end(), [&](SegmentEntry *segment) { return segment->segment_id() == segment_id; });
+        if (segments_.end() - erase_begin != 1) {
+            UnrecoverableError("Segment not found in layer");
+        }
+        segments_.erase(erase_begin, segments_.end());
         compacting_segments_map_.emplace(txn_id, Vector<SegmentEntry *>{segment_entry});
     }
 
@@ -114,36 +117,45 @@ public:
         TransactionID txn_id = txn->TxnID();
 
         Vector<SegmentEntry *> compact_segments = segment_layers_[layer].SetAllCompacting(txn_id);
-        AddSegmentToHigher(compact_segments, layer, txn_id);
+        AddSegmentToHigher(compact_segments, layer + 1, txn_id);
 
+        if (compact_segments.size() <= 1) {
+            UnrecoverableError("Algorithm bug.");
+        }
         return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
     }
 
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentEntry *shrink_segment, StdFunction<Txn *()> generate_txn) final {
         SegmentID segment_id = shrink_segment->segment_id();
         auto iter = segment_layer_map_.find(segment_id);
-        if (iter == segment_layer_map_.end()) {
-            UnrecoverableError("Segment not found");
-        }
-        int layer = iter->second;
-        SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
-        int new_layer = config_.CalculateLayer(new_row_cnt);
-        if (layer == new_layer) {
+        if (iter == segment_layer_map_.end()) { // the segment has been compacted and not committed
             return None;
         }
-        if (new_layer >= layer) {
+        int old_layer = iter->second;
+        SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
+        int new_layer = config_.CalculateLayer(new_row_cnt);
+        if (old_layer == new_layer) {
+            return None;
+        }
+        if (new_layer >= old_layer) {
             UnrecoverableError("Shrink segment has less rows than before");
         }
 
         Txn *txn = generate_txn();
         TransactionID txn_id = txn->TxnID();
 
-        SegmentLayer &old_segment_layer = segment_layers_[layer];
+        SegmentLayer &old_segment_layer = segment_layers_[old_layer];
         old_segment_layer.SetOneCompacting(shrink_segment, txn_id);
 
         Vector<SegmentEntry *> compact_segments{shrink_segment};
-        AddSegmentToHigher(compact_segments, layer, txn_id);
+        AddSegmentToHigher(compact_segments, new_layer, txn_id);
 
+        if (compact_segments.size() == 1) {
+            this->CommitCompact(compact_segments, txn_id);
+            return MakePair(Vector<SegmentEntry *>(), std::move(txn));
+        } else if (compact_segments.empty()) {
+            UnrecoverableError("Algorithm bug.");
+        }
         return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
     }
 
@@ -183,7 +195,6 @@ private:
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id) {
         while (true) {
-            ++layer;
             if (layer >= (int)segment_layers_.size()) {
                 segment_layers_.emplace_back();
             }
@@ -193,6 +204,7 @@ private:
             }
             auto compact_segments1 = segment_layer.SetAllCompacting(txn_id);
             compact_segments.insert(compact_segments.end(), compact_segments1.begin(), compact_segments1.end());
+            ++layer;
         }
     }
 

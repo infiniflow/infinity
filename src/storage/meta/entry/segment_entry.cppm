@@ -154,7 +154,7 @@ public:
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
-protected: // for unit test
+protected: // protected for unit test
     // called when lock held
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
