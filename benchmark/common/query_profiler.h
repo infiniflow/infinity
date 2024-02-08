@@ -6,6 +6,7 @@
 
 #include "magic_enum.hpp"
 #include "base_profiler.h"
+#include <vector>
 
 namespace infinity {
 
