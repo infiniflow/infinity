@@ -13,6 +13,7 @@ import data_block;
 import column_indexer;
 import third_party;
 import segment;
+import internal_types;
 export module indexer;
 
 namespace infinity {
@@ -34,9 +35,11 @@ public:
 
     void Add(DataBlock *data_block);
 
+    void Insert(RowID row_id, String &data);
+
     void Commit();
 
-    bool NeedDump();
+    void TryDump();
 
     void Dump();
 
@@ -50,7 +53,13 @@ public:
 
     ColumnIndexer *GetColumnIndexer(u64 column_id) { return column_indexers_[column_id].get(); }
 
+    std::shared_mutex &GetMutex() { return flush_mutex_; }
+
 private:
+    void AddSegment();
+
+    void UpdateSegment(RowID row_id, u64 inc_count = 1);
+
     InvertedIndexConfig index_config_;
     String directory_;
     Vector<u64> column_ids_;
@@ -59,5 +68,8 @@ private:
     FlatHashMap<u64, UniquePtr<ColumnIndexer>, detail::Hash<u64>> column_indexers_;
     SharedPtr<IDGenerator> id_generator_;
     Vector<Segment> segments_;
+    Atomic<Segment *> active_segment_;
+    Atomic<u32> dump_ref_count_;
+    mutable std::shared_mutex flush_mutex_;
 };
 } // namespace infinity

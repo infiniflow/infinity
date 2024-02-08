@@ -163,12 +163,10 @@ void MemoryIndexer::SwitchActiveParallelInverters() {
     ++num_inverters_;
 }
 
-void MemoryIndexer::Commit() {
+void MemoryIndexer::PreCommit() {
     if (index_config_.GetIndexingParallelism() > 1) {
-        auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
+        inflight_commit_task_ = MakeUnique<CommitTask>(parallel_inverter_.get());
         SwitchActiveParallelInverters();
-        invert_executor_->SyncAll();
-        commit_executor_->Execute(0, std::move(task));
     } else {
         auto task = MakeUnique<CommitTask>(inverter_.get());
         commit_executor_->Execute(0, std::move(task));
@@ -176,7 +174,14 @@ void MemoryIndexer::Commit() {
     }
 }
 
-bool MemoryIndexer::NeedDump() { return indexer_->NeedDump(); }
+void MemoryIndexer::Commit() {
+    if (index_config_.GetIndexingParallelism() > 1) {
+        invert_executor_->SyncAll();
+        commit_executor_->Execute(0, std::move(inflight_commit_task_));
+    }
+}
+
+void MemoryIndexer::TryDump() { indexer_->TryDump(); }
 
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
     MemoryIndexer::PostingTable::Iterator iter = posting_store_->find(term);
@@ -232,8 +237,6 @@ void MemoryIndexer::Reset() {
         rt_posting_store_->clear();
     }
 }
-
-void MemoryIndexer::Dump() { column_indexer_->Dump(); }
 
 } // namespace infinity
 
