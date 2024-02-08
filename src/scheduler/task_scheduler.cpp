@@ -94,8 +94,7 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
     return min_workload_worker_id;
 }
 
-Pair<Vector<PlanFragment *>, SizeT> TaskScheduler::GetStartFragments(PlanFragment *plan_fragment) {
-    Vector<PlanFragment *> leaf_fragments;
+SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanFragment *>& leaf_fragments) {
     SizeT all_fragment_n = 0;
     StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
         all_fragment_n += root->GetContext()->Tasks().size();
@@ -110,7 +109,7 @@ Pair<Vector<PlanFragment *>, SizeT> TaskScheduler::GetStartFragments(PlanFragmen
     // Traverse the tree to get all leaf fragments
     TraversePlanFragmentTree(plan_fragment);
 
-    return {leaf_fragments, all_fragment_n};
+    return all_fragment_n;
 }
 
 void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
@@ -119,9 +118,10 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment) {
     }
     // DumpPlanFragment(plan_fragment);
 
-    auto [fragments, task_n] = GetStartFragments(plan_fragment);
+    Vector<PlanFragment *> start_fragments;
+    SizeT task_n = GetStartFragments(plan_fragment, start_fragments);
     plan_fragment->GetContext()->notifier()->SetTaskN(task_n);
-    for (auto *sub_fragment : fragments) {
+    for (auto *sub_fragment : start_fragments) {
         auto &tasks = sub_fragment->GetContext()->Tasks();
         for (auto &task : tasks) {
             // set the status to running

@@ -451,14 +451,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     case HnswEncodeType::kPlain: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
+                                using HnswIP = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainIPDist<f32, SegmentOffset>>;
                                 // Fixme: const_cast here. may have bug.
-                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
+                                KnnScan(const_cast<HnswIP *>(static_cast<const HnswIP *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
-                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
+                                using HnswL2 = KnnHnsw<f32, SegmentOffset, PlainStore<f32, SegmentOffset>, PlainL2Dist<f32, SegmentOffset>>;
+                                KnnScan(const_cast<HnswL2 *>(static_cast<const HnswL2 *>(index_handle.GetData())));
                                 break;
                             }
                             default: {
@@ -470,19 +470,19 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     case HnswEncodeType::kLVQ: {
                         switch (index_hnsw->metric_type_) {
                             case MetricType::kMerticInnerProduct: {
-                                using Hnsw = KnnHnsw<f32,
-                                                     SegmentOffset,
-                                                     LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>,
-                                                     LVQIPDist<f32, SegmentOffset, i8>>;
-                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
+                                using HnswLVQIP = KnnHnsw<f32,
+                                                          SegmentOffset,
+                                                          LVQStore<f32, SegmentOffset, i8, LVQIPCache<f32, i8>>,
+                                                          LVQIPDist<f32, SegmentOffset, i8>>;
+                                KnnScan(const_cast<HnswLVQIP *>(static_cast<const HnswLVQIP *>(index_handle.GetData())));
                                 break;
                             }
                             case MetricType::kMerticL2: {
-                                using Hnsw = KnnHnsw<f32,
-                                                     SegmentOffset,
-                                                     LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>,
-                                                     LVQL2Dist<f32, SegmentOffset, i8>>;
-                                KnnScan(const_cast<Hnsw *>(static_cast<const Hnsw *>(index_handle.GetData())));
+                                using HnswLVQL2 = KnnHnsw<f32,
+                                                          SegmentOffset,
+                                                          LVQStore<f32, SegmentOffset, i8, LVQL2Cache<f32, i8>>,
+                                                          LVQL2Dist<f32, SegmentOffset, i8>>;
+                                KnnScan(const_cast<HnswLVQL2 *>(static_cast<const HnswLVQL2 *>(index_handle.GetData())));
                                 break;
                             }
                             default: {
