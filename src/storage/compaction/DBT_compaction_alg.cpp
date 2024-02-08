@@ -83,14 +83,13 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
     return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentEntry *shrink_segment, StdFunction<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    SegmentID segment_id = shrink_segment->segment_id();
     auto iter = segment_layer_map_.find(segment_id);
     if (iter == segment_layer_map_.end()) { // the segment has been compacted and not committed
         return None;
     }
-    int old_layer = iter->second;
+    auto [shrink_segment, old_layer] = iter->second;
     SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
     int new_layer = config_.CalculateLayer(new_row_cnt);
     if (old_layer == new_layer) {
@@ -108,6 +107,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
 
     Vector<SegmentEntry *> compact_segments{shrink_segment};
     AddSegmentToHigher(compact_segments, new_layer, txn_id);
+    lock.unlock();
 
     if (compact_segments.size() == 1) {
         this->CommitCompact(compact_segments, txn_id);
@@ -143,11 +143,12 @@ Optional<int> DBTCompactionAlg::AddSegmentInner(SegmentEntry *new_segment) {
         segment_layers_.resize(layer + 1);
     }
     SegmentLayer &segment_layer = segment_layers_[layer];
-    segment_layer_map_.emplace(new_segment->segment_id(), layer);
+    segment_layer_map_.emplace(new_segment->segment_id(), Pair<SegmentEntry *, int>{new_segment, layer});
     segment_layer.AddSegmentInfo(new_segment);
 
-    if (layer == max_layer_ // the filled segment will not be merged
-        || segment_layer.LayerSize() < config_.m_) {
+    // Now: prohibit the top layer to merge
+    // TODO: merge the top layer if possible
+    if (layer == max_layer_ || segment_layer.LayerSize() < config_.m_) {
         return None;
     }
     return layer;

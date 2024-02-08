@@ -18,8 +18,6 @@ export module compact_segments_task;
 
 import stl;
 import bg_task;
-import segment_entry;
-
 import default_values;
 import infinity_exception;
 import txn;
@@ -30,6 +28,7 @@ import internal_types;
 namespace infinity {
 
 class TableEntry;
+class SegmentEntry;
 
 class RowIDRemapper {
 private:
@@ -78,18 +77,17 @@ export struct CompactSegmentsTaskState {
     UniquePtr<BaseTableRef> new_table_ref_;
 };
 
-enum class CompactSegmentsTaskType {
+export enum class CompactSegmentsTaskType : i8 {
     kCompactTable,
     kCompactPickedSegments,
 };
 
 export class CompactSegmentsTask final : public BGTask {
 public:
-    static CompactSegmentsTask MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> segments, Txn *txn);
+    static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> segments, Txn *txn);
 
-    static CompactSegmentsTask MakeTaskWithWholeTable(SharedPtr<BaseTableRef> &table_ref, Txn *txn);
+    static SharedPtr<CompactSegmentsTask> MakeTaskWithWholeTable(SharedPtr<BaseTableRef> &table_ref, Txn *txn);
 
-private:
     explicit CompactSegmentsTask(SharedPtr<BaseTableRef> table_ref, Txn *txn, CompactSegmentsTaskType type);
 
 public:
@@ -121,7 +119,7 @@ private:
     bool ApplyToDelete(const RowIDRemapper &remapper);
 
 private:
-    CompactSegmentsTaskType type_;
+    CompactSegmentsTaskType task_type_;
     const SharedPtr<BaseTableRef> table_ref_; // hold table ref here because task may be background task
 
     Txn *const txn_;

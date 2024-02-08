@@ -44,7 +44,7 @@ public:
     // Add a new segment, return the segments to be compacted, and the transaction to commit or rollback
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) = 0;
 
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentEntry *shrink_segment, StdFunction<Txn *()> generate_txn) = 0;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) = 0;
 
     // After finish compaction, call this to add the compacted segment.
     // TODO: when compacting, some row may be deleted and triggered compaction condition again, ignroe it now

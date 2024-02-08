@@ -239,7 +239,7 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
     }
     {
         new_segment->ShrinkSegment(2);
-        auto ret = DBTCompact.DeleteInSegment(new_segment, GetTxn);
+        auto ret = DBTCompact.DeleteInSegment(new_segment->segment_id(), GetTxn);
         EXPECT_TRUE(ret.has_value());
         auto [segments, txn] = ret.value();
         txn->Begin();
@@ -289,7 +289,7 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
     }
     {
         new_segment->ShrinkSegment(1);
-        auto ret = DBTCompact.DeleteInSegment(new_segment, GetTxn);
+        auto ret = DBTCompact.DeleteInSegment(new_segment->segment_id(), GetTxn);
         EXPECT_TRUE(ret.has_value());
         auto [segments, txn] = ret.value();
         txn->Begin();

@@ -109,6 +109,10 @@ export {
     // default distance compute blas parameter
     constexpr SizeT DISTANCE_COMPUTE_BLAS_QUERY_BS = 4096;
     constexpr SizeT DISTANCE_COMPUTE_BLAS_DATABASE_BS = 1024;
+
+    constexpr SizeT DBT_COMPACTION_M = 4;
+    constexpr SizeT DBT_COMPACTION_C = 4;
+    constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

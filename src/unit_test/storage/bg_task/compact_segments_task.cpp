@@ -56,6 +56,7 @@ protected:
             txn->Begin();
 
             auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
@@ -130,7 +131,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
-                compact_task.Execute();
+                compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
         }
@@ -207,7 +208,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
-                compact_task.Execute();
+                compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
         }
@@ -311,7 +312,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
-                compact_task.Execute();
+                compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
         }
@@ -411,7 +412,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
-                auto state = compact_task.CompactSegments();
+                auto state = compact_task->CompactSegments();
 
                 {
                     auto txn5 = txn_mgr->CreateTxn();
@@ -436,8 +437,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                     txn_mgr->CommitTxn(txn5);
                 }
 
-                compact_task.SaveSegmentsData(std::move(state.segment_data_));
-                compact_task.ApplyDeletes(state.remapper_);
+                compact_task->SaveSegmentsData(std::move(state.segment_data_));
+                compact_task->ApplyDeletes(state.remapper_);
             }
 
             txn_mgr->CommitTxn(txn4);
@@ -539,7 +540,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, compact_txn->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, compact_txn);
 
-                auto state = compact_task.CompactSegments();
+                auto state = compact_task->CompactSegments();
 
                 Vector<RowID> delete_row_ids;
                 Vector<RowID> delete_row_ids2;
@@ -579,7 +580,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     delete_n += delete_row_n1;
                 }
 
-                compact_task.SaveSegmentsData(std::move(state.segment_data_));
+                compact_task->SaveSegmentsData(std::move(state.segment_data_));
                 {
                     // std::this_thread::sleep_for(std::chrono::seconds(1));
                     Thread t([&]() {
@@ -592,7 +593,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     });
                     t.join();
                 }
-                compact_task.ApplyDeletes(state.remapper_);
+                compact_task->ApplyDeletes(state.remapper_);
             }
             txn_mgr->CommitTxn(compact_txn);
 
