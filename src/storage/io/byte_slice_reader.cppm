@@ -48,6 +48,7 @@ public:
     SizeT Tell() const { return global_offset_; }
 
     bool CurrentSliceEnough(SizeT len) { return current_slice_offset_ + len <= GetSliceDataSize(current_slice_); }
+
     u8 *GetCurrentSliceData() { return current_slice_->data_ + current_slice_offset_; }
 
 public:
