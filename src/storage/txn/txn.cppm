@@ -59,6 +59,7 @@ struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
+enum class CompactSegmentsTaskType;
 
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
@@ -77,7 +78,7 @@ public:
 
     TxnTimeStamp Commit();
 
-    void CommitBottom();
+    void CommitBottom() noexcept;
 
     void CancelCommitBottom();
 
@@ -137,7 +138,10 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
 
-    Status Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+    Status Compact(const String &db_name,
+                   const String &table_name,
+                   Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                   CompactSegmentsTaskType type);
 
     // Getter
     BufferManager *GetBufferMgr() const;
@@ -172,6 +176,8 @@ public:
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
     void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
+
+    TxnManager *txn_mgr() const { return txn_mgr_; }
 
 private:
     TxnManager *txn_mgr_{};

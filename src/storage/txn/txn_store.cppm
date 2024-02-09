@@ -31,6 +31,9 @@ struct TableEntry;
 struct SegmentEntry;
 class DataBlock;
 class SegmentColumnIndexEntry;
+class BGTaskProcessor;
+class TxnManager;
+enum class CompactSegmentsTaskType;
 
 struct TxnSegmentIndexStore {
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_entry_map_{};
@@ -52,6 +55,8 @@ public:
 
 export struct TxnCompactStore {
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+
+    CompactSegmentsTaskType task_type_;
 };
 
 export class TxnTableStore {
@@ -62,11 +67,13 @@ public:
 
     Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
 
-    Tuple<UniquePtr<String>, Status> CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
+    Tuple<UniquePtr<String>, Status>
+    CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
-    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                                             CompactSegmentsTaskType type);
 
     void Scan(SharedPtr<DataBlock> &output_block);
 
@@ -75,6 +82,8 @@ public:
     void PrepareCommit();
 
     void Commit() const;
+
+    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};

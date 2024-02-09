@@ -221,6 +221,9 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     if (max_bytes < 0) {
         UnrecoverableError("ptr goes out of range when reading CatalogDeltaOperation");
     }
+    if (operation.get() == nullptr) {
+        UnrecoverableError("operation is nullptr");
+    }
     return operation;
 }
 

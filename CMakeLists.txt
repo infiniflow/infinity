@@ -33,7 +33,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
 else ()
     message(FATAL_ERROR, "Please use clang version 17.0 and above")
