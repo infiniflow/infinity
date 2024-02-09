@@ -84,6 +84,7 @@ public:
                 segment_size -= row_count;
             }
         } while (result.size() == 1 && (result[0]->actual_row_count() == result[0]->row_count()));
+        // FIXME: compact single segment with too much delete row
         return result;
     }
 
@@ -93,8 +94,24 @@ private:
     const SizeT max_segment_size_;
 };
 
-CompactSegmentsTask::CompactSegmentsTask(BaseTableRef *table_ref, Txn *txn)
-    : BGTask(BGTaskType::kCompactSegments, false), table_ref_(table_ref), txn_(txn) {}
+SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> segments, Txn *txn) {
+    if (segments.empty()) {
+        UnrecoverableError("No segment to compact");
+    }
+    auto block_index = MakeShared<BlockIndex>();
+    for (auto *segment : segments) {
+        block_index->Insert(segment, UNCOMMIT_TS, false);
+    }
+    auto mock_table_ref = MakeShared<BaseTableRef>(table_entry, std::move(block_index));
+    return MakeShared<CompactSegmentsTask>(mock_table_ref, txn, CompactSegmentsTaskType::kCompactPickedSegments);
+}
+
+SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(SharedPtr<BaseTableRef> &table_ref, Txn *txn) {
+    return MakeShared<CompactSegmentsTask>(table_ref, txn, CompactSegmentsTaskType::kCompactTable);
+}
+
+CompactSegmentsTask::CompactSegmentsTask(SharedPtr<BaseTableRef> table_ref, Txn *txn, CompactSegmentsTaskType type)
+    : BGTask(BGTaskType::kCompactSegments, false), task_type_(type), table_ref_(table_ref), txn_(txn) {}
 
 void CompactSegmentsTask::Execute() {
     auto state = CompactSegments();
@@ -103,23 +120,42 @@ void CompactSegmentsTask::Execute() {
     ApplyDeletes(state.remapper_);
 }
 
+// generate new_table_ref_ to compact
 CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
-    CompactSegmentsTaskState state(table_ref_);
+    CompactSegmentsTaskState state(table_ref_.get());
     auto block_index = MakeShared<BlockIndex>();
 
-    Vector<SegmentEntry *> segments = PickSegmentsToCompact();
-    GreedyCompactableSegmentsGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
+    switch (task_type_) {
+        case CompactSegmentsTaskType::kCompactTable: {
+            Vector<SegmentEntry *> segments = PickSegmentsToCompact();
+            GreedyCompactableSegmentsGenerator generator(segments, DEFAULT_SEGMENT_CAPACITY);
 
-    while (true) {
-        Vector<SegmentEntry *> to_compact_segments = generator.generate();
-        if (to_compact_segments.empty()) {
+            while (true) {
+                Vector<SegmentEntry *> to_compact_segments = generator.generate();
+                if (to_compact_segments.empty()) {
+                    break;
+                }
+                auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
+                block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
+                state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
+            }
             break;
         }
-        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
-        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
-        state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
+        case CompactSegmentsTaskType::kCompactPickedSegments: {
+            // the picked segments are already in table ref
+            Vector<SegmentEntry *> to_compact_segments = table_ref_->block_index_->segments_; // copy the vector
+            if (to_compact_segments.empty()) {
+                UnrecoverableError("No segment to compact");
+            }
+            auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
+            block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
+            state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
+            break;
+        }
+        default: {
+            UnrecoverableError("Unknown compact segments task type");
+        }
     }
-
     // TODO: BaseTableRef has no copy constructor
     *state.new_table_ref_ = BaseTableRef(table_ref_->table_entry_ptr_,
                                          table_ref_->column_ids_,
@@ -170,7 +206,7 @@ void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, 
     auto *table_entry = table_ref_->table_entry_ptr_;
     String db_name = *table_entry->GetDBName();
     String table_name = *table_entry->GetTableName();
-    txn_->Compact(db_name, table_name, std::move(segment_data));
+    txn_->Compact(db_name, table_name, std::move(segment_data), task_type_);
     txn_->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(segment_infos), std::move(old_segment_ids)));
 }
 

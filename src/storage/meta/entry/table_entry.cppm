@@ -33,6 +33,7 @@ import txn_manager;
 import segment_entry;
 import block_entry;
 import table_index_meta;
+import compaction_alg;
 
 namespace infinity {
 
@@ -47,9 +48,6 @@ export struct TableEntry : public BaseEntry {
     friend struct NewCatalog;
 
 public:
-    // for iterator unit test.
-    explicit TableEntry() : BaseEntry(EntryType::kTable) {}
-
     explicit TableEntry(const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -190,6 +188,18 @@ private:
 
     // Index meta
     HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
+
+public:
+    // set nullptr to close auto compaction
+    void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
+
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn);
+
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn);
+
+private:
+    // the compaction algorithm, mutable because all its interface are protected by lock
+    mutable UniquePtr<CompactionAlg> compaction_alg_{};
 };
 
 } // namespace infinity

@@ -46,6 +46,7 @@ import catalog_delta_entry;
 import bg_task;
 import backgroud_process;
 import base_table_ref;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -125,7 +126,10 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     return delete_status;
 }
 
-Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
+Status Txn::Compact(const String &db_name,
+                    const String &table_name,
+                    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                    CompactSegmentsTaskType type) {
     auto [table_entry, status] = GetTableEntry(db_name, table_name);
     if (!status.ok()) {
         return status;
@@ -137,7 +141,7 @@ Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair
     }
     table_store = txn_tables_store_[table_name].get();
 
-    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data));
+    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
 }
 
@@ -458,7 +462,7 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-void Txn::CommitBottom() {
+void Txn::CommitBottom() noexcept {
 
     // prepare to commit txn local data into table
     for (const auto &name_table_pair : txn_tables_store_) {
@@ -472,6 +476,7 @@ void Txn::CommitBottom() {
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
         table_local_store->Commit();
+        table_local_store->TryTriggerCompaction(bg_task_processor_, txn_mgr_);
     }
 
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();

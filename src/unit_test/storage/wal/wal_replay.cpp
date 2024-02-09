@@ -746,8 +746,8 @@ TEST_F(WalReplayTest, WalReplayCompact) {
 
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                CompactSegmentsTask compact_task(&table_ref, txn4);
-                compact_task.Execute();
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
         }
@@ -844,7 +844,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
-                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+                txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
             }
             txn_mgr->CommitTxn(txn);
         }
@@ -951,7 +951,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
-                txn->CreateIndexPrepare(table_index_entry, &table_ref, prepare);
+                txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
             }
             txn_mgr->CommitTxn(txn);
         }
