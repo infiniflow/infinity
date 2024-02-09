@@ -64,15 +64,69 @@ public:
             ASSERT_EQ(info.pre_doc_agg_pos_count_, answer[i].first);
             ASSERT_EQ(info.current_doc_pos_count_, answer[i].second);
         }
+        fs_.DeleteFile(file_name);
+    }
+
+    void DoTest2() {
+        MemoryPool pool;
+        PositionBitmapWriter writer(&pool);
+
+        /*
+         * first block:
+         * 100111111....11111111111
+         *    |<------255-------->|
+         */
+        writer.Set(0);
+        writer.EndDocument(1, 3);
+        for (u32 i = 0; i < 255; ++i) {
+            writer.Set(i + 3);
+            writer.EndDocument(i + 2, i + 4);
+        }
+        /*
+         * second block:
+         * 111111111111111111111111
+         * |<--------100--------->|
+         */
+        for (u32 i = 0; i < 100; ++i) {
+            writer.Set(i + 258);
+            writer.EndDocument(i + 257, i + 259);
+        }
+        u32 pos_count = 358;
+        writer.Resize(pos_count);
+
+        String file_name = dir_ + "bitmap";
+        SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(fs_, file_name, 128);
+        writer.Dump(file_writer, pos_count);
+        file_writer->Sync();
+
+        u32 file_length = writer.GetDumpLength(pos_count);
+
+        FileReader file_reader(fs_, file_name, 128);
+        ByteSlice *slice = ByteSlice::CreateSlice(file_length, &pool);
+        file_reader.Read((char *)slice->data_, file_length);
+        ByteSliceList byte_slice_list(slice, &pool);
+
+        PositionCountInfo info;
+        PositionBitmapReader reader;
+        reader.Init(&byte_slice_list, 0);
+
+        info = reader.GetPosCountInfo(300);
+        ASSERT_EQ((u32)301, info.pre_doc_agg_pos_count_);
+        ASSERT_EQ((u32)1, info.current_doc_pos_count_);
+
+        info = reader.GetPosCountInfo(356);
+        ASSERT_EQ((u32)357, info.pre_doc_agg_pos_count_);
+        ASSERT_EQ((u32)1, info.current_doc_pos_count_);
+
+        fs_.DeleteFile(file_name);
     }
 
 private:
-    std::string dir_;
+    String dir_;
     LocalFileSystem fs_;
 };
 
 TEST_F(PositionBitmapReaderTest, test1) {
-    using namespace infinity;
     DoTest(10, false);
     DoTest(10, true);
 
@@ -87,3 +141,5 @@ TEST_F(PositionBitmapReaderTest, test1) {
     DoTest(MAX_DOC_PER_BITMAP_BLOCK * 3 + 10, false);
     DoTest(MAX_DOC_PER_BITMAP_BLOCK * 3 + 10, true);
 }
+
+TEST_F(PositionBitmapReaderTest, test2) { DoTest2(); }
