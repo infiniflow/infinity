@@ -14,7 +14,7 @@ public:
     BufferedSkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
     virtual ~BufferedSkipListWriter() = default;
 
-    void AddItem(u32 deltaValue1);
+    void AddItem(u32 delta_value1);
 
     void AddItem(u32 key, u32 value1);
 
