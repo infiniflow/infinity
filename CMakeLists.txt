@@ -16,15 +16,6 @@ endif()
 #     message("Can not find ccache")
 # endif()
 
-option(FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
-if (${FORCE_COLORED_OUTPUT})
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        add_compile_options(-fdiagnostics-color=always)
-    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        add_compile_options(-fcolor-diagnostics)
-    endif ()
-endif ()
-
 set(CMAKE_CXX_STANDARD 20)
 
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string)
@@ -32,8 +23,6 @@ string(REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_S
 if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
-
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field")
 
 else ()
     message(FATAL_ERROR, "Please use clang version 17.0 and above")
@@ -86,21 +75,37 @@ if (NOT CMAKE_BUILD_TYPE)
             "Default BUILD_TYPE is ${default_build_type}" FORCE)
 endif ()
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
-#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
-#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
-#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
-#    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=cfi -fno-omit-frame-pointer")
+message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O0")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -O0")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+
+    set(CMAKE_CXX_FLAGS "-Ofast -DNDEBUG")
+    set(CMAKE_C_FLAGS  "-Ofast -DNDEBUG")
+
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+
+    set(CMAKE_CXX_FLAGS "-O2 -g -DNDEBUG")
+    set(CMAKE_C_FLAGS  "-O2 -g -DNDEBUG")
+
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+
+    set(CMAKE_CXX_FLAGS "-O0 -g -DNDEBUG")
+    set(CMAKE_C_FLAGS "-O0 -g -DNDEBUG")
+
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
+    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=cfi -fno-omit-frame-pointer")
     set(CMAKE_DEBUG_POSTFIX "")
+
+else ()
+    message(FATAL_ERROR "Only support CMake build type: Release, Debug, and MinSizeRel")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
+
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc -z noexecstack")
 
 #add_definitions(-march=native)
