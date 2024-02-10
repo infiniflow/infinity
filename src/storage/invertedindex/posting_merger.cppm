@@ -5,22 +5,33 @@ export module posting_merger;
 import stl;
 import memory_pool;
 import file_writer;
-import doc_list_encoder;
-import inmem_posting_decoder;
-import pos_list_encoder;
+import posting_decoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
 import segment;
 
 namespace infinity {
+export class SegmentTermPosting {
+public:
+    SegmentTermPosting();
+    SegmentTermPosting(segmentid_t segment_id, docid_t base_doc);
+
+    bool HasNext();
+
+private:
+    segmentid_t segment_id_;
+    docid_t base_doc_id_;
+    PostingDecoder *posting_decoder_{nullptr};
+};
+
 class PostingDumper;
 export class PostingMerger {
 public:
     PostingMerger();
     ~PostingMerger();
 
-    void Merge(const Segment &segment);
+    void Merge(const Vector<Segment> &segments);
 
 private:
     PostingFormatOption format_option_;

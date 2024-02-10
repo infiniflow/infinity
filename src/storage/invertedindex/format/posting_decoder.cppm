@@ -22,11 +22,9 @@ public:
               const SharedPtr<Bitmap> &tf_bitmap,
               SizeT posting_data_len);
 
-    // init for dict inline compress
     void Init(TermMeta *term_meta, bool is_doc_list, bool df_first);
 
-    // virtual for test
-    virtual u32 DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, SizeT len);
+    u32 DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpayload_t *doc_payload_buf, SizeT len);
 
     u32 DecodePosList(pos_t *pos_list_buf, SizeT len);
 
@@ -40,9 +38,8 @@ public:
     SizeT GetPostingDataLength() const { return posting_data_length_; }
 
 private:
-    // virtual for test
-    virtual void InitDocListEncoder(const DocListFormatOption &doc_list_format_option, df_t df);
-    virtual void InitPosListEncoder(const PositionListFormatOption &pos_list_format_option, ttf_t total_tf);
+    void InitDocListEncoder(const DocListFormatOption &doc_list_format_option, df_t df);
+    void InitPosListEncoder(const PositionListFormatOption &pos_list_format_option, ttf_t total_tf);
 
     TermMeta *term_meta_;
 

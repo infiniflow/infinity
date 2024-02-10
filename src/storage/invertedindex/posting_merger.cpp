@@ -16,6 +16,8 @@ import term_meta;
 
 namespace infinity {
 
+SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
+
 class DocMerger {
 public:
     DocMerger(const PostingFormatOption &format_option, PostingDecoder *posting_decoder);
@@ -161,6 +163,6 @@ PostingMerger::PostingMerger() { posting_dumper_ = MakeShared<PostingDumper>(for
 
 PostingMerger::~PostingMerger() {}
 
-void PostingMerger::Merge(const Segment &segment) {}
+void PostingMerger::Merge(const Vector<Segment> &segments) {}
 
 } // namespace infinity
