@@ -500,7 +500,6 @@ bool FragmentContext::TryFinishFragment() {
     if (!TryFinishFragmentInner()) {
         LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
         if (fragment_type_ == FragmentType::kParallelStream) {
-            auto *parent_plan_fragment = fragment_ptr_->GetParent();
             if (parent_plan_fragment) {
                 auto *scheduler = query_context_->scheduler();
                 LOG_TRACE(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));
