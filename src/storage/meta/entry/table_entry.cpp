@@ -43,6 +43,9 @@ import extra_ddl_info;
 import create_index_info;
 import column_def;
 import data_type;
+import default_values;
+import DBT_compaction_alg;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -63,6 +66,9 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
 
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
+
+    SetCompactionAlg(nullptr);
+    // SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
@@ -332,6 +338,18 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
         }
         ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
+    switch (compact_store.task_type_) {
+        case CompactSegmentsTaskType::kCompactPickedSegments: {
+            Vector<SegmentEntry *> new_segments;
+            std::transform(compact_store.segment_data_.begin(),
+                           compact_store.segment_data_.end(),
+                           std::back_inserter(new_segments),
+                           [](const auto &pair) { return pair.first.get(); });
+            compaction_alg_->CommitCompact(new_segments, txn_id);
+            break;
+        }
+        default:
+    }
     return Status::OK();
 }
 
@@ -341,6 +359,13 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
         for (const auto &old_segment : old_segments) {
             old_segment->RollbackCompact();
         }
+    }
+    switch (compact_store.task_type_) {
+        case CompactSegmentsTaskType::kCompactPickedSegments: {
+            compaction_alg_->RollbackCompact(txn_id);
+            break;
+        }
+        default:
     }
     return Status::OK();
 }
@@ -604,6 +629,20 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *d
     }
 
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), delete_txn);
+}
+
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) {
+    if (compaction_alg_.get() == nullptr) {
+        return None;
+    }
+    return compaction_alg_->AddSegment(new_segment, generate_txn);
+}
+
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) {
+    if (compaction_alg_.get() == nullptr) {
+        return None;
+    }
+    return compaction_alg_->DeleteInSegment(segment_id, generate_txn);
 }
 
 } // namespace infinity

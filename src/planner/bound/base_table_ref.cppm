@@ -44,9 +44,13 @@ public:
           block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)),
           table_index_(table_index) {}
 
-    static BaseTableRef FakeTableRef(TableEntry *table_entry, TxnTimeStamp ts) {
+    // only use some fields
+    explicit BaseTableRef(TableEntry *table_entry, SharedPtr<BlockIndex> block_index)
+        : TableRef(TableRefType::kTable, ""), table_entry_ptr_(table_entry), block_index_(std::move(block_index)) {}
+
+    static SharedPtr<BaseTableRef> FakeTableRef(TableEntry *table_entry, TxnTimeStamp ts) {
         SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(ts);
-        return BaseTableRef(table_entry, {}, block_index, "", 0, {}, {});
+        return MakeShared<BaseTableRef>(table_entry, std::move(block_index));
     }
 
     void RetainColumnByIndices(const Vector<SizeT> &&indices) {

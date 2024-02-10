@@ -56,8 +56,8 @@ public:
                                                                 const SharedPtr<String> &segment_dir,
                                                                 u64 column_count,
                                                                 SizeT row_count,
-                                                                SizeT row_capacity,
                                                                 SizeT actual_row_count,
+                                                                SizeT row_capacity,
                                                                 TxnTimeStamp min_row_ts,
                                                                 TxnTimeStamp max_row_ts,
                                                                 TxnTimeStamp commit_ts,
@@ -126,8 +126,10 @@ public:
     inline SizeT row_capacity() const { return row_capacity_; }
     inline SizeT column_count() const { return column_count_; }
 
-    // Getter, FIXME: lock?
     inline SizeT row_count() const {
+        if (sealed()) {
+            return row_count_;
+        }
         std::shared_lock lock(rw_locker_);
         return row_count_;
     }
@@ -152,6 +154,7 @@ public:
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
+protected: // protected for unit test
     // called when lock held
     inline void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
