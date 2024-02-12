@@ -49,6 +49,7 @@ public:
 
     [[nodiscard]] inline u64 query_memory_limit() const { return system_option_.query_memory_limit; }
 
+    // Network
     [[nodiscard]] inline String listen_address() const { return system_option_.listen_address; }
 
     [[nodiscard]] inline u16 pg_port() const { return system_option_.pg_port; }
@@ -56,6 +57,8 @@ public:
     [[nodiscard]] inline u32 http_port() const { return system_option_.http_port; }
 
     [[nodiscard]] inline u32 sdk_port() const { return system_option_.sdk_port; }
+
+    [[nodiscard]] inline i32 connection_limit() const { return system_option_.connection_limit_; }
 
     // Profiler
     [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler; }
@@ -80,15 +83,17 @@ public:
     // Storage
     [[nodiscard]] inline SharedPtr<String> data_dir() const { return system_option_.data_dir; }
 
-    [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
-
     [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }
 
     [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
 
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return system_option_.temp_dir; }
 
+    [[nodiscard]] inline u64 storage_capacity() const { return system_option_.storage_capacity_; }
+
     // Wal
+    [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
+
     [[nodiscard]] inline u64 full_checkpoint_interval_sec() const { return system_option_.full_checkpoint_interval_sec_; }
 
     [[nodiscard]] inline u64 full_checkpoint_txn_interval() const { return system_option_.full_checkpoint_txn_interval_; }

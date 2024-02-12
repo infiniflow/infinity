@@ -94,6 +94,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u32 default_pg_port = 5432;
     u32 default_http_port = 8088;
     u32 default_sdk_port = 23817;
+    i32 default_connection_limit = 128;
 
     // Default log config
     SharedPtr<String> default_log_filename = MakeShared<String>("infinity.log");
@@ -107,8 +108,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     // Default storage config
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
-    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
     u64 default_row_size = 8192lu;
+    u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
@@ -121,6 +122,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
+    SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
 
     // Default resource config
     String default_resource_dict_path = String("/tmp/infinity/resource");
@@ -162,6 +164,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.pg_port = default_pg_port;
             system_option_.http_port = default_http_port;
             system_option_.sdk_port = default_sdk_port;
+            system_option_.connection_limit_ = default_connection_limit;
         }
 
         // Log
@@ -178,8 +181,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Storage
         {
             system_option_.data_dir = MakeShared<String>(*default_data_dir);
-            system_option_.wal_dir = MakeShared<String>(*default_wal_dir);
             system_option_.default_row_size = default_row_size;
+            system_option_.storage_capacity_ = default_storage_capacity;
         }
 
         // Buffer
@@ -190,6 +193,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
         // Wal
         {
+            system_option_.wal_dir = MakeShared<String>(*default_wal_dir);
             system_option_.wal_size_threshold_ = wal_size_threshold;
             system_option_.full_checkpoint_interval_sec_ = full_checkpoint_interval_sec;
             system_option_.delta_checkpoint_interval_sec_ = delta_checkpoint_interval_sec;
@@ -306,6 +310,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.pg_port = network_config["pg_port"].value_or(default_pg_port);
             system_option_.http_port = network_config["http_port"].value_or(default_http_port);
             system_option_.sdk_port = network_config["sdk_port"].value_or(default_sdk_port);
+            system_option_.connection_limit_ = network_config["connection_limit"].value_or(default_connection_limit);
         }
 
         // Log
@@ -347,8 +352,12 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         {
             auto storage_config = config["storage"];
             system_option_.data_dir = MakeShared<String>(storage_config["data_dir"].value_or(*default_data_dir));
-            system_option_.wal_dir = MakeShared<String>(storage_config["wal_dir"].value_or(*default_wal_dir));
             system_option_.default_row_size = storage_config["default_row_size"].value_or(default_row_size);
+            String storage_capacity_str = storage_config["storage_capacity"].value_or("64GB");
+            result = ParseByteSize(storage_capacity_str, system_option_.storage_capacity_);
+            if (result.get() != nullptr) {
+                return result;
+            }
         }
 
         // Buffer
@@ -365,6 +374,7 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
         // Wal
         {
             auto wal_config = config["wal"];
+            system_option_.wal_dir = MakeShared<String>(wal_config["wal_dir"].value_or(*default_wal_dir));
             system_option_.full_checkpoint_interval_sec_ = wal_config["full_checkpoint_interval_sec"].value_or(full_checkpoint_interval_sec);
             system_option_.delta_checkpoint_interval_sec_ = wal_config["delta_checkpoint_interval_sec"].value_or(delta_checkpoint_interval_sec);
             system_option_.delta_checkpoint_interval_wal_bytes_ =
@@ -408,6 +418,7 @@ void Config::PrintAll() const {
     fmt::print(" - postgres port: {}\n", system_option_.pg_port);
     fmt::print(" - http port: {}\n", system_option_.http_port);
     fmt::print(" - sdk port: {}\n", system_option_.sdk_port);
+    fmt::print(" - connection limit: {}\n", system_option_.connection_limit_);
 
     // Log
     fmt::print(" - log_file_path: {}\n", system_option_.log_file_path->c_str());
@@ -418,8 +429,8 @@ void Config::PrintAll() const {
 
     // Storage
     fmt::print(" - data_dir: {}\n", system_option_.data_dir->c_str());
-    fmt::print(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
     fmt::print(" - default_row_size: {}\n", system_option_.default_row_size);
+    fmt::print(" - storage_capacity: {}\n", Utility::FormatByteSize(system_option_.storage_capacity_));
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
@@ -430,7 +441,8 @@ void Config::PrintAll() const {
     fmt::print(" - full_checkpoint_txn_interval: {}\n", system_option_.full_checkpoint_txn_interval_);
     fmt::print(" - delta_checkpoint_interval_sec: {}\n", system_option_.delta_checkpoint_interval_sec_);
     fmt::print(" - delta_checkpoint_interval_wal_bytes: {}\n", system_option_.delta_checkpoint_interval_wal_bytes_);
-    fmt::print(" - wal_size_threshold: {}\n", system_option_.wal_size_threshold_);
+    fmt::print(" - wal_size_threshold: {}\n", Utility::FormatByteSize(system_option_.wal_size_threshold_));
+    fmt::print(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
 
     // Resource
     fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());

@@ -111,15 +111,6 @@ auto main(int argc, char **argv) -> int {
                "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
                "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
-    fmt::print("Infinity, version: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
-               version_major(),
-               version_minor(),
-               version_patch(),
-               current_system_time(),
-               build_type(),
-               git_branch_name(),
-               git_commit_id());
-
     StartupParameter parameters;
     CLI::App app{"infinity_main"};
     String config_path = "";
@@ -139,11 +130,20 @@ auto main(int argc, char **argv) -> int {
 
     InfinityContext::instance().config()->PrintAll();
 
+    fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
+               version_major(),
+               version_minor(),
+               version_patch(),
+               current_system_time(),
+               build_type(),
+               git_branch_name(),
+               git_commit_id());
     //    threaded_thrift_server.Init(9090);
     //    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
     u32 thrift_server_port = InfinityContext::instance().config()->sdk_port();
+    i32 thrift_server_pool_size = InfinityContext::instance().config()->connection_limit();
 
-    pool_thrift_server.Init(thrift_server_port, 128);
+    pool_thrift_server.Init(thrift_server_port, thrift_server_pool_size);
     pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
 
     //    non_block_pool_thrift_server.Init(9070, 64);

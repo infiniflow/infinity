@@ -50,6 +50,7 @@ export struct SystemOptions {
     u16 pg_port{};
     u32 http_port{};
     u32 sdk_port{};
+    i32 connection_limit_{};
 
     // Log
     SharedPtr<String> log_filename{MakeShared<String>("infinity.log")};
@@ -63,14 +64,15 @@ export struct SystemOptions {
 
     // Storage
     SharedPtr<String> data_dir{};
-    SharedPtr<String> wal_dir{};
     u64 default_row_size{};
+    u64 storage_capacity_{};
 
     // Buffer
     u64 buffer_pool_size{};
     SharedPtr<String> temp_dir{};
 
     // Wal
+    SharedPtr<String> wal_dir{};
     u64 wal_size_threshold_{};
     u64 full_checkpoint_interval_sec_{};
     u64 full_checkpoint_txn_interval_{};
