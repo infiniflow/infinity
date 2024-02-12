@@ -18,6 +18,7 @@ import local_file_system;
 import file_writer;
 import posting_writer;
 import term_meta;
+import fst;
 
 namespace infinity {
 
@@ -52,20 +53,33 @@ void ColumnIndexer::Dump() {
     String index_prefix = path.string();
     LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX;
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128);
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX;
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128);
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     MemoryIndexer::PostingTable *posting_table = active_memory_indexer_->GetPostingTable();
     TermMetaDumper term_meta_dumpler(active_memory_indexer_->index_config_.GetPostingFormatOption());
 
+    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
+    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    OstreamWriter wtr(ofs);
+    FstBuilder builder(wtr);
+
     if (posting_table) {
+        SizeT term_meta_offset = 0;
         for (auto it = posting_table->begin(); it.valid(); ++it) {
             const MemoryIndexer::PostingPtr posting_writer = it.getData();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta);
             /// TODO dict writer
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
+            const String &term = it.getKey();
+            builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
+            term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
+        dict_file_writer->Sync();
+        builder.Finish();
+        fs.AppendFile(dict_file, fst_file);
+        fs.DeleteFile(fst_file);
     }
     active_memory_indexer_->Reset();
 }

@@ -70,7 +70,7 @@ sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
 sudo systemctl start infinity
 ```
 
-Ubuntu
+Ubuntu/Debian
 ```bash
 sudo dpkg -i infinity-0.1.0-dev-x86_64.deb
 sudo systemctl start infinity
@@ -81,8 +81,10 @@ See [Build from Source](docs/build_from_source.md).
 
 ### Install Infinity's Python client
 
+`infinity-sdk` requires Python 3.10+.
+
 ```bash
-pip install infinity_sdk 
+pip3 install infinity-sdk
 ```
 
 ### Import necessary modules
