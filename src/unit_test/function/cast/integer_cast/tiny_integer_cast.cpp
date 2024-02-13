@@ -389,6 +389,6 @@ TEST_F(TinyIntegerCastTest, tiny_integer_cast1) {
     {
         DataType source(LogicalType::kTinyInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<SmallIntT>(source, target), UnrecoverableException);
+        EXPECT_THROW(BindIntegerCast<SmallIntT>(source, target), RecoverableException);
     }
 }
