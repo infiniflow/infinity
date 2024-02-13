@@ -19,11 +19,11 @@ public:
     PositionListEncoder(const PositionListFormatOption &pos_list_format_option,
                         MemoryPool *byte_slice_pool,
                         MemoryPool *buffer_pool,
-                        const PositionListFormat *posListFormat = nullptr)
+                        const PositionListFormat *pos_list_format = nullptr)
         : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
-          pos_list_format_option_(pos_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(posListFormat),
+          pos_list_format_option_(pos_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
           byte_slice_pool_(byte_slice_pool) {
-        if (!posListFormat) {
+        if (!pos_list_format) {
             pos_list_format_ = new PositionListFormat(pos_list_format_option);
             is_own_format_ = true;
         }
@@ -51,9 +51,13 @@ public:
 
     const ByteSliceList *GetPositionList() const { return pos_list_buffer_.GetByteSliceList(); }
 
+    const BufferedByteSlice *GetBufferedByteSlice() const { return &pos_list_buffer_; }
+
     void SetDocSkipListWriter(BufferedSkipListWriter *writer) { pos_skiplist_writer_ = writer; }
 
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
+
+    BufferedSkipListWriter *GetBufferedSkipListWriter() const { return pos_skiplist_writer_; }
 
 private:
     void CreatePosSkipListWriter();
@@ -69,8 +73,6 @@ private:
     BufferedSkipListWriter *pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
     MemoryPool *byte_slice_pool_;
-
-    friend class PositionListEncoderTest;
 };
 
 } // namespace infinity

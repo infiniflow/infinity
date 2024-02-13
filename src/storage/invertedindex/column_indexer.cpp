@@ -69,7 +69,8 @@ void ColumnIndexer::Dump() {
         for (auto it = posting_table->begin(); it.valid(); ++it) {
             const MemoryIndexer::PostingPtr posting_writer = it.getData();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
-            posting_writer->Write(posting_file_writer, term_meta);
+            posting_writer->Dump(posting_file_writer, term_meta);
+            /// TODO dict writer
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.getKey();
             builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
