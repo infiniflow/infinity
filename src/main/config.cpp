@@ -15,6 +15,7 @@
 module;
 
 #include <unistd.h>
+#include <cctype>
 
 module config;
 //
@@ -26,6 +27,7 @@ import default_values;
 import logger;
 import local_file_system;
 import utility;
+import status;
 
 namespace infinity {
 
@@ -50,7 +52,7 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
 
     u64 factor;
     auto res = std::from_chars(byte_size_str.data(), byte_size_str.data() + byte_size_str.size(), factor);
-    if(res.ec == std::errc()) {
+    if (res.ec == std::errc()) {
         String unit = res.ptr;
         ToLower(unit);
         auto it = byte_unit.find(unit);
@@ -63,6 +65,49 @@ SharedPtr<String> Config::ParseByteSize(const String &byte_size_str, u64 &byte_s
     } else {
         return MakeShared<String>("Unrecognized byte size");
     }
+}
+
+Status Config::ParseTimeInfo(const String &time_info, u64 &time_seconds) {
+    if (time_info.empty()) {
+        return Status::EmptyConfigParameter();
+    }
+
+    SizeT info_size = time_info.size();
+    if(info_size == 1) {
+        return Status::InvalidTimeInfo(time_info);
+    }
+
+    u64 time_number = 0;
+    for (SizeT i = 0; i < info_size - 1; ++i) {
+        if(std::isdigit(time_info[i])) {
+            time_number += time_number * 10 + (time_info[i] - '0');
+        } else {
+            return Status::InvalidTimeInfo(time_info);
+        }
+    }
+
+    switch(time_info[info_size - 1]) {
+        case 's':
+        case 'S': {
+            time_seconds = time_number;
+            break;
+        }
+        case 'm':
+        case 'M': {
+            time_seconds = time_number * 60u;
+            break;
+        }
+        case 'h':
+        case 'H': {
+            time_seconds = time_number * 3600u;
+            break;
+        }
+        default: {
+            return Status::InvalidTimeInfo(time_info);
+        }
+    }
+
+    return Status::OK();
 }
 
 // extern SharedPtr<spdlogger> infinity_logger;
@@ -110,6 +155,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr<String> default_data_dir = MakeShared<String>("/tmp/infinity/data");
     u64 default_row_size = 8192lu;
     u64 default_storage_capacity = 64 * 1024lu * 1024lu * 1024lu; // 64Gib
+    u64 default_garbage_collection_interval = 0;                  // real-time
+    double default_garbage_collection_storage_ratio = 0;          // disable the function
 
     // Default buffer config
     u64 default_buffer_pool_size = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
@@ -129,10 +176,10 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
-        if(config_path.get() == nullptr) {
+        if (config_path.get() == nullptr) {
             fmt::print("No config file is given, use default configs.\n");
         } else {
-            if(!fs.Exists(*config_path)) {
+            if (!fs.Exists(*config_path)) {
                 fmt::print("Config file: {} is not existent.\n", *config_path);
             }
         }
@@ -183,6 +230,8 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             system_option_.data_dir = MakeShared<String>(*default_data_dir);
             system_option_.default_row_size = default_row_size;
             system_option_.storage_capacity_ = default_storage_capacity;
+            system_option_.garbage_collection_interval_ = default_garbage_collection_interval;
+            system_option_.garbage_collection_storage_ratio_ = default_garbage_collection_storage_ratio;
         }
 
         // Buffer
@@ -358,6 +407,15 @@ SharedPtr<String> Config::Init(const SharedPtr<String> &config_path) {
             if (result.get() != nullptr) {
                 return result;
             }
+
+            String garbage_collection_interval_str = storage_config["garbage_collection_interval"].value_or("60s");
+            Status parse_status = ParseTimeInfo(garbage_collection_interval_str, system_option_.garbage_collection_interval_);
+            if(!parse_status.ok()) {
+                return MakeShared<String>(parse_status.message());
+            }
+
+            system_option_.garbage_collection_storage_ratio_ =
+                storage_config["garbage_collection_storage_ratio"].value_or(default_garbage_collection_storage_ratio);
         }
 
         // Buffer
@@ -431,6 +489,8 @@ void Config::PrintAll() const {
     fmt::print(" - data_dir: {}\n", system_option_.data_dir->c_str());
     fmt::print(" - default_row_size: {}\n", system_option_.default_row_size);
     fmt::print(" - storage_capacity: {}\n", Utility::FormatByteSize(system_option_.storage_capacity_));
+    fmt::print(" - garbage_collection_interval: {}\n", Utility::FormatTimeInfo(system_option_.garbage_collection_interval_));
+    fmt::print(" - garbage_collection_storage_ratio: {}\n", system_option_.garbage_collection_storage_ratio_);
 
     // Buffer
     fmt::print(" - buffer_pool_size: {}\n", Utility::FormatByteSize(system_option_.buffer_pool_size));
@@ -467,9 +527,9 @@ void SystemVariables::InitVariablesMap() {
 
 HashMap<String, SysVar> SystemVariables::map_;
 
-SysVar SystemVariables::GetSysVarEnumByName(const String& var_name) {
+SysVar SystemVariables::GetSysVarEnumByName(const String &var_name) {
     auto it = map_.find(var_name);
-    if(it != map_.end()) {
+    if (it != map_.end()) {
         return it->second;
     }
     return SysVar::kInvalid;

@@ -25,6 +25,8 @@ export enum class ErrorCode : long {
     kOk = 0, // success
 
     // 1. config error,
+    kInvalidTimeInfo = 1001,
+    kEmptyConfigParameter = 1002,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -118,6 +120,10 @@ export class Status {
 public:
     // 0. Success
     static Status OK() { return {}; }
+
+    // 1. Config error
+    static Status InvalidTimeInfo(const String &time_info);
+    static Status EmptyConfigParameter();
 
     // 2. Auth error
     static Status WrongPasswd(const String &user_name);

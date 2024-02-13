@@ -68,10 +68,21 @@ void Status::AppendMessage(const String &msg) {
 }
 
 // Error functions
+
+// 1. Config error
+Status Status::InvalidTimeInfo(const String &time_info) {
+    return Status(ErrorCode::kInvalidTimeInfo, MakeUnique<String>(fmt::format("Invalid time info format: {}", time_info)));
+}
+
+Status Status::EmptyConfigParameter() {
+    return Status(ErrorCode::kEmptyConfigParameter, MakeUnique<String>("Empty configure parameter."));
+}
+
 // 2. Auth error
 Status Status::WrongPasswd(const String &user_name) {
     return Status(ErrorCode::kWrongPasswd, MakeUnique<String>(fmt::format("Invalid password to login user: {}", user_name)));
 }
+
 Status Status::InsufficientPrivilege(const String &user_name, const String &detailed_error) {
     return Status(ErrorCode::kInsufficientPrivilege, MakeUnique<String>(fmt::format("{} do not have permission to {}", user_name, detailed_error)));
 }

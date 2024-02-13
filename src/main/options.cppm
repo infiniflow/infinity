@@ -66,6 +66,8 @@ export struct SystemOptions {
     SharedPtr<String> data_dir{};
     u64 default_row_size{};
     u64 storage_capacity_{};
+    u64 garbage_collection_interval_{}; // unit: seconds, 0 means real-time
+    double garbage_collection_storage_ratio_{}; // 0~1.0, 0 means disable the function
 
     // Buffer
     u64 buffer_pool_size{};

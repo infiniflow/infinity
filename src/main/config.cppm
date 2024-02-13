@@ -18,6 +18,7 @@ export module config;
 import stl;
 import third_party;
 import options;
+import status;
 
 namespace infinity {
 
@@ -85,11 +86,16 @@ public:
 
     [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }
 
+    [[nodiscard]] inline u64 storage_capacity() const { return system_option_.storage_capacity_; }
+
+    [[nodiscard]] inline u64 garbage_collection_interval() const { return system_option_.garbage_collection_interval_; }
+
+    [[nodiscard]] inline double garbage_collection_storage_ratio() const { return system_option_.garbage_collection_storage_ratio_; }
+
+    // Buffer
     [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
 
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return system_option_.temp_dir; }
-
-    [[nodiscard]] inline u64 storage_capacity() const { return system_option_.storage_capacity_; }
 
     // Wal
     [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
@@ -111,6 +117,8 @@ private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
     static SharedPtr<String> ParseByteSize(const String &byte_size_str, u64 &byte_size);
+
+    static Status ParseTimeInfo(const String &time_info, u64 &time_seconds);
 
     static u64 GetAvailableMem();
 
@@ -141,7 +149,7 @@ export struct SystemVariables {
     static HashMap<String, SysVar> map_;
 
     static void InitVariablesMap();
-    static SysVar GetSysVarEnumByName(const String& var_name);
+    static SysVar GetSysVarEnumByName(const String &var_name);
 };
 
 } // namespace infinity
