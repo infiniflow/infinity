@@ -18,6 +18,8 @@ public:
     SegmentTermPosting();
     SegmentTermPosting(segmentid_t segment_id, docid_t base_doc);
 
+    docid_t GetBaesDocId() { return base_doc_id_; }
+
     bool HasNext();
 
     PostingDecoder *GetPostingDecoder() { return posting_decoder_; }
@@ -33,12 +35,14 @@ private:
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger();
+    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Vector<Segment> &segments);
     ~PostingMerger();
 
-    void Merge(const Vector<Segment> &segments);
+    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings);
 
 private:
+    MemoryPool *memory_pool_{nullptr};
+    RecyclePool *buffer_pool_{nullptr};
     PostingFormatOption format_option_;
     SharedPtr<PostingDumper> posting_dumper_;
     df_t df_;

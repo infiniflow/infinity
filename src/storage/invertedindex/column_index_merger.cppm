@@ -19,7 +19,7 @@ import column_index_iterator;
 namespace infinity {
 export class ColumnIndexMerger {
 public:
-    ColumnIndexMerger(const InvertedIndexConfig &index_config, u64 column_id);
+    ColumnIndexMerger(const InvertedIndexConfig &index_config, u64 column_id, MemoryPool *memory_pool, RecyclePool *buffer_pool);
     ~ColumnIndexMerger();
 
 private:
@@ -27,5 +27,7 @@ private:
 
     InvertedIndexConfig index_config_;
     u64 column_id_;
+    MemoryPool *memory_pool_{nullptr};
+    RecyclePool *buffer_pool_{nullptr};
 };
 } // namespace infinity
