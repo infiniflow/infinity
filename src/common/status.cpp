@@ -74,8 +74,27 @@ Status Status::InvalidTimeInfo(const String &time_info) {
     return Status(ErrorCode::kInvalidTimeInfo, MakeUnique<String>(fmt::format("Invalid time info format: {}", time_info)));
 }
 
-Status Status::EmptyConfigParameter() {
-    return Status(ErrorCode::kEmptyConfigParameter, MakeUnique<String>("Empty configure parameter."));
+Status Status::EmptyConfigParameter() { return Status(ErrorCode::kEmptyConfigParameter, MakeUnique<String>("Empty configure parameter.")); }
+
+Status Status::MismatchVersion(const String &current_version, const String &expected_version) {
+    return Status(ErrorCode::kMismatchVersion,
+                  MakeUnique<String>(fmt::format("Current infinity version: {}, expected version: {}", current_version, expected_version)));
+}
+
+Status Status::InvalidTimezone(const String &timezone) {
+    return Status(ErrorCode::kInvalidTimezone, MakeUnique<String>(fmt::format("Invalid time zone: {}.", timezone)));
+}
+
+Status Status::InvalidByteSize(const String &byte_size) {
+    return Status(ErrorCode::kInvalidByteSize, MakeUnique<String>(fmt::format("Invalid byte size: {}.", byte_size)));
+}
+
+Status Status::InvalidIPAddr(const String &ip_addr) {
+    return Status(ErrorCode::kInvalidIPAddr, MakeUnique<String>(fmt::format("Invalid ip address: {}.", ip_addr)));
+}
+
+Status Status::InvalidLogLevel(const String &log_level) {
+    return Status(ErrorCode::kInvalidLogLevel, MakeUnique<String>(fmt::format("Invalid log level: {}.", log_level)));
 }
 
 // 2. Auth error

@@ -27,6 +27,11 @@ export enum class ErrorCode : long {
     // 1. config error,
     kInvalidTimeInfo = 1001,
     kEmptyConfigParameter = 1002,
+    kMismatchVersion = 1003,
+    kInvalidTimezone = 1004,
+    kInvalidByteSize = 1005,
+    kInvalidIPAddr = 1006,
+    kInvalidLogLevel = 1007,
 
     // 2. Auth error
     kWrongPasswd = 2001,
@@ -128,6 +133,11 @@ public:
     // 2. Auth error
     static Status WrongPasswd(const String &user_name);
     static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
+    static Status MismatchVersion(const String &current_version, const String &expected_version);
+    static Status InvalidTimezone(const String &timezone);
+    static Status InvalidByteSize(const String &byte_size);
+    static Status InvalidIPAddr(const String &ip_addr);
+    static Status InvalidLogLevel(const String &log_level);
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);

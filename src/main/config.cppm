@@ -29,7 +29,7 @@ export constexpr std::string_view log_level = "log_level";
 
 export struct Config {
 public:
-    SharedPtr<String> Init(const SharedPtr<String> &config_path);
+    Status Init(const SharedPtr<String> &config_path);
 
     void PrintAll() const;
 
@@ -116,7 +116,7 @@ public:
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
-    static SharedPtr<String> ParseByteSize(const String &byte_size_str, u64 &byte_size);
+    static Status ParseByteSize(const String &byte_size_str, u64 &byte_size);
 
     static Status ParseTimeInfo(const String &time_info, u64 &time_seconds);
 
