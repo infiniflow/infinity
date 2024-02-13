@@ -15,6 +15,7 @@ private:
     u8 *data_ptr_;
     SizeT data_len_;
     UniquePtr<Fst> fst_;
+    UniquePtr<FstStream> s_;
 
 public:
     DictionaryReader(const String &dict_path, const PostingFormatOption &option);
@@ -23,6 +24,10 @@ public:
 
     bool Lookup(const String &key, TermMeta &term_meta);
 
-    void LookupPrefix(const String &prefix, Vector<Pair<String, TermMeta>> &term_metas);
+    void InitIterator(const String &min, const String &max);
+
+    void InitIterator(const String &prefix);
+
+    bool Next(String &term, TermMeta &term_meta);
 };
 } // namespace infinity
