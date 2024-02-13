@@ -29,9 +29,8 @@ void ColumnIndexIterator::Init(const Segment &segment) {
     Path path = Path(root_dir) / std::to_string(segment.GetSegmentId());
     String dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
-    dict_iterator_ = dict_reader->CreateIterator();
-
+    dict_reader_ = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
+    dict_reader_->InitIterator("");
     String posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
     posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
@@ -46,10 +45,10 @@ void ColumnIndexIterator::Init(const Segment &segment) {
     posting_decoder_ = MakeShared<PostingDecoder>(format_option_);
 }
 
-bool ColumnIndexIterator::HasNext() { return dict_iterator_->Next(); }
-
-PostingDecoder *ColumnIndexIterator::Next(const String &key) {
-    dict_iterator_->GetCurrentTermMeta(term_meta_);
+bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
+    bool ret = dict_reader_->Next(key, term_meta_);
+    if (!ret)
+        return false;
     u32 total_len = 0;
     DecodeTermMeta();
     DecodeDocList();
@@ -57,7 +56,8 @@ PostingDecoder *ColumnIndexIterator::Next(const String &key) {
     DecodePosList();
 
     posting_decoder_->Init(&term_meta_, doc_list_reader_, pos_list_reader_, tf_bitmap_, total_len);
-    return posting_decoder_.get();
+    decoder = posting_decoder_.get();
+    return true;
 }
 
 void ColumnIndexIterator::DecodeTermMeta() {}

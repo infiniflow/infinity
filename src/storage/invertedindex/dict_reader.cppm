@@ -8,24 +8,6 @@ export module dict_reader;
 
 namespace infinity {
 
-export class DictionaryIterator {
-public:
-    DictionaryIterator(const String &term) : current_(term) {}
-
-    ~DictionaryIterator() = default;
-
-    bool Next() { return false; }
-
-    void GetCurrentTerm(String &term) const {}
-
-    void GetCurrentTermMeta(TermMeta &term_meta) const {}
-
-    void Seek(String &key) {}
-
-private:
-    String current_;
-};
-
 export class DictionaryReader {
 private:
     const String &dict_path_;

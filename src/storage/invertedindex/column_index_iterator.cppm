@@ -26,9 +26,7 @@ public:
 
     void Init(const Segment &segment);
 
-    bool HasNext();
-
-    PostingDecoder *Next(const String &term);
+    bool Next(String &term, PostingDecoder *&decoder);
 
 private:
     void DecodeTermMeta();
@@ -43,7 +41,7 @@ private:
     PostingFormatOption format_option_;
     u64 column_id_;
 
-    SharedPtr<DictionaryIterator> dict_iterator_;
+    SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_file_;
     ByteSlice *doc_list_slice_{nullptr};
     ByteSlice *pos_list_slice_{nullptr};

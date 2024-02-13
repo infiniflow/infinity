@@ -20,8 +20,7 @@ namespace infinity {
 SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
 
 bool SegmentTermPosting::HasNext() {
-    if (column_index_iterator_->HasNext()) {
-        posting_decoder_ = column_index_iterator_->Next(term_);
+    if (column_index_iterator_->Next(term_, posting_decoder_)) {
         return true;
     }
     return false;
