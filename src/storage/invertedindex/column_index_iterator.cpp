@@ -40,13 +40,17 @@ bool ColumnIndexIterator::HasNext() {
 }
 
 PostingDecoder *ColumnIndexIterator::Next(const String &key) {
-
+    u32 total_len = 0;
+    DecodeTermMeta();
     DecodeDocList();
     DecodeTfBitmap();
     DecodePosList();
 
+    posting_decoder_->Init(&term_meta_, doc_list_reader_, pos_list_reader_, tf_bitmap_, total_len);
     return posting_decoder_.get();
 }
+
+void ColumnIndexIterator::DecodeTermMeta() {}
 
 void ColumnIndexIterator::DecodeDocList() {
     u32 doc_skiplist_len = posting_file_->ReadVInt();

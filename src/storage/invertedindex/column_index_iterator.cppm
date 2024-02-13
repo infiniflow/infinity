@@ -29,6 +29,8 @@ public:
     PostingDecoder *Next(const String &term);
 
 private:
+    void DecodeTermMeta();
+
     void DecodeDocList();
 
     void DecodeTfBitmap();
