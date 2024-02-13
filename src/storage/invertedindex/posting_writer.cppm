@@ -33,7 +33,11 @@ public:
 
     tf_t GetCurrentTF() const;
 
-    void Write(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
+    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
+
+    u32 GetDumpLength();
+
+    void EndSegment();
 
     InMemPostingDecoder *CreateInMemPostingDecoder(MemoryPool *session_pool) const;
 
