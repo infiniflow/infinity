@@ -47,8 +47,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '/tmp/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
-                table_name, csv_name
+            "COPY {} FROM '{}/{}' WITH ( DELIMITER ',' );\n".format(
+                table_name, copy_dir, csv_name
             )
         )
         slt_file.write("----\n")

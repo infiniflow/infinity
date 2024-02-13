@@ -32,6 +32,9 @@ import table_entry;
 import catalog;
 import internal_types;
 import data_type;
+import backgroud_process;
+import bg_task;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -117,8 +120,12 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
     return {nullptr, Status::OK()};
 }
 
-Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
-    compact_state_.segment_data_ = std::move(segment_data);
+Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                                                        CompactSegmentsTaskType type) {
+    if (!compact_state_.segment_data_.empty()) {
+        UnrecoverableError("Attempt to compact table store twice");
+    }
+    compact_state_ = TxnCompactStore{std::move(segment_data), type};
     return {nullptr, Status::OK()};
 }
 
@@ -146,7 +153,7 @@ void TxnTableStore::PrepareCommit() {
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
-        const auto &uncommitted = uncommitted_segments_[seg_idx];
+        const SharedPtr<SegmentEntry> &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
         NewCatalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
@@ -165,6 +172,33 @@ void TxnTableStore::PrepareCommit() {
 void TxnTableStore::Commit() const {
     NewCatalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
     NewCatalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+}
+
+void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
+    StdFunction<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
+
+    // FIXME OPT: trigger compaction one time for all segments
+    for (const SharedPtr<SegmentEntry> &new_segment : uncommitted_segments_) {
+        auto ret = table_entry_->AddSegment(new_segment.get(), generate_txn);
+        if (!ret.has_value()) {
+            continue;
+        }
+        auto [to_compacts, txn] = *ret;
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, to_compacts, txn);
+        bg_task_processor->Submit(compact_task);
+    }
+    for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
+        auto ret = table_entry_->DeleteInSegment(segment_id, generate_txn);
+        if (!ret.has_value()) {
+            continue;
+        }
+        auto [to_compacts, txn] = *ret;
+        if (to_compacts.empty()) {
+            continue; // delete down layer but not trigger compaction
+        }
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, to_compacts, txn);
+        bg_task_processor->Submit(compact_task);
+    }
 }
 
 } // namespace infinity

@@ -241,12 +241,12 @@ TEST_F(InMemDocListDecoderTest, test2) {
     docid_t doc_buffer[1024];
     ASSERT_TRUE(doc_list_decoder.DecodeDocBuffer(0, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
-    ASSERT_EQ(0, first_doc_id);
-    ASSERT_EQ(8128, last_doc_id);
+    ASSERT_EQ((u32)0, first_doc_id);
+    ASSERT_EQ((u32)8128, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
-    ASSERT_EQ(0, doc_buffer[0]);
-    ASSERT_EQ(1, doc_buffer[1]);
-    ASSERT_EQ(2, doc_buffer[2]);
+    ASSERT_EQ((u32)0, doc_buffer[0]);
+    ASSERT_EQ((u32)1, doc_buffer[1]);
+    ASSERT_EQ((u32)2, doc_buffer[2]);
 
     ASSERT_TRUE(!doc_list_decoder.DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
@@ -274,18 +274,18 @@ TEST_F(InMemDocListDecoderTest, test3) {
 
     ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(256, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
-    ASSERT_EQ(256, first_doc_id);
-    ASSERT_EQ(510, last_doc_id);
+    ASSERT_EQ((u32)256, first_doc_id);
+    ASSERT_EQ((u32)510, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
-    ASSERT_EQ(129, doc_buffer[0]);
-    ASSERT_EQ(2, doc_buffer[1]);
+    ASSERT_EQ((u32)129, doc_buffer[0]);
+    ASSERT_EQ((u32)2, doc_buffer[1]);
 
     ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
-    ASSERT_EQ(1000, first_doc_id);
-    ASSERT_EQ(1000, last_doc_id);
+    ASSERT_EQ((u32)1000, first_doc_id);
+    ASSERT_EQ((u32)1000, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
-    ASSERT_EQ(490, doc_buffer[0]);
+    ASSERT_EQ((u32)490, doc_buffer[0]);
 
     ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
@@ -311,12 +311,12 @@ TEST_F(InMemDocListDecoderTest, test4) {
 
     ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
-    ASSERT_EQ(1000, first_doc_id);
-    ASSERT_EQ(1002, last_doc_id);
+    ASSERT_EQ((u32)1000, first_doc_id);
+    ASSERT_EQ((u32)1002, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
-    ASSERT_EQ(490, doc_buffer[0]);
-    ASSERT_EQ(1, doc_buffer[1]);
-    ASSERT_EQ(1, doc_buffer[2]);
+    ASSERT_EQ((u32)490, doc_buffer[0]);
+    ASSERT_EQ((u32)1, doc_buffer[1]);
+    ASSERT_EQ((u32)1, doc_buffer[2]);
 
     ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
@@ -345,13 +345,13 @@ TEST_F(InMemDocListDecoderTest, test5) {
 
     ASSERT_TRUE(doc_list_decoder_->DecodeDocBuffer(1000, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 
-    ASSERT_EQ(1000, first_doc_id);
-    ASSERT_EQ(9001, last_doc_id);
+    ASSERT_EQ((u32)1000, first_doc_id);
+    ASSERT_EQ((u32)9001, last_doc_id);
     ASSERT_EQ((ttf_t)0, current_ttf);
-    ASSERT_EQ(490, doc_buffer[0]);
-    ASSERT_EQ(0, doc_buffer[1]);
-    ASSERT_EQ(1, doc_buffer[2]);
-    ASSERT_EQ(2, doc_buffer[3]);
+    ASSERT_EQ((u32)490, doc_buffer[0]);
+    ASSERT_EQ((u32)0, doc_buffer[1]);
+    ASSERT_EQ((u32)1, doc_buffer[2]);
+    ASSERT_EQ((u32)2, doc_buffer[3]);
 
     ASSERT_TRUE(!doc_list_decoder_->DecodeDocBuffer(last_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf));
 

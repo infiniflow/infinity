@@ -19,9 +19,9 @@ public:
     PositionBitmapReader();
     ~PositionBitmapReader();
 
-    u32 Init(const ByteSliceList *sliceList, u32 offset);
+    u32 Init(const ByteSliceList *slice_list, u32 offset);
 
-    u32 Init(ByteSlice *sliceList, u32 offset);
+    u32 Init(ByteSlice *slice_list, u32 offset);
 
     PositionCountInfo GetPosCountInfo(u32 seeked_doc_count);
 

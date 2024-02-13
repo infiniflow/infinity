@@ -6,6 +6,7 @@ import file_writer;
 
 import dynamic_bitmap;
 import index_defines;
+import byte_slice_writer;
 
 export module position_bitmap_writer;
 
@@ -26,6 +27,8 @@ public:
     virtual u32 GetDumpLength(u32 bit_count) const;
 
     virtual void Dump(const SharedPtr<FileWriter> &file, u32 bit_count);
+
+    void Dump(ByteSliceWriter &byte_slice_writer, u32 bit_count);
 
     const DynamicBitmap &GetBitmap() const { return bitmap_; }
 

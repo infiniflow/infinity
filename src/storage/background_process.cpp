@@ -70,7 +70,9 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kCompactSegments: {
                 auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
+                task->BeginTxn();
                 task->Execute();
+                task->CommitTxn();
                 break;
             }
             case BGTaskType::kInvalid: {
