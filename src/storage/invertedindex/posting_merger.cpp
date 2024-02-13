@@ -14,17 +14,9 @@ import posting_writer;
 import posting_decoder;
 import term_meta;
 import column_index_iterator;
+import segment_term_posting;
 
 namespace infinity {
-
-SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
-
-bool SegmentTermPosting::HasNext() {
-    if (column_index_iterator_->Next(term_, posting_decoder_)) {
-        return true;
-    }
-    return false;
-}
 
 class DocMerger {
 public:
@@ -245,6 +237,7 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_posti
     while (!queue.empty()) {
         SortedPosting *sorted_posting = queue.top();
         queue.pop();
+        sorted_posting->Merge(posting_dumper_);
         if (sorted_posting->Next()) {
             queue.push(sorted_posting);
         } else

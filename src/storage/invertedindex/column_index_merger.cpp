@@ -25,4 +25,6 @@ PostingMerger *ColumnIndexMerger::CreatePostingMerger(const Vector<Segment> &seg
     return new PostingMerger(memory_pool_, buffer_pool_, segments);
 }
 
+void ColumnIndexMerger::Merge() {}
+
 } // namespace infinity

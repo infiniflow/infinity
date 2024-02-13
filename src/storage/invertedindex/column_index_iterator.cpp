@@ -24,13 +24,12 @@ ColumnIndexIterator::ColumnIndexIterator(const InvertedIndexConfig &index_config
 
 ColumnIndexIterator::~ColumnIndexIterator() {}
 
-void ColumnIndexIterator::Init(const Segment &segment) {
+void ColumnIndexIterator::Init(segmentid_t segment_id) {
     String root_dir = index_config_.GetIndexName();
-    Path path = Path(root_dir) / std::to_string(segment.GetSegmentId());
+    Path path = Path(root_dir) / std::to_string(segment_id);
     String dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
-    dict_reader_->InitIterator("");
     String posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
     posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
@@ -50,7 +49,6 @@ bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
     if (!ret)
         return false;
     u32 total_len = 0;
-    DecodeTermMeta();
     DecodeDocList();
     DecodeTfBitmap();
     DecodePosList();
@@ -59,8 +57,6 @@ bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
     decoder = posting_decoder_.get();
     return true;
 }
-
-void ColumnIndexIterator::DecodeTermMeta() {}
 
 void ColumnIndexIterator::DecodeDocList() {
     u32 doc_skiplist_len = posting_file_->ReadVInt();

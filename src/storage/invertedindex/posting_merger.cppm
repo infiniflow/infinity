@@ -11,26 +11,9 @@ import index_defines;
 import term_meta;
 import segment;
 import column_index_iterator;
+import segment_term_posting;
 
 namespace infinity {
-export class SegmentTermPosting {
-public:
-    SegmentTermPosting();
-    SegmentTermPosting(segmentid_t segment_id, docid_t base_doc);
-
-    docid_t GetBaesDocId() { return base_doc_id_; }
-
-    bool HasNext();
-
-    PostingDecoder *GetPostingDecoder() { return posting_decoder_; }
-
-private:
-    segmentid_t segment_id_;
-    docid_t base_doc_id_;
-    String term_;
-    PostingDecoder *posting_decoder_{nullptr};
-    SharedPtr<ColumnIndexIterator> column_index_iterator_;
-};
 
 class PostingDumper;
 export class PostingMerger {

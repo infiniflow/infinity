@@ -24,13 +24,11 @@ public:
 
     ~ColumnIndexIterator();
 
-    void Init(const Segment &segment);
+    void Init(segmentid_t segment_id);
 
     bool Next(String &term, PostingDecoder *&decoder);
 
 private:
-    void DecodeTermMeta();
-
     void DecodeDocList();
 
     void DecodeTfBitmap();

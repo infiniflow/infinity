@@ -22,6 +22,8 @@ public:
     ColumnIndexMerger(const InvertedIndexConfig &index_config, u64 column_id, MemoryPool *memory_pool, RecyclePool *buffer_pool);
     ~ColumnIndexMerger();
 
+    void Merge();
+
 private:
     PostingMerger *CreatePostingMerger(const Vector<Segment> &segments);
 
