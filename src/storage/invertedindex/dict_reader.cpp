@@ -22,6 +22,7 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
     SizeT fst_len = fst_root_addr + 21;
     u8 *fst_data = data_ptr_ + (data_len_ - fst_len);
     fst_ = MakeUnique<Fst>(fst_data, fst_len);
+    s_ = MakeUnique<FstStream>(*fst_);
 }
 
 DictionaryReader::~DictionaryReader() {
@@ -42,19 +43,23 @@ bool DictionaryReader::Lookup(const String &key, TermMeta &term_meta) {
     return true;
 }
 
-void DictionaryReader::LookupPrefix(const String &prefix, Vector<Pair<String, TermMeta>> &term_metas) {
-    FstStream s(*fst_, (u8 *)prefix.c_str(), prefix.length());
+void DictionaryReader::InitIterator(const String &min, const String &max) {
+    s_->Reset((u8 *)min.c_str(), min.length(), (u8 *)max.c_str(), max.length());
+}
+
+void DictionaryReader::InitIterator(const String &prefix) { s_->Reset((u8 *)prefix.c_str(), prefix.length()); }
+
+bool DictionaryReader::Next(String &term, TermMeta &term_meta) {
     Vector<u8> key;
     u64 val;
-    String term;
-    TermMeta term_meta;
-    while (s.Next(key, val)) {
-        term = String((char *)key.data(), key.size());
-        u8 *data_cursor = data_ptr_ + val;
-        SizeT left_size = data_len_ - val;
-        meta_loader_.Load(data_cursor, left_size, term_meta);
-        term_metas.push_back({term, term_meta});
+    if (!s_->Next(key, val)) {
+        return false;
     }
+    term = String((char *)key.data(), key.size());
+    u8 *data_cursor = data_ptr_ + val;
+    SizeT left_size = data_len_ - val;
+    meta_loader_.Load(data_cursor, left_size, term_meta);
+    return true;
 }
 
 } // namespace infinity
