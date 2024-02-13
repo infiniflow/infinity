@@ -13,6 +13,8 @@ import index_defines;
 import term_meta;
 import segment;
 import index_config;
+import dict_reader;
+import local_file_system;
 namespace infinity {
 
 ColumnIndexIterator::ColumnIndexIterator(const InvertedIndexConfig &index_config, u64 column_id)
@@ -22,7 +24,17 @@ ColumnIndexIterator::ColumnIndexIterator(const InvertedIndexConfig &index_config
 
 ColumnIndexIterator::~ColumnIndexIterator() {}
 
-void ColumnIndexIterator::Init() {
+void ColumnIndexIterator::Init(const Segment &segment) {
+    String root_dir = index_config_.GetIndexName();
+    Path path = Path(root_dir) / std::to_string(segment.GetSegmentId());
+    String dict_file = path.string();
+    dict_file.append(DICT_SUFFIX);
+    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
+    dict_iterator_ = dict_reader->CreateIterator();
+
+    String posting_file = path.string();
+    posting_file.append(POSTING_SUFFIX);
+    posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
 
     doc_list_reader_ = MakeShared<ByteSliceReader>();
     if (format_option_.HasTfBitmap()) {
@@ -34,12 +46,10 @@ void ColumnIndexIterator::Init() {
     posting_decoder_ = MakeShared<PostingDecoder>(format_option_);
 }
 
-bool ColumnIndexIterator::HasNext() {
-    // TODO get dictionary iterator from dictionaray reader
-    return false;
-}
+bool ColumnIndexIterator::HasNext() { return dict_iterator_->Next(); }
 
 PostingDecoder *ColumnIndexIterator::Next(const String &key) {
+    dict_iterator_->GetCurrentTermMeta(term_meta_);
     u32 total_len = 0;
     DecodeTermMeta();
     DecodeDocList();
