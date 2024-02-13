@@ -18,6 +18,7 @@ export module config;
 import stl;
 import third_party;
 import options;
+import status;
 
 namespace infinity {
 
@@ -28,7 +29,7 @@ export constexpr std::string_view log_level = "log_level";
 
 export struct Config {
 public:
-    SharedPtr<String> Init(const SharedPtr<String> &config_path);
+    Status Init(const SharedPtr<String> &config_path);
 
     void PrintAll() const;
 
@@ -49,6 +50,7 @@ public:
 
     [[nodiscard]] inline u64 query_memory_limit() const { return system_option_.query_memory_limit; }
 
+    // Network
     [[nodiscard]] inline String listen_address() const { return system_option_.listen_address; }
 
     [[nodiscard]] inline u16 pg_port() const { return system_option_.pg_port; }
@@ -56,6 +58,8 @@ public:
     [[nodiscard]] inline u32 http_port() const { return system_option_.http_port; }
 
     [[nodiscard]] inline u32 sdk_port() const { return system_option_.sdk_port; }
+
+    [[nodiscard]] inline i32 connection_limit() const { return system_option_.connection_limit_; }
 
     // Profiler
     [[nodiscard]] inline bool enable_profiler() const { return system_option_.enable_profiler; }
@@ -80,15 +84,22 @@ public:
     // Storage
     [[nodiscard]] inline SharedPtr<String> data_dir() const { return system_option_.data_dir; }
 
-    [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
-
     [[nodiscard]] inline u64 default_row_size() const { return system_option_.default_row_size; }
 
+    [[nodiscard]] inline u64 storage_capacity() const { return system_option_.storage_capacity_; }
+
+    [[nodiscard]] inline u64 garbage_collection_interval() const { return system_option_.garbage_collection_interval_; }
+
+    [[nodiscard]] inline double garbage_collection_storage_ratio() const { return system_option_.garbage_collection_storage_ratio_; }
+
+    // Buffer
     [[nodiscard]] inline u64 buffer_pool_size() const { return system_option_.buffer_pool_size; }
 
     [[nodiscard]] inline SharedPtr<String> temp_dir() const { return system_option_.temp_dir; }
 
     // Wal
+    [[nodiscard]] inline SharedPtr<String> wal_dir() const { return system_option_.wal_dir; }
+
     [[nodiscard]] inline u64 full_checkpoint_interval_sec() const { return system_option_.full_checkpoint_interval_sec_; }
 
     [[nodiscard]] inline u64 full_checkpoint_txn_interval() const { return system_option_.full_checkpoint_txn_interval_; }
@@ -105,7 +116,9 @@ public:
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
-    static SharedPtr<String> ParseByteSize(const String &byte_size_str, u64 &byte_size);
+    static Status ParseByteSize(const String &byte_size_str, u64 &byte_size);
+
+    static Status ParseTimeInfo(const String &time_info, u64 &time_seconds);
 
     static u64 GetAvailableMem();
 
@@ -136,7 +149,7 @@ export struct SystemVariables {
     static HashMap<String, SysVar> map_;
 
     static void InitVariablesMap();
-    static SysVar GetSysVarEnumByName(const String& var_name);
+    static SysVar GetSysVarEnumByName(const String &var_name);
 };
 
 } // namespace infinity
