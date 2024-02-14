@@ -14,6 +14,8 @@ import index_defines;
 import term_meta;
 import segment;
 import index_config;
+import dict_reader;
+import local_file_system;
 namespace infinity {
 
 export class ColumnIndexIterator {
@@ -22,15 +24,11 @@ public:
 
     ~ColumnIndexIterator();
 
-    void Init();
+    void Init(segmentid_t segment_id);
 
-    bool HasNext();
-
-    PostingDecoder *Next(const String &term);
+    bool Next(String &term, PostingDecoder *&decoder);
 
 private:
-    void DecodeTermMeta();
-
     void DecodeDocList();
 
     void DecodeTfBitmap();
@@ -41,6 +39,7 @@ private:
     PostingFormatOption format_option_;
     u64 column_id_;
 
+    SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_file_;
     ByteSlice *doc_list_slice_{nullptr};
     ByteSlice *pos_list_slice_{nullptr};
@@ -52,6 +51,7 @@ private:
     TermMeta term_meta_;
 
     SharedPtr<PostingDecoder> posting_decoder_;
+    LocalFileSystem fs_;
 };
 
 } // namespace infinity

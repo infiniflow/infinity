@@ -34,6 +34,7 @@ public:
 
     virtual void Deallocate(void *, SizeT) {}
 
+    // Release allocated memory
     virtual void Release() {
         ScopedSpinLock lock(mutex_);
         chunk_allocator_->Release();
@@ -41,16 +42,17 @@ public:
         mem_chunk_ = &(MemoryPool::DUMMY_CHUNK);
     }
 
+    // Reset memory to init state
     virtual SizeT Reset() {
         ScopedSpinLock lock(mutex_);
         return ResetUnsafe();
     }
 
     SizeT ResetUnsafe() {
-        SizeT totalSize = chunk_allocator_->Reset();
+        SizeT total_size = chunk_allocator_->Reset();
         mem_chunk_ = &(MemoryPool::DUMMY_CHUNK);
         alloc_size_ = 0;
-        return totalSize;
+        return total_size;
     }
 
     void Clear() {

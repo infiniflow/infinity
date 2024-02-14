@@ -14,18 +14,9 @@ import posting_writer;
 import posting_decoder;
 import term_meta;
 import column_index_iterator;
+import segment_term_posting;
 
 namespace infinity {
-
-SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
-
-bool SegmentTermPosting::HasNext() {
-    if (column_index_iterator_->HasNext()) {
-        posting_decoder_ = column_index_iterator_->Next(term_);
-        return true;
-    }
-    return false;
-}
 
 class DocMerger {
 public:
@@ -130,18 +121,30 @@ bool DocMerger::HasNext() {
 
 class PostingDumper {
 public:
-    PostingDumper(const PostingFormatOption &format_option) : format_option_(format_option) {}
+    PostingDumper(MemoryPool *memory_pool, RecyclePool *buffer_pool, const PostingFormatOption &format_option, const Segment &target_segment)
+        : format_option_(format_option), target_segment_(target_segment) {
+        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option);
+    }
 
     ~PostingDumper() {}
 
-    void Dump();
+    void Dump(const String &term);
+
+    void EndSegment() { posting_writer_->EndSegment(); }
+
+    u32 GetDF() const { return posting_writer_->GetDF(); }
+
+    u32 GetTotalTF() const { return posting_writer_->GetTotalTF(); }
+
+    u64 GetPostingLength() const { return posting_writer_->GetDumpLength(); }
+
+    SharedPtr<PostingWriter> GetPostingWriter() { return posting_writer_; }
 
 private:
     PostingFormatOption format_option_;
-    Vector<SharedPtr<PostingWriter>> posting_writers_;
+    SharedPtr<PostingWriter> posting_writer_;
+    Segment target_segment_;
 };
-
-void PostingDumper::Dump() {}
 
 class SortedPosting {
 public:
@@ -149,29 +152,73 @@ public:
         : format_option_(format_option), base_doc_id_(base_doc_id), doc_merger_(format_option, posting_decoder) {}
     ~SortedPosting() {}
 
-    bool HasNext() { return false; }
+    bool Next() {
+        bool ret = doc_merger_.HasNext();
+        if (!ret)
+            return false;
+        current_doc_id_ = doc_merger_.CurrentDoc();
+        return ret;
+    }
 
-    void Merge(const SharedPtr<PostingDumper> &pos_dumper) {}
+    void Merge(const SharedPtr<PostingDumper> &pos_dumper) {
+        if (current_doc_id_ == INVALID_DOCID) {
+            doc_merger_.Merge(INVALID_DOCID, nullptr);
+            return;
+        }
+        SharedPtr<PostingWriter> posting_writer = pos_dumper->GetPostingWriter();
+        doc_merger_.Merge(current_doc_id_, posting_writer.get());
+    }
 
-    Pair<segmentid_t, docid_t> GetCurrent() const { return current_; }
+    docid_t GetCurrentDocID() const { return current_doc_id_; }
 
 private:
     PostingFormatOption format_option_;
     docid_t base_doc_id_;
-    Pair<segmentid_t, docid_t> current_{INVALID_SEGMENTID, INVALID_DOCID};
+    segmentid_t current_segment_{INVALID_SEGMENTID};
+    docid_t current_doc_id_{INVALID_DOCID};
     DocMerger doc_merger_;
 };
 
 struct SortedPostingComparator {
-    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrent().first > rhs->GetCurrent().first; }
+    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrentDocID() > rhs->GetCurrentDocID(); }
 };
 
 using PriorityQueue = Heap<SortedPosting *, SortedPostingComparator>;
 
-PostingMerger::PostingMerger() { posting_dumper_ = MakeShared<PostingDumper>(format_option_); }
+PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Segment &target_segment)
+    : memory_pool_(memory_pool), buffer_pool_(buffer_pool) {
+    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, target_segment);
+}
 
 PostingMerger::~PostingMerger() {}
 
-void PostingMerger::Merge(const Vector<Segment> &segments) {}
+void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_postings) {
+    PriorityQueue queue;
+    for (u32 i = 0; i < segment_term_postings.size(); ++i) {
+        SegmentTermPosting *term_posting = segment_term_postings[i];
+        u64 base_doc_id = term_posting->GetBaesDocId();
+        PostingDecoder *decoder = term_posting->GetPostingDecoder();
+        SortedPosting *sorted_posting = new SortedPosting(format_option_, base_doc_id, decoder);
+        queue.push(sorted_posting);
+    }
+
+    while (!queue.empty()) {
+        SortedPosting *sorted_posting = queue.top();
+        queue.pop();
+        while (sorted_posting->Next()) {
+            sorted_posting->Merge(posting_dumper_);
+        }
+        delete sorted_posting;
+    }
+    posting_dumper_->EndSegment();
+}
+
+void PostingMerger::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
+    posting_dumper_->GetPostingWriter()->Dump(file_writer, term_meta);
+}
+
+u32 PostingMerger::GetDF() { return posting_dumper_->GetDF(); }
+
+u32 PostingMerger::GetTotalTF() { return posting_dumper_->GetTotalTF(); }
 
 } // namespace infinity
