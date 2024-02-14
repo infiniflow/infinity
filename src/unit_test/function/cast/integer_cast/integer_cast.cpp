@@ -409,6 +409,6 @@ TEST_F(IntegerCastTest, integer_cast1) {
     {
         DataType source(LogicalType::kInteger);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), UnrecoverableException);
+        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), RecoverableException);
     }
 }
