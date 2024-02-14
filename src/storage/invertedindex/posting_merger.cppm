@@ -23,6 +23,10 @@ public:
 
     void Merge(const Vector<SegmentTermPosting *> &segment_term_postings);
 
+    u32 GetDF();
+
+    u32 GetTotalTF();
+
 private:
     MemoryPool *memory_pool_{nullptr};
     RecyclePool *buffer_pool_{nullptr};

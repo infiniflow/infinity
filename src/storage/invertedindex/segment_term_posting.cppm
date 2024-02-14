@@ -14,6 +14,7 @@ import column_index_iterator;
 import index_config;
 
 namespace infinity {
+// Utility class for posting merging
 export class SegmentTermPosting {
 public:
     SegmentTermPosting();
@@ -47,9 +48,16 @@ public:
 export class SegmentTermPostingQueue {
 public:
     SegmentTermPostingQueue(const InvertedIndexConfig &index_config, u64 column_id);
+
     ~SegmentTermPostingQueue();
 
+    bool Empty() const { return segment_term_postings_.empty(); }
+
     void Init(const Vector<Segment> &segments);
+
+    const Vector<SegmentTermPosting *> &GetCurrentMerging(String &term);
+
+    void MoveToNextTerm();
 
 private:
     SharedPtr<ColumnIndexIterator> CreateIndexIterator(segmentid_t segment_id);
@@ -59,6 +67,7 @@ private:
     const InvertedIndexConfig &index_config_;
     u64 column_id_;
     PriorityQueue segment_term_postings_;
+    Vector<SegmentTermPosting *> merging_term_postings_;
 };
 
 } // namespace infinity

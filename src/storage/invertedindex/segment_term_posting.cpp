@@ -41,8 +41,8 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
 
 void SegmentTermPostingQueue::Init(const Vector<Segment> &segments) {
     for (u32 i = 0; i < segments.size(); ++i) {
-        SharedPtr<ColumnIndexIterator> index_iterator = CreateIndexIterator(segments[i].GetSegmentId());
         SegmentTermPosting *segment_term_posting = new SegmentTermPosting(segments[i].GetSegmentId(), 0);
+        segment_term_posting->column_index_iterator_ = CreateIndexIterator(segments[i].GetSegmentId());
         if (segment_term_posting->HasNext()) {
             segment_term_postings_.push(segment_term_posting);
         } else
@@ -54,6 +54,33 @@ SharedPtr<ColumnIndexIterator> SegmentTermPostingQueue::CreateIndexIterator(segm
     SharedPtr<ColumnIndexIterator> index_iterator = MakeShared<ColumnIndexIterator>(index_config_, column_id_);
     index_iterator->Init(segment_id);
     return index_iterator;
+}
+
+const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(String &term) {
+    SegmentTermPosting *term_posting = segment_term_postings_.top();
+    term = term_posting->term_;
+    segment_term_postings_.pop();
+    merging_term_postings_.push_back(term_posting);
+    term_posting = segment_term_postings_.size() > 0 ? segment_term_postings_.top() : nullptr;
+    while (term_posting != nullptr && (term_posting->term_.compare(term) == 0)) {
+        merging_term_postings_.push_back(term_posting);
+        segment_term_postings_.pop();
+        term_posting = segment_term_postings_.size() > 0 ? segment_term_postings_.top() : nullptr;
+    }
+    return merging_term_postings_;
+}
+
+void SegmentTermPostingQueue::MoveToNextTerm() {
+    for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
+        SegmentTermPosting *term_posting = merging_term_postings_[i];
+        merging_term_postings_[i] = nullptr;
+        if (term_posting->HasNext()) {
+            segment_term_postings_.push(term_posting);
+        } else {
+            delete term_posting;
+        }
+    }
+    merging_term_postings_.clear();
 }
 
 } // namespace infinity

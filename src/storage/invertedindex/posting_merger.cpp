@@ -246,4 +246,8 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_posti
     posting_dumper_->EndSegment();
 }
 
+u32 PostingMerger::GetDF() { return posting_dumper_->GetDF(); }
+
+u32 PostingMerger::GetTotalTF() { return posting_dumper_->GetTotalTF(); }
+
 } // namespace infinity
