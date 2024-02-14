@@ -18,10 +18,13 @@ namespace infinity {
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Vector<Segment> &segments);
+    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Segment &target_segment);
+
     ~PostingMerger();
 
     void Merge(const Vector<SegmentTermPosting *> &segment_term_postings);
+
+    void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
 
     u32 GetDF();
 
