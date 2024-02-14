@@ -72,7 +72,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
             auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
             EXPECT_EQ(col_expr->names_[0], "a");

@@ -423,7 +423,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
 
-    TransactionID txn_id = query_context->GetTxn()->TxnID();
+//    TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);

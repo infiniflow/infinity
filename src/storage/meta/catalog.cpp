@@ -446,8 +446,8 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
         RecoverableError(Status::CatalogCorrupted(catalog_path));
     }
 
-    auto global_commit_ts = catalog_delta_entry->commit_ts();
-    auto global_txn_id = catalog_delta_entry->txn_id();
+//    auto global_commit_ts = catalog_delta_entry->commit_ts();
+//    auto global_txn_id = catalog_delta_entry->txn_id();
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
         auto type = op->GetType();

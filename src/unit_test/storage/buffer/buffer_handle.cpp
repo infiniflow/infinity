@@ -70,7 +70,7 @@ TEST_F(BufferHandleTest, test1) {
 
     {
         auto buf_handle1 = buf1->Load();
-        EXPECT_EQ(buf1->rc(), 1);
+        EXPECT_EQ(buf1->rc(), 1u);
 
         auto buf_handle2 = buf2->Load();
 
@@ -107,7 +107,7 @@ TEST_F(BufferHandleTest, test1) {
     }
     {
         auto buf_handle1 = buf1->Load();
-        auto data = static_cast<const int *>(buf_handle1.GetData());
+        auto data = static_cast<const size_t *>(buf_handle1.GetData());
         for (size_t i = 0; i < write_size; ++i) {
             EXPECT_EQ(data[i], i);
         }

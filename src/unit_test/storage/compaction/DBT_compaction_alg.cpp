@@ -95,11 +95,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 5);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 5u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {

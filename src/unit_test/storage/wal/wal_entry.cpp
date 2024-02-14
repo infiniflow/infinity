@@ -303,7 +303,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
     EXPECT_EQ(max_commit_ts, 123);
     EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
-    EXPECT_EQ(replay_entries.size(), 1);
+    EXPECT_EQ(replay_entries.size(), 1u);
 }
 
 TEST_F(WalEntryTest, WalListIterator) {
