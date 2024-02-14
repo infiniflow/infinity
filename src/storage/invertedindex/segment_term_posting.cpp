@@ -3,15 +3,9 @@ module;
 module segment_term_posting;
 
 import stl;
-import memory_pool;
 import file_writer;
-import doc_list_encoder;
-import inmem_posting_decoder;
-import pos_list_encoder;
-import posting_list_format;
 import index_defines;
 import index_config;
-import posting_writer;
 import posting_decoder;
 import term_meta;
 import segment;
@@ -36,6 +30,9 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
         SegmentTermPosting *segment_term_posting = segment_term_postings_.top();
         segment_term_postings_.pop();
         delete segment_term_posting;
+    }
+    for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
+        delete merging_term_postings_[i];
     }
 }
 

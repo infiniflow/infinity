@@ -3,10 +3,8 @@ module;
 export module segment_term_posting;
 
 import stl;
-import memory_pool;
 import file_writer;
 import posting_decoder;
-import posting_list_format;
 import index_defines;
 import term_meta;
 import segment;
