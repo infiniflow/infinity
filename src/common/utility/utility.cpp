@@ -18,9 +18,10 @@ module;
 #include <sstream>
 #include <iomanip>
 
-import stl;
-
 module utility;
+
+import stl;
+import third_party;
 
 namespace infinity::Utility {
 
@@ -48,6 +49,24 @@ String FormatByteSize(u64 byte_size) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(2) << size << sizeSuffixes[suffixIndex];
     return oss.str();
+}
+
+String FormatTimeInfo(u64 seconds) {
+    u64 second = seconds % 60;
+    seconds -= second;
+    if(seconds == 0) {
+        return fmt::format("{}s", second);
+    }
+
+    seconds /= 60;
+    u64 minute = seconds % 60;
+    seconds -= minute;
+    if(seconds == 0) {
+        return fmt::format("{}m", minute);
+    }
+
+    seconds /= 60;
+    return fmt::format("{}h", seconds);
 }
 
 

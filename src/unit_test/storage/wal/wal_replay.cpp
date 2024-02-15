@@ -545,9 +545,9 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
-            EXPECT_EQ(segment_id, 0);
+            EXPECT_EQ(segment_id, 0u);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4, false);
-            EXPECT_EQ(segment_entry->segment_id(), 0);
+            EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn4);
             // auto last_block_entry = segment_entry->GetLastEntry();
 

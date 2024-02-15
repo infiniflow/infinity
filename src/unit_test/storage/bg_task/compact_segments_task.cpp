@@ -143,7 +143,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             EXPECT_NE(table_entry, nullptr);
 
             size_t test_segment_n = segment_sizes.size();
-            int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
+            size_t row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
             for (size_t i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);

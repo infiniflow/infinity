@@ -96,7 +96,7 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 
 SizeT TaskScheduler::GetStartFragments(PlanFragment *plan_fragment, Vector<PlanFragment *>& leaf_fragments) {
     SizeT all_fragment_n = 0;
-    StdFunction<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root) {
+    std::function<void(PlanFragment *)> TraversePlanFragmentTree = [&](PlanFragment *root)->void {
         all_fragment_n += root->GetContext()->Tasks().size();
         if (root->Children().empty()) {
             leaf_fragments.emplace_back(root);
@@ -216,7 +216,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
 }
 
 void TaskScheduler::DumpPlanFragment(PlanFragment *root) {
-    StdFunction<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
+    std::function<void(PlanFragment *)> TraverseFragmentTree = [&](PlanFragment *fragment) {
         auto *fragment_ctx = fragment->GetContext();
         LOG_INFO(fmt::format("Fragment id: {}, type: {}, ctx: {}",
                              fragment->FragmentID(),

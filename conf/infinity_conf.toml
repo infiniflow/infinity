@@ -17,6 +17,7 @@ listen_address          = "0.0.0.0"
 pg_port                 = 5432
 http_port               = 8088
 sdk_port                = 23817
+connection_limit        = 128
 
 [profiler]
 enable                  = false
@@ -34,17 +35,30 @@ log_level               = "info"
 
 [storage]
 data_dir                = "/var/infinity/data"
-wal_dir                 = "/var/infinity/wal"
 default_row_size        = 8192
+storage_capacity        = "64GB"
+
+# periodically activates garbage collection:
+# 0 means real-time,
+# s means seconds, for example "60s", 60 seconds
+# m means minutes, for example "60m", 60 minutes
+# h means hours, for example "1h", 1 hour
+garbage_collection_interval = "60s"
+
+# storage ratio activates garbage collection:
+# 0 means disable,
+# 0.1 means, once the storage reach 10% storage capacity, GC is triggered.
+garbage_collection_storage_ratio = 0.1
 
 [buffer]
 buffer_pool_size        = "4GB"
 temp_dir                = "/var/infinity/temp"
 
 [wal]
+wal_dir                 = "/var/infinity/wal"
 full_checkpoint_interval_sec      = 86400
 delta_checkpoint_interval_sec     = 60
-delta_checkpoint_interval_wal_bytes      = 1000000000
+delta_checkpoint_interval_wal_bytes = 1000000000
 wal_file_size_threshold            = "1GB"
 
 [resource]

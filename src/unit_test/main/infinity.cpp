@@ -54,11 +54,11 @@ TEST_F(InfinityTest, test1) {
     {
         QueryResult result = infinity->ListDatabases();
         //    EXPECT_EQ(result.result_table_->row_count(), 1); // Bug
-        EXPECT_EQ(result.result_table_->ColumnCount(), 1);
+        EXPECT_EQ(result.result_table_->ColumnCount(), 1u);
         EXPECT_EQ(result.result_table_->GetColumnNameById(0), "database");
-        EXPECT_EQ(result.result_table_->DataBlockCount(), 1);
+        EXPECT_EQ(result.result_table_->DataBlockCount(), 1u);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
-        EXPECT_EQ(data_block->row_count(), 1);
+        EXPECT_EQ(data_block->row_count(), 1u);
         Value value = data_block->GetValue(0, 0);
         const String &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "default");

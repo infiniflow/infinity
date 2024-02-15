@@ -31,9 +31,9 @@ import internal_types;
 
 namespace infinity {
 
-using AggregateInitializeFuncType = StdFunction<void(ptr_t)>;
-using AggregateUpdateFuncType = StdFunction<void(ptr_t, const SharedPtr<ColumnVector> &)>;
-using AggregateFinalizeFuncType = StdFunction<ptr_t(ptr_t)>;
+using AggregateInitializeFuncType = std::function<void(ptr_t)>;
+using AggregateUpdateFuncType = std::function<void(ptr_t, const SharedPtr<ColumnVector> &)>;
+using AggregateFinalizeFuncType = std::function<ptr_t(ptr_t)>;
 
 class AggregateOperation {
 public:
