@@ -24,7 +24,7 @@ import wal_entry;
 
 namespace infinity {
 
-using PutWalEntryFn = StdFunction<void(SharedPtr<WalEntry>)>;
+using PutWalEntryFn = std::function<void(SharedPtr<WalEntry>)>;
 
 class BGTaskProcessor;
 struct NewCatalog;

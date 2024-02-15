@@ -631,14 +631,14 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *d
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), delete_txn);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
     return compaction_alg_->AddSegment(new_segment, generate_txn);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }

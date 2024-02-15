@@ -73,7 +73,7 @@ void DBTCompactionAlg::AddInitSegments(Vector<SegmentEntry *> segment_entries) {
     }
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
     auto layer_opt = AddSegmentInner(new_segment);
     if (!layer_opt.has_value()) {
@@ -93,7 +93,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
     return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
     auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
     if (shrink_segment == nullptr) {

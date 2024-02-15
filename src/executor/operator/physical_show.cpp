@@ -702,7 +702,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const StdFunction<u64(const String &)> &file_size_func, const String &path) {
+    auto chuck_filling = [&](const std::function<u64(const String &)> &file_size_func, const String &path) {
         SizeT column_id = 0;
         {
             Value value = Value::MakeVarchar(path);

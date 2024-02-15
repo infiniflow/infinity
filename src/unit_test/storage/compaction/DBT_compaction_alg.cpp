@@ -70,7 +70,7 @@ TEST_F(DBTCompactionTest, AddSegments) {
     int m = 3;
     int c = 3;
     int s = 1;
-    StdFunction<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
 
     // {1, 2, 2, 3, 5, 3, 6};
@@ -197,7 +197,7 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
     int m = 3;
     int c = 3;
     int s = 1;
-    StdFunction<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
 
     Vector<SharedPtr<SegmentEntry>> segment_entries; // hold lifetime
@@ -322,7 +322,7 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
     int c = 10;
     int s = 10;
     // layer0: 0~9, layer1: 10~99, layer2: 100~999
-    StdFunction<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
 
     Vector<SharedPtr<SegmentEntry>> segment_entries; // hold lifetime
@@ -393,7 +393,7 @@ TEST_F(DBTCompactionTest, RollbackTest) {
     int m = 3;
     int c = 3;
     int s = 1;
-    StdFunction<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> GetTxn = [&]() { return txn_mgr->CreateTxn(); };
     DBTCompactionAlg DBTCompact(m, c, s, MockSegmentEntry::segment_capacity);
 
     // {1, 2, 2, 3, 5, 3, 6};
