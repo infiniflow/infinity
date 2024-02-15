@@ -234,6 +234,6 @@ TEST_F(HugeIntCastTest, hugeint_cast1) {
     {
         DataType source(LogicalType::kBigInt);
         DataType target(LogicalType::kTimestamp);
-        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), UnrecoverableException);
+        EXPECT_THROW(BindIntegerCast<IntegerT>(source, target), RecoverableException);
     }
 }

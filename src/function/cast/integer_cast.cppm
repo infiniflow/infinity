@@ -27,6 +27,7 @@ import column_vector;
 import vector_buffer;
 import internal_types;
 import data_type;
+import status;
 
 namespace infinity {
 
@@ -67,7 +68,7 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, IntegerTryCastToVarlen>);
         }
         default: {
-            UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            RecoverableError(Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString())));
         }
     }
     return BoundCastFunc(nullptr);
