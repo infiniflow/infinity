@@ -58,6 +58,11 @@
         irs::bstring converted_str((uint8_t *)str.c_str(), str.length());
         return converted_str;
     }
+
+    // Avoid warnings with the error counter.
+    #if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+    #endif
 }
 
 /* terminal symbol */
