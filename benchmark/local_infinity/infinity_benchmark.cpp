@@ -51,7 +51,7 @@ using namespace infinity;
 
 constexpr u64 second_unit = 1000 * 1000 * 1000;
 
-double Measurement(String name, SizeT thread_num, SizeT times, const StdFunction<void(SizeT, SharedPtr<Infinity>, std::thread::id)> &closure) {
+double Measurement(String name, SizeT thread_num, SizeT times, const std::function<void(SizeT, SharedPtr<Infinity>, std::thread::id)> &closure) {
     infinity::BaseProfiler profiler(name);
     Vector<std::thread> threads;
     threads.reserve(thread_num);

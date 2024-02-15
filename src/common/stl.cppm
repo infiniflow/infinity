@@ -51,207 +51,213 @@ export module stl;
 
 export namespace std {
 
-using std::experimental::source_location;
+    using std::experimental::source_location;
 // using std::stringstream;
-using std::forward;
-using std::move;
+    using std::forward;
+    using std::move;
 
-using std::swap;
+    using std::swap;
 
-using std::max;
-using std::min;
+    using std::max;
+    using std::min;
 
-using std::to_string;
-using std::from_chars;
-using std::errc;
+    using std::to_string;
+    using std::from_chars;
+    using std::errc;
 
-using std::stoi;
-using std::strtol;
-using std::strtof;
-using std::strtod;
+    using std::stoi;
+    using std::strtol;
+    using std::strtof;
+    using std::strtod;
 
-using std::memcpy;
-using std::memset;
-using std::memcmp;
-using std::strlen;
+    using std::memcpy;
+    using std::memset;
+    using std::memcmp;
+    using std::strlen;
 
-using std::time;
-using std::printf;
+    using std::time;
+    using std::printf;
 
-using std::is_same;
-using std::fill;
-using std::lower_bound;
+    using std::is_same;
+    using std::fill;
+    using std::lower_bound;
 
-using std::condition_variable;
-using std::lock_guard;
-using std::memory_order;
-using std::memory_order_acq_rel;
-using std::memory_order_acquire;
-using std::memory_order_consume;
-using std::memory_order_relaxed;
-using std::memory_order_release;
-using std::memory_order_seq_cst;
-using std::mutex;
-using std::shared_lock;
-using std::shared_mutex;
-using std::unique_lock;
+    using std::condition_variable;
+    using std::lock_guard;
+    using std::memory_order;
+    using std::memory_order_acq_rel;
+    using std::memory_order_acquire;
+    using std::memory_order_consume;
+    using std::memory_order_relaxed;
+    using std::memory_order_release;
+    using std::memory_order_seq_cst;
+    using std::mutex;
+    using std::shared_lock;
+    using std::shared_mutex;
+    using std::unique_lock;
 
-using std::forward_list;
-using std::isalpha;
-using std::isalnum;
-using std::pow;
-using std::log2;
-using std::sqrt;
-using std::floor;
-using std::nearbyint;
-using std::isnan;
-using std::isinf;
-using std::fmod;
-using std::fabs;
-using std::fill_n;
-using std::transform;
-using std::sort;
-using std::make_heap;
-using std::pop_heap;
-using std::reverse;
-using std::remove_if;
-using std::find;
+    using std::forward_list;
+    using std::isalpha;
+    using std::isalnum;
+    using std::pow;
+    using std::log2;
+    using std::sqrt;
+    using std::floor;
+    using std::nearbyint;
+    using std::isnan;
+    using std::isinf;
+    using std::fmod;
+    using std::fabs;
+    using std::fill_n;
+    using std::transform;
+    using std::sort;
+    using std::make_heap;
+    using std::pop_heap;
+    using std::reverse;
+    using std::remove_if;
+    using std::find;
 
-namespace ranges {
+    namespace ranges {
 
-using std::ranges::for_each;
-using std::ranges::equal;
+        using std::ranges::for_each;
+        using std::ranges::equal;
 
-}
+    }
 
-using std::decay_t;
-using std::function;
-using std::numeric_limits;
+    using std::decay_t;
+    using std::function;
+    using std::numeric_limits;
 
-namespace chrono {
-using std::chrono::duration;
-using std::chrono::microseconds;
-using std::chrono::milliseconds;
-using std::chrono::nanoseconds;
-using std::chrono::seconds;
+    namespace chrono {
+        using std::chrono::duration;
+        using std::chrono::microseconds;
+        using std::chrono::milliseconds;
+        using std::chrono::nanoseconds;
+        using std::chrono::seconds;
 
-using std::chrono::operator>;
-using std::chrono::operator>=;
-using std::chrono::operator<;
-using std::chrono::operator<=;
-using std::chrono::operator==;
+        using std::chrono::operator>;
+        using std::chrono::operator>=;
+        using std::chrono::operator<;
+        using std::chrono::operator<=;
+        using std::chrono::operator==;
 
-using std::chrono::operator+;
-using std::chrono::operator-;
+        using std::chrono::operator+;
+        using std::chrono::operator-;
 
-using std::chrono::minutes;
-using std::chrono::weeks;
-using std::chrono::years;
+        using std::chrono::minutes;
+        using std::chrono::weeks;
+        using std::chrono::years;
 
-using std::chrono::steady_clock;
-using std::chrono::time_point;
-} // namespace chrono
+        using std::chrono::steady_clock;
+        using std::chrono::time_point;
+    } // namespace chrono
 
-using std::cout;
-using std::cerr;
-using std::endl;
+    using std::cout;
+    using std::cerr;
+    using std::endl;
 
-using std::ostream;
-using std::ofstream;
-using std::ifstream;
-using std::ios;
+    using std::ostream;
+    using std::ofstream;
+    using std::ifstream;
+    using std::ios;
 
-using std::align;
+    using std::align;
 
-using std::ptrdiff_t;
+    using std::ptrdiff_t;
 
-using std::static_pointer_cast;
-using std::dynamic_pointer_cast;
+    using std::static_pointer_cast;
+    using std::dynamic_pointer_cast;
 
-namespace filesystem {
-    using std::filesystem::file_size;
-}
+    namespace filesystem {
+        using std::filesystem::file_size;
+    }
 
-using std::mt19937;
-using std::uniform_real_distribution;
-using std::iota;
+    using std::mt19937;
+    using std::uniform_real_distribution;
+    using std::iota;
 
-using std::exception;
-using std::unordered_set;
+    using std::exception;
+    using std::unordered_set;
 
-using std::back_inserter;
-using std::hash;
+    using std::back_inserter;
+    using std::hash;
 
-using std::string_view;
-using std::streamsize;
+    using std::string_view;
+    using std::streamsize;
 
-using std::variant;
-using std::holds_alternative;
-using std::get;
-using std::visit;
+    using std::variant;
+    using std::holds_alternative;
+    using std::get;
+    using std::visit;
 
-using std::is_integral_v;
-using std::is_floating_point_v;
+    using std::is_integral_v;
+    using std::is_floating_point_v;
 
-using std::monostate;
+    using std::monostate;
+    using std::function;
 
 } // namespace std
 
 namespace infinity {
 
-export {
+    export {
 
     // Containers
 
-    template <typename T1, typename T2>
+    template<typename T1, typename T2>
     using Pair = std::pair<T1, T2>;
 
-    template <typename... T>
+    template<typename... T>
     using Tuple = std::tuple<T...>;
 
-    template <typename T, std::size_t N>
+    template<typename T, std::size_t N>
     using Array = std::array<T, N>;
 
-    template <typename T, typename Allocator = std::allocator<T>>
+    template<typename T, typename Allocator = std::allocator<T>>
     using Vector = std::vector<T, Allocator>;
 
-    template <typename T>
+    template<typename T>
     using Deque = std::deque<T>;
 
-    template <typename T>
+    template<typename T>
     using List = std::list<T>;
 
-    template <typename T>
+    template<typename T>
     using Queue = std::queue<T>;
 
-    template <typename S, typename T>
+    template<typename S, typename T>
     using Map = std::map<S, T>;
 
-    template <typename S, typename T>
+    template<typename S, typename T>
     using MultiMap = std::multimap<S, T>;
 
-    template <typename T>
+    template<typename T>
     using Set = std::set<T>;
 
     template<typename T>
     using Hash = std::hash<T>;
 
-    template <typename S, typename T, typename H = std::hash<S>, typename Eq = std::equal_to<S>>
+    template<typename T>
+    struct EqualTo {
+        bool operator()(const T &left, const T &right) const { return left == right; }
+    };
+
+    template<typename S, typename T, typename H = std::hash<S>, typename Eq = EqualTo<S>>
     using HashMap = std::unordered_map<S, T, H, Eq>;
 
-    template <typename S, typename T, typename H = std::hash<S>>
+    template<typename S, typename T, typename H = std::hash<S>>
     using MultiHashMap = std::unordered_multimap<S, T, H>;
 
-    template <typename S>
+    template<typename S>
     using HashSet = std::unordered_set<S>;
 
-    template <typename T>
+    template<typename T>
     using MaxHeap = std::priority_queue<T>;
 
-    template <typename T, typename C>
+    template<typename T, typename C>
     using Heap = std::priority_queue<T, std::vector<T>, C>;
 
-    template <typename T>
+    template<typename T>
     using Optional = std::optional<T>;
     constexpr std::nullopt_t None = std::nullopt;
 
@@ -274,24 +280,28 @@ export {
         return path.substr(pos + 1);
     }
 
-    void ToUpper(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
+    void ToUpper(String &str) { std::transform(str.begin(), str.end(), str.begin(), ::toupper); }
+
     int ToUpper(int c) { return ::toupper(c); }
 
-    void ToLower(String & str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
+    void ToLower(String &str) { std::transform(str.begin(), str.end(), str.begin(), ::tolower); }
+
     int ToLower(int c) { return ::tolower(c); }
 
-    inline void StringToLower(String & str) {
+    inline void StringToLower(String &str) {
         std::transform(str.begin(), str.end(), str.begin(), [](const auto c) { return std::tolower(c); });
     }
 
     template<class BidirIteratorType>
-    BidirIteratorType Prev(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
+    BidirIteratorType
+    Prev(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
         std::advance(it, -n);
         return it;
     }
 
     template<class BidirIteratorType>
-    BidirIteratorType Next(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
+    BidirIteratorType
+    Next(BidirIteratorType it, typename std::iterator_traits<BidirIteratorType>::difference_type n = 1) {
         std::advance(it, n);
         return it;
     }
@@ -345,46 +355,46 @@ export {
     using atomic_bool = std::atomic_bool;
     using atomic_flag = std::atomic_flag;
 
-    template <typename T>
+    template<typename T>
     using Atomic = std::atomic<T>;
 
     // Smart ptr
 
-    template <typename T>
+    template<typename T>
     using SharedPtr = std::shared_ptr<T>;
 
-    template <typename T, typename... Args>
-    inline SharedPtr<T> MakeShared(Args && ...args) {
+    template<typename T, typename... Args>
+    inline SharedPtr<T> MakeShared(Args &&...args) {
         return std::make_shared<T>(std::forward<Args>(args)...);
     }
 
-    template <typename T>
+    template<typename T>
     using UniquePtr = std::unique_ptr<T>;
 
-    template <typename T, typename... Args>
-    inline UniquePtr<T> MakeUnique(Args && ...args) {
+    template<typename T, typename... Args>
+    inline UniquePtr<T> MakeUnique(Args &&...args) {
         return std::make_unique<T>(std::forward<Args>(args)...);
     }
 
-    template <typename T, typename... Args>
-    inline UniquePtr<T> MakeUniqueForOverwrite(Args && ...args) {
+    template<typename T, typename... Args>
+    inline UniquePtr<T> MakeUniqueForOverwrite(Args &&...args) {
         return std::make_unique_for_overwrite<T>(std::forward<Args>(args)...);
     }
 
-    template <typename T, typename U>
-    inline constexpr Pair<T, U> MakePair(T && first, U && second) {
+    template<typename T, typename U>
+    inline constexpr Pair<T, U> MakePair(T &&first, U &&second) {
         return std::make_pair<T, U>(std::forward<T>(first), std::forward<U>(second));
     }
 
     template<typename T>
-    inline constexpr Optional<T> MakeOptional(T && value) {
+    inline constexpr Optional<T> MakeOptional(T &&value) {
         return std::make_optional<T>(std::forward<T>(value));
     }
 
     // Chrono
     using Clock = std::chrono::high_resolution_clock;
 
-    template <typename T>
+    template<typename T>
     using TimePoint = std::chrono::time_point<T, std::chrono::nanoseconds>;
 
     using NanoSeconds = std::chrono::nanoseconds;
@@ -392,16 +402,17 @@ export {
     using MilliSeconds = std::chrono::milliseconds;
     using Seconds = std::chrono::seconds;
 
-    inline NanoSeconds ElapsedFromStart(const TimePoint<Clock> &end, const TimePoint<Clock> &start) { return end - start; }
+    inline NanoSeconds ElapsedFromStart(const TimePoint<Clock> &end, const TimePoint<Clock> &start) {
+        return end - start;
+    }
 
-    template <typename T>
+    template<typename T>
     T ChronoCast(const NanoSeconds &nano_seconds) {
         return std::chrono::duration_cast<T>(nano_seconds);
     }
 
-
     // IsStandLayout
-    template <typename T>
+    template<typename T>
     concept IsStandLayout = std::is_standard_layout_v<T>;
 
     // Stringstream
@@ -414,7 +425,7 @@ export {
 
     inline Vector<String> GetFilesFromDir(const String &path) {
         Vector<String> result;
-        for (auto &i : std::filesystem::directory_iterator(path)) {
+        for (auto &i: std::filesystem::directory_iterator(path)) {
             result.emplace_back(i.path().string());
         }
         return result;
@@ -424,28 +435,30 @@ export {
     //    using TypeID = std::typeid();
 
     // std::function
-    template <typename T>
-    using StdFunction = std::function<T>;
+//    template<typename R, typename... Ts>
+//    using std::function = std::function<R, Ts>;
 
     // SharedPtr
-    template <typename T>
+    template<typename T>
     using EnableSharedFromThis = std::enable_shared_from_this<T>;
 
-    template <typename II, typename OI>
+    template<typename II, typename OI>
     OI Copy(II first, II last, OI d_first) {
         return std::copy(first, last, d_first);
     }
 }
 
-export template <typename T1, typename T2>
+export template<typename T1, typename T2>
 struct CompareByFirst {
     using P = std::pair<T1, T2>;
+
     bool operator()(const P &lhs, const P &rhs) const { return lhs.first < rhs.first; }
 };
 
-export template <typename T1, typename T2>
+export template<typename T1, typename T2>
 struct CompareByFirstReverse {
     using P = std::pair<T1, T2>;
+
     bool operator()(const P &lhs, const P &rhs) const { return lhs.first > rhs.first; }
 };
 

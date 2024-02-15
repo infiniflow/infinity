@@ -121,7 +121,7 @@ TEST_F(StatementParsingTest, good_test1) {
             auto *insert_statement = (InsertStatement *)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "default");
-            EXPECT_EQ(insert_statement->values_->size(), 1);
+            EXPECT_EQ(insert_statement->values_->size(), 1u);
 
             ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
             EXPECT_STREQ(insert0_expr->str_value_, "abc");

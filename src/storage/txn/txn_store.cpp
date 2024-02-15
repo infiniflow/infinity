@@ -175,7 +175,7 @@ void TxnTableStore::Commit() const {
 }
 
 void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
-    StdFunction<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
+    std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
 
     // FIXME OPT: trigger compaction one time for all segments
     for (const SharedPtr<SegmentEntry> &new_segment : uncommitted_segments_) {

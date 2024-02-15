@@ -79,9 +79,9 @@ public:
     virtual void AddInitSegments(Vector<SegmentEntry *> segment_entries) final;
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, StdFunction<Txn *()> generate_txn) final;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) final;
 
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, StdFunction<Txn *()> generate_txn) final;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) final;
 
     virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) final;
 

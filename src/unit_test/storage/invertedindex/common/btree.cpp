@@ -48,8 +48,8 @@ TEST_F(BtreeTest, test1) {
     auto iter = btree.begin();
     auto i = 0;
     for (; iter.valid(); ++iter, ++i) {
-        EXPECT_EQ(iter.getKey(), 2 * i + 1);
-        EXPECT_EQ(iter.getData(), 2 * i + 2);
+        EXPECT_EQ(iter.getKey(), 2u * i + 1);
+        EXPECT_EQ(iter.getData(), 2u * i + 2);
     }
 
     GenerationHandler::generation_t oldest_used_gen = generation_handler.get_oldest_used_generation();
