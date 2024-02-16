@@ -13,8 +13,6 @@ public:
     IndexSegmentReader();
     virtual ~IndexSegmentReader() {}
 
-    virtual docid_t GetBaseDocId() const = 0;
-
     virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
 };
 

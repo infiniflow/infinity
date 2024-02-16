@@ -19,15 +19,13 @@ public:
     DiskIndexSegmentReader(const Segment &segment, const InvertedIndexConfig &index_config);
     virtual ~DiskIndexSegmentReader();
 
-    docid_t GetBaseDocId() const override;
-
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:
-    String path_;
     const Segment &segment_;
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_reader_;
+    docid_t base_doc_id_{INVALID_DOCID};
     PostingFormatOption posting_format_option_;
     LocalFileSystem fs_;
 };

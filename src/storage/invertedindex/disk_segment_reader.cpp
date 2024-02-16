@@ -36,14 +36,12 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, docid_t base_
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta))
         return false;
     posting_reader_->Seek(term_meta.doc_start_);
-    u64 file_length = term_meta.pos_start_ - term_meta.doc_start_;
+    u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
     posting_reader_->Read((char *)slice->data_, file_length);
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
     seg_posting.Init(byte_slice_list, base_doc_id, term_meta.doc_freq_);
     return true;
 }
-
-docid_t DiskIndexSegmentReader::GetBaseDocId() const { return 0; }
 
 } // namespace infinity

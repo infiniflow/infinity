@@ -17,8 +17,6 @@ public:
     InMemIndexSegmentReader(MemoryIndexer *column_indexer);
     virtual ~InMemIndexSegmentReader() = default;
 
-    docid_t GetBaseDocId() const override;
-
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:

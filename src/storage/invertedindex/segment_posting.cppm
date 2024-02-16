@@ -26,7 +26,7 @@ public:
     void Init(docid_t base_doc_id, u64 doc_count);
 
     // for in memory segment posting
-    void Init(docid_t base_doc_id, u32 doc_count, PostingWriter *posting_writer);
+    void Init(docid_t base_doc_id, PostingWriter *posting_writer);
 
     docid_t GetBaseDocId() const { return base_doc_id_; }
     void SetBaseDocId(docid_t base_doc_id) { base_doc_id_ = base_doc_id; }
