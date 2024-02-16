@@ -39,11 +39,7 @@ void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
 }
 
 SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    Path path = Path(root_dir_) / std::to_string(segment.GetSegmentId());
-    String dict_file = path.string();
-    dict_file.append(DICT_SUFFIX);
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
-    return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
+    return MakeShared<DiskIndexSegmentReader>(segment, index_config_);
 }
 
 SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {

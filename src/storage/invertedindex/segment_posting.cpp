@@ -17,7 +17,6 @@ void SegmentPosting::Init(const SharedPtr<ByteSliceList> &slice_list, docid_t ba
     slice_list_ = slice_list;
     base_doc_id_ = base_doc_id;
     doc_count_ = doc_count;
-    term_meta_ = GetSegmentTermMeta();
     posting_writer_ = nullptr;
 }
 
@@ -31,22 +30,6 @@ void SegmentPosting::Init(docid_t base_doc_id, u32 doc_count, PostingWriter *pos
     doc_count_ = doc_count;
     posting_writer_ = posting_writer;
     GetInMemTermMeta(term_meta_);
-}
-
-TermMeta SegmentPosting::GetSegmentTermMeta() const {
-    if (posting_writer_) {
-        // in memory segment no truncate posting list
-        return term_meta_;
-    }
-
-    if (slice_list_) {
-        TermMeta tm;
-        TermMetaLoader loader(posting_option_);
-        ByteSliceReader reader(slice_list_.get());
-        loader.Load(&reader, tm);
-        return tm;
-    }
-    return term_meta_;
 }
 
 } // namespace infinity

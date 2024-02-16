@@ -49,8 +49,6 @@ public:
         // tm.SetPayload(term_payload);
     }
 
-    TermMeta GetSegmentTermMeta() const;
-
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 
 private:

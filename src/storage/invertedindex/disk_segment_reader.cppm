@@ -11,14 +11,12 @@ import segment;
 import dict_reader;
 import file_reader;
 import posting_list_format;
+import local_file_system;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
-    DiskIndexSegmentReader(const String &root_path,
-                           const Segment &segment,
-                           const InvertedIndexConfig &index_config,
-                           const SharedPtr<DictionaryReader> &dict_reader);
+    DiskIndexSegmentReader(const Segment &segment, const InvertedIndexConfig &index_config);
     virtual ~DiskIndexSegmentReader();
 
     docid_t GetBaseDocId() const override;
@@ -27,9 +25,11 @@ public:
 
 private:
     String path_;
+    const Segment &segment_;
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_reader_;
     PostingFormatOption posting_format_option_;
+    LocalFileSystem fs_;
 };
 
 } // namespace infinity
