@@ -12,28 +12,32 @@ table_column_count_limit = 65536
 
 types_array = [
     # int
-    # "int", "int8", "int16", "int32", "int64", "int128", "integer",
+    "int", "int8", "int16", "int32", "int64", "integer",
+    # int128
+    # "int128",
     # float
-    # "float", "float32", "double", "float64",
+    "float", "float32", "double", "float64",
     # string
-    # "varchar",
+    "varchar",
     # bool
     # "bool",
     # vector
-    # "vector, 3, float"
+    "vector, 3, float"
 ]
 
 types_example_array = [
     # int
-    # 1, 127, 32767, 2147483647, pow(2, 63) - 1, pow(2, 127) - 1, 10,
+    1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
+    # int128
+    # pow(2, 127) - 1,
     # float
-    # float(1.1), np.float32(1/3), np.double(1/3), np.float64(1/3),
+    float(1.1), np.float32(1/3), np.double(1/3), np.float64(1/3),
     # string
-    # "^789$ test insert varchar",
+    "^789$ test insert varchar",
     # bool
     # True,
     # vector
-    # np.array([1.1, 2.2, 3.3])
+    np.array([1.1, 2.2, 3.3])
     # [1, 2, 3]
 ]
 
