@@ -272,6 +272,11 @@ Status Status::ExceedIndexNameLength(u64 index_name_length) {
                   MakeUnique<String>(fmt::format("Given index name length exceeds {}", MAX_IDENTIFIER_NAME_LENGTH)));
 }
 
+Status Status::NoColumnDefined(const infinity::String &table_name) {
+    return Status(ErrorCode::kNoColumnDefined,
+                  MakeUnique<String>(fmt::format("Try to define Table {} without any column.", table_name)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
