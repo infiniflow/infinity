@@ -381,6 +381,10 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     // Check if columns is given.
     Vector<SharedPtr<ColumnDef>> columns;
     SizeT column_count = create_table_info->column_defs_.size();
+    if(column_count == 0) {
+        return Status::NoColumnDefined(create_table_info->table_name_);
+    }
+
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
 
