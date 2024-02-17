@@ -4,7 +4,7 @@ _Briefly describe what this PR aims to solve. Include background context that wi
 
 Issue link:#[Link the issue here]
 
-## Type of change
+### Type of change
 
 - [ ] Bug Fix (non-breaking change which fixes an issue)
 - [ ] New Feature (non-breaking change which adds functionality)
