@@ -91,10 +91,10 @@ SELECT 1+5;
 query T
 SELECT 'abc';
 ----
-'abc'
+abc
 
 query T
 SELECT 'abccccccccccccccccccccccccccccccccccccccccc';
 ----
-'abccccccccccccccccccccccccccccccccccccccccc'
+abccccccccccccccccccccccccccccccccccccccccc
 
