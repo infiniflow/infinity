@@ -192,6 +192,7 @@ export namespace std {
 
     using std::is_integral_v;
     using std::is_floating_point_v;
+    using std::common_type_t;
 
     using std::monostate;
     using std::function;
