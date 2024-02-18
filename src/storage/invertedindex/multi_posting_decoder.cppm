@@ -45,14 +45,12 @@ private:
         if (seg_cursor >= segment_count_) {
             return INVALID_DOCID;
         }
-
-        SegmentPosting &posting = (*seg_postings_)[seg_cursor];
-        return posting.GetBaseDocId();
+        return (*seg_postings_)[seg_cursor].GetBaseDocId();
     }
 
     inline u32 LocateSegment(u32 start_seg_cursor, docid_t start_doc_id) {
-        docid_t curSegBaseDocId = GetSegmentBaseDocId(start_seg_cursor);
-        if (curSegBaseDocId == INVALID_DOCID) {
+        docid_t cur_seg_base_doc_id = GetSegmentBaseDocId(start_seg_cursor);
+        if (cur_seg_base_doc_id == INVALID_DOCID) {
             return start_seg_cursor;
         }
 

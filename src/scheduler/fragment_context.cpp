@@ -611,10 +611,18 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             break;
         }
+        case PhysicalOperatorType::kProjection: {
+            if(this->GetOperators().size() == 1) {
+                // Only one operator and it's project
+                tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
+            } else {
+                UnrecoverableError("Project shouldn't be the first operator of the fragment");
+            }
+            break;
+        }
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kFilter:
         case PhysicalOperatorType::kHash:
-        case PhysicalOperatorType::kProjection:
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
         case PhysicalOperatorType::kSort:

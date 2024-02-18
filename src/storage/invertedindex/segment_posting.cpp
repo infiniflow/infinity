@@ -13,40 +13,19 @@ namespace infinity {
 SegmentPosting::SegmentPosting(const PostingFormatOption &posting_option)
     : base_doc_id_(INVALID_DOCID), doc_count_(0), posting_writer_(nullptr), posting_option_(posting_option) {}
 
-void SegmentPosting::Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count) {
+void SegmentPosting::Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count, TermMeta &term_meta) {
     slice_list_ = slice_list;
     base_doc_id_ = base_doc_id;
     doc_count_ = doc_count;
-    term_meta_ = GetSegmentTermMeta();
+    term_meta_ = term_meta;
     posting_writer_ = nullptr;
 }
 
-void SegmentPosting::Init(docid_t base_doc_id, u64 doc_count) {
+void SegmentPosting::Init(docid_t base_doc_id, PostingWriter *posting_writer) {
     base_doc_id_ = base_doc_id;
-    doc_count_ = doc_count;
-}
-
-void SegmentPosting::Init(docid_t base_doc_id, u32 doc_count, PostingWriter *posting_writer) {
-    base_doc_id_ = base_doc_id;
-    doc_count_ = doc_count;
+    doc_count_ = posting_writer->GetDF();
     posting_writer_ = posting_writer;
     GetInMemTermMeta(term_meta_);
-}
-
-TermMeta SegmentPosting::GetSegmentTermMeta() const {
-    if (posting_writer_) {
-        // in memory segment no truncate posting list
-        return term_meta_;
-    }
-
-    if (slice_list_) {
-        TermMeta tm;
-        TermMetaLoader loader(posting_option_);
-        ByteSliceReader reader(slice_list_.get());
-        loader.Load(&reader, tm);
-        return tm;
-    }
-    return term_meta_;
 }
 
 } // namespace infinity

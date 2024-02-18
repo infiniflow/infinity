@@ -29,10 +29,8 @@ bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
     if (posting_writer == nullptr) {
         return false;
     }
-    seg_posting.Init(base_doc_id, 0, posting_writer);
+    seg_posting.Init(base_doc_id, posting_writer);
     return true;
 }
-
-docid_t InMemIndexSegmentReader::GetBaseDocId() const { return 0; }
 
 } // namespace infinity

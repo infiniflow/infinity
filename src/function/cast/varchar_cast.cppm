@@ -200,6 +200,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
     SizeT len{0};
     if (source.IsInlined()) {
         value = std::strtol(source.short_.data_, &endptr, 10);
+        len = (endptr - source.short_.data_);
     } else {
         // No tiny int isn't inline
         return false;
@@ -219,6 +220,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
     SizeT len{0};
     if (source.IsInlined()) {
         value = std::strtol(source.short_.data_, &endptr, 10);
+        len = (endptr - source.short_.data_);
     } else {
         return false;
     }
@@ -239,6 +241,7 @@ inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
     SizeT len{0};
     if (source.IsInlined()) {
         target = std::strtol(source.short_.data_, &endptr, 10);
+        len = (endptr - source.short_.data_);
     } else {
         target = std::strtol(source.value_.ptr_, &endptr, 10);
     }
