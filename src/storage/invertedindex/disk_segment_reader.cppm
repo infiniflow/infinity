@@ -16,12 +16,13 @@ import local_file_system;
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
-    DiskIndexSegmentReader(const Segment &segment, const InvertedIndexConfig &index_config);
+    DiskIndexSegmentReader(u64 column_id, const Segment &segment, const InvertedIndexConfig &index_config);
     virtual ~DiskIndexSegmentReader();
 
     bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:
+    u64 column_id_;
     const Segment &segment_;
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_reader_;

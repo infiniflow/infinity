@@ -49,6 +49,7 @@ void ColumnIndexer::PreCommit() { active_memory_indexer_->PreCommit(); }
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 
 void ColumnIndexer::Dump() {
+    active_memory_indexer_->DisableCommit();
     Path path = Path(index_name_) / std::to_string(current_segment_id_);
     String index_prefix = path.string();
     LocalFileSystem fs;

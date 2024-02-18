@@ -16,15 +16,18 @@ import posting_list_format;
 
 namespace infinity {
 
-DiskIndexSegmentReader::DiskIndexSegmentReader(const Segment &segment, const InvertedIndexConfig &index_config) : segment_(segment) {
+DiskIndexSegmentReader::DiskIndexSegmentReader(u64 column_id, const Segment &segment, const InvertedIndexConfig &index_config)
+    : column_id_(column_id), segment_(segment) {
     posting_format_option_ = index_config.GetPostingFormatOption();
 
     String root_dir = index_config.GetIndexName();
-    Path path = Path(root_dir) / std::to_string(segment_.GetSegmentId());
-    String dict_file = path.string();
+    Path path = Path(root_dir) / std::to_string(column_id_);
+    String path_str = path.string();
+    path_str.append(std::to_string(segment_.GetSegmentId()));
+    String dict_file = path_str;
     dict_file.append(DICT_SUFFIX);
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, index_config.GetPostingFormatOption());
-    String posting_file = path.string();
+    String posting_file = path_str;
     posting_file.append(POSTING_SUFFIX);
     posting_reader_ = MakeShared<FileReader>(fs_, posting_file, 1024);
 }

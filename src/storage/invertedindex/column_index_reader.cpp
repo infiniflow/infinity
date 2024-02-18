@@ -39,7 +39,7 @@ void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
 }
 
 SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    return MakeShared<DiskIndexSegmentReader>(segment, index_config_);
+    return MakeShared<DiskIndexSegmentReader>(column_id_, segment, index_config_);
 }
 
 SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
