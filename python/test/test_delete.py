@@ -199,6 +199,30 @@ class TestDelete:
 
     # delete table with only one block
     # delete table with multiple blocks, but only one segment
+    @pytest.mark.skip(reason="May cause core dumped")
+    def test_delete_table_with_one_segment(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_table_with_one_segment")
+        table_obj = db_obj.create_table("test_delete_table_with_one_segment", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        for i in range(1024):
+            table_obj.delete("c1 = " + str(i))
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
     # select before delete, select after delete and check the change.
     # delete just inserted data and select to check
     # delete inserted long before and select to check
