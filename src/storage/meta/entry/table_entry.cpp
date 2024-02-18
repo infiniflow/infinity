@@ -213,7 +213,7 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
         if (status.ok()) {
             irs_index_entry = table_index_entry->irs_index_entry();
             for (const SharedPtr<IndexBase> &index_base : table_index_entry->index_def()->index_array_) {
-                if (index_base->index_type_ != IndexType::kIRSFullText)
+                if (index_base->index_type_ != IndexType::kFullText)
                     continue;
                 IndexFullText *index_full_text = static_cast<IndexFullText *>(index_base.get());
                 for (auto &column_name : index_full_text->column_names_) {

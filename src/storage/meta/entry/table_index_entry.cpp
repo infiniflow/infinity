@@ -88,7 +88,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
                 RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
             }
             ColumnID column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
-            if (index_base->index_type_ == IndexType::kIRSFullText) {
+            if (index_base->index_type_ == IndexType::kFullText) {
                 index_info_map.emplace(column_id, std::static_pointer_cast<IndexFullText>(index_base));
             } else {
                 SharedPtr<String> column_index_dir =

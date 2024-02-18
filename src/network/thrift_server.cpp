@@ -879,7 +879,7 @@ private:
             case infinity_thrift_rpc::IndexType::Hnsw:
                 return IndexType::kHnsw;
             case infinity_thrift_rpc::IndexType::IRSFullText:
-                return IndexType::kIRSFullText;
+                return IndexType::kFullText;
             default:
                 UnrecoverableError("Invalid index type");
         }
