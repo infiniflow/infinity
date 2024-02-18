@@ -14,23 +14,29 @@
 
 module;
 
-module invert_task;
+export module multi_query_iterator;
 
 import stl;
-import column_inverter;
-import column_vector;
-
-import internal_types;
-
+import memory_pool;
+import posting_iterator;
+import index_defines;
+import segment;
+import index_config;
+import doc_iterator;
 namespace infinity {
+export class MultiQueryIterator : public DocIterator {
+public:
+    MultiQueryIterator();
 
-InvertTask::InvertTask(ColumnInverter *inverter, const String &value, u32 row_id) : inverter_(inverter), value_(value), row_id_(row_id) {}
+    virtual ~MultiQueryIterator() = default;
 
-void InvertTask::Run() { inverter_->InvertColumn(row_id_, value_); }
+    virtual bool IsAnd() const { return false; }
 
-BatchInvertTask::BatchInvertTask(ColumnInverter *inverter, SharedPtr<ColumnVector> column_vector, RowID start_row_id)
-    : inverter_(inverter), column_vector_(column_vector), start_row_id_(start_row_id) {}
+    virtual bool IsAndNot() const { return false; }
 
-void BatchInvertTask::Run() { inverter_->InvertColumn(column_vector_, start_row_id_); }
+    virtual bool IsOr() const { return false; }
 
+protected:
+    Vector<UniquePtr<DocIterator>> children_;
+};
 } // namespace infinity
