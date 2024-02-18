@@ -19,6 +19,7 @@ import common_values
 import infinity
 from utils import trace_expected_exceptions
 
+
 class TestUpdate:
 
     def test_version(self):
@@ -95,6 +96,7 @@ class TestUpdate:
         assert res.success
 
     # update empty table
+    @trace_expected_exceptions
     def test_update_empty_table(self):
 
         # connect
@@ -107,16 +109,19 @@ class TestUpdate:
         except Exception as e:
             print(e)
 
-        # tb_obj = db_obj.get_table("test_update_empty_table")
-        #
-        # try:
-        #     # FIXME tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
-        #     pass
-        # except Exception as e:
-        #     print(e)
+        tb_obj = db_obj.get_table("test_update_empty_table")
+
+        try:
+            tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+        except Exception as e:
+            print(e)
 
         # res = tb_obj.output["*"].to_df()
         # print(res)
+        # disconnect
+        res = infinity_obj.disconnect()
+
+        assert res.success
 
     # update non-existent table
     def test_update_non_existent_table(self):
@@ -138,6 +143,11 @@ class TestUpdate:
             pass
         except Exception as e:
             print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+
+        assert res.success
 
     # update table, no row is met the condition
     @trace_expected_exceptions
@@ -212,6 +222,7 @@ class TestUpdate:
 
             except Exception as e:
                 print(e)
+
     # update table with only one block
     # update table with multiple blocks, but only one segment
     # update before delete, select after delete and check the change.
