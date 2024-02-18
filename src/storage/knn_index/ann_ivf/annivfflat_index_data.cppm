@@ -23,11 +23,15 @@ import file_system_type;
 import search_top_k;
 import kmeans_partition;
 import infinity_exception;
+import logger;
+import third_party;
 
 namespace infinity {
 
 export template <typename CentroidsDataType, typename VectorDataType = CentroidsDataType>
 struct AnnIVFFlatIndexData {
+    using CommonType = std::common_type_t<VectorDataType, CentroidsDataType>;
+    bool loaded_{false};
     MetricType metric_{MetricType::kInvalid};
     u32 dimension_{};
     u32 partition_num_{};
@@ -35,17 +39,23 @@ struct AnnIVFFlatIndexData {
     Vector<CentroidsDataType> centroids_;
     Vector<Vector<u32>> ids_;
     Vector<Vector<VectorDataType>> vectors_;
+
     AnnIVFFlatIndexData() = default;
     AnnIVFFlatIndexData(MetricType metric, u32 dimension, u32 partition_num)
-        : metric_(metric), dimension_(dimension), partition_num_(partition_num), centroids_(partition_num_ * dimension_), ids_(partition_num_),
-          vectors_(partition_num_) {}
+        : metric_(metric), dimension_(dimension), partition_num_(partition_num) {}
 
-    void train_centroids(u32 dimension,
-                         u32 vector_count,
-                         const VectorDataType *vectors_ptr,
-                         u32 iteration_max = 0,
-                         u32 min_points_per_centroid = 32,
-                         u32 max_points_per_centroid = 256) {
+    // use existing vectors for training and insert
+    // used in benchmark because there is no deleted rows
+    void BuildIndex(const u32 dimension,
+                    const u32 train_count,
+                    const VectorDataType *train_ptr,
+                    const u32 vector_count,
+                    const VectorDataType *vectors_ptr,
+                    const u32 min_points_per_centroid = 32,
+                    const u32 max_points_per_centroid = 256) {
+        if (loaded_) {
+            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): Index data already exists.");
+        }
         if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
@@ -57,19 +67,34 @@ struct AnnIVFFlatIndexData {
             }
             return;
         }
-        k_means_partition_only_centroids<f32>(metric_,
-                                              dimension,
-                                              vector_count,
-                                              vectors_ptr,
-                                              centroids_.data(),
-                                              partition_num_,
-                                              iteration_max,
-                                              min_points_per_centroid,
-                                              max_points_per_centroid);
+        if (vector_count == 0 or train_count == 0) {
+            LOG_TRACE("AnnIVFFlatIndexData::BuildIndex(): Empty data, no need to build index");
+            return;
+        }
+
+        // step 1. train centroids
+        TrainCentroids(train_count, train_ptr, min_points_per_centroid, max_points_per_centroid);
+
+        // step 2. insert data to partitions
+        struct {
+            u32 operator[](u32 i) { return i; }
+        } get_id;
+        InsertData(vector_count, vectors_ptr, get_id);
+
+        loaded_ = true;
     }
 
-    void insert_data(i32 dimension, u64 vector_count, const VectorDataType *vectors_ptr, u32 id_begin = 0) {
-        if (dimension != i32(dimension_)) {
+    // use iter for both training and insert
+    // used when create index for a segment
+    void BuildIndex(auto &&iter,
+                    const u32 dimension,
+                    const u32 real_vector_count,
+                    const u32 min_points_per_centroid = 32,
+                    const u32 max_points_per_centroid = 256) {
+        if (loaded_) {
+            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): Index data already exists.");
+        }
+        if (dimension != dimension_) {
             UnrecoverableError("Dimension not match");
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
@@ -80,10 +105,113 @@ struct AnnIVFFlatIndexData {
             }
             return;
         }
-        add_data_to_partition(dimension, vector_count, vectors_ptr, this, id_begin);
+        if (real_vector_count == 0) {
+            LOG_TRACE("AnnIVFFlatIndexData::BuildIndex(): Empty data, no need to build index");
+            return;
+        }
+
+        // step 1. load input data
+
+        // reserve space for vectors and ids
+        Vector<VectorDataType> segment_column_data;
+        segment_column_data.reserve(real_vector_count * dimension);
+        // offset without deleted rows
+        Vector<SegmentOffset> segment_offset;
+        segment_offset.reserve(real_vector_count);
+
+        // record input data count
+        u32 cnt = 0;
+        while (true) {
+            auto pair_opt = iter.Next();
+            if (!pair_opt) {
+                break;
+            }
+            if (cnt >= real_vector_count) {
+                UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): segment row count more than expected");
+            }
+            auto &[val_ptr, offset] = pair_opt.value(); // val_ptr is const VectorDataType * type, offset is SegmentOffset type
+            // copy data of single embedding
+            segment_column_data.insert(segment_column_data.end(), val_ptr, val_ptr + dimension);
+            // copy offset of single embedding
+            segment_offset.push_back(offset);
+            // update cnt
+            ++cnt;
+        }
+        if (cnt != real_vector_count) {
+            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): segment row count les than expected");
+        }
+
+        // step 2. train centroids
+        TrainCentroids(real_vector_count, segment_column_data.data(), min_points_per_centroid, max_points_per_centroid);
+
+        // step 3. insert data to partitions
+        InsertData(real_vector_count, segment_column_data.data(), segment_offset.data());
+
+        loaded_ = true;
+    }
+
+    inline void TrainCentroids(const u32 vector_count,
+                               const VectorDataType *vector_data_ptr,
+                               const u32 min_points_per_centroid,
+                               const u32 max_points_per_centroid) {
+        u32 iteration_max = 0;
+        u32 real_partition_num = GetKMeansCentroids<CommonType>(metric_,
+                                                                dimension_,
+                                                                vector_count,
+                                                                vector_data_ptr,
+                                                                centroids_,
+                                                                partition_num_,
+                                                                iteration_max,
+                                                                min_points_per_centroid,
+                                                                max_points_per_centroid);
+        if (real_partition_num != partition_num_) {
+            LOG_INFO(fmt::format("AnnIVFFlatIndexData::BuildIndex(): After K-means partition, real_partition_num = %u, partition_num_ = %u",
+                                 real_partition_num,
+                                 partition_num_));
+            LOG_INFO(fmt::format("AnnIVFFlatIndexData::BuildIndex(): Update partition_num_ to %u", real_partition_num));
+            partition_num_ = real_partition_num;
+        }
+    }
+
+    inline void InsertData(u32 vector_count, const VectorDataType *vector_data_ptr, auto &&get_offset) {
+        // step 1. Classify vectors
+        // search_top_1
+        auto assigned_partition_id = MakeUniqueForOverwrite<u32[]>(vector_count);
+        search_top_1_without_dis<CommonType>(dimension_,
+                                             vector_count,
+                                             vector_data_ptr,
+                                             partition_num_,
+                                             centroids_.data(),
+                                             assigned_partition_id.get());
+
+        // step 2. Reserve space
+        Vector<u32> partition_element_count(partition_num_);
+        // calculate partition_element_count
+        for (u32 i = 0; i < vector_count; ++i)
+            ++partition_element_count[assigned_partition_id[i]];
+        ids_.resize(partition_num_);
+        vectors_.resize(partition_num_);
+        for (u32 i = 0; i < partition_num_; ++i) {
+            ids_[i].reserve(partition_element_count[i]);
+            vectors_[i].reserve(partition_element_count[i] * dimension_);
+        }
+
+        // step 3. Insert vectors into partitions
+        for (u32 i = 0; i < vector_count; ++i) {
+            auto vector_pos_i = vector_data_ptr + i * dimension_;
+            auto partition_of_i = assigned_partition_id[i];
+            vectors_[partition_of_i].insert(vectors_[partition_of_i].end(), vector_pos_i, vector_pos_i + dimension_);
+            ids_[partition_of_i].push_back(get_offset[i]);
+        }
+
+        // step 4. Update data_num_
+        data_num_ += vector_count;
     }
 
     void SaveIndexInner(FileHandler &file_handler) {
+        if (!loaded_) {
+            UnrecoverableError("AnnIVFFlatIndexData::SaveIndexInner(): Index data not loaded.");
+        }
         file_handler.Write(&metric_, sizeof(metric_));
         file_handler.Write(&dimension_, sizeof(dimension_));
         file_handler.Write(&partition_num_, sizeof(partition_num_));
@@ -122,6 +250,7 @@ struct AnnIVFFlatIndexData {
             vectors_[i].resize(dimension_ * vector_element_num);
             file_handler.Read(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
         }
+        loaded_ = true;
     }
 
     static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndexInner(FileHandler &file_handler) {
@@ -138,52 +267,5 @@ struct AnnIVFFlatIndexData {
         return index_data;
     }
 };
-
-export template <typename ElemType, typename CentroidsDataType, typename VectorDataType>
-void add_data_to_partition(u32 dimension,
-                           u32 vector_count,
-                           const ElemType *vectors_ptr,
-                           AnnIVFFlatIndexData<CentroidsDataType, VectorDataType> *index_data,
-                           u32 id_begin = 0) {
-    if (vector_count <= 0 || index_data == nullptr) {
-        UnrecoverableError("vector_count <= 0 || index_data == nullptr");
-        return;
-    }
-    if (index_data->dimension_ != dimension) {
-        UnrecoverableError("index_data->dimension_ != dimension");
-        return;
-    }
-    if (id_begin == 0)
-        id_begin = index_data->data_num_;
-    u32 partition_num = index_data->partition_num_;
-    const auto &centroids = index_data->centroids_;
-    auto &vectors = index_data->vectors_;
-    auto &ids = index_data->ids_;
-    Vector<u32> assigned_partition_id(vector_count);
-
-    // Classify vectors
-    // search_top_1
-    search_top_1_without_dis<f32>(dimension, vector_count, vectors_ptr, partition_num, centroids.data(), assigned_partition_id.data());
-
-    Vector<u32> partition_element_count(partition_num);
-    // calculate partition_element_count
-    for (u32 i = 0; i < vector_count; ++i)
-        ++partition_element_count[assigned_partition_id[i]];
-    // Reserve space
-    for (u32 i = 0; i < partition_num; ++i) {
-        vectors[i].reserve(vectors[i].size() + partition_element_count[i] * dimension);
-        ids[i].reserve(ids[i].size() + partition_element_count[i]);
-    }
-
-    // insert vectors to partition
-    for (u32 i = 0; i < vector_count; ++i) {
-        auto vector_pos_i = vectors_ptr + i * dimension;
-        auto partition_of_i = assigned_partition_id[i];
-        vectors[partition_of_i].insert(vectors[partition_of_i].end(), vector_pos_i, vector_pos_i + dimension);
-        ids[partition_of_i].push_back(id_begin + i);
-    }
-    // update data_num_
-    index_data->data_num_ += vector_count;
-}
 
 } // namespace infinity

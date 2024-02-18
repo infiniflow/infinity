@@ -61,8 +61,7 @@ public:
     static UniquePtr<AnnIVFFlatIndexData<DistType>>
     CreateIndex(u32 dimension, u32 train_count, const DistType *train_ptr, u32 vector_count, const DistType *vectors_ptr, u32 partition_num) {
         auto index_data = MakeUnique<AnnIVFFlatIndexData<DistType>>(metric, dimension, partition_num);
-        k_means_partition_only_centroids<f32>(metric, dimension, train_count, train_ptr, index_data->centroids_.data(), partition_num);
-        add_data_to_partition(dimension, vector_count, vectors_ptr, index_data.get());
+        index_data->BuildIndex(dimension, train_count, train_ptr, vector_count, vectors_ptr);
         return index_data;
     }
 
