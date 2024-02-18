@@ -1,0 +1,111 @@
+query I
+SELECT CAST ('0' AS TINYINT);
+----
+0
+
+query I
+SELECT CAST ('1' AS TINYINT);
+----
+1
+
+query I
+SELECT CAST ('127' AS TINYINT);
+----
+127
+
+query I
+SELECT CAST ('128' AS TINYINT);
+----
+-128
+
+query I
+SELECT CAST ('256' AS TINYINT);
+----
+0
+
+query I
+SELECT CAST ('-1' AS TINYINT);
+----
+-1
+
+query I
+SELECT CAST ('-127' AS TINYINT);
+----
+-127
+
+query I
+SELECT CAST ('0' AS SMALLINT);
+----
+0
+
+query I
+SELECT CAST ('1' AS SMALLINT);
+----
+1
+
+query I
+SELECT CAST ('32767' AS SMALLINT);
+----
+32767
+
+query I
+SELECT CAST ('32768' AS SMALLINT);
+----
+-32768
+
+query I
+SELECT CAST ('131072' AS SMALLINT);
+----
+0
+
+query I
+SELECT CAST ('-1' AS SMALLINT);
+----
+-1
+
+query I
+SELECT CAST ('-32767' AS SMALLINT);
+----
+-32767
+
+query I
+SELECT CAST ('0' AS INTEGER);
+----
+0
+
+query I
+SELECT CAST ('1' AS INTEGER);
+----
+1
+
+query I
+SELECT CAST ('2147483647' AS INTEGER);
+----
+2147483647
+
+query I
+SELECT CAST ('2147483648' AS INTEGER);
+----
+-2147483648
+
+query I
+SELECT CAST ('4294967296' AS INTEGER);
+----
+0
+
+query I
+SELECT CAST ('-2147483647' AS INTEGER);
+----
+-2147483647
+
+query I
+SELECT CAST ('-1' AS INTEGER);
+----
+-1
+
+query I
+SELECT CAST ('-2147483647' AS INTEGER);
+----
+-2147483647
+
+

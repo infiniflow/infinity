@@ -28,6 +28,8 @@ import internal_types;
 
 namespace infinity {
 
+struct ColumnVectorCastData;
+
 export class UnaryOperator {
 public:
     template <typename InputType, typename ResultType, typename Operator>
