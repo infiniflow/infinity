@@ -219,6 +219,30 @@ class TestDelete:
         assert res
 
     # delete table with multiple blocks, but only one segment
+    @pytest.mark.skip(reason="May cause core dumped")
+    def test_delete_table_with_one_segment(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_table_with_one_segment")
+        table_obj = db_obj.create_table("test_delete_table_with_one_segment", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        for i in range(1024):
+            table_obj.delete("c1 = " + str(i))
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
     # select before delete, select after delete and check the change.
     def test_select_before_after_delete(self):
         # connect
@@ -305,3 +329,28 @@ class TestDelete:
         assert res
 
     # various expression will be given in where clause, and check result correctness
+    @pytest.mark.skip(reason="May cause core dumped")
+    @pytest.mark.parametrize('column_types', common_values.types_array)
+    @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
+    def test_various_expression_in_where_clause(self, column_types, column_types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_various_expression_in_where_clause")
+        db_obj.create_table("test_various_expression_in_where_clause", {"c1": column_types}, None)
+
+        table_obj = db_obj.get_table("test_various_expression_in_where_clause")
+
+        values = [{"c1": column_types_example} for _ in range(5)]
+        table_obj.insert(values)
+
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        table_obj.delete("c1 = " + str(column_types_example))
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
