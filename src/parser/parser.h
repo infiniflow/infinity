@@ -293,7 +293,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 95 "parser.y"
+#line 102 "parser.y"
 
     bool    bool_value;
     char*   str_value;

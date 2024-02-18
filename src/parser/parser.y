@@ -92,6 +92,13 @@ struct SQL_LTYPE {
   @$.string_length = 0;
 };
 
+%code{
+// Avoid warnings with the error counter.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+}
+
 %union {
     bool    bool_value;
     char*   str_value;
