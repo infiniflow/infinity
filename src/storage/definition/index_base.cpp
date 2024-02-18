@@ -115,7 +115,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexHnsw>(file_name, column_names, metric_type, encode_type, M, ef_construction, ef);
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             String analyzer = ReadBufAdv<String>(ptr);
             res = MakeShared<IndexFullText>(file_name, column_names, analyzer);
             break;
@@ -182,7 +182,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             String analyzer = index_def_json["analyzer"];
             auto ptr = MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
             res = std::static_pointer_cast<IndexBase>(ptr);

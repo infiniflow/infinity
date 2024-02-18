@@ -39,7 +39,7 @@ namespace infinity {
 
 class IndexDef;
 struct TableIndexEntry;
-class IrsIndexEntry;
+class FulltextIndexEntry;
 class TableMeta;
 class Txn;
 struct NewCatalog;
@@ -144,7 +144,7 @@ public:
 
     void GetFullTextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,
-                              SharedPtr<IrsIndexEntry> &irs_index_entry,
+                              SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                               Map<String, String> &column2analyzer);
 
 public:

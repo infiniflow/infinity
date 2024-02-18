@@ -1411,7 +1411,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                                                        index_hnsw->ef_);
                         break;
                     }
-                    case IndexType::kIRSFullText: {
+                    case IndexType::kFullText: {
                         const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
                         other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
                         break;

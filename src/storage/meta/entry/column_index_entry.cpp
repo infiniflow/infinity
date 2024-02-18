@@ -188,7 +188,7 @@ Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateInde
             file_worker = MakeUnique<HnswFileWorker>(this->col_index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             //            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -291,7 +291,7 @@ UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_
             SizeT max_element = seg_row_count;
             return MakeUnique<CreateHnswParam>(index_base_.get(), column_def, max_element);
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             return MakeUnique<CreateFullTextParam>(index_base_.get(), column_def);
         }
         case IndexType::kSecondary: {

@@ -88,7 +88,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
                 RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
             }
             ColumnID column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
-            if (index_base->index_type_ == IndexType::kIRSFullText) {
+            if (index_base->index_type_ == IndexType::kFullText) {
                 index_info_map.emplace(column_id, std::static_pointer_cast<IndexFullText>(index_base));
             } else {
                 SharedPtr<String> column_index_dir =
@@ -100,8 +100,8 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         }
 
         if (!index_info_map.empty()) {
-            table_index_entry->irs_index_entry_ =
-                IrsIndexEntry::NewIrsIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
+            table_index_entry->fulltext_index_entry_ =
+                FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
         }
 
         return table_index_entry;
@@ -143,14 +143,16 @@ void TableIndexEntry::CommitCreateIndex(u64 column_id,
     }
 }
 
-// For irs_index_entry
-void TableIndexEntry::CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry) { this->irs_index_entry_ = irs_index_entry; }
+// For fulltext_index_entry
+void TableIndexEntry::CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry) {
+    this->fulltext_index_entry_ = fulltext_index_entry;
+}
 
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
     Vector<ColumnIndexEntry *> column_index_entry_candidates;
-    IrsIndexEntry *irs_index_entry_candidate_{};
+    FulltextIndexEntry *fulltext_index_entry_candidate_{};
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json["txn_id"] = this->txn_id_.load();
@@ -168,15 +170,15 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
             column_index_entry_candidates.emplace_back((ColumnIndexEntry *)column_index_entry.get());
         }
 
-        irs_index_entry_candidate_ = this->irs_index_entry_.get();
+        fulltext_index_entry_candidate_ = this->fulltext_index_entry_.get();
     }
 
     for (const auto &column_index_entry : column_index_entry_candidates) {
         json["column_indexes"].emplace_back(column_index_entry->Serialize(max_commit_ts));
     }
 
-    if (irs_index_entry_candidate_ != nullptr) {
-        json["irs_index_entry"] = irs_index_entry_candidate_->Serialize(max_commit_ts);
+    if (fulltext_index_entry_candidate_ != nullptr) {
+        json["fulltext_index_entry"] = fulltext_index_entry_candidate_->Serialize(max_commit_ts);
     }
 
     return json;
@@ -215,9 +217,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
         }
     }
 
-    if (index_def_entry_json.contains("irs_index_entry")) {
-        table_index_entry->irs_index_entry_ =
-            IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
+    if (index_def_entry_json.contains("fulltext_index_entry")) {
+        table_index_entry->fulltext_index_entry_ =
+            FulltextIndexEntry::Deserialize(index_def_entry_json["fulltext_index_entry"], table_index_entry.get(), buffer_mgr);
     }
     return table_index_entry;
 }
@@ -233,14 +235,14 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
 }
 
 Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
-    IrsIndexEntry *irs_index_entry = this->irs_index_entry_.get();
-    if (irs_index_entry != nullptr) {
+    FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
+    if (fulltext_index_entry != nullptr) {
         auto *buffer_mgr = txn->GetBufferMgr();
         for (const auto *segment_entry : block_index->segments_) {
-            irs_index_entry->irs_index_->BatchInsert(table_entry, index_def_.get(), segment_entry, buffer_mgr);
+            fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_def_.get(), segment_entry, buffer_mgr);
         }
-        irs_index_entry->irs_index_->Commit();
-        irs_index_entry->irs_index_->StopSchedule();
+        fulltext_index_entry->irs_index_->Commit();
+        fulltext_index_entry->irs_index_->StopSchedule();
     }
     for (const auto &[column_id, column_index_entry] : column_index_map_) {
         column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay, check_ts);

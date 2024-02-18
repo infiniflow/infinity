@@ -31,7 +31,7 @@ public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
     IndexFullText(String file_name, Vector<String> column_names, String analyzer)
-        : IndexBase(file_name, IndexType::kIRSFullText, std::move(column_names)), analyzer_(std::move(analyzer)) {}
+        : IndexBase(file_name, IndexType::kFullText, std::move(column_names)), analyzer_(std::move(analyzer)) {}
 
     ~IndexFullText() final = default;
 
