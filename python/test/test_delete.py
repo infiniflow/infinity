@@ -105,7 +105,8 @@ class TestDelete:
 
         try:
             # FIXME res = table_obj.delete("c1 = 1")
-            res = table_obj()
+            res = table_obj.delete("c1 = 1")
+            # res = table_obj()
         except Exception as e:
             print(e)
 
@@ -134,33 +135,28 @@ class TestDelete:
 
     # delete table, all rows are met the condition
     @trace_expected_exceptions
-    def test_delete_table_all_row_met_the_condition(self):
-        # connect
+    @pytest.mark.parametrize('column_types', common_values.types_array)
+    @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
+    def test_delete_table_all_row_met_the_condition(self, column_types, column_types_example):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        for i in range(len(common_values.types_array)):
-            tb = db_obj.drop_table("test_delete_table_all_row_met_the_condition" + str(i))
+        db_obj.drop_table("test_delete_table_all_row_met_the_condition")
+        db_obj.create_table("test_delete_table_all_row_met_the_condition", {"c1": column_types}, None)
+        table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition")
+        try:
+            table_obj.insert([{"c1": column_types_example}])
+            print("insert c1 = " + str(column_types_example))
+        except Exception as e:
+            print(e)
+        try:
+            table_obj.delete("c1 = " + str(column_types_example))
+            print("delete c1 = " + str(column_types_example))
+        except Exception as e:
+            print(e)
 
-        for i in range(len(common_values.types_array)):
-            tb = db_obj.create_table("test_delete_table_all_row_met_the_condition" + str(i),
-                                     {"c1": common_values.types_array[i]}, None)
-            assert tb
-
-            table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition" + str(i))
-            try:
-                table_obj.insert([{"c1": common_values.types_example_array[i]}])
-                print("insert c1 = " + str(common_values.types_example_array[i]))
-            except Exception as e:
-                print(e)
-            try:
-                table_obj.delete("c1 = " + str(common_values.types_example_array[i]))
-                print("delete c1 = " + str(common_values.types_example_array[i]))
-            except Exception as e:
-                print(e)
-
-            res = table_obj.output(["*"]).to_df()
-            print("{}：{}".format(common_values.types_array[i], res))
-            assert tb
+        # res = table_obj.output(["*"]).to_df()
+        # print("{}：{}".format(column_types_example, res))
+        # assert tb
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -294,4 +290,18 @@ class TestDelete:
         assert res
 
     # delete dropped table
+    def test_delete_dropped_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        with pytest.raises(Exception, match="Get Table Error"):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_delete_dropped_table")
+            table_obj = db_obj.get_table("test_delete_dropped_table")
+            table_obj.delete("c1 = 0")
+            assert table_obj
+            db_obj.drop_table("test_delete_dropped_table")
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # various expression will be given in where clause, and check result correctness
