@@ -563,7 +563,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     for (IndexInfo *index_info : index_info_list) {
         SharedPtr<IndexBase> base_index_ptr{nullptr};
         switch (index_info->index_type_) {
-            case IndexType::kIRSFullText: {
+            case IndexType::kFullText: {
                 base_index_ptr = IndexFullText::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                      {index_info->column_name_},
                                                      *(index_info->index_param_list_));

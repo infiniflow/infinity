@@ -299,7 +299,7 @@ enum IndexType {
 IVFFlat,
 HnswLVQ,
 Hnsw,
-IRSFullText,
+FullText,
 }
 
 struct IndexInfo {

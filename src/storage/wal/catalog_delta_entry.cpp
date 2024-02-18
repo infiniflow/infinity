@@ -172,12 +172,12 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                 MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_def);
             break;
         }
-        case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
+        case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIrsIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir);
+            operation = MakeUnique<AddFulltextIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir);
             break;
         }
         case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
@@ -323,7 +323,7 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     index_def_->WriteAdv(buf);
 }
 
-void AddIrsIndexEntryOp::WriteAdv(char *&buf) const {
+void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -448,13 +448,13 @@ void AddTableIndexEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddIrsIndexEntryOp::SaveSate() {
-    this->is_delete_ = irs_index_entry_->deleted_;
-    this->begin_ts_ = irs_index_entry_->begin_ts_;
-    this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->irs_index_entry_->table_index_entry()->table_index_meta()->index_name();
-    this->index_dir_ = this->irs_index_entry_->index_dir();
+void AddFulltextIndexEntryOp::SaveSate() {
+    this->is_delete_ = fulltext_index_entry_->deleted_;
+    this->begin_ts_ = fulltext_index_entry_->begin_ts_;
+    this->db_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
+    this->table_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
+    this->index_name_ = this->fulltext_index_entry_->table_index_entry()->table_index_meta()->index_name();
+    this->index_dir_ = this->fulltext_index_entry_->index_dir();
     is_saved_sate_ = true;
 }
 
@@ -563,8 +563,12 @@ const String AddTableIndexEntryOp::ToString() const {
                        index_def_->ToString());
 }
 
-const String AddIrsIndexEntryOp::ToString() const {
-    return fmt::format("AddIrsIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}", db_name_, table_name_, index_name_, index_dir_);
+const String AddFulltextIndexEntryOp::ToString() const {
+    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}",
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       index_dir_);
 }
 
 const String AddColumnIndexEntryOp::ToString() const {
