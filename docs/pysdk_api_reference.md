@@ -291,9 +291,9 @@ This method uses `indexInfo` to create an index.
 - `IndexInfo`
     - `column_name` : `str` Name of the column. Required.
     - `index_type` : `Enum`. The index type. Includes: 
-        - `IVFFlat` 
+        - `IVFFlat`
         - `HnswLVQ`
-        - ``Hnsw` 
+        - `Hnsw`
         - `FullText`
     - `index_param_list` : list[InitParameter]
         - `param_name` : `str`
@@ -532,7 +532,7 @@ VEC supports list or np.ndarray.
 
 - `vector_column_name` : `str`
 - `embedding_data` : VEC
-- `embedding_data_type` : `str``
+- `embedding_data_type` : `str`
   - `float`
   - `int`
 
