@@ -40,7 +40,7 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, docid_t base_
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
     posting_reader_->Read((char *)slice->data_, file_length);
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
-    seg_posting.Init(byte_slice_list, base_doc_id, term_meta.doc_freq_);
+    seg_posting.Init(byte_slice_list, base_doc_id, term_meta.doc_freq_, term_meta);
     return true;
 }
 

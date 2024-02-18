@@ -21,10 +21,8 @@ public:
                (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
     }
 
-    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count);
-
-    void Init(docid_t base_doc_id, u64 doc_count);
-
+    // for on disk segment posting
+    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
     void Init(docid_t base_doc_id, PostingWriter *posting_writer);
 
@@ -43,11 +41,11 @@ public:
     void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
         tf_t ttf = posting_writer_->GetTotalTF();
-        // termpayload_t term_payload = posting_writer_->GetTermPayload();
         tm.SetDocFreq(df);
         tm.SetTotalTermFreq(ttf);
-        // tm.SetPayload(term_payload);
     }
+
+    const TermMeta &GetTermMeta() const { return term_meta_; }
 
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 
