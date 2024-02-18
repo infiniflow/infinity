@@ -1,5 +1,6 @@
 from infinity import NetworkAddress
 import numpy as np
+
 TEST_REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
 # TEST_REMOTE_HOST = NetworkAddress("192.168.200.151", 23817)
 # infinity thrift server port
@@ -35,17 +36,17 @@ types_example_array = [
     # bool
     # True,
     # vector
-    # np.array([1.1, 2.2, 3.3])
+    # np.array([1.1, 2.2, 3.3]),
     # [1, 2, 3]
 ]
 
 # db_name, table_name, index_name, column_name
 invalid_name_array = [
-    # [],
-    # (),
-    # {},
-    # 1,
-    # 1.1,
+    [],
+    (),
+    {},
+    1,
+    1.1,
     '',
     ' ',
     '12',
