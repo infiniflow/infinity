@@ -33,6 +33,7 @@ void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), l
 
 SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     String analyzer{};
+    bool homebrewed = false;
     SizeT param_count = index_param_list.size();
     for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
@@ -40,9 +41,15 @@ SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column
         ToLowerString(para_name);
         if (para_name == "analyzer") {
             analyzer = parameter->param_value_;
+        } else if (para_name == "homebrewed") {
+            String para_val = parameter->param_value_;
+            ToLowerString(para_val);
+            if (!para_val.empty() && para_val != "false" && para_val != "0") {
+                homebrewed = true;
+            }
         }
     }
-    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
+    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer, homebrewed);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -57,12 +64,15 @@ bool IndexFullText::operator!=(const IndexFullText &other) const { return !(*thi
 i32 IndexFullText::GetSizeInBytes() const {
     SizeT size = IndexBase::GetSizeInBytes();
     size += sizeof(int32_t) + analyzer_.length();
+    size += sizeof(u8); // for homebrewed_
     return size;
 }
 
 void IndexFullText::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
     WriteBufAdv(ptr, analyzer_);
+    u8 is_homebrewed = homebrewed_ ? 1 : 0;
+    WriteBufAdv(ptr, is_homebrewed);
 }
 
 SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
@@ -82,6 +92,7 @@ String IndexFullText::ToString() const {
 nlohmann::json IndexFullText::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
     res["analyzer"] = analyzer_;
+    res["homebrewed"] = homebrewed_ ? "true" : "false";
     return res;
 }
 
