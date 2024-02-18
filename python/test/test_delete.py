@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
+
 import pandas as pd
 import pytest
 from numpy import dtype
@@ -222,7 +224,74 @@ class TestDelete:
 
     # delete table with multiple blocks, but only one segment
     # select before delete, select after delete and check the change.
+    def test_select_before_after_delete(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_select_before_after_delete")
+        table_obj = db_obj.create_table("test_select_before_after_delete", {"c1": "int"}, None)
+
+        # insert
+        for i in range(10):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete("c1 = 1")
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete just inserted data and select to check
+    def test_delete_insert_data(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_insert_data")
+        table_obj = db_obj.create_table("test_delete_insert_data", {"c1": "int"}, None)
+
+        # insert
+        values = [{"c1": 1} for _ in range(10)]
+        table_obj.insert(values)
+
+        # delete
+        table_obj.delete("c1 = 1")
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete inserted long before and select to check
+    @pytest.mark.skip(reason="Cost too much time.")
+    def test_delete_inserted_long_before_data(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_inserted_long_before_data")
+        table_obj = db_obj.create_table("test_delete_inserted_long_before_data", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(5)]
+            table_obj.insert(values)
+
+        time.sleep(1000)
+
+        # delete
+        table_obj.delete("c1 = 1")
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete dropped table
     # various expression will be given in where clause, and check result correctness
