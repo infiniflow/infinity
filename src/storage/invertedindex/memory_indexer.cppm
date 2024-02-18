@@ -90,6 +90,8 @@ public:
 
     void Reset();
 
+    void DisableCommit() { disable_commit_ = true; }
+
 private:
     void SetAnalyzer();
 
@@ -127,5 +129,9 @@ private:
     u32 max_inverters_;
     UniquePtr<SequencedTaskExecutor> invert_executor_;
     UniquePtr<SequencedTaskExecutor> commit_executor_;
+
+    bool disable_commit_{false};
+    std::condition_variable cv_;
+    std::mutex mutex_;
 };
 } // namespace infinity

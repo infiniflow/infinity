@@ -157,9 +157,7 @@ bool MultiPostingDecoder::MoveToSegment(docid_t start_doc_id) {
     ByteSliceList *posting_list = cur_segment_posting.GetSliceListPtr().get();
     doc_list_reader.Open(posting_list);
     doc_list_reader_.Open(posting_list);
-    TermMeta term_meta;
-    TermMetaLoader tmLoader(cur_segment_format_option_);
-    tmLoader.Load(&doc_list_reader, term_meta);
+    const TermMeta &term_meta = cur_segment_posting.GetTermMeta();
     u32 doc_skiplist_size = doc_list_reader.ReadVUInt32();
     u32 doc_list_size = doc_list_reader.ReadVUInt32();
 
