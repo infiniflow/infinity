@@ -248,20 +248,20 @@ class IndexType(object):
     IVFFlat = 0
     HnswLVQ = 1
     Hnsw = 2
-    IRSFullText = 3
+    FullText = 3
 
     _VALUES_TO_NAMES = {
         0: "IVFFlat",
         1: "HnswLVQ",
         2: "Hnsw",
-        3: "IRSFullText",
+        3: "FullText",
     }
 
     _NAMES_TO_VALUES = {
         "IVFFlat": 0,
         "HnswLVQ": 1,
         "Hnsw": 2,
-        "IRSFullText": 3,
+        "FullText": 3,
     }
 
 

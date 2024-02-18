@@ -113,6 +113,9 @@ public:
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
+    // Fulltext
+    [[nodiscard]] inline bool enable_homebrewed_fulltext() const { return system_option_.enable_homebrewed_fulltext_; }
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 

@@ -2701,7 +2701,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     ParserHelper::ToLower($5);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($5, "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp($5, "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($5, "ivfflat") == 0) {
@@ -2749,7 +2749,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     ParserHelper::ToLower($6);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($6, "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp($6, "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($6, "ivfflat") == 0) {
