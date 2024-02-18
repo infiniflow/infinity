@@ -23,7 +23,6 @@ ByteSlice *ByteSlice::CreateSlice(SizeT data_size, MemoryPool *pool) {
 }
 
 void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
-    slice->~ByteSlice();
     u8 *mem = (u8 *)slice;
     if (pool == nullptr) {
         delete[] mem;
