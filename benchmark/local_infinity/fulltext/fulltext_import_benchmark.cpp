@@ -97,7 +97,7 @@ int main() {
     auto index_info_list = new std::vector<IndexInfo *>();
     {
         auto index_info = new IndexInfo();
-        index_info->index_type_ = IndexType::kIRSFullText;
+        index_info->index_type_ = IndexType::kFullText;
         index_info->column_name_ = "text";
 
         {

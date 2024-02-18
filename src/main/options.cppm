@@ -83,6 +83,9 @@ export struct SystemOptions {
 
     // Resource
     String resource_dict_path_{};
+
+    // Fulltext
+    bool enable_homebrewed_fulltext_{};
 };
 
 } // namespace infinity

@@ -75,13 +75,13 @@ class TestIndex:
 
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("body",
-                                                      index.IndexType.IRSFullText,
+                                                      index.IndexType.FullText,
                                                       [index.InitParameter("ANALYZER", "segmentation")]),
                                       index.IndexInfo("doctitle",
-                                                      index.IndexType.IRSFullText,
+                                                      index.IndexType.FullText,
                                                       []),
                                       index.IndexInfo("docdate",
-                                                      index.IndexType.IRSFullText,
+                                                      index.IndexType.FullText,
                                                       []),
                                       ], None)
 

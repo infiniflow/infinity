@@ -27,7 +27,7 @@ class TestQuery:
 
         res = table.create_index("my_index",
                                  [index.IndexInfo("body",
-                                                  index.IndexType.IRSFullText,
+                                                  index.IndexType.FullText,
                                                   [index.InitParameter("ANALYZER", "segmentation")]),
                                   ], None)
         assert res.success

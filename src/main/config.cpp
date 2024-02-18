@@ -174,6 +174,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     // Default resource config
     String default_resource_dict_path = String("/tmp/infinity/resource");
 
+    // Default fulltext config
+    bool default_enable_homebrewed_fulltext = false;
+
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         if (config_path.get() == nullptr) {
@@ -251,6 +254,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Resource
         { system_option_.resource_dict_path_ = default_resource_dict_path; }
+
+        // Fulltext
+        { system_option_.enable_homebrewed_fulltext_ = default_enable_homebrewed_fulltext; }
     } else {
         fmt::print("Read config from: {}\n", *config_path);
         toml::table config = toml::parse_file(*config_path);
@@ -445,6 +451,12 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             auto resource_config = config["resource"];
             system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
         }
+
+        // Fulltext
+        {
+            auto fulltext_config = config["fulltext"];
+            system_option_.enable_homebrewed_fulltext_ = fulltext_config["enable_homebrewed"].value_or(default_enable_homebrewed_fulltext);
+        }
     }
 
     return Status::OK();
@@ -502,6 +514,9 @@ void Config::PrintAll() const {
 
     // Resource
     fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
+
+    // Profiler
+    fmt::print(" - enable_homebrewed_fulltext: {}\n", system_option_.enable_homebrewed_fulltext_);
 }
 
 void SystemVariables::InitVariablesMap() {

@@ -34,12 +34,11 @@ namespace infinity {
 TermPostings::TermPostings(MemoryIndexer *memory_indexer) : memory_indexer_(memory_indexer), terms_{0, ValueRefHash{}, TermEq{postings_}} {}
 
 void TermPostings::GetSorted(Vector<const TermPosting *> &term_postings) {
-    term_postings.resize(term_postings.size());
-
-    for (auto *p = term_postings.data(); const auto &posting : postings_) {
-        *p++ = &posting;
+    SizeT num = postings_.size();
+    term_postings.resize(num);
+    for (SizeT i = 0; i < num; i++) {
+        term_postings[i] = &postings_[i];
     }
-
     std::sort(term_postings.begin(), term_postings.end(), [](const auto lhs, const auto rhs) { return StringViewCompare(lhs->term_, rhs->term_); });
 }
 

@@ -267,7 +267,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);

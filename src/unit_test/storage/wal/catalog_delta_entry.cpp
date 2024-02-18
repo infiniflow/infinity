@@ -109,8 +109,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op11_same_name));
 
     // irs index entry
-    auto op12 = MakeUnique<AddIrsIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
-    auto op12_same_name = MakeUnique<AddIrsIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
+    auto op12 = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
+    auto op12_same_name = MakeUnique<AddFulltextIndexEntryOp>(12, false, 0, 0, db_name, table_name, index_name, index_dir);
     local_catalog_delta_entry->operations().push_back(std::move(op12));
     local_catalog_delta_entry->operations().push_back(std::move(op12_same_name));
 
