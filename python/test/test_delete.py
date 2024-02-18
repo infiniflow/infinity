@@ -196,6 +196,28 @@ class TestDelete:
         assert res
 
     # delete table with only one block
+    def test_delete_table_with_one_block(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_table_with_one_block")
+        table_obj = db_obj.create_table("test_delete_table_with_one_block", {"c1": "int"}, None)
+
+        # insert
+        values = [{"c1": 1} for _ in range(8192)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete("c1 = 1")
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # delete table with multiple blocks, but only one segment
     @pytest.mark.skip(reason="May cause core dumped")
     def test_delete_table_with_one_segment(self):
