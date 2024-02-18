@@ -78,7 +78,7 @@ public:
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexDef *index_def() const { return index_def_.get(); }
     const SharedPtr<IndexDef> &table_index_def() { return index_def_; }
-    SharedPtr<IrsIndexEntry> &irs_index_entry() { return irs_index_entry_; }
+    SharedPtr<FulltextIndexEntry> &irs_index_entry() { return irs_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
 
@@ -91,8 +91,8 @@ private:
 
     // For SegmentColumnIndexEntry
     void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);
-    // For IrsIndexEntry
-    void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
+    // For FulltextIndexEntry
+    void CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &irs_index_entry);
 
 private:
     std::shared_mutex rw_locker_{};
@@ -102,7 +102,7 @@ private:
 
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
-    SharedPtr<IrsIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> irs_index_entry_{};
 };
 
 } // namespace infinity

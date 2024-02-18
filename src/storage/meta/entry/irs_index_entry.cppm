@@ -30,26 +30,26 @@ struct TableEntry;
 class IRSDataStore;
 class IndexFullText;
 
-export struct IrsIndexEntry : public BaseEntry {
+export struct FulltextIndexEntry : public BaseEntry {
 public:
-    IrsIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, TransactionID txn_id, TxnTimeStamp begin_ts);
-    ~IrsIndexEntry() override = default;
+    FulltextIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, TransactionID txn_id, TxnTimeStamp begin_ts);
+    ~FulltextIndexEntry() override = default;
 
-    static SharedPtr<IrsIndexEntry>
+    static SharedPtr<FulltextIndexEntry>
     NewIrsIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
 
-    static SharedPtr<IrsIndexEntry> NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                           SharedPtr<String> index_dir,
-                                                           TransactionID txn_id,
-                                                           TxnTimeStamp begin_ts,
-                                                           TxnTimeStamp commit_ts,
-                                                           bool is_delete);
+    static SharedPtr<FulltextIndexEntry> NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
+                                                                SharedPtr<String> index_dir,
+                                                                TransactionID txn_id,
+                                                                TxnTimeStamp begin_ts,
+                                                                TxnTimeStamp commit_ts,
+                                                                bool is_delete);
 
     void AddColumn(SharedPtr<IndexBase> index_base, ColumnID column_id);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    static SharedPtr<IrsIndexEntry>
+    static SharedPtr<FulltextIndexEntry>
     Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 
 private:

@@ -629,20 +629,20 @@ private:
     SharedPtr<IndexDef> index_def_{};
 };
 
-/// class AddIrsIndexEntryOp
-export class AddIrsIndexEntryOp : public CatalogDeltaOperation {
+/// class AddFulltextIndexEntryOp
+export class AddFulltextIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddIrsIndexEntryOp(TxnTimeStamp begin_ts,
-                                bool is_delete,
-                                TransactionID txn_id,
-                                TxnTimeStamp commit_ts,
-                                String db_name,
-                                String table_name,
-                                String index_name,
-                                String index_dir)
+    explicit AddFulltextIndexEntryOp(TxnTimeStamp begin_ts,
+                                     bool is_delete,
+                                     TransactionID txn_id,
+                                     TxnTimeStamp commit_ts,
+                                     String db_name,
+                                     String table_name,
+                                     String index_name,
+                                     String index_dir)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)) {}
-    explicit AddIrsIndexEntryOp(SharedPtr<IrsIndexEntry> irs_index_entry)
+    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> irs_index_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY; }
     String GetTypeStr() const final { return "ADD_IRS_INDEX_ENTRY"; }
@@ -662,7 +662,7 @@ public:
     }
 
 public:
-    SharedPtr<IrsIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> irs_index_entry_{};
 
 public:
     const String &db_name() const { return db_name_; }

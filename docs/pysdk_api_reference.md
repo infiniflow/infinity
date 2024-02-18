@@ -273,13 +273,13 @@ db_obj.create_table(
 db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
                              [index.IndexInfo("body",
-							                                index.IndexType.IRSFullText,
+							                                index.IndexType.FullText,
 	                                            [index.InitParameter("ANALYZER", "segmentation")]),
                               index.IndexInfo("doctitle",
-                                              index.IndexType.IRSFullText,
+                                              index.IndexType.FullText,
                                               []),
                               index.IndexInfo("docdate",
-                                              index.IndexType.IRSFullText,
+                                              index.IndexType.FullText,
                                               []),
                               ], None)
 ```
@@ -294,7 +294,7 @@ This method uses `indexInfo` to create an index.
         - `IVFFlat` 
         - `HnswLVQ`
         - ``Hnsw` 
-        - `IRSFullText`
+        - `FullText`
     - `index_param_list` : list[InitParameter]
         - `param_name` : `str`
         - `param_value` : `str`

@@ -80,7 +80,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    SharedPtr<IrsIndexEntry> irs_index_entry;
+    SharedPtr<FulltextIndexEntry> irs_index_entry;
     Map<String, String> column2analyzer;
     base_table_ref_->table_entry_ptr_->GetFullTextAnalyzers(txn_id, begin_ts, irs_index_entry, column2analyzer);
     // 1.2 parse options into map, populate default_field
@@ -99,7 +99,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     ScoredIds result;
     UniquePtr<IRSDataStore> &dataStore = irs_index_entry->irs_index_;
     if (dataStore == nullptr) {
-        UnrecoverableError(fmt::format("IrsIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));
+        UnrecoverableError(fmt::format("FulltextIndexEntry::irs_index_ is nullptr for table {}", *base_table_ref_->table_entry_ptr_->GetTableName()));
     }
     rc = dataStore->Search(flt.get(), search_ops.options_, result);
     if (rc != 0) {

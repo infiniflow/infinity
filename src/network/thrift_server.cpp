@@ -878,7 +878,7 @@ private:
                 return IndexType::kIVFFlat;
             case infinity_thrift_rpc::IndexType::Hnsw:
                 return IndexType::kHnsw;
-            case infinity_thrift_rpc::IndexType::IRSFullText:
+            case infinity_thrift_rpc::IndexType::FullText:
                 return IndexType::kFullText;
             default:
                 UnrecoverableError("Invalid index type");

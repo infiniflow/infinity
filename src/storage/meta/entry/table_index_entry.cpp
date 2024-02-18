@@ -101,7 +101,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
         if (!index_info_map.empty()) {
             table_index_entry->irs_index_entry_ =
-                IrsIndexEntry::NewIrsIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
+                FulltextIndexEntry::NewIrsIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
         }
 
         return table_index_entry;
@@ -144,13 +144,13 @@ void TableIndexEntry::CommitCreateIndex(u64 column_id,
 }
 
 // For irs_index_entry
-void TableIndexEntry::CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry) { this->irs_index_entry_ = irs_index_entry; }
+void TableIndexEntry::CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &irs_index_entry) { this->irs_index_entry_ = irs_index_entry; }
 
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
     Vector<ColumnIndexEntry *> column_index_entry_candidates;
-    IrsIndexEntry *irs_index_entry_candidate_{};
+    FulltextIndexEntry *irs_index_entry_candidate_{};
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
         json["txn_id"] = this->txn_id_.load();
@@ -217,7 +217,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
 
     if (index_def_entry_json.contains("irs_index_entry")) {
         table_index_entry->irs_index_entry_ =
-            IrsIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
+            FulltextIndexEntry::Deserialize(index_def_entry_json["irs_index_entry"], table_index_entry.get(), buffer_mgr);
     }
     return table_index_entry;
 }
@@ -233,7 +233,7 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
 }
 
 Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
-    IrsIndexEntry *irs_index_entry = this->irs_index_entry_.get();
+    FulltextIndexEntry *irs_index_entry = this->irs_index_entry_.get();
     if (irs_index_entry != nullptr) {
         auto *buffer_mgr = txn->GetBufferMgr();
         for (const auto *segment_entry : block_index->segments_) {

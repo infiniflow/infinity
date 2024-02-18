@@ -205,7 +205,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
 
 void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
-                                      SharedPtr<IrsIndexEntry> &irs_index_entry,
+                                      SharedPtr<FulltextIndexEntry> &irs_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
     for (auto &[_, table_index_meta] : this->index_meta_map_) {

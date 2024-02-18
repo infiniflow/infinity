@@ -684,7 +684,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 break;
             }
             case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
-                auto add_irs_index_entry_op = static_cast<AddIrsIndexEntryOp *>(op.get());
+                auto add_irs_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
                 auto db_name = add_irs_index_entry_op->db_name();
                 auto table_name = add_irs_index_entry_op->table_name();
                 auto index_name = add_irs_index_entry_op->index_name();
@@ -705,8 +705,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
-                auto irs_index_entry =
-                    IrsIndexEntry::NewReplayIrsIndexEntry(table_index_entry, MakeUnique<String>(index_dir), txn_id, begin_ts, commit_ts, is_delete);
+                auto irs_index_entry = FulltextIndexEntry::NewReplayIrsIndexEntry(table_index_entry,
+                                                                                  MakeUnique<String>(index_dir),
+                                                                                  txn_id,
+                                                                                  begin_ts,
+                                                                                  commit_ts,
+                                                                                  is_delete);
                 table_index_entry->irs_index_entry() = std::move(irs_index_entry);
                 break;
             }
