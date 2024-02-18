@@ -175,6 +175,10 @@ void MemoryIndexer::PreCommit() {
 }
 
 void MemoryIndexer::Commit() {
+    std::unique_lock<std::mutex> lck(mutex_);
+    while (disable_commit_)
+        cv_.wait(lck);
+
     if (index_config_.GetIndexingParallelism() > 1) {
         invert_executor_->SyncAll();
         commit_executor_->Execute(0, std::move(inflight_commit_task_));
@@ -236,6 +240,8 @@ void MemoryIndexer::Reset() {
         }
         rt_posting_store_->clear();
     }
+    disable_commit_ = false;
+    cv_.notify_all();
 }
 
 } // namespace infinity
