@@ -144,11 +144,8 @@ public:
         }
     }
 
-    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Bitmask &bitmask) {
-        if (bitmask.IsAllTrue()) {
-            Search(base_ivf, segment_id, n_probes);
-            return;
-        }
+    template <typename Filter>
+    void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Filter &filter) {
         // check metric type
         if (base_ivf->metric_ != metric) {
             UnrecoverableError("Metric type is invalid");
@@ -176,7 +173,7 @@ public:
                 const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                 for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                     auto segment_offset = base_ivf->ids_[selected_centroid][j];
-                    if (bitmask.IsTrue(segment_offset)) {
+                    if (filter(segment_offset)) {
                         DistType distance = Distance(x_i, y_j, this->dimension_);
                         result_handler_->AddResult(i, distance, RowID(segment_id, segment_offset));
                     }
@@ -202,7 +199,7 @@ public:
                     const DistType *y_j = base_ivf->vectors_[selected_centroid].data();
                     for (u32 j = 0; j < contain_nums; j++, y_j += this->dimension_) {
                         auto segment_offset = base_ivf->ids_[selected_centroid][j];
-                        if (bitmask.IsTrue(segment_offset)) {
+                        if (filter(segment_offset)) {
                             DistType distance = Distance(x_i, y_j, this->dimension_);
                             result_handler_->AddResult(i, distance, RowID(segment_id, segment_offset));
                         }

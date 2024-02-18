@@ -348,14 +348,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 BufferHandle index_handle = segment_column_index_entry->GetIndex();
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
-                auto IVFFlatScan = [&]<typename AnnIVFFlatType>() {
+                auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
                     AnnIVFFlatType ann_ivfflat_query(query,
                                                      knn_scan_shared_data->query_count_,
                                                      knn_scan_shared_data->topk_,
                                                      knn_scan_shared_data->dimension_,
                                                      knn_scan_shared_data->elem_type_);
                     ann_ivfflat_query.Begin();
-                    ann_ivfflat_query.Search(index, segment_id, n_probes, bitmask);
+                    ann_ivfflat_query.Search(index, segment_id, n_probes, std::forward<OptionalFilter>(filter)...);
                     ann_ivfflat_query.EndWithoutSort();
                     auto dists = ann_ivfflat_query.GetDistances();
                     auto row_ids = ann_ivfflat_query.GetIDs();
@@ -366,17 +366,35 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         dists;
                     merge_heap->Search(dists, row_ids, result_count);
                 };
-                switch (knn_scan_shared_data->knn_distance_type_) {
-                    case KnnDistanceType::kL2: {
-                        IVFFlatScan.template operator()<AnnIVFFlatL2<DataType>>();
-                        break;
+                auto IVFFlatScan = [&]<typename... OptionalFilter>(OptionalFilter &&...filter) {
+                    switch (knn_scan_shared_data->knn_distance_type_) {
+                        case KnnDistanceType::kL2: {
+                            IVFFlatScanTemplate.template operator()<AnnIVFFlatL2<DataType>>(std::forward<OptionalFilter>(filter)...);
+                            break;
+                        }
+                        case KnnDistanceType::kInnerProduct: {
+                            IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<DataType>>(std::forward<OptionalFilter>(filter)...);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError("Not implemented");
+                        }
                     }
-                    case KnnDistanceType::kInnerProduct: {
-                        IVFFlatScan.template operator()<AnnIVFFlatIP<DataType>>();
-                        break;
+                };
+                if (use_bitmask) {
+                    if (segment_entry->CheckAnyDelete(begin_ts)) {
+                        DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
+                        IVFFlatScan(filter);
+                    } else {
+                        BitmaskFilter<SegmentOffset> filter(bitmask);
+                        IVFFlatScan(filter);
                     }
-                    default: {
-                        UnrecoverableError("Not implemented");
+                } else {
+                    if (segment_entry->CheckAnyDelete(begin_ts)) {
+                        DeleteFilter filter(segment_entry, begin_ts);
+                        IVFFlatScan(filter);
+                    } else {
+                        IVFFlatScan();
                     }
                 }
                 break;
