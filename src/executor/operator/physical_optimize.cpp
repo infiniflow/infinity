@@ -30,7 +30,7 @@ import status;
 import logger;
 import iresearch_datastore;
 import base_table_ref;
-import irs_index_entry;
+import fulltext_index_entry;
 
 namespace infinity {
 
@@ -61,18 +61,18 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
         return ;
     }
 
-    SharedPtr<FulltextIndexEntry> irs_index_entry;
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry;
     for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
         auto [table_index_entry, index_status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (!index_status.ok()) {
             operator_state->status_ = index_status;
             RecoverableError(index_status);
         }
-        irs_index_entry = table_index_entry->irs_index_entry();
+        fulltext_index_entry = table_index_entry->fulltext_index_entry();
     }
-    if (irs_index_entry) {
+    if (fulltext_index_entry) {
         LOG_INFO(fmt::format("ScheduleOptimize"));
-        irs_index_entry->irs_index_->ScheduleOptimize();
+        fulltext_index_entry->irs_index_->ScheduleOptimize();
     }
     LOG_TRACE("Optimize index");
 }

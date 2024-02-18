@@ -14,7 +14,7 @@
 
 module;
 
-module irs_index_entry;
+module fulltext_index_entry;
 
 import stl;
 import third_party;
@@ -35,21 +35,22 @@ FulltextIndexEntry::FulltextIndexEntry(TableIndexEntry *table_index_entry, Share
     begin_ts_ = begin_ts;
 }
 
-SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                                   Txn *txn,
-                                                                   TransactionID txn_id,
-                                                                   SharedPtr<String> index_dir,
-                                                                   TxnTimeStamp begin_ts) {
-    auto irs_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewFulltextIndexEntry(TableIndexEntry *table_index_entry,
+                                                                        Txn *txn,
+                                                                        TransactionID txn_id,
+                                                                        SharedPtr<String> index_dir,
+                                                                        TxnTimeStamp begin_ts) {
+    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
+    fulltext_index_entry->irs_index_ =
+        MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
 
     {
         if (txn != nullptr) {
-            auto operation = MakeUnique<AddFulltextIndexEntryOp>(irs_index_entry);
+            auto operation = MakeUnique<AddFulltextIndexEntryOp>(fulltext_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
-    return irs_index_entry;
+    return fulltext_index_entry;
 }
 
 SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
@@ -58,11 +59,12 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayIrsIndexEntry(TableIn
                                                                          TxnTimeStamp begin_ts,
                                                                          TxnTimeStamp commit_ts,
                                                                          bool is_delete) {
-    auto irs_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    irs_index_entry->irs_index_ = MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
-    irs_index_entry->commit_ts_.store(commit_ts);
-    irs_index_entry->deleted_ = is_delete;
-    return irs_index_entry;
+    auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
+    fulltext_index_entry->irs_index_ =
+        MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    fulltext_index_entry->commit_ts_.store(commit_ts);
+    fulltext_index_entry->deleted_ = is_delete;
+    return fulltext_index_entry;
 }
 
 nlohmann::json FulltextIndexEntry::Serialize(TxnTimeStamp) {
@@ -82,13 +84,13 @@ FulltextIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, Tabl
     TxnTimeStamp commit_ts = index_def_entry_json["commit_ts"];
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
 
-    auto irs_index_entry = NewIrsIndexEntry(table_index_entry, nullptr, txn_id, index_dir, begin_ts);
-    irs_index_entry->commit_ts_.store(commit_ts);
-    irs_index_entry->txn_id_.store(txn_id);
-    irs_index_entry->begin_ts_ = begin_ts;
-    irs_index_entry->index_dir_ = index_dir;
+    auto fulltext_index_entry = NewFulltextIndexEntry(table_index_entry, nullptr, txn_id, index_dir, begin_ts);
+    fulltext_index_entry->commit_ts_.store(commit_ts);
+    fulltext_index_entry->txn_id_.store(txn_id);
+    fulltext_index_entry->begin_ts_ = begin_ts;
+    fulltext_index_entry->index_dir_ = index_dir;
 
-    return irs_index_entry;
+    return fulltext_index_entry;
 }
 
 SharedPtr<String> FulltextIndexEntry::DetermineIndexDir(const String &, const String &) {

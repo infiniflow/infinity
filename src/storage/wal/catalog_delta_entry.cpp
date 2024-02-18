@@ -172,7 +172,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                 MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_def);
             break;
         }
-        case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
+        case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
@@ -449,12 +449,12 @@ void AddTableIndexEntryOp::SaveSate() {
 }
 
 void AddFulltextIndexEntryOp::SaveSate() {
-    this->is_delete_ = irs_index_entry_->deleted_;
-    this->begin_ts_ = irs_index_entry_->begin_ts_;
-    this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->irs_index_entry_->table_index_entry()->table_index_meta()->index_name();
-    this->index_dir_ = this->irs_index_entry_->index_dir();
+    this->is_delete_ = fulltext_index_entry_->deleted_;
+    this->begin_ts_ = fulltext_index_entry_->begin_ts_;
+    this->db_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
+    this->table_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
+    this->index_name_ = this->fulltext_index_entry_->table_index_entry()->table_index_meta()->index_name();
+    this->index_dir_ = this->fulltext_index_entry_->index_dir();
     is_saved_sate_ = true;
 }
 

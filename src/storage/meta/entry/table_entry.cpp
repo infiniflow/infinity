@@ -205,13 +205,13 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
 
 void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
-                                      SharedPtr<FulltextIndexEntry> &irs_index_entry,
+                                      SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
     for (auto &[_, table_index_meta] : this->index_meta_map_) {
         auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (status.ok()) {
-            irs_index_entry = table_index_entry->irs_index_entry();
+            fulltext_index_entry = table_index_entry->fulltext_index_entry();
             for (const SharedPtr<IndexBase> &index_base : table_index_entry->index_def()->index_array_) {
                 if (index_base->index_type_ != IndexType::kFullText)
                     continue;
@@ -269,8 +269,8 @@ void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
                 table_index_entry->CommitCreateIndex(column_id, segment_id, segment_column_index, is_replay);
             }
         }
-        if (table_index_entry->irs_index_entry().get() != nullptr) {
-            table_index_entry->CommitCreateIndex(table_index_entry->irs_index_entry());
+        if (table_index_entry->fulltext_index_entry().get() != nullptr) {
+            table_index_entry->CommitCreateIndex(table_index_entry->fulltext_index_entry());
         }
     }
 }

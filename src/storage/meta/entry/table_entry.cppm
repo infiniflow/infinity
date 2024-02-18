@@ -144,7 +144,7 @@ public:
 
     void GetFullTextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,
-                              SharedPtr<FulltextIndexEntry> &irs_index_entry,
+                              SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                               Map<String, String> &column2analyzer);
 
 public:

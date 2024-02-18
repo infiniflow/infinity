@@ -14,7 +14,7 @@
 
 module;
 
-export module irs_index_entry;
+export module fulltext_index_entry;
 
 import stl;
 import index_base;
@@ -36,7 +36,7 @@ public:
     ~FulltextIndexEntry() override = default;
 
     static SharedPtr<FulltextIndexEntry>
-    NewIrsIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
+    NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
 
     static SharedPtr<FulltextIndexEntry> NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
                                                                 SharedPtr<String> index_dir,

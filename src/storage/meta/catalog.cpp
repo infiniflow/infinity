@@ -49,7 +49,7 @@ import table_index_meta;
 import base_entry;
 import block_entry;
 import block_column_entry;
-import irs_index_entry;
+import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 
@@ -683,12 +683,12 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 index_meta->entry_list().emplace_front(std::move(table_index_entry));
                 break;
             }
-            case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
-                auto add_irs_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
-                auto db_name = add_irs_index_entry_op->db_name();
-                auto table_name = add_irs_index_entry_op->table_name();
-                auto index_name = add_irs_index_entry_op->index_name();
-                auto index_dir = add_irs_index_entry_op->index_dir();
+            case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
+                auto add_fulltext_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
+                auto db_name = add_fulltext_index_entry_op->db_name();
+                auto table_name = add_fulltext_index_entry_op->table_name();
+                auto index_name = add_fulltext_index_entry_op->index_name();
+                auto index_dir = add_fulltext_index_entry_op->index_dir();
 
                 auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -705,13 +705,13 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
-                auto irs_index_entry = FulltextIndexEntry::NewReplayIrsIndexEntry(table_index_entry,
-                                                                                  MakeUnique<String>(index_dir),
-                                                                                  txn_id,
-                                                                                  begin_ts,
-                                                                                  commit_ts,
-                                                                                  is_delete);
-                table_index_entry->irs_index_entry() = std::move(irs_index_entry);
+                auto fulltext_index_entry = FulltextIndexEntry::NewReplayIrsIndexEntry(table_index_entry,
+                                                                                       MakeUnique<String>(index_dir),
+                                                                                       txn_id,
+                                                                                       begin_ts,
+                                                                                       commit_ts,
+                                                                                       is_delete);
+                table_index_entry->fulltext_index_entry() = std::move(fulltext_index_entry);
                 break;
             }
             case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {

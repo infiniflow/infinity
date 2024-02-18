@@ -48,7 +48,7 @@ public:
 
     //    Vector<ColumnIndexEntry*> column_index_entry_{};
     //
-    FulltextIndexEntry *irs_index_entry_{};
+    FulltextIndexEntry *fulltext_index_entry_{};
 
     HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
 };

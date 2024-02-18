@@ -30,7 +30,7 @@ import segment_entry;
 import block_entry;
 import block_column_entry;
 import table_index_entry;
-import irs_index_entry;
+import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 import catalog;
@@ -63,7 +63,7 @@ export enum class CatalogDeltaOpType : i8 {
     // INDEX
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 21,
-    ADD_IRS_INDEX_ENTRY = 22,
+    ADD_FULLTEXT_INDEX_ENTRY = 22,
     ADD_COLUMN_INDEX_ENTRY = 23,
     ADD_SEGMENT_COLUMN_INDEX_ENTRY = 24,
 };
@@ -640,12 +640,12 @@ public:
                                      String table_name,
                                      String index_name,
                                      String index_dir)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)) {}
-    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> irs_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY; }
-    String GetTypeStr() const final { return "ADD_IRS_INDEX_ENTRY"; }
+    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> fulltext_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY), fulltext_index_entry_(fulltext_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_FULLTEXT_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
         total_size += sizeof(i32) + this->db_name_.size();
@@ -662,7 +662,7 @@ public:
     }
 
 public:
-    SharedPtr<FulltextIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
 public:
     const String &db_name() const { return db_name_; }
