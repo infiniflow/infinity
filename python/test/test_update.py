@@ -224,7 +224,56 @@ class TestUpdate:
                 print(e)
 
     # update table with only one block
+
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_update_table_with_one_block(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_table_with_one_block")
+        table_obj = db_obj.create_table("test_update_table_with_one_block", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8192)]
+        # values = [{"c1": 1, "c2": 2}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 20}])
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update table with multiple blocks, but only one segment
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_update_table_with_one_segment(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_table_with_one_segment")
+        table_obj = db_obj.create_table("test_update_table_with_one_segment", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": 1, "c2": 2} for _ in range(8)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 20}])
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update before delete, select after delete and check the change.
     # update just inserted data and select to check
     # update inserted long before and select to check
