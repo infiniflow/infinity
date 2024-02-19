@@ -22,12 +22,12 @@ import index_config;
 
 namespace infinity {
 
-export template <typename NodeType>
-class QueryVisitor {
+export class QueryVisitor {
 public:
     QueryVisitor() = default;
-    virtual ~QueryVisitor() = default;
+    ~QueryVisitor() = default;
 
+    template <typename NodeType>
     void Visit(NodeType &n);
 };
 

@@ -14,24 +14,25 @@
 
 module;
 
+#include "query.h"
+
 module query_visitor;
 
 import stl;
 import index_defines;
 import index_config;
-import query_node;
 
 namespace infinity {
 template <>
-void QueryVisitor<And>::Visit(And &) {}
+void QueryVisitor::Visit<And>(And &) {}
 
 template <>
-void QueryVisitor<AndNot>::Visit(AndNot &) {}
+void QueryVisitor::Visit<AndNot>(AndNot &) {}
 
 template <>
-void QueryVisitor<Or>::Visit(Or &) {}
+void QueryVisitor::Visit<Or>(Or &) {}
 
 template <>
-void QueryVisitor<Wand>::Visit(Wand &) {}
+void QueryVisitor::Visit<Wand>(Wand &) {}
 
 } // namespace infinity

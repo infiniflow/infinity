@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-module query_node;
-
-import stl;
-import index_defines;
-import index_config;
+#include "query.h"
 
 namespace infinity {} // namespace infinity

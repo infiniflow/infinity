@@ -12,26 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
-export module query_builder;
+#include "query.h"
+#include <stack>
 
 import stl;
-import index_defines;
-import index_config;
-import query_node;
-import doc_iterator;
 
 namespace infinity {
 
-export class QueryBuilder {
+class QueryBuilder {
 public:
     QueryBuilder();
 
     ~QueryBuilder();
 
-    UniquePtr<DocIterator> CreateSearch(Node *query_tree);
+    UniquePtr<QueryNode> Build();
+
+    void AddTerm(const String &term, float weight = 1.0);
+
+    void AddAnd(int child_count);
+
+    void AddAndNot(int child_count);
+
+    void AddOr(int child_count);
+
+    void AddWAnd(int child_count);
+
+    void AddPhrase(int child_count);
 
 private:
+    struct NodeInfo {
+        MultiQuery *node_;
+        int left_child_count_;
+        NodeInfo(MultiQuery *node, int c) : node_(node), left_child_count_(c) {}
+    };
+
+    void AddTermQuery(QueryNode *n);
+
+    void AddMultiQuery(MultiQuery *n, int child_count);
+
+    UniquePtr<QueryNode> root_;
+    std::stack<NodeInfo> nodes_;
 };
 } // namespace infinity
