@@ -20,6 +20,7 @@ import stl;
 import index_base;
 import third_party;
 import base_entry;
+import indexer;
 
 namespace infinity {
 
@@ -67,5 +68,6 @@ public:
     SharedPtr<String> index_dir_{};
     HashMap<u64, SharedPtr<IndexFullText>> index_info_map_{};
     UniquePtr<IRSDataStore> irs_index_{};
+    UniquePtr<Indexer> indexer_{}; // for homebrewed fulltext index
 };
 } // namespace infinity

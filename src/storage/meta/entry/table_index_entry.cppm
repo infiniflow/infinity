@@ -81,6 +81,7 @@ public:
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
+    bool IsFulltextIndexHomebrewed() const;
 
     Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
