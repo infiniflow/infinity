@@ -14,20 +14,25 @@
 
 module;
 
+export module term_doc_iterator;
+
 import stl;
 import memory_pool;
-import segment_posting;
+import posting_iterator;
+import bitmap;
 import index_defines;
+import term_meta;
 import segment;
-export module index_segment_reader;
-
+import index_config;
+import doc_iterator;
 namespace infinity {
-export class IndexSegmentReader {
+export class TermDocIterator : public DocIterator {
 public:
-    IndexSegmentReader();
-    virtual ~IndexSegmentReader() {}
+    TermDocIterator(const String &term, PostingIterator *iter);
 
-    virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+    ~TermDocIterator();
+
+private:
+    PostingIterator *iter_ = nullptr;
 };
-
 } // namespace infinity
