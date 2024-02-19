@@ -14,20 +14,29 @@
 
 module;
 
+export module multi_query_iterator;
+
 import stl;
 import memory_pool;
-import segment_posting;
+import posting_iterator;
 import index_defines;
 import segment;
-export module index_segment_reader;
-
+import index_config;
+import doc_iterator;
 namespace infinity {
-export class IndexSegmentReader {
+export class MultiQueryIterator : public DocIterator {
 public:
-    IndexSegmentReader();
-    virtual ~IndexSegmentReader() {}
+    MultiQueryIterator();
 
-    virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+    virtual ~MultiQueryIterator() = default;
+
+    virtual bool IsAnd() const { return false; }
+
+    virtual bool IsAndNot() const { return false; }
+
+    virtual bool IsOr() const { return false; }
+
+protected:
+    Vector<UniquePtr<DocIterator>> children_;
 };
-
 } // namespace infinity

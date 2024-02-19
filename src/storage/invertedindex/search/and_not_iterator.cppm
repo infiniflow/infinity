@@ -14,20 +14,22 @@
 
 module;
 
+export module and_not_iterator;
+
 import stl;
 import memory_pool;
-import segment_posting;
+import posting_iterator;
 import index_defines;
 import segment;
-export module index_segment_reader;
-
+import index_config;
+import multi_query_iterator;
 namespace infinity {
-export class IndexSegmentReader {
+export class AndNotIterator : public MultiQueryIterator {
 public:
-    IndexSegmentReader();
-    virtual ~IndexSegmentReader() {}
+    AndNotIterator(Vector<UniquePtr<DocIterator>> &iterators);
 
-    virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+    ~AndNotIterator();
+
+    bool IsAndNot() const override { return true; }
 };
-
 } // namespace infinity
