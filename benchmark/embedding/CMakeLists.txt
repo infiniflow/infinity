@@ -25,6 +25,8 @@ target_link_libraries(
         benchmark_profiler
         onnxruntime_mlas
         iresearch
+        newpfor
+        vespalib
         atomic.a
         lz4.a
 )

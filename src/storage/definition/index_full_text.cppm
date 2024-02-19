@@ -30,8 +30,8 @@ export class IndexFullText final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexFullText(String file_name, Vector<String> column_names, String analyzer)
-        : IndexBase(file_name, IndexType::kFullText, std::move(column_names)), analyzer_(std::move(analyzer)) {}
+    IndexFullText(String file_name, Vector<String> column_names, String analyzer, bool homebrewed)
+        : IndexBase(file_name, IndexType::kFullText, std::move(column_names)), analyzer_(std::move(analyzer)), homebrewed_(homebrewed) {}
 
     ~IndexFullText() final = default;
 
@@ -54,6 +54,7 @@ public:
 
 public:
     String analyzer_{};
+    bool homebrewed_{false};
 };
 
 } // namespace infinity

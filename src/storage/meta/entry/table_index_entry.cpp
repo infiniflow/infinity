@@ -89,7 +89,8 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
             }
             ColumnID column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
             if (index_base->index_type_ == IndexType::kFullText) {
-                index_info_map.emplace(column_id, std::static_pointer_cast<IndexFullText>(index_base));
+                SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
+                index_info_map.emplace(column_id, index_fulltext);
             } else {
                 SharedPtr<String> column_index_dir =
                     MakeShared<String>(fmt::format("{}/{}", *table_index_entry->index_dir_, index_base->column_names_[0]));
@@ -106,6 +107,19 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
 
         return table_index_entry;
     }
+}
+
+bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
+    bool homebrewed = false;
+    for (SizeT idx = 0; idx < index_def_->index_array_.size(); ++idx) {
+        SharedPtr<IndexBase> &index_base = index_def_->index_array_[idx];
+        if (index_base->index_type_ == IndexType::kFullText) {
+            SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
+            homebrewed = index_fulltext->homebrewed_;
+            break;
+        }
+    }
+    return homebrewed;
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
