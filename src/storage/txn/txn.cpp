@@ -111,7 +111,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     if (!status.ok()) {
         return status;
     }
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids)) {
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 

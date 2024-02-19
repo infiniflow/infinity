@@ -32,7 +32,7 @@ public:
 
     static SharedPtr<MockSegmentEntry> Make(SizeT row_cnt) { return MakeShared<MockSegmentEntry>(cur_segment_id_++, row_cnt); }
 
-    MockSegmentEntry(SegmentID segment_id, SizeT row_cnt) : SegmentEntry(nullptr, nullptr, segment_id, 0, 0, true) {
+    MockSegmentEntry(SegmentID segment_id, SizeT row_cnt) : SegmentEntry(nullptr, nullptr, segment_id, 0, 0, SegmentStatus::kSealed) {
         this->IncreaseRowCount(row_cnt);
     }
 

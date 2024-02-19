@@ -67,8 +67,8 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
-    SetCompactionAlg(nullptr);
-    // SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
+    // SetCompactionAlg(nullptr);
+    SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
@@ -246,10 +246,13 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
+                if (unsealed_segment_ != nullptr) {
+                    unsealed_segment_->SetSealed();
+                }
+
                 SegmentID new_segment_id = this->next_segment_id_++;
                 SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
-                new_segment->SetSealed();
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
@@ -334,7 +337,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
         std::unique_lock lock(this->rw_locker_);
         for (const auto &old_segment : old_segments) {
-            old_segment->SetDeprecated(commit_ts);
+            old_segment->SetDeprecated();
         }
         ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
@@ -349,6 +352,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
             break;
         }
         default:
+            break;
     }
     return Status::OK();
 }
@@ -366,6 +370,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             break;
         }
         default:
+            break;
     }
     return Status::OK();
 }
@@ -618,7 +623,7 @@ void TableEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *delete_txn) {
+bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids) {
     HashMap<SegmentID, Vector<SegmentOffset>> delete_row_map;
     for (const auto row_id : delete_row_ids) {
         delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
@@ -628,7 +633,7 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *d
         check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
     }
 
-    return SegmentEntry::CheckDeleteConflict(std::move(check_segments), delete_txn);
+    return SegmentEntry::CheckDeleteConflict(std::move(check_segments));
 }
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {

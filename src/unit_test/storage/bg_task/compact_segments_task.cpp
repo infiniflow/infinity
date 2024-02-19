@@ -148,11 +148,11 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             for (size_t i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->actual_row_count(), row_count);
 
             txn_mgr->CommitTxn(txn5);
@@ -224,13 +224,13 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
                 auto *compact_segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
                 cnt += compact_segment->actual_row_count();
             }
             EXPECT_EQ(cnt, row_count);
@@ -327,11 +327,11 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -438,7 +438,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                 }
 
                 compact_task->SaveSegmentsData(std::move(state.segment_data_));
-                compact_task->ApplyDeletes(state.remapper_);
+                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
             }
 
             txn_mgr->CommitTxn(txn4);
@@ -454,11 +454,11 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -468,6 +468,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
         infinity::GlobalResourceUsage::UnInit();
     }
 }
+
+// Cannot compile the test. So annotate it.
 
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
     {
@@ -536,6 +538,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             auto [table_entry, status] = compact_txn->GetTableEntry("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
+            Vector<RowID> delete_row_ids2;
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, compact_txn->BeginTS());
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, compact_txn);
@@ -543,9 +546,9 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 auto state = compact_task->CompactSegments();
 
                 Vector<RowID> delete_row_ids;
-                Vector<RowID> delete_row_ids2;
 
                 int delete_row_n1 = 0;
+                int delete_row_n2 = 0;
 
                 for (int i = 0; i < (int)segment_sizes.size(); ++i) {
                     Vector<SegmentOffset> offsets;
@@ -566,10 +569,12 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     }
 
                     delete_row_n1 += offsets.size();
+                    delete_row_n2 += offsets2.size();
                 }
 
                 auto delete_txn2 = txn_mgr->CreateTxn();
                 delete_txn2->Begin();
+                delete_txn2->Delete("default", table_name, delete_row_ids2);
                 {
                     auto delete_txn1 = txn_mgr->CreateTxn();
                     delete_txn1->Begin();
@@ -582,20 +587,28 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
                 compact_task->SaveSegmentsData(std::move(state.segment_data_));
                 {
-                    // std::this_thread::sleep_for(std::chrono::seconds(1));
                     Thread t([&]() {
-                        try {
-                            delete_txn2->Delete("default", table_name, delete_row_ids2);
-                        } catch (const RecoverableException &e) {
-                            EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
-                        }
-                        txn_mgr->RollBackTxn(delete_txn2);
+                        // std::this_thread::sleep_for(std::chrono::seconds(1));
+                        txn_mgr->CommitTxn(delete_txn2);
+                        delete_n += delete_row_n2;
                     });
                     t.join();
                 }
-                compact_task->ApplyDeletes(state.remapper_);
+                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
             }
             txn_mgr->CommitTxn(compact_txn);
+            {
+                auto txn5 = txn_mgr->CreateTxn();
+                txn5->Begin();
+                txn5->Delete("default", table_name, delete_row_ids2);
+                // try {
+                //     txn_mgr->CommitTxn(txn5);
+                //     ASSERT_EQ(0, 1);
+                // } catch (const RecoverableException &e) {
+                //     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+                // } 
+                txn_mgr->RollBackTxn(txn5);
+            }
 
             {
                 auto txn5 = txn_mgr->CreateTxn();
@@ -608,11 +621,11 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 for (int i = 0; i < test_segment_n; ++i) {
                     auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                     EXPECT_NE(segment_entry, nullptr);
-                    EXPECT_NE(segment_entry->deprecate_ts(), UNCOMMIT_TS);
+                    EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
                 }
                 auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
                 EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 

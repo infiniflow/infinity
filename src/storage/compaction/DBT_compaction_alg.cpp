@@ -66,9 +66,6 @@ SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
 
 void DBTCompactionAlg::AddInitSegments(Vector<SegmentEntry *> segment_entries) {
     for (auto *segment : segment_entries) {
-        if (!segment->sealed()) {
-            UnrecoverableError("Segment must be sealed before compaction");
-        }
         AddSegmentInner(segment); // TODO: check if the segment will trigger compaction
     }
 }
