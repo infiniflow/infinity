@@ -54,7 +54,7 @@ export struct ColumnCommitter {
 
 export class ColumnInverter {
 public:
-    virtual void InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) = 0;
+    virtual void InvertColumn(const ColumnVector &column_vector, RowID start_row_id) = 0;
 
     virtual void InvertColumn(u32 doc_id, const String &val) = 0;
 };

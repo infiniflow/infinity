@@ -56,7 +56,7 @@ ColumnIndexer::~ColumnIndexer() {}
 
 void ColumnIndexer::Insert(RowID row_id, String &data) { active_memory_indexer_->Insert(row_id, data); }
 
-void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
+void ColumnIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
 
 void ColumnIndexer::PreCommit() { active_memory_indexer_->PreCommit(); }
 

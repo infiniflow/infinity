@@ -84,7 +84,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     }
 }
 
-void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {}
+void ParallelColumnInverter::InvertColumn(const ColumnVector &column_vector, RowID start_row_id) {}
 
 ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
     inverters_.resize(size_);

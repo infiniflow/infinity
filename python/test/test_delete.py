@@ -243,6 +243,7 @@ class TestDelete:
         # disconnect
         res = infinity_obj.disconnect()
         assert res
+
     # select before delete, select after delete and check the change.
     def test_select_before_after_delete(self):
         # connect

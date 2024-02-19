@@ -23,7 +23,8 @@ import index_config;
 import index_segment_reader;
 import inmem_index_segment_reader;
 import posting_writer;
-import data_block;
+import block_entry;
+import buffer_manager;
 import column_indexer;
 import third_party;
 import segment;
@@ -31,6 +32,8 @@ import internal_types;
 export module indexer;
 
 namespace infinity {
+
+struct TableEntry;
 
 namespace detail {
 template <class T>
@@ -47,7 +50,7 @@ public:
 
     void Open(const InvertedIndexConfig &index_config, const String &directory);
 
-    void Add(DataBlock *data_block);
+    void BatchInsert(const BlockEntry *block_entry, u32 row_offset, u32 row_count, BufferManager *buffer_mgr);
 
     void Insert(RowID row_id, String &data);
 

@@ -43,7 +43,7 @@ private:
 
 export class BatchInvertTask : public TaskExecutor::Task {
 public:
-    BatchInvertTask(ColumnInverter *inverter, SharedPtr<ColumnVector> column_vector, RowID start_row_id);
+    BatchInvertTask(ColumnInverter *inverter, const ColumnVector &column_vector, RowID start_row_id);
 
     ~BatchInvertTask() = default;
 
@@ -52,7 +52,7 @@ public:
 private:
     ColumnInverter *inverter_{nullptr};
 
-    SharedPtr<ColumnVector> column_vector_;
+    ColumnVector column_vector_;
 
     RowID start_row_id_;
 };

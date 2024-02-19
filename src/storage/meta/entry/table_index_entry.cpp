@@ -24,6 +24,7 @@ import default_values;
 import random;
 import index_def;
 import index_base;
+import segment_iter;
 
 import infinity_exception;
 import index_full_text;
@@ -251,12 +252,23 @@ SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, c
 Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr) {
-        auto *buffer_mgr = txn->GetBufferMgr();
-        for (const auto *segment_entry : block_index->segments_) {
-            fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_def_.get(), segment_entry, buffer_mgr);
+        if (fulltext_index_entry->irs_index_.get() != nullptr) {
+            auto *buffer_mgr = txn->GetBufferMgr();
+            for (const auto *segment_entry : block_index->segments_) {
+                fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_def_.get(), segment_entry, buffer_mgr);
+            }
+            fulltext_index_entry->irs_index_->Commit();
+            fulltext_index_entry->irs_index_->StopSchedule();
+        } else {
+            auto *buffer_mgr = txn->GetBufferMgr();
+            for (const auto *segment_entry : block_index->segments_) {
+                auto block_entry_iter = BlockEntryIter(segment_entry);
+                for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                    fulltext_index_entry->indexer_->BatchInsert(block_entry, 0, block_entry->row_count(), buffer_mgr);
+                }
+            }
+            // Don't need to commit explictly here since it's done in the indexer_ thread.
         }
-        fulltext_index_entry->irs_index_->Commit();
-        fulltext_index_entry->irs_index_->StopSchedule();
     }
     for (const auto &[column_id, column_index_entry] : column_index_map_) {
         column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay, check_ts);
