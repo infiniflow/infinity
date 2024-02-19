@@ -600,13 +600,12 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             {
                 auto txn5 = txn_mgr->CreateTxn();
                 txn5->Begin();
-                txn5->Delete("default", table_name, delete_row_ids2);
-                // try {
-                //     txn_mgr->CommitTxn(txn5);
-                //     ASSERT_EQ(0, 1);
-                // } catch (const RecoverableException &e) {
-                //     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
-                // } 
+                try {
+                    txn5->Delete("default", table_name, delete_row_ids2);
+                    ASSERT_EQ(0, 1);
+                } catch (const RecoverableException &e) {
+                    EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);
+                }
                 txn_mgr->RollBackTxn(txn5);
             }
 
