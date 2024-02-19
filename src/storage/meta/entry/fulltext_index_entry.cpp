@@ -25,6 +25,7 @@ import index_base;
 import index_full_text;
 import logger;
 import catalog_delta_entry;
+import index_config;
 
 namespace infinity {
 
@@ -41,8 +42,15 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewFulltextIndexEntry(TableInd
                                                                         SharedPtr<String> index_dir,
                                                                         TxnTimeStamp begin_ts) {
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    fulltext_index_entry->irs_index_ =
-        MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
+    if (homebrewed) {
+        fulltext_index_entry->indexer_ = MakeUnique<Indexer>();
+        InvertedIndexConfig index_config;
+        fulltext_index_entry->indexer_->Open(index_config, *index_dir);
+    } else {
+        fulltext_index_entry->irs_index_ =
+            MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    }
 
     {
         if (txn != nullptr) {
@@ -60,8 +68,15 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayIrsIndexEntry(TableIn
                                                                          TxnTimeStamp commit_ts,
                                                                          bool is_delete) {
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
-    fulltext_index_entry->irs_index_ =
-        MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
+    if (homebrewed) {
+        fulltext_index_entry->indexer_ = MakeUnique<Indexer>();
+        InvertedIndexConfig index_config;
+        fulltext_index_entry->indexer_->Open(index_config, *index_dir);
+    } else {
+        fulltext_index_entry->irs_index_ =
+            MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
+    }
     fulltext_index_entry->commit_ts_.store(commit_ts);
     fulltext_index_entry->deleted_ = is_delete;
     return fulltext_index_entry;
