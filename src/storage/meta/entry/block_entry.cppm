@@ -27,6 +27,8 @@ import internal_types;
 import base_entry;
 import block_column_entry;
 import block_version;
+import fast_rough_filter;
+import value;
 
 namespace infinity {
 
@@ -120,6 +122,10 @@ public:
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 
+    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+
+    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+
     // Get visible range of the BlockEntry since the given row number for a txn
     Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
@@ -157,6 +163,9 @@ protected:
     u16 row_capacity_{};
 
     UniquePtr<BlockVersion> block_version_{};
+
+    // check if a value must not exist in the block
+    FastRoughFilter fast_rough_filter_;
 
     TxnTimeStamp min_row_ts_{0};    // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry

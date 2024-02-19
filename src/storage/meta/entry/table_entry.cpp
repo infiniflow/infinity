@@ -46,6 +46,7 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -206,11 +207,16 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_ != nullptr) {
-                    unsealed_segment_->SetSealed();
+                    // in wal replay, txn->txn_mgr() will return nullptr, and the sealing task will be skipped
+                    // after wal replay, the missing sealing tasks will be created
+                    // this function will not change unsealed to sealed (will be changed in CommitAppend)
+                    // the background task will skip and put itself into the task queue again if the segment has not been changed to sealing yet
+                    unsealed_segment_->CreateTaskSetSegmentStatusSealed(this, txn->txn_mgr());
+                    append_state_ptr->set_sealing_segments_.push_back(unsealed_segment_->segment_id());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewAppendSegmentEntry(this, new_segment_id, txn);
 
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
@@ -220,6 +226,18 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
+    }
+    if (!append_state_ptr->set_sealing_segments_.empty()) {
+        // Add a catalog delta operation to set the segment to sealing
+        auto operation = MakeUnique<SetSegmentStatusSealingOp>(this, append_state_ptr->set_sealing_segments_);
+        txn->AddCatalogDeltaOperation(std::move(operation));
+    }
+}
+
+void TableEntry::SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments) {
+    for (SegmentID segment_id : set_sealing_segments) {
+        SegmentEntry *segment_entry = this->segment_map_[segment_id].get();
+        segment_entry->SetSealing();
     }
 }
 
@@ -262,6 +280,8 @@ void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         row_count += range.row_count_;
     }
     this->row_count_ += row_count;
+    // finally, set the full unsealed segment to sealing
+    SetSegmentSealingForAppend(append_state_ptr->set_sealing_segments_);
 }
 
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {

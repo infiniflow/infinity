@@ -31,6 +31,7 @@ export enum class BGTaskType {
     kCatalogDeltaOpsMerge, // Merge
     kCompactSegments,
     kCleanup,
+    kSetSegmentStatusSealed,
     kInvalid
 };
 

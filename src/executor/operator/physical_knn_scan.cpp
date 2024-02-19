@@ -264,6 +264,19 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
         const BlockEntry *block_entry = block_column_entry->block_entry();
+        // check FastRoughFilter
+        const auto &fast_rough_filter = *block_entry->GetFastRoughFilter();
+        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
+            // skip this block
+            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} skipped after FastRoughFilter",
+                                  knn_scan_function_data->task_id_,
+                                  block_column_idx + 1,
+                                  brute_task_n));
+        } else [[likely]] {
+        LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after FastRoughFilter",
+                              knn_scan_function_data->task_id_,
+                              block_column_idx + 1,
+                              brute_task_n));
         const auto row_count = block_entry->row_count();
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
@@ -298,6 +311,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                            block_entry->segment_id(),
                            block_entry->block_id(),
                            bitmask);
+        }
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
@@ -312,6 +326,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         } else {
             segment_entry = iter->second;
         }
+        // check FastRoughFilter
+        const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
+        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
+            // skip this segment
+            LOG_TRACE(
+                fmt::format("KnnScan: {} index {}/{} skipped after FastRoughFilter", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
+        } else [[likely]] {
+        LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after FastRoughFilter",
+                              knn_scan_function_data->task_id_,
+                              index_idx + 1,
+                              index_task_n));
         auto segment_row_count = segment_entry->row_count();
         Bitmask bitmask;
         if (filter_expression_) {
@@ -520,6 +545,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             default: {
                 UnrecoverableError("Not implemented");
             }
+        }
         }
     }
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {

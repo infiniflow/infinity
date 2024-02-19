@@ -96,6 +96,7 @@ export namespace std {
     using std::shared_lock;
     using std::shared_mutex;
     using std::unique_lock;
+    using std::scoped_lock;
 
     using std::binary_search;
     using std::fabs;
@@ -189,6 +190,7 @@ export namespace std {
     using std::streamsize;
 
     using std::variant;
+    using std::variant_size_v;
     using std::holds_alternative;
     using std::get;
     using std::visit;
@@ -196,6 +198,7 @@ export namespace std {
     using std::is_integral_v;
     using std::is_floating_point_v;
     using std::common_type_t;
+    using std::underlying_type_t;
 
     using std::function;
     using std::monostate;

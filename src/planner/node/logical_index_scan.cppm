@@ -28,6 +28,7 @@ import secondary_index_scan_execute_expression;
 import data_type;
 import table_entry;
 import table_index_entry;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -38,6 +39,7 @@ public:
                               SharedPtr<BaseExpression> &&index_filter_qualified,
                               HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                               Vector<FilterExecuteElem> &&filter_execute_command,
+                              UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                               bool add_row_id = true);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
@@ -63,6 +65,8 @@ public:
     HashMap<ColumnID, TableIndexEntry *> column_index_map_;
     // Commands used in PhysicalIndexScan::ExecuteInternal()
     Vector<FilterExecuteElem> filter_execute_command_;
+
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_;
 
     bool add_row_id_;
 };

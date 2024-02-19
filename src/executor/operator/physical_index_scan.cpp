@@ -33,8 +33,10 @@ import logical_type;
 import table_index_entry;
 import segment_index_entry;
 import segment_entry;
+import fast_rough_filter;
 // TODO:use bitset
 import bitmask;
+import filter_value_type_classification;
 
 namespace infinity {
 
@@ -43,11 +45,13 @@ PhysicalIndexScan::PhysicalIndexScan(u64 id,
                                      SharedPtr<BaseExpression> index_filter_qualified,
                                      HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                      Vector<FilterExecuteElem> &&filter_execute_command,
+                                     UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                      SharedPtr<Vector<LoadMeta>> load_metas,
                                      bool add_row_id)
     : PhysicalOperator(PhysicalOperatorType::kIndexScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
       index_filter_qualified_(std::move(index_filter_qualified)), column_index_map_(std::move(column_index_map)),
-      filter_execute_command_(std::move(filter_execute_command)), add_row_id_(add_row_id) {
+      filter_execute_command_(std::move(filter_execute_command)), fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)),
+      add_row_id_(add_row_id) {
     // output only one hidden column: RowID
     // create empty output_names_ and output_types_
     output_names_ = MakeShared<Vector<String>>();
@@ -539,6 +543,28 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     } else {
         segment_entry = iter->second;
     }
+    // check FastRoughFilter
+    const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
+    if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
+        // skip this segment
+        LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, skipped after FastRoughFilter", next_idx, segment_ids.size()));
+        // output one empty data block
+        // some operator expect at least one input block
+        Vector<SharedPtr<DataType>> output_types;
+        output_types.emplace_back(MakeShared<DataType>(LogicalType::kRowID));
+        auto data_block = DataBlock::MakeUniquePtr();
+        data_block->Init(output_types);
+        output_data_blocks.emplace_back(std::move(data_block));
+        // update next_idx
+        // check if jobs are all done
+        if (++next_idx >= segment_ids.size()) {
+            // Finished
+            index_scan_operator_state->SetComplete();
+        }
+        return;
+    }
+    LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, not skipped after FastRoughFilter", next_idx, segment_ids.size()));
+
     const u32 segment_row_count = segment_entry->row_count();               // count of rows in segment, include deleted rows
     const u32 segment_row_actual_count = segment_entry->actual_row_count(); // count of rows in segment, exclude deleted rows
 
@@ -585,13 +611,12 @@ void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOp
     auto &result = result_stack.back();
     result.Output(output_data_blocks, segment_id, delete_filter);
 
-    LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}", next_idx, segment_ids.size()));
+    LOG_TRACE(fmt::format("IndexScan: job number: {}, segment_ids.size(): {}, finished", next_idx, segment_ids.size()));
     // update next_idx
     // check if jobs are all done
     if (++next_idx >= segment_ids.size()) {
         // Finished
         index_scan_operator_state->SetComplete();
-        return;
     }
 }
 

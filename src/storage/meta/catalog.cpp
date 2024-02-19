@@ -456,6 +456,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto table_name = add_segment_entry_op->table_name();
                 auto segment_id = add_segment_entry_op->segment_id();
                 auto segment_dir = add_segment_entry_op->segment_dir();
+                auto segment_status = add_segment_entry_op->status();
                 auto column_count = add_segment_entry_op->column_count();
                 auto row_count = add_segment_entry_op->row_count();
                 auto actual_row_count = add_segment_entry_op->actual_row_count();
@@ -476,6 +477,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
                                                                                 segment_id,
                                                                                 MakeUnique<String>(segment_dir),
+                                                                                segment_status,
                                                                                 column_count,
                                                                                 row_count,
                                                                                 actual_row_count,
@@ -667,6 +669,49 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                          commit_ts,
                                                                                          is_delete);
                 table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)});
+                break;
+            }
+            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING: {
+                auto *set_segment_status_sealing_op = static_cast<SetSegmentStatusSealingOp *>(op.get());
+                auto &db_name = set_segment_status_sealing_op->db_name();
+                auto &table_name = set_segment_status_sealing_op->table_name();
+                auto &set_sealing_segments = set_segment_status_sealing_op->set_sealing_segments();
+
+                auto *db_meta = catalog->db_meta_map().at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError(db_status.message());
+                }
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError(tb_status.message());
+                }
+                table_entry->SetSegmentSealingForAppend(set_sealing_segments);
+                break;
+            }
+            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+                auto set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
+                auto db_name = set_segment_status_sealed_op->db_name();
+                auto table_name = set_segment_status_sealed_op->table_name();
+                auto segment_id = set_segment_status_sealed_op->segment_id();
+                auto const &segment_filter_binary = set_segment_status_sealed_op->segment_filter_binary_data();
+                auto const &block_filter_binary = set_segment_status_sealed_op->block_filter_binary_data();
+                auto const prev_status = set_segment_status_sealed_op->prev_status();
+
+                auto *db_meta = catalog->db_meta_map().at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError(db_status.message());
+                }
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError(tb_status.message());
+                }
+                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
+                segment_entry->FinishTaskSetSegmentStatusSealed(prev_status);
+                segment_entry->WalLoadFilterBinaryData(segment_filter_binary, block_filter_binary);
                 break;
             }
             default:

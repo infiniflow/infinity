@@ -34,6 +34,7 @@ import secondary_index_data;
 import secondary_index_scan_execute_expression;
 import table_index_entry;
 import segment_index_entry;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -50,23 +51,24 @@ public:
                                SharedPtr<BaseExpression> index_filter_qualified,
                                HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                Vector<FilterExecuteElem> &&filter_execute_command,
+                               UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                bool add_row_id = true);
 
-    ~PhysicalIndexScan() override final = default;
+    ~PhysicalIndexScan() final = default;
 
-    void Init() override final;
+    void Init() final;
 
-    bool Execute(QueryContext *query_context, OperatorState *operator_state) override final;
+    bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const override final { return output_names_; }
+    inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override final { return output_types_; }
+    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     // different from table scan:
     // table scan: one tasklet scan one block
     // index scan: one tasklet scan one segment
-    SizeT TaskletCount() override final { return base_table_ref_->block_index_->SegmentCount(); }
+    SizeT TaskletCount() final { return base_table_ref_->block_index_->SegmentCount(); }
 
     // for InputLoad
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
@@ -87,17 +89,19 @@ private:
     void ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const;
 
 private:
-    SharedPtr<Vector<String>> output_names_;
-    SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
-    SharedPtr<BaseTableRef> base_table_ref_;
+    SharedPtr<Vector<String>> output_names_{};
+    SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+    SharedPtr<BaseTableRef> base_table_ref_{};
     // input from optimizer
-    SharedPtr<BaseExpression> index_filter_qualified_;
-    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
+    SharedPtr<BaseExpression> index_filter_qualified_{};
+    HashMap<ColumnID, TableIndexEntry *> column_index_map_{};
     // Commands used in ExecuteInternal()
-    Vector<FilterExecuteElem> filter_execute_command_;
+    Vector<FilterExecuteElem> filter_execute_command_{};
 
-    bool add_row_id_;
-    mutable Vector<SizeT> column_ids_;
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
+
+    bool add_row_id_{};
+    mutable Vector<SizeT> column_ids_{};
 };
 
 } // namespace infinity
