@@ -14,20 +14,21 @@
 
 module;
 
+export module query_visitor;
+
 import stl;
-import memory_pool;
-import segment_posting;
 import index_defines;
-import segment;
-export module index_segment_reader;
+import index_config;
 
 namespace infinity {
-export class IndexSegmentReader {
-public:
-    IndexSegmentReader();
-    virtual ~IndexSegmentReader() {}
 
-    virtual bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) const = 0;
+export class QueryVisitor {
+public:
+    QueryVisitor() = default;
+    ~QueryVisitor() = default;
+
+    template <typename NodeType>
+    void Visit(NodeType &n);
 };
 
 } // namespace infinity
