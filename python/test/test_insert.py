@@ -243,7 +243,47 @@ class TestInsert:
     # insert table with column value exceeding invalid value range
 
     # batch insert, within limit
-    # batch insert with 10000 columns
     # batch insert, batch size limit? 8192?
     # batch insert, with invalid data type inside.
+    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.parametrize("batch", [10, 1024])
+    @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
+    def test_insert_with_invalid_data_type(self, batch, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_data_type")
+        table_obj = db_obj.create_table("test_insert_with_invalid_data_type",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+
+        # insert
+        for i in range(5):
+            values = [{"c1": 1, "c2": types} for _ in range(batch)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # batch insert, with invalid column count
+    @pytest.mark.parametrize("batch", [10, 1024])
+    def test_insert_with_invalid_column_count(self, batch):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_column_count")
+        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {"c1": "int"}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            for i in range(5):
+                values = [{"c1": 1, "c2": 1} for _ in range(batch)]
+                table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
