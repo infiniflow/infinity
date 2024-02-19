@@ -316,6 +316,25 @@ class TestInsert:
         assert res.success
 
     # insert table with 10000 columns.
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_insert_table_with_10000_columns(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_table_with_10000_columns")
+        table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        for i in range(100):
+            values = [{"c1": 1, "c2": 2} for _ in range(100)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # insert table with columns isn't matched (more and less)
     @pytest.mark.parametrize("values", [[{"c1": 1}], [{"c1": 1, "c2": 1, "c3": 1}]])
     def test_insert_with_not_matched_columns(self, values):
@@ -355,7 +374,41 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.success
     # batch insert, within limit
-    # batch insert with 10000 columns
+    @pytest.mark.parametrize("batch", [10, 1024, 2048])
+    def test_batch_insert_within_limit(self, batch):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_batch_insert_within_limit")
+        table_obj = db_obj.create_table("test_batch_insert_within_limit", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(batch)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # batch insert, batch size limit? 8192?
+    def test_batch_insert(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_batch_insert")
+        table_obj = db_obj.create_table("test_batch_insert", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8192)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # batch insert, with invalid data type inside.
     # batch insert, with invalid column count
