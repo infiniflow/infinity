@@ -26,9 +26,10 @@ QueryBuilder::~QueryBuilder() {}
 
 UniquePtr<QueryNode> QueryBuilder::Build() { return std::move(root_); }
 
-void QueryBuilder::AddTerm(const String &term, float weight) {
+void QueryBuilder::AddTerm(const String &term, const String &column, float weight) {
     QueryNode *term_query = new QueryNode;
     term_query->term_ = term;
+    term_query->column_ = column;
     term_query->weight_ = weight;
     AddTermQuery(term_query);
 }

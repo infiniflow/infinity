@@ -15,6 +15,7 @@
 module;
 
 #include "query.h"
+#include <vector>
 
 module query_visitor;
 
@@ -23,6 +24,7 @@ import index_defines;
 import index_config;
 
 namespace infinity {
+
 template <>
 void QueryVisitor::Visit<And>(And &) {}
 

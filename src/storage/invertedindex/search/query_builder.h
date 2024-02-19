@@ -29,7 +29,7 @@ public:
 
     UniquePtr<QueryNode> Build();
 
-    void AddTerm(const String &term, float weight = 1.0);
+    void AddTerm(const String &term, const String &column, float weight = 1.0);
 
     void AddAnd(int child_count);
 

@@ -21,8 +21,11 @@ namespace infinity {
 
 struct QueryNode {
     String term_;
+    String column_;
     float weight_;
     bool position_{false};
+
+    void Accept(QueryVisitor &visitor) { visitor.Visit(*this); }
 };
 
 class MultiQuery : public QueryNode {
@@ -39,20 +42,27 @@ public:
 
     QueryNode &Add(UniquePtr<QueryNode> &&node) { return *children_.emplace_back(std::move(node)); }
 
-    template <typename T>
-    void Accept(QueryVisitor &visitor) {
-        visitor.Visit(static_cast<T &>(*this));
-    }
-
 protected:
     friend class QueryBuilder;
     Vector<UniquePtr<QueryNode>> children_;
 };
 
-class And : public MultiQuery {};
-class AndNot : public MultiQuery {};
-class Or : public MultiQuery {};
-class Wand : public MultiQuery {};
-class Phrase : public MultiQuery {};
+template <typename T>
+class QueryWrapper : public MultiQuery {
+public:
+    QueryWrapper() = default;
 
+    ~QueryWrapper() = default;
+
+    void Accept(QueryVisitor &visitor) { visitor.Visit(static_cast<T &>(*this)); }
+};
+
+class And : public QueryWrapper<And> {};
+class AndNot : public QueryWrapper<AndNot> {};
+class Or : public QueryWrapper<Or> {};
+class Wand : public QueryWrapper<Wand> {};
+class Phrase : public QueryWrapper<Phrase> {};
+class PrefixTerm : public QueryWrapper<PrefixTerm> {};
+class SuffixTerm : public QueryWrapper<SuffixTerm> {};
+class SubstringTerm : public QueryWrapper<SubstringTerm> {};
 } // namespace infinity
