@@ -14,11 +14,11 @@
 
 module;
 
+module index_defines;
+
 import stl;
 
 import default_values;
-
-module index_defines;
 
 namespace infinity {
 

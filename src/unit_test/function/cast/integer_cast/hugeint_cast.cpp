@@ -96,7 +96,7 @@ TEST_F(HugeIntCastTest, hugeint_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr), UnrecoverableException);
+        EXPECT_THROW(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
     }
     // HugeInt to Date, throw exception
     {

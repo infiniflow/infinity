@@ -75,7 +75,7 @@ TEST_F(DateTimeCastTest, datetime_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(DateTimeTryCastToVarlen::Run(source, target, col_varchar_ptr), UnrecoverableException);
+        EXPECT_THROW(DateTimeTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
     }
 }
 

@@ -18,6 +18,7 @@ module;
 #include <vector>
 
 module parallel_column_inverter;
+
 import stl;
 import analyzer;
 import memory_pool;
