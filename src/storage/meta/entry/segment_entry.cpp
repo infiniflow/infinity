@@ -130,7 +130,7 @@ void SegmentEntry::SetNoDelete() {
         UnrecoverableError("Assert.");
     }
     status_ = SegmentStatus::kNoDelete;
-    txn_num_cv_.wait(lock, [this] { return delete_txn_num_ == 0; });
+    txn_num_cv_.wait(lock, [this] { return delete_txns_.empty(); });
     compact_task_ = nullptr;
 }
 
@@ -150,7 +150,7 @@ void SegmentEntry::RollbackCompact() {
     status_ = SegmentStatus::kSealed;
 }
 
-bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments) {
+bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id) {
     // hold all locks and check
     Vector<std::shared_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
@@ -160,7 +160,8 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
         }
     }
     for (const auto &[segment_entry, delete_offsets] : segments) {
-        ++segment_entry->delete_txn_num_;
+        SegmentID id = segment_entry->segment_id_;
+        segment_entry->delete_txns_.insert(txn_id);
     }
     return false;
 }
@@ -305,7 +306,8 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
             compact_task_->AddToDelete(segment_id_, std::move(segment_offsets));
         }
         {
-            if (delete_txn_num_ > 0 && --delete_txn_num_ == 0) { // == 0 when replay
+            delete_txns_.erase(txn_id);
+            if (delete_txns_.empty()) { // == 0 when replay
                 txn_num_cv_.notify_one();
             }
         }

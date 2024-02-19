@@ -623,17 +623,18 @@ void TableEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids) {
+bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id) {
     HashMap<SegmentID, Vector<SegmentOffset>> delete_row_map;
     for (const auto row_id : delete_row_ids) {
         delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
     }
     Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> check_segments;
+    std::shared_lock lock(this->rw_locker_);
     for (const auto &[segment_id, segment_offsets] : delete_row_map) {
         check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
     }
 
-    return SegmentEntry::CheckDeleteConflict(std::move(check_segments));
+    return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
 }
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {

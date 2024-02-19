@@ -154,7 +154,7 @@ public:
 
     virtual void MergeFrom(BaseEntry &other);
 
-    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids);
+    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

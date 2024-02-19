@@ -93,7 +93,7 @@ public:
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments);
+    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
@@ -195,7 +195,7 @@ private:
     SegmentStatus status_;
 
     std::condition_variable_any txn_num_cv_{};
-    int delete_txn_num_{0}; // current number of delete txn that write this segment
+    HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 };
 
 } // namespace infinity
