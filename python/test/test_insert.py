@@ -232,6 +232,26 @@ class TestInsert:
             table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
+    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.parametrize("types", common_values.types_array)
+    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition")
+        table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition",
+                                        {"c1": "int", "c2": types}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": types_example}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
