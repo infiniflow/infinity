@@ -123,7 +123,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}

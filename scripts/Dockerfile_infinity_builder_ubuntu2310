@@ -43,9 +43,10 @@ RUN apt install -y liblz4-dev libboost1.81-dev liburing-dev libgflags-dev libeve
 # Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
 RUN python3 -m venv /usr/local/venv
 ENV PATH="/usr/local/venv/bin:$PATH"
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn && pip3 install wheel twine
 
 # infinity python SDK dependencies
 COPY python/requirements.txt .
-RUN pip3 install --no-input -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple/ --trusted-host pypi.tuna.tsinghua.edu.cn
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt pip3 install --no-input -r /root/requirements.txt
 
 ENTRYPOINT [ "bash", "-c", "while true; do sleep 60; done"]

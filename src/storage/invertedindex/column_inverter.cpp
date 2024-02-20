@@ -15,6 +15,7 @@
 module;
 
 module column_inverter;
+
 import stl;
 import column_vector;
 import internal_types;
