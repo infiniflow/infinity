@@ -160,15 +160,19 @@ void TaskScheduler::ScheduleTask(FragmentTask *task, u64 worker_id) {
 void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id) {
     List<FragmentTask *> task_lists;
     auto iter = task_lists.end();
+    auto last_iter = task_lists.end();
     while (true) {
-        Vector<FragmentTask *> dequeue_output;
-        if (task_lists.empty()) {
-            task_queue->DequeueBulk(dequeue_output);
-        } else {
-            task_queue->TryDequeueBulk(dequeue_output);
-        }
-        if (!dequeue_output.empty()) {
-            task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+        if (iter == last_iter) {
+            Vector<FragmentTask *> dequeue_output;
+            if (task_lists.empty()) {
+                task_queue->DequeueBulk(dequeue_output);
+            } else {
+                task_queue->TryDequeueBulk(dequeue_output);
+            }
+            if (!dequeue_output.empty()) {
+                task_lists.insert(task_lists.end(), dequeue_output.begin(), dequeue_output.end());
+            }
+            last_iter = task_lists.end();
         }
         if (iter == task_lists.end()) {
             iter = task_lists.begin();
@@ -192,7 +196,7 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
 
         if (fragment_task->status() != FragmentTaskStatus::kError) {
             if (fragment_task->IsComplete()) {
-                auto *sink_op = fragment_ctx->GetSinkOperator();
+                // auto *sink_op = fragment_ctx->GetSinkOperator();
                 --worker_workloads_[worker_id];
                 fragment_task->CompleteTask();
                 iter = task_lists.erase(iter);

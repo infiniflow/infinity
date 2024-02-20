@@ -347,15 +347,17 @@ struct TryCastVarcharVector {
 // Cast VarcharT to BigIntT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, i64 &target) {
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        target = std::strtol(source.short_.data_, &endptr, 10);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
         if(source.IsValue()) {
-            target = std::strtol(source.value_.ptr_, &endptr, 10);
-            len = (endptr - source.value_.ptr_);
+            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         } else {
             // varchar is vector
             SizeT varchar_len = source.length_;
@@ -364,12 +366,12 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
             varchar_ptr[varchar_len] = '\0';
             source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
-            target = std::strtol(varchar_ptr.get(), &endptr, 10);
-            len = (endptr - varchar_ptr.get());
+
+            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         }
-    }
-    if (len != source.length_) {
-        return false;
     }
     return true;
 }
@@ -377,15 +379,17 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to FloatT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, FloatT &target) {
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        target = std::strtof(source.short_.data_, &endptr);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
         if(source.IsValue()) {
-            target = std::strtof(source.value_.ptr_, &endptr);
-            len = (endptr - source.value_.ptr_);
+            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         } else {
             // varchar is vector
             SizeT varchar_len = source.length_;
@@ -394,12 +398,12 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
             varchar_ptr[varchar_len] = '\0';
             source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
-            target = std::strtof(varchar_ptr.get(), &endptr);
-            len = (endptr - varchar_ptr.get());
+
+            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         }
-    }
-    if (len != source.length_) {
-        return false;
     }
     return true;
 }
@@ -407,15 +411,17 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to DoubleT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DoubleT &target) {
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        target = std::strtod(source.short_.data_, &endptr);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
         if(source.IsValue()) {
-            target = std::strtod(source.value_.ptr_, &endptr);
-            len = (endptr - source.value_.ptr_);
+            auto [ptr, ec] = std::from_chars(source.value_.ptr_, source.value_.ptr_ + source.length_, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         } else {
             // varchar is vector
             SizeT varchar_len = source.length_;
@@ -424,12 +430,12 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
             varchar_ptr[varchar_len] = '\0';
             source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
-            target = std::strtod(varchar_ptr.get(), &endptr);
-            len = (endptr - varchar_ptr.get());
+
+            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
+            if (ec != std::errc()) {
+                return false;
+            }
         }
-    }
-    if (len != source.length_) {
-        return false;
     }
     return true;
 }

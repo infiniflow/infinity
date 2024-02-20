@@ -239,7 +239,6 @@ class TestInsert:
     # insert data into index created table
 
     # insert table with 10000 columns.
-    @pytest.mark.skip(reason="May cause core dumped.")
     def test_insert_table_with_10000_columns(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
