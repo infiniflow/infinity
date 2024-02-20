@@ -37,6 +37,16 @@ public:
 
     void SetColumn(const String &column) { column_.column_name_ = column; }
 
+    virtual void Optimize(TermQuery *&self) {}
+
+    virtual void OptimizeSelf() {}
+
+    virtual bool IsAnd() const { return false; }
+
+    virtual bool IsAndNot() const { return false; }
+
+    virtual bool IsOr() const { return false; }
+
 protected:
     virtual void NotifyChange() {
         if (parent_ != nullptr) {
@@ -54,20 +64,44 @@ public:
 
     const Vector<UniquePtr<TermQuery>> &GetChildren() const { return children_; }
 
-    const TermQuery &GetChild(u32 n) const { return *children_[n]; }
+    u32 GetChildrenCount() const { return children_.size(); }
 
-    TermQuery &GetChild(u32 n) { return *children_[n]; }
+    const TermQuery *GetChild(u32 i) const { return children_[i].get(); }
+
+    TermQuery *GetChild(u32 i) { return children_[i].get(); }
 
     MultiQuery &AddChild(UniquePtr<TermQuery> child);
 
+    MultiQuery &InsertChild(u32 i, UniquePtr<TermQuery> child);
+
+    UniquePtr<TermQuery> RemoveChild(u32 i);
+
+    UniquePtr<TermQuery> RemoveLastChild() { return RemoveChild(children_.size() - 1); }
+
     void Reserve(u32 n) { children_.reserve(n); }
+
+    void Optimize(TermQuery *&self);
 
 protected:
     Vector<UniquePtr<TermQuery>> children_;
 };
 
-export class AndQuery : public MultiQuery {};
-export class AndNotQuery : public MultiQuery {};
-export class OrQuery : public MultiQuery {};
+export class AndQuery : public MultiQuery {
+public:
+    void OptimizeSelf() override;
+
+    bool IsAnd() const override { return true; }
+};
+export class AndNotQuery : public MultiQuery {
+    void OptimizeSelf() override;
+
+    bool IsAndNot() const override { return true; }
+};
+export class OrQuery : public MultiQuery {
+    void OptimizeSelf() override;
+
+    bool IsOr() const override { return true; }
+};
 export class WandQuery : public MultiQuery {};
+
 } // namespace infinity
