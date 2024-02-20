@@ -330,7 +330,6 @@ class TestDelete:
         assert res
 
     # various expression will be given in where clause, and check result correctness
-    @pytest.mark.skip(reason="May cause core dumped")
     @pytest.mark.parametrize('column_types', common_values.types_array)
     @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
     def test_various_expression_in_where_clause(self, column_types, column_types_example):
