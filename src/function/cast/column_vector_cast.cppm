@@ -73,7 +73,7 @@ struct TryCastVarlenToValue {
     inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
 
-        if (Operator::template Run<SourceValueType, TargetValueType>(std::move(input), result)) {
+        if (Operator::template Run<SourceValueType, TargetValueType>(std::move(input), cast_data_ptr->source_column_vector_ptr_, result)) {
             return;
         }
 
