@@ -31,6 +31,7 @@ import data_type;
 namespace infinity {
 
 export struct TryCastVarchar;
+export struct TryCastVarcharVector;
 export struct TryCastVarcharToChar;
 export struct TryCastVarcharToVarchar;
 
@@ -52,16 +53,16 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, IntegerT, TryCastVarchar>);
         }
         case kBigInt: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, BigIntT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BigIntT, TryCastVarcharVector>);
         }
         case kHugeInt: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, HugeIntT, TryCastVarchar>);
         }
         case kFloat: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, FloatT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, FloatT, TryCastVarcharVector>);
         }
         case kDouble: {
-            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, DoubleT, TryCastVarchar>);
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DoubleT, TryCastVarcharVector>);
         }
         case kDecimal: {
             UnrecoverableError(fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString()));
@@ -330,6 +331,105 @@ inline bool TryCastVarchar::Run(const VarcharT &, TimestampT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, IntervalT &) {
     UnrecoverableError("Cast from varchar to interval");
+    return true;
+}
+
+struct TryCastVarcharVector {
+    template <typename SourceType, typename TargetType>
+    static inline bool Run(const SourceType &, ColumnVector* source_vector, TargetType &) {
+        UnrecoverableError(
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        return false;
+    }
+};
+
+// Cast VarcharT to BigIntT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, i64 &target) {
+    char *endptr{nullptr};
+    SizeT len{0};
+    if (source.IsInlined()) {
+        target = std::strtol(source.short_.data_, &endptr, 10);
+        len = (endptr - source.short_.data_);
+    } else {
+        if(source.IsValue()) {
+            target = std::strtol(source.value_.ptr_, &endptr, 10);
+            len = (endptr - source.value_.ptr_);
+        } else {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            u32 chunk_id = source.vector_.chunk_id_;
+            u32 chunk_offset = source.vector_.chunk_offset_;
+            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
+            varchar_ptr[varchar_len] = '\0';
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
+            target = std::strtol(varchar_ptr.get(), &endptr, 10);
+            len = (endptr - varchar_ptr.get());
+        }
+    }
+    if (len != source.length_) {
+        return false;
+    }
+    return true;
+}
+
+// Cast VarcharT to FloatT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, FloatT &target) {
+    char *endptr{nullptr};
+    SizeT len{0};
+    if (source.IsInlined()) {
+        target = std::strtof(source.short_.data_, &endptr);
+        len = (endptr - source.short_.data_);
+    } else {
+        if(source.IsValue()) {
+            target = std::strtof(source.value_.ptr_, &endptr);
+            len = (endptr - source.value_.ptr_);
+        } else {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            u32 chunk_id = source.vector_.chunk_id_;
+            u32 chunk_offset = source.vector_.chunk_offset_;
+            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
+            varchar_ptr[varchar_len] = '\0';
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
+            target = std::strtof(varchar_ptr.get(), &endptr);
+            len = (endptr - varchar_ptr.get());
+        }
+    }
+    if (len != source.length_) {
+        return false;
+    }
+    return true;
+}
+
+// Cast VarcharT to DoubleT type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DoubleT &target) {
+    char *endptr{nullptr};
+    SizeT len{0};
+    if (source.IsInlined()) {
+        target = std::strtod(source.short_.data_, &endptr);
+        len = (endptr - source.short_.data_);
+    } else {
+        if(source.IsValue()) {
+            target = std::strtod(source.value_.ptr_, &endptr);
+            len = (endptr - source.value_.ptr_);
+        } else {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            u32 chunk_id = source.vector_.chunk_id_;
+            u32 chunk_offset = source.vector_.chunk_offset_;
+            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
+            varchar_ptr[varchar_len] = '\0';
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
+            target = std::strtod(varchar_ptr.get(), &endptr);
+            len = (endptr - varchar_ptr.get());
+        }
+    }
+    if (len != source.length_) {
+        return false;
+    }
     return true;
 }
 

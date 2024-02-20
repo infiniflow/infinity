@@ -31,6 +31,7 @@ module;
 #include <string.h>
 
 module memory_indexer;
+
 import stl;
 import memory_pool;
 import segment_posting;

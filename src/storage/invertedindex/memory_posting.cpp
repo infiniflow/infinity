@@ -17,6 +17,7 @@ module;
 #include <vector>
 
 module memory_posting;
+
 import stl;
 import memory_pool;
 import file_writer;

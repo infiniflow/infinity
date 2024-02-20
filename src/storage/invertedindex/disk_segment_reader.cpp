@@ -15,6 +15,7 @@
 module;
 
 module disk_index_segment_reader;
+
 import stl;
 import memory_pool;
 import segment_posting;
