@@ -41,10 +41,8 @@ public:
     ~ColumnIndexer();
 
     MemoryIndexer *GetMemoryIndexer() { return active_memory_indexer_.get(); }
-    // realtime insert
-    void Insert(RowID row_id, String &data);
 
-    void Insert(const ColumnVector &column_vector, RowID start_row_id);
+    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
 
     void PreCommit();
 

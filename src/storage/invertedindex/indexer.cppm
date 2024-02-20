@@ -50,9 +50,8 @@ public:
 
     void Open(const InvertedIndexConfig &index_config, const String &directory);
 
+    // Exactly one thread can call this method
     void BatchInsert(const BlockEntry *block_entry, u32 row_offset, u32 row_count, BufferManager *buffer_mgr);
-
-    void Insert(RowID row_id, String &data);
 
     void Commit();
 

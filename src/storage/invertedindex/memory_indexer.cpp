@@ -105,12 +105,9 @@ void MemoryIndexer::SetAnalyzer() {
     jieba_specialize_ = analyzer.compare("chinese") == 0 ? true : false;
 }
 
-void MemoryIndexer::Insert(RowID row_id, String &data) { inverter_->InvertColumn(RowID2DocID(row_id), data); }
-
-void MemoryIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id) {
+void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin) {
     if (index_config_.GetIndexingParallelism() > 1) {
-        docid_t start_doc_id = RowID2DocID(start_row_id);
-
+        docid_t start_doc_id = RowID2DocID(row_id_begin);
         u32 row_size = column_vector.Size();
         for (u32 i = 0; i < row_size; i += parallel_inverter_->Size()) {
             for (u32 j = 0; j < parallel_inverter_->inverters_.size(); ++j) {
@@ -119,7 +116,7 @@ void MemoryIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id
             }
         }
     } else {
-        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, start_row_id);
+        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, row_id_begin);
         invert_executor_->Execute(0, std::move(task));
     }
 }

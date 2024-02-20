@@ -108,17 +108,9 @@ void Indexer::BatchInsert(const BlockEntry *block_entry, u32 row_offset, u32 row
     for (auto &[column_id, column_indexer] : column_indexers_) {
         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
         ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
-        column_indexers_[column_id]->Insert(column_vector, row_id_begin);
+        column_indexers_[column_id]->Insert(column_vector, row_offset, row_count, row_id_begin);
     }
     ctx->IncDocCount(row_count);
-}
-
-void Indexer::Insert(RowID row_id, String &data) {
-    UpdateSegment(row_id);
-    for (SizeT i = 0; i < column_ids_.size(); ++i) {
-        u64 column_id = column_ids_[i];
-        column_indexers_[column_id]->Insert(row_id, data);
-    }
 }
 
 void Indexer::Commit() {

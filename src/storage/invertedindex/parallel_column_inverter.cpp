@@ -87,9 +87,9 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
 
 void ParallelColumnInverter::InvertColumn(const ColumnVector &column_vector, RowID start_row_id) {}
 
-ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
-    inverters_.resize(size_);
-    for (u32 i = 0; i < size_; ++i) {
+ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer) {
+    inverters_.resize(size);
+    for (u32 i = 0; i < size; ++i) {
         inverters_[i] = MakeUnique<ParallelColumnInverter>(memory_indexer);
     }
 }

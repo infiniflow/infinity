@@ -71,10 +71,8 @@ public:
     void SetIndexMode(IndexMode index_mode);
 
     bool IsRealTime() { return index_mode_ == REAL_TIME; }
-    // realtime insert
-    void Insert(RowID row_id, String &data);
 
-    void Insert(const ColumnVector &column_vector, RowID start_row_id);
+    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
 
     void PreCommit();
 
