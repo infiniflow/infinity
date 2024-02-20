@@ -20,6 +20,12 @@ import stl;
 
 namespace infinity {
 
+UniquePtr<TermQuery> TermQuery::Optimize(UniquePtr<TermQuery> query) {
+    TermQuery *root = query.release();
+    root->Optimize(root);
+    return UniquePtr<TermQuery>(root);
+}
+
 MultiQuery &MultiQuery::AddChild(UniquePtr<TermQuery> child) {
     child->SetParent(this);
     children_.push_back(std::move(child));

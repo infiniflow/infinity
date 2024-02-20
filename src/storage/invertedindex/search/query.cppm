@@ -37,6 +37,8 @@ public:
 
     void SetColumn(const String &column) { column_.column_name_ = column; }
 
+    static UniquePtr<TermQuery> Optimize(UniquePtr<TermQuery> query);
+
     virtual void Optimize(TermQuery *&self) {}
 
     virtual void OptimizeSelf() {}

@@ -70,4 +70,16 @@ void QueryVisitor::Visit<TermQueryNode>(TermQueryNode &node) {
     result_.reset(query.release());
 }
 
+template <>
+void QueryVisitor::Visit<Phrase>(Phrase &node) {}
+
+template <>
+void QueryVisitor::Visit<PrefixTerm>(PrefixTerm &node) {}
+
+template <>
+void QueryVisitor::Visit<SuffixTerm>(SuffixTerm &node) {}
+
+template <>
+void QueryVisitor::Visit<SubstringTerm>(SubstringTerm &node) {}
+
 } // namespace infinity
