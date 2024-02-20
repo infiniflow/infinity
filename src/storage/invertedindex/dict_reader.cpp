@@ -15,13 +15,15 @@
 module;
 
 #include <cassert>
+
+module dict_reader;
+
 import stl;
 import term_meta;
 import posting_list_format;
 import fst;
 import mmap;
 import infinity_exception;
-module dict_reader;
 
 namespace infinity {
 

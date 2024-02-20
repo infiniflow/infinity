@@ -74,7 +74,7 @@ TEST_F(BitmapCastTest, bitmap_cast0) {
         SharedPtr<ColumnVector> col_varchar_ptr = MakeShared<ColumnVector>(data_type);
         col_varchar_ptr->Initialize();
 
-        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, col_varchar_ptr), UnrecoverableException);
+        EXPECT_THROW(BitmapTryCastToVarlen::Run(source, target, col_varchar_ptr.get()), UnrecoverableException);
     }
 }
 

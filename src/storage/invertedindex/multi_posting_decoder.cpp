@@ -1,5 +1,7 @@
 module;
 
+module multi_posting_decoder;
+
 import stl;
 import byte_slice;
 import byte_slice_reader;
@@ -17,7 +19,6 @@ import inmem_posting_decoder;
 import inmem_pos_list_decoder;
 import pair_value_skiplist_reader;
 import tri_value_skiplist_reader;
-module multi_posting_decoder;
 
 namespace infinity {
 
