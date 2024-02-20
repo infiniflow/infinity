@@ -48,9 +48,9 @@ private:
         NodeInfo(MultiQueryNode *node, int c) : node_(node), left_child_count_(c) {}
     };
 
-    void AddTermQuery(QueryNode *n);
+    void AddCompleteNode(QueryNode *n);
 
-    void AddMultiQuery(MultiQueryNode *n, int child_count);
+    void AddIntermediateNode(MultiQueryNode *n, int child_count);
 
     UniquePtr<QueryNode> root_;
     std::stack<NodeInfo> nodes_;

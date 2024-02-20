@@ -14,30 +14,16 @@
 
 module;
 
-export module query_visitor;
+module term_queries;
 
 import stl;
-import index_defines;
-import index_config;
-import term_queries;
 
 namespace infinity {
 
-export class QueryVisitor {
-public:
-    QueryVisitor() = default;
-    ~QueryVisitor() = default;
-
-    template <typename NodeType>
-    void Visit(NodeType &node);
-
-    UniquePtr<TermQuery> Build() { return std::move(result_); }
-
-private:
-    template <typename NodeType>
-    void BuildMultiQuery(MultiQuery *query, NodeType &n);
-
-    UniquePtr<TermQuery> result_;
-};
-
+MultiQuery &MultiQuery::AddChild(UniquePtr<TermQuery> child) {
+    child->SetParent(this);
+    children_.push_back(std::move(child));
+    NotifyChange();
+    return *this;
+}
 } // namespace infinity

@@ -20,12 +20,18 @@ import query_visitor;
 namespace infinity {
 
 struct QueryNode {
+    QueryNode() = default;
+    virtual ~QueryNode() = default;
+
+    virtual void Accept(QueryVisitor &visitor) = 0;
+};
+
+struct TermQueryNode : public QueryNode {
     String term_;
     String column_;
     float weight_;
     bool position_{false};
-
-    void Accept(QueryVisitor &visitor) { visitor.Visit(*this); }
+    void Accept(QueryVisitor &visitor) override;
 };
 
 class MultiQueryNode : public QueryNode {
@@ -54,7 +60,7 @@ public:
 
     ~QueryWrapper() = default;
 
-    void Accept(QueryVisitor &visitor) { visitor.Visit(static_cast<T &>(*this)); }
+    void Accept(QueryVisitor &visitor) override { visitor.Visit(static_cast<T &>(*this)); }
 };
 
 class And : public QueryWrapper<And> {};
