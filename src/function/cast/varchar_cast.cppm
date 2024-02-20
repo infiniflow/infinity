@@ -27,6 +27,7 @@ import column_vector;
 import vector_buffer;
 import internal_types;
 import data_type;
+import status;
 
 namespace infinity {
 
@@ -122,7 +123,7 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             //            UnrecoverableError("Cast from varchar to blob");
             //        }
         case kEmbedding: {
-            UnrecoverableError("Cast from varchar to embedding");
+            RecoverableError(Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString())));
         }
         case kRowID: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<VarcharT, RowID, TryCastVarchar>);
