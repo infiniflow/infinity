@@ -822,10 +822,24 @@ public:
     void set_txn_id(TransactionID txn_id) { txn_id_ = txn_id; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { commit_ts_ = commit_ts; }
-    Deque<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
-private:
-    Deque<UniquePtr<CatalogDeltaOperation>> operations_{};
+    // called by `AddCatalogDeltaOperation`
+    void AddOperation(UniquePtr<CatalogDeltaOperation> operation) {
+        std::lock_guard lock(mtx_);
+        operations_.emplace_back(std::move(operation));
+    }
+
+    // Pick and remove all operations that are committed before `max_commit_ts`
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+    // FIXME:  should not contain mutex so that it can be moved out
+
+public:
+    // Attention: only use in unit test or thread safe context
+    Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
+
+protected:
+    std::mutex mtx_{};
+    Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
 export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {

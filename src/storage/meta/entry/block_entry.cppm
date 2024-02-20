@@ -148,7 +148,7 @@ public:
     // Get visible range of the BlockEntry since the given row number for a txn
     Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
-    bool CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
+    bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const;
 
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 

@@ -432,6 +432,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
     return catalog;
 }
 
+// called by Replay
 void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
@@ -446,8 +447,8 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
         RecoverableError(Status::CatalogCorrupted(catalog_path));
     }
 
-//    auto global_commit_ts = catalog_delta_entry->commit_ts();
-//    auto global_txn_id = catalog_delta_entry->txn_id();
+    //    auto global_commit_ts = catalog_delta_entry->commit_ts();
+    //    auto global_txn_id = catalog_delta_entry->txn_id();
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
         auto type = op->GetType();
@@ -865,28 +866,24 @@ void NewCatalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_
     LOG_INFO(fmt::format("Saved catalog to: {}", catalog_path));
 }
 
+// called by bg_task
 bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
 
-    auto const global_catalog_delta_entry = std::move(this->global_catalog_delta_entry_);
     this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
 
-    auto global_entry_commit_ts = global_catalog_delta_entry->commit_ts();
-    LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.", global_entry_commit_ts, max_commit_ts));
-    auto op_size = global_catalog_delta_entry->operations().size();
-    if (op_size == 0) {
+    LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.",
+                         global_catalog_delta_entry_->commit_ts(),
+                         max_commit_ts));
+
+    // Check the SegmentEntry's for flush the data to disk.
+    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+
+    if (flush_delta_entry->operations().empty()) {
         LOG_INFO("Global catalog delta entry ops is empty. Skip flush.");
         return true;
     }
-    // Check the SegmentEntry's for flush the data to disk.
-    auto &ops = global_catalog_delta_entry->operations();
-    for (auto &op : ops) {
-        auto op_commit_ts = op->commit_ts();
-        if (op_commit_ts > max_commit_ts) {
-            this->global_catalog_delta_entry_->operations().emplace_back(std::move(op));
-            global_catalog_delta_entry->operations().pop_front();
-            continue;
-        }
+    for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
@@ -911,10 +908,10 @@ bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     }
 
     // Save the global catalog delta entry to disk.
-    auto exp_size = global_catalog_delta_entry->GetSizeInBytes();
+    auto exp_size = flush_delta_entry->GetSizeInBytes();
     Vector<char> buf(exp_size);
     char *ptr = buf.data();
-    global_catalog_delta_entry->WriteAdv(ptr);
+    flush_delta_entry->WriteAdv(ptr);
     i32 act_size = ptr - buf.data();
     if (exp_size != act_size) {
         UnrecoverableError(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size));

@@ -661,6 +661,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
  * @param ptr
  * @return void
  */
+// called by bg_task
 void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
     std::memcpy(ptr, this, sizeof(CatalogDeltaEntryHeader));
@@ -689,6 +690,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
+// called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
     LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
@@ -709,7 +711,28 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
+    for (auto &op : operations_) {
+        TxnTimeStamp op_commit_ts = op->commit_ts();
+        if (op_commit_ts <= max_commit_ts) {
+            flush_delta_entry->operations_.push_back(std::move(op));
+        } else {
+            break; // commit_ts is in ascending order
+        }
+    }
+    auto flush_size = flush_delta_entry->operations_.size();
+    operations_.erase(operations_.begin(), operations_.begin() + flush_size);
+    return flush_delta_entry;
+}
+
+// called by bg_task
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
+    // FIXME: should make timestamp increase ? 
+    std::lock_guard<std::mutex> lock(mtx_);
+
     auto &global_operations = this->operations();
     auto &local_operations = other->operations();
 

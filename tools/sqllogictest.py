@@ -35,7 +35,7 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def python_skd_test(python_test_dir: str):
+def python_sdk_test(python_test_dir: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
     # check if infinity_sdk is installed
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            python_skd_test(python_test_dir)
+            python_sdk_test(python_test_dir)
             test_process(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)

@@ -33,6 +33,14 @@ struct TableEntry;
 class CompactSegmentsTask;
 class BlockEntryIter;
 
+export enum class SegmentStatus : u8 {
+    kUnsealed,
+    kSealed,
+    kCompacting,
+    kNoDelete,
+    kDeprecated,
+};
+
 export struct SegmentEntry : public BaseEntry {
 public:
     friend class BlockEntryIter;
@@ -44,7 +52,7 @@ public:
                           SegmentID segment_id,
                           SizeT row_capacity,
                           SizeT column_count,
-                          bool sealed);
+                          SegmentStatus status);
 
     static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, bool sealed);
 
@@ -71,40 +79,25 @@ public:
     void MergeFrom(infinity::BaseEntry &other) override;
 
 public:
-    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+    void SetSealed();
 
-    TxnTimeStamp deprecate_ts() {
-        std::shared_lock lock(rw_locker_);
-        return deprecate_ts_;
-    }
+    bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
-    bool sealed() const { return false; } // FIXME: implement sealed
+    void SetNoDelete();
 
-    void SetSealed() {
-        if (sealed_.test_and_set()) {
-            UnrecoverableError("SetSealed failed");
-        }
-    }
+    void SetDeprecated();
 
-    BlockEntry *GetBlockEntryByID(BlockID block_id) const;
-
-    int Room() const;
+    void RollbackCompact();
 
     void FlushNewData();
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    bool TrySetCompacting(CompactSegmentsTask *compact_task, TxnTimeStamp compacting_ts);
+    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
-    void SetNoDelete(TxnTimeStamp no_delete_ts);
+    bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
-    void SetDeprecated(TxnTimeStamp deprecate_ts);
-
-    void RollbackCompact();
-
-    static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, Txn *delete_txn);
-
-    bool CheckVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
+    bool CheckVisible(TxnTimeStamp check_ts) const;
 
     // Check if the segment has any delete before check_ts
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
@@ -120,16 +113,18 @@ public:
 
 public:
     // Const getter
-    inline const TableEntry *GetTableEntry() const { return table_entry_; }
-    inline const SharedPtr<String> &segment_dir() const { return segment_dir_; }
-    inline SegmentID segment_id() const { return segment_id_; }
-    inline SizeT row_capacity() const { return row_capacity_; }
-    inline SizeT column_count() const { return column_count_; }
+    const TableEntry *GetTableEntry() const { return table_entry_; }
+    const SharedPtr<String> &segment_dir() const { return segment_dir_; }
+    SegmentID segment_id() const { return segment_id_; }
+    SizeT row_capacity() const { return row_capacity_; }
+    SizeT column_count() const { return column_count_; }
 
-    inline SizeT row_count() const {
-        if (sealed()) {
-            return row_count_;
-        }
+    SegmentStatus status() const {
+        std::shared_lock lock(rw_locker_);
+        return status_;
+    }
+
+    SizeT row_count() const {
         std::shared_lock lock(rw_locker_);
         return row_count_;
     }
@@ -139,7 +134,16 @@ public:
         return actual_row_count_;
     }
 
-    inline TxnTimeStamp max_row_ts() const { return deprecate_ts_; }
+    int Room() const { return this->row_capacity_ - this->row_count(); }
+
+    TxnTimeStamp min_row_ts() const { return min_row_ts_; }
+
+    TxnTimeStamp max_row_ts() const {
+        std::shared_lock lock(rw_locker_);
+        return max_row_ts_;
+    }
+
+    BlockEntry *GetBlockEntryByID(BlockID block_id) const;
 
 public:
     // called by wal thread
@@ -156,13 +160,13 @@ private:
 
 protected: // protected for unit test
     // called when lock held
-    inline void IncreaseRowCount(SizeT increased_row_count) {
+    void IncreaseRowCount(SizeT increased_row_count) {
         row_count_ += increased_row_count;
         actual_row_count_ += increased_row_count;
     }
 
     // called when lock held
-    inline void DecreaseRemainRow(SizeT decrease_row_count) {
+    void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             UnrecoverableError("Decrease row count exceed actual row count");
         }
@@ -175,22 +179,23 @@ private:
     const SegmentID segment_id_{};
     const SizeT row_capacity_{};
     const u64 column_count_{};
-    atomic_flag sealed_;
 
     mutable std::shared_mutex rw_locker_{}; // protect following
 
     SizeT row_count_{};
     SizeT actual_row_count_{}; // not deleted row count
 
-    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};      // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
+    TxnTimeStamp max_row_ts_{UNCOMMIT_TS};
     TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
-    TxnTimeStamp compacting_ts_{UNCOMMIT_TS};   // Indicate the commit_ts which start compacting this SegmentEntry
-    TxnTimeStamp no_delete_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which prehibit delete in this SegmentEntry
-    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which deprecate this SegmentEntry
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
     CompactSegmentsTask *compact_task_{};
+    SegmentStatus status_;
+
+    std::condition_variable_any no_delete_complete_cv_{};
+    HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 };
 
 } // namespace infinity
