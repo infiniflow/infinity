@@ -216,9 +216,6 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
 
 void DBTCompactionAlg::Disable() {
     std::unique_lock lock(mtx_);
-    if (status_ == DBTStatus::kDisable) {
-        UnrecoverableError("Disable compaction when compaction already disable");
-    }
     cv_.wait(lock, [this]() { return status_ != DBTStatus::kRunning; });
     status_ = DBTStatus::kDisable;
 }

@@ -194,7 +194,7 @@ private:
     CompactSegmentsTask *compact_task_{};
     SegmentStatus status_;
 
-    std::condition_variable_any txn_num_cv_{};
+    std::condition_variable_any no_delete_complete_cv_{};
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 };
 

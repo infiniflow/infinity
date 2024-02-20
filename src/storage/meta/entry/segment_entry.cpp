@@ -127,7 +127,7 @@ void SegmentEntry::SetNoDelete() {
         UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
     }
     status_ = SegmentStatus::kNoDelete;
-    txn_num_cv_.wait(lock, [this] { return delete_txns_.empty(); });
+    no_delete_complete_cv_.wait(lock, [this] { return delete_txns_.empty(); });
     compact_task_ = nullptr;
 }
 
@@ -142,7 +142,7 @@ void SegmentEntry::SetDeprecated() {
 void SegmentEntry::RollbackCompact() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: Rollbacked segment should be kNoDelete.");
+        UnrecoverableError("Assert: Rollbacked segment should be in No Delete state.");
     }
     status_ = SegmentStatus::kSealed;
 }
@@ -198,7 +198,7 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
     if (this->status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("AppendData to sealed segment");
+        UnrecoverableError("AppendData to sealed/compacting/no_delete/deprecated segment");
     }
     if (this->row_capacity_ - this->row_count_ <= 0) {
         return 0;
@@ -279,6 +279,7 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
 // One writer
 void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap) {
     Vector<BlockEntry *> delete_blocks;
+    delete_blocks.reserve(block_row_hashmap.size());
     {
         std::unique_lock lck(this->rw_locker_);
         this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
@@ -304,14 +305,11 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
         {
             delete_txns_.erase(txn_id);
             if (delete_txns_.empty()) { // == 0 when replay
-                txn_num_cv_.notify_one();
+                no_delete_complete_cv_.notify_one();
             }
         }
         for (const auto &[block_id, delete_rows] : block_row_hashmap) {
             BlockEntry *block_entry = block_entries_.at(block_id).get();
-            if (block_entry == nullptr) {
-                UnrecoverableError(fmt::format("The segment doesn't contain the given block: {}.", block_id));
-            }
             if (delete_rows.size() > block_entry->row_capacity()) {
                 UnrecoverableError("Delete rows exceed block capacity");
             }
