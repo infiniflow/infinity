@@ -214,7 +214,8 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
         while (to_append_rows > 0) {
             // Append to_append_rows into block
             if (block_entries_.empty() || block_entries_.back()->GetAvailableCapacity() <= 0) {
-                this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, 0, 0, this->column_count_, txn));
+                BlockID new_block_id = this->block_entries_.size();
+                this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, new_block_id, 0, this->column_count_, txn));
             }
             BlockEntry *last_block_entry = this->block_entries_.back().get();
 
