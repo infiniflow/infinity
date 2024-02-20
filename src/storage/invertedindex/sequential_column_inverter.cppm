@@ -96,8 +96,6 @@ private:
 
     void DoInsert();
 
-    void DoRTInsert();
-
     MemoryIndexer *memory_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};
     bool jieba_specialize_{false};
