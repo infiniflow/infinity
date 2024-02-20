@@ -351,8 +351,13 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
             compaction_alg_->CommitCompact(new_segments, txn_id);
             break;
         }
-        default:
+        case CompactSegmentsTaskType::kCompactTable: {
+            // TODO: reinitialize compaction_alg_ with new segments
             break;
+        }
+        default: {
+            UnrecoverableError("Invalid compact task type");
+        }
     }
     return Status::OK();
 }
@@ -369,8 +374,12 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             compaction_alg_->RollbackCompact(txn_id);
             break;
         }
-        default:
-            break;
+        case CompactSegmentsTaskType::kCompactTable: {
+            break; // does not interfere with compaction_alg_
+        }
+        default: {
+            UnrecoverableError("Invalid compact task type");
+        }
     }
     return Status::OK();
 }

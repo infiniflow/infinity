@@ -14,8 +14,6 @@
 
 module;
 
-#include <bits/std_thread.h>
-#include <bits/this_thread_sleep.h>
 #include <ctime>
 #include <stdexcept>
 #include <string>
@@ -113,7 +111,7 @@ void SegmentEntry::SetSealed() {
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("Assert.");
+        UnrecoverableError("Assert: Compactable segment should be sealed.");
     }
     if (status_ != SegmentStatus::kSealed) {
         return false;
@@ -124,10 +122,9 @@ bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
 }
 
 void SegmentEntry::SetNoDelete() {
-
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kCompacting) {
-        UnrecoverableError("Assert.");
+        UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
     }
     status_ = SegmentStatus::kNoDelete;
     txn_num_cv_.wait(lock, [this] { return delete_txns_.empty(); });
@@ -137,7 +134,7 @@ void SegmentEntry::SetNoDelete() {
 void SegmentEntry::SetDeprecated() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert.");
+        UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
     }
     status_ = SegmentStatus::kDeprecated;
 }
@@ -145,7 +142,7 @@ void SegmentEntry::SetDeprecated() {
 void SegmentEntry::RollbackCompact() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert.");
+        UnrecoverableError("Assert: Rollbacked segment should be kNoDelete.");
     }
     status_ = SegmentStatus::kSealed;
 }
@@ -160,7 +157,6 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
         }
     }
     for (const auto &[segment_entry, delete_offsets] : segments) {
-        SegmentID id = segment_entry->segment_id_;
         segment_entry->delete_txns_.insert(txn_id);
     }
     return false;
@@ -269,7 +265,7 @@ void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u1
     {
         std::unique_lock lck(this->rw_locker_);
         if (this->status_ != SegmentStatus::kUnsealed) {
-            UnrecoverableError("Assert.");
+            UnrecoverableError("Assert: Should not commit append to sealed segment.");
         }
         if (this->min_row_ts_ == UNCOMMIT_TS) {
             this->min_row_ts_ = commit_ts;
@@ -290,11 +286,11 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
             this->first_delete_ts_ = commit_ts;
         }
         if (status_ == SegmentStatus::kDeprecated) {
-            UnrecoverableError("Assert.");
+            UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
         }
         if (compact_task_ != nullptr) {
             if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-                UnrecoverableError("Assert.");
+                UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
             }
             Vector<SegmentOffset> segment_offsets;
             for (const auto &[block_id, delete_rows] : block_row_hashmap) {

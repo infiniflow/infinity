@@ -138,7 +138,7 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_INFO(fmt::format("Compacting segments: {}", ss));
+            LOG_TRACE(fmt::format("Compacting segments: {}", ss));
         }
 
         auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
@@ -171,7 +171,7 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
             Vector<SegmentEntry *> to_compact_segments;
             for (auto *segment : table_ref_->block_index_->segments_) {
                 if (!segment->TrySetCompacting(this)) {
-                    UnrecoverableError("Assert");
+                    UnrecoverableError("Picked segment should be compactable");
                 }
                 to_compact_segments.push_back(segment);
             }
