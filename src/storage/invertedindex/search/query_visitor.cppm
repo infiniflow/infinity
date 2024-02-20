@@ -19,6 +19,7 @@ export module query_visitor;
 import stl;
 import index_defines;
 import index_config;
+import term_queries;
 
 namespace infinity {
 
@@ -28,7 +29,15 @@ public:
     ~QueryVisitor() = default;
 
     template <typename NodeType>
-    void Visit(NodeType &n);
+    void Visit(NodeType &node);
+
+    UniquePtr<TermQuery> Build() { return std::move(result_); }
+
+private:
+    template <typename NodeType>
+    void BuildMultiQuery(MultiQuery *query, NodeType &n);
+
+    UniquePtr<TermQuery> result_;
 };
 
 } // namespace infinity

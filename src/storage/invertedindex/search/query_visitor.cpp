@@ -14,25 +14,72 @@
 
 module;
 
-#include "query.h"
+#include "query_node.h"
+#include <vector>
 
 module query_visitor;
 
 import stl;
 import index_defines;
 import index_config;
+import term_queries;
 
 namespace infinity {
-template <>
-void QueryVisitor::Visit<And>(And &) {}
+
+UniquePtr<TermQuery> BuildQuery(QueryNode &node) {
+    QueryVisitor visitor;
+    node.Accept(visitor);
+    UniquePtr<TermQuery> result = visitor.Build();
+    return result;
+}
+
+template <typename NodeType>
+void QueryVisitor::BuildMultiQuery(MultiQuery *q, NodeType &n) {
+    UniquePtr<MultiQuery> query(q);
+    const Vector<UniquePtr<QueryNode>> &children = n.GetChildren();
+    for (u32 i = 0; i < children.size(); ++i) {
+        query->AddChild(BuildQuery(*children[i]));
+    }
+    result_.reset(query.release());
+}
 
 template <>
-void QueryVisitor::Visit<AndNot>(AndNot &) {}
+void QueryVisitor::Visit<And>(And &node) {
+    BuildMultiQuery(new AndQuery, node);
+}
 
 template <>
-void QueryVisitor::Visit<Or>(Or &) {}
+void QueryVisitor::Visit<AndNot>(AndNot &node) {
+    BuildMultiQuery(new AndNotQuery, node);
+}
 
 template <>
-void QueryVisitor::Visit<Wand>(Wand &) {}
+void QueryVisitor::Visit<Or>(Or &node) {
+    BuildMultiQuery(new OrQuery, node);
+}
+
+template <>
+void QueryVisitor::Visit<Wand>(Wand &node) {
+    BuildMultiQuery(new WandQuery, node);
+}
+
+template <>
+void QueryVisitor::Visit<TermQueryNode>(TermQueryNode &node) {
+    UniquePtr<TermQuery> query = MakeUnique<TermQuery>();
+    query->SetColumn(node.column_);
+    result_.reset(query.release());
+}
+
+template <>
+void QueryVisitor::Visit<Phrase>(Phrase &node) {}
+
+template <>
+void QueryVisitor::Visit<PrefixTerm>(PrefixTerm &node) {}
+
+template <>
+void QueryVisitor::Visit<SuffixTerm>(SuffixTerm &node) {}
+
+template <>
+void QueryVisitor::Visit<SubstringTerm>(SubstringTerm &node) {}
 
 } // namespace infinity
