@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <storage/invertedindex/common/vespa_alloc.h>
@@ -17,6 +31,7 @@ module;
 #include <string.h>
 
 module memory_indexer;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -102,14 +117,14 @@ void MemoryIndexer::SetAnalyzer() {
 
 void MemoryIndexer::Insert(RowID row_id, String &data) { inverter_->InvertColumn(RowID2DocID(row_id), data); }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
+void MemoryIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id) {
     if (index_config_.GetIndexingParallelism() > 1) {
         docid_t start_doc_id = RowID2DocID(start_row_id);
 
-        u32 row_size = column_vector->Size();
+        u32 row_size = column_vector.Size();
         for (u32 i = 0; i < row_size; i += parallel_inverter_->Size()) {
             for (u32 j = 0; j < parallel_inverter_->inverters_.size(); ++j) {
-                auto task = MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector->ToString(i + j), start_doc_id + i + j);
+                auto task = MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector.ToString(i + j), start_doc_id + i + j);
                 invert_executor_->Execute(j, std::move(task));
             }
         }

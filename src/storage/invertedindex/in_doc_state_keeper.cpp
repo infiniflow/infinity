@@ -1,5 +1,7 @@
 module;
 
+module in_doc_state_keeper;
+
 import stl;
 import memory_pool;
 import byte_slice;
@@ -10,7 +12,6 @@ import inmem_posting_decoder;
 import inmem_pos_list_decoder;
 import index_defines;
 import pos_list_format_option;
-module in_doc_state_keeper;
 
 namespace infinity {
 InDocStateKeeper::InDocStateKeeper(InDocPositionState *state, MemoryPool *session_pool) : state_(state), session_pool_(session_pool) {}

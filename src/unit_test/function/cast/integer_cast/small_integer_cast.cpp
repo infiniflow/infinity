@@ -169,49 +169,49 @@ TEST_F(SmallIntegerCastTest, small_integer_cast0) {
         col_varchar_ptr->Initialize();
 
         source = std::numeric_limits<SmallIntT>::min();
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 6u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = std::numeric_limits<SmallIntT>::max();
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 5u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 0;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 1u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 9;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 1u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 10;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 2u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 99;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 2u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = -100;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 4u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 100;
-        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr));
+        EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
         src_str = std::to_string(source);
         EXPECT_EQ(src_str.size(), 3u);
         EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());

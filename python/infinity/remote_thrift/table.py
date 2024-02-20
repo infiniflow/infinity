@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import numpy as np
 from abc import ABC
 from typing import Optional, Union, List, Any
 
@@ -91,7 +92,7 @@ class RemoteTable(Table, ABC):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                               i64_value=value)
 
-                elif isinstance(value, float):
+                elif isinstance(value, float) or isinstance(value, np.float32):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                               f64_value=value)
                 elif isinstance(value, list):
@@ -203,7 +204,7 @@ class RemoteTable(Table, ABC):
                         elif isinstance(value, int):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                                       i64_value=value)
-                        elif isinstance(value, float):
+                        elif isinstance(value, float) or isinstance(value, np.float32):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                                       f64_value=value)
                         else:

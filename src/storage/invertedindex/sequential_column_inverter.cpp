@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <arpa/inet.h>
@@ -29,10 +43,10 @@ SequentialColumnInverter::~SequentialColumnInverter() {}
 
 bool SequentialColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void SequentialColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
+void SequentialColumnInverter::InvertColumn(const ColumnVector &column_vector, RowID start_row_id) {
     docid_t start_doc_id = RowID2DocID(start_row_id);
-    for (SizeT i = 0; i < column_vector->Size(); ++i) {
-        String data = column_vector->ToString(i);
+    for (SizeT i = 0; i < column_vector.Size(); ++i) {
+        String data = column_vector.ToString(i);
         InvertColumn(start_doc_id + i, data);
     }
 }
