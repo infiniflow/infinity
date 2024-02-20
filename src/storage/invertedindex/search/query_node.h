@@ -28,27 +28,27 @@ struct QueryNode {
     void Accept(QueryVisitor &visitor) { visitor.Visit(*this); }
 };
 
-class MultiQuery : public QueryNode {
+class MultiQueryNode : public QueryNode {
 public:
-    MultiQuery() = default;
+    MultiQueryNode() = default;
 
-    ~MultiQuery() = default;
+    ~MultiQueryNode() = default;
 
-    MultiQuery(const MultiQuery &other) = delete;
+    MultiQueryNode(const MultiQueryNode &other) = delete;
 
-    MultiQuery &operator=(const MultiQuery &other) = delete;
+    MultiQueryNode &operator=(const MultiQueryNode &other) = delete;
 
     const Vector<UniquePtr<QueryNode>> &GetChildren() const { return children_; }
 
     QueryNode &Add(UniquePtr<QueryNode> &&node) { return *children_.emplace_back(std::move(node)); }
 
 protected:
-    friend class QueryBuilder;
+    friend class QueryTreeBuilder;
     Vector<UniquePtr<QueryNode>> children_;
 };
 
 template <typename T>
-class QueryWrapper : public MultiQuery {
+class QueryWrapper : public MultiQueryNode {
 public:
     QueryWrapper() = default;
 

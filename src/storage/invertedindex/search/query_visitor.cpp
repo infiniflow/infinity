@@ -14,7 +14,7 @@
 
 module;
 
-#include "query.h"
+#include "query_node.h"
 #include <vector>
 
 module query_visitor;
