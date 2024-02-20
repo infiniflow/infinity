@@ -22,7 +22,6 @@ module logical_planner;
 import stl;
 import bind_context;
 
-
 import infinity_exception;
 import query_binder;
 import bound_delete_statement;
@@ -381,7 +380,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     // Check if columns is given.
     Vector<SharedPtr<ColumnDef>> columns;
     SizeT column_count = create_table_info->column_defs_.size();
-    if(column_count == 0) {
+    if (column_count == 0) {
         return Status::NoColumnDefined(create_table_info->table_name_);
     }
 
@@ -861,12 +860,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCompactTable: {
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
-            UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
 
-            SharedPtr<BaseTableRef> table_ref = query_binder_ptr->GetTableRef(compact_table->schema_name(), compact_table->table_name());
-
+            Txn *txn = query_context_ptr_->GetTxn();
+            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name(), compact_table->table_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
-            logical_command->table_ref_ = table_ref;
+            logical_command->table_entry_ = table_entry;
 
             this->logical_plan_ = logical_command;
             break;

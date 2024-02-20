@@ -69,6 +69,8 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
 
     // SetCompactionAlg(nullptr);
     SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
+    Vector<SegmentEntry *> segments = this->PickCompactSegments();
+    compaction_alg_->Enable(segments);
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
@@ -334,6 +336,9 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
 }
 
 Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    if (compact_store.segment_data_.empty()) {
+        return Status::OK();
+    }
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
         std::unique_lock lock(this->rw_locker_);
         for (const auto &old_segment : old_segments) {
@@ -341,18 +346,22 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
         }
         ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
+    if (compaction_alg_.get() == nullptr) {
+        return Status::OK();
+    }
+
+    Vector<SegmentEntry *> new_segments;
+    std::transform(compact_store.segment_data_.begin(), compact_store.segment_data_.end(), std::back_inserter(new_segments), [](const auto &pair) {
+        return pair.first.get();
+    });
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
-            Vector<SegmentEntry *> new_segments;
-            std::transform(compact_store.segment_data_.begin(),
-                           compact_store.segment_data_.end(),
-                           std::back_inserter(new_segments),
-                           [](const auto &pair) { return pair.first.get(); });
             compaction_alg_->CommitCompact(new_segments, txn_id);
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
-            // TODO: reinitialize compaction_alg_ with new segments
+            //  reinitialize compaction_alg_ with new segments and enable it
+            compaction_alg_->Enable(new_segments);
             break;
         }
         default: {
@@ -363,19 +372,32 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
 }
 
 Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+    if (compact_store.segment_data_.empty()) {
+        return Status::OK();
+    }
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
         std::unique_lock lock(this->rw_locker_);
         for (const auto &old_segment : old_segments) {
             old_segment->RollbackCompact();
         }
     }
+    if (compaction_alg_.get() == nullptr) {
+        return Status::OK();
+    }
+
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
             compaction_alg_->RollbackCompact(txn_id);
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
-            break; // does not interfere with compaction_alg_
+            Vector<SegmentEntry *> new_segments;
+            std::transform(compact_store.segment_data_.begin(),
+                           compact_store.segment_data_.end(),
+                           std::back_inserter(new_segments),
+                           [](const auto &pair) { return pair.first.get(); });
+            compaction_alg_->Enable(new_segments);
+            break;
         }
         default: {
             UnrecoverableError("Invalid compact task type");
@@ -658,6 +680,23 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(Segmen
         return None;
     }
     return compaction_alg_->DeleteInSegment(segment_id, generate_txn);
+}
+
+Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->Disable(); // wait for current compaction to finish
+    }
+    Vector<SegmentEntry *> result;
+    std::shared_lock lock(this->rw_locker_);
+    for (const auto &[segment_id, segment] : this->segment_map_) {
+        auto status = segment->status();
+        if (status == SegmentStatus::kSealed) {
+            result.emplace_back(segment.get());
+        } else if (status == SegmentStatus::kCompacting || status == SegmentStatus::kNoDelete) {
+            UnrecoverableError("Segment should not be compacting or no delete when picking manually");
+        }
+    }
+    return result;
 }
 
 } // namespace infinity

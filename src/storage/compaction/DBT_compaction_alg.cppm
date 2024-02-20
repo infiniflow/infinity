@@ -71,25 +71,32 @@ private:
     MultiHashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
 };
 
-export class DBTCompactionAlg : public CompactionAlg {
+export enum class DBTStatus : u8 {
+    kDisable,
+    kEnable,
+    kRunning,
+};
+
+export class DBTCompactionAlg final : public CompactionAlg {
 public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity) : config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)) {}
 
-    // init with exisiting segments, should called before any compact
-    virtual void AddInitSegments(Vector<SegmentEntry *> segment_entries) final;
-
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) final;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
 
-    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) final;
+    virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) override;
 
-    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) final;
+    virtual void CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) override;
 
-    virtual void RollbackCompact(TransactionID rollback_txn_id) final;
+    virtual void RollbackCompact(TransactionID rollback_txn_id) override;
+
+    virtual void Enable(const Vector<SegmentEntry *> &segment_entries) override;
+
+    virtual void Disable() override;
 
 private:
-    // Add the segment in layer, return the layer if it triggers compaction
-    Optional<int> AddSegmentInner(SegmentEntry *new_segment);
+    // return layer
+    int AddSegmentNoCheck(SegmentEntry *new_segment);
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
@@ -101,6 +108,9 @@ private:
 
     std::mutex mtx_;
     Vector<SegmentLayer> segment_layers_;
+
+    std::condition_variable cv_;
+    DBTStatus status_;
 };
 
 } // namespace infinity

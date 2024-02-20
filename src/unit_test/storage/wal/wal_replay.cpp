@@ -745,8 +745,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);

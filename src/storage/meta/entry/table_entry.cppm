@@ -197,6 +197,8 @@ public:
 
     Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn);
 
+    Vector<SegmentEntry *> PickCompactSegments() const;
+
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};

@@ -129,8 +129,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
@@ -206,8 +205,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
@@ -310,8 +308,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
@@ -410,8 +407,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 auto state = compact_task->CompactSegments();
 
                 {
@@ -540,8 +536,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
             Vector<RowID> delete_row_ids2;
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, compact_txn->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, compact_txn);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
 
                 auto state = compact_task->CompactSegments();
 
