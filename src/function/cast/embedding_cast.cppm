@@ -43,8 +43,12 @@ template <typename SourceElemType>
 BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
+    if(source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kVarchar) {
+        return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
+    }
+
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {} and {}", source.ToString(), target.ToString()));
+        UnrecoverableError(fmt::format("Embedding type: {} can't be cast to {}", source.ToString(), target.ToString()));
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
@@ -132,7 +136,7 @@ struct EmbeddingTryCastToFixlen {
 
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, const SharedPtr<ColumnVector> &) {
+    static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, ColumnVector*) {
         UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -144,7 +148,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &source_type,
                                           VarcharT &target,
                                           const DataType &,
-                                          const SharedPtr<ColumnVector> &vector_ptr) {
+                                          ColumnVector* vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
         UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }

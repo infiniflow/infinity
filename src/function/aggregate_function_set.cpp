@@ -65,7 +65,7 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
     if (candidates_index.size() > 1) {
         // multiple functions matched
         std::stringstream ss;
-        ss << "Multiple matched functions for " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
+        ss << "Multiple matched functions of " << FunctionSet::ToString(name_, {input_argument}) << std::endl;
         ss << "Matched candidate functions: " << std::endl;
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
