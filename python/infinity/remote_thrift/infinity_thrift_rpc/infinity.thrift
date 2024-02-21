@@ -195,6 +195,7 @@ struct Field {
 enum CopyFileType {
 CSV,
 JSON,
+JSONL,
 FVECS,
 }
 
