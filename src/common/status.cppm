@@ -86,6 +86,7 @@ export enum class ErrorCode : long {
     kExceedColumnNameLength = 3046,
     kExceedIndexNameLength = 3047,
     kNoColumnDefined = 3048,
+    kNotSupportedTypeConversion = 3049,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -186,6 +187,7 @@ public:
     static Status ExceedColumnNameLength(u64 column_name_length);
     static Status ExceedIndexNameLength(u64 index_name_length);
     static Status NoColumnDefined(const String& table_name);
+    static Status NotSupportedTypeConversion(const String& from_type, const String& to_type);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

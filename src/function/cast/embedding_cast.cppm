@@ -48,7 +48,7 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     }
 
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("Embedding type: {} can't be cast to {}", source.ToString(), target.ToString()));
+        RecoverableError(Status::NotSupportedTypeConversion(source.ToString(), target.ToString()));
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
