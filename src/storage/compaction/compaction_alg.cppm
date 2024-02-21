@@ -39,8 +39,6 @@ export class CompactionAlg {
 public:
     virtual ~CompactionAlg() = default;
 
-    virtual void AddInitSegments(Vector<SegmentEntry *> segment_entries) = 0;
-
     // Add a new segment, return the segments to be compacted, and the transaction to commit or rollback
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) = 0;
 
@@ -52,6 +50,12 @@ public:
 
     // Rollback the compaction
     virtual void RollbackCompact(TransactionID rollback_txn_id) = 0;
+
+    // ReInitialize segments and enable auto compaction
+    virtual void Enable(const Vector<SegmentEntry *> &segment_entries) = 0;
+
+    // Wait for all compaction to finish and disable auto compaction
+    virtual void Disable() = 0;
 };
 
 } // namespace infinity

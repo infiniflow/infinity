@@ -707,7 +707,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, false);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, true);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -745,8 +745,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
@@ -775,11 +774,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment, nullptr);
-                EXPECT_NE(segment->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
         }
         infinity::InfinityContext::instance().UnInit();
