@@ -73,7 +73,9 @@ UniquePtr<DocIterator> MultiQuery::CreateSearch() {
     Vector<UniquePtr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (u32 i = 0; i < children_.size(); ++i) {
-        sub_doc_iters.push_back(children_[i]->CreateSearch());
+        auto iter = children_[i]->CreateSearch();
+        if (iter)
+            sub_doc_iters.push_back(std::move(iter));
     }
     return CreateMultiSearch(std::move(sub_doc_iters));
 }
