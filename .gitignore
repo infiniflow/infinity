@@ -80,7 +80,6 @@ test/data/csv/test_sort.csv
 test/sql/dql/sort.slt
 test/data/csv/*big*.csv
 test/sql/**/*big*.slt
-test/data/fvecs/
 test/sql/**/*fvecs*.slt
 
 benchmark/toml/toml_config.h
