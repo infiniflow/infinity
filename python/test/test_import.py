@@ -17,8 +17,7 @@ import pytest
 import common_values
 import infinity
 
-TEST_DATA_DIR = "../../test/data/"
-TEST_DATA_DIR_TMP = "test/data/"
+TEST_DATA_DIR = "/test/data/"
 
 
 
@@ -99,7 +98,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_fvecs")
         table_obj = db_obj.create_table("test_import_empty_file_fvecs",
                                         {"c1": "vector,128,float"}, None)
-        table_obj.import_data(TEST_DATA_DIR_TMP + file_format + "/pysdk_test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -117,7 +116,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_csv")
         table_obj = db_obj.create_table("test_import_empty_file_csv",
                                         {"c1": "int", "c2": "vector,3,int"}, None)
-        table_obj.import_data(TEST_DATA_DIR_TMP + file_format + "/pysdk_test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -135,7 +134,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_jsonl")
         table_obj = db_obj.create_table("test_import_empty_file_jsonl",
                                         {"c1": "int", "c2": "vector,3,int"}, None)
-        table_obj.import_data(TEST_DATA_DIR_TMP + file_format + "/pysdk_test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)

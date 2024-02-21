@@ -157,10 +157,6 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         block_entry->IncreaseRowCount(1);
         ++row_idx;
 
-        if (block_entry->row_count() == 0) {
-            break;
-        }
-
         if (row_idx == vector_n) {
             segment_entry->AppendBlockEntry(std::move(block_entry));
             SaveSegmentData(txn_store, segment_entry);

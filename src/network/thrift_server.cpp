@@ -224,7 +224,7 @@ public:
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
         auto &delimiter_string = request.import_option.delimiter;
         if (import_options.copy_file_type_ == CopyFileType::kCSV && delimiter_string.size() != 1) {
-            RecoverableError(Status::SyntaxError("delimiter isn't a char."));
+            RecoverableError(Status::SyntaxError("CSV file delimiter isn't a char."));
         }
         import_options.delimiter_ = delimiter_string[0];
 
