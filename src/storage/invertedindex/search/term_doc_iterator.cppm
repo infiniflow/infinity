@@ -30,7 +30,11 @@ export class TermDocIterator : public DocIterator {
 public:
     TermDocIterator(const String &term, PostingIterator *iter);
 
-    ~TermDocIterator();
+    virtual ~TermDocIterator();
+
+    void AddIterator(DocIterator *iter) override {}
+
+    void DoSeek(docid_t doc_id) override;
 
 private:
     PostingIterator *iter_ = nullptr;

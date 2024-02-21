@@ -17,6 +17,8 @@ module;
 export module term_queries;
 
 import stl;
+import doc_iterator;
+import column_index_reader;
 
 namespace infinity {
 
@@ -49,6 +51,8 @@ public:
 
     virtual bool IsOr() const { return false; }
 
+    virtual UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader);
+
 protected:
     virtual void NotifyChange() {
         if (parent_ != nullptr) {
@@ -56,13 +60,14 @@ protected:
         }
     }
     TermQuery *parent_{nullptr};
+    String term_;
     ColumnInfo column_;
 };
 
 export class MultiQuery : public TermQuery {
 public:
     MultiQuery() = default;
-    ~MultiQuery() = default;
+    virtual ~MultiQuery() = default;
 
     const Vector<UniquePtr<TermQuery>> &GetChildren() const { return children_; }
 
@@ -82,7 +87,11 @@ public:
 
     void Reserve(u32 n) { children_.reserve(n); }
 
-    void Optimize(TermQuery *&self);
+    void Optimize(TermQuery *&self) override;
+
+    UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader) override;
+
+    virtual UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) = 0;
 
 protected:
     Vector<UniquePtr<TermQuery>> children_;
@@ -93,17 +102,28 @@ public:
     void OptimizeSelf() override;
 
     bool IsAnd() const override { return true; }
+
+    UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) override;
 };
 export class AndNotQuery : public MultiQuery {
+public:
     void OptimizeSelf() override;
 
     bool IsAndNot() const override { return true; }
+
+    UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) override;
 };
 export class OrQuery : public MultiQuery {
+public:
     void OptimizeSelf() override;
 
     bool IsOr() const override { return true; }
+
+    UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) override;
 };
-export class WandQuery : public MultiQuery {};
+export class WandQuery : public MultiQuery {
+public:
+    UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) override;
+};
 
 } // namespace infinity

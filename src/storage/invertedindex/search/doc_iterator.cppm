@@ -25,7 +25,7 @@ import index_config;
 namespace infinity {
 export class DocIterator {
 public:
-    DocIterator();
+    DocIterator() = default;
 
     virtual ~DocIterator() = default;
 

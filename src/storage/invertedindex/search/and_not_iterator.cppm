@@ -17,19 +17,23 @@ module;
 export module and_not_iterator;
 
 import stl;
-import memory_pool;
-import posting_iterator;
 import index_defines;
-import segment;
-import index_config;
 import multi_query_iterator;
-namespace infinity {
-export class AndNotIterator : public MultiQueryIterator {
-public:
-    AndNotIterator(Vector<UniquePtr<DocIterator>> &iterators);
+import doc_iterator;
 
-    ~AndNotIterator();
+namespace infinity {
+export class AndNotIterator : public MultiQueryDocIterator {
+public:
+    AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
+
+    virtual ~AndNotIterator();
 
     bool IsAndNot() const override { return true; }
+
+    void DoSeek(docid_t doc_id) override;
+
+private:
+    DocIterator *left_iterator_{nullptr};
+    DocIterator *right_iterator_{nullptr};
 };
 } // namespace infinity

@@ -24,17 +24,24 @@ import segment;
 import index_config;
 import doc_iterator;
 namespace infinity {
-export class MultiQueryIterator : public DocIterator {
+export class MultiQueryDocIterator : public DocIterator {
 public:
-    MultiQueryIterator();
+    MultiQueryDocIterator() = default;
 
-    virtual ~MultiQueryIterator() = default;
+    virtual ~MultiQueryDocIterator() = default;
 
     virtual bool IsAnd() const { return false; }
 
     virtual bool IsAndNot() const { return false; }
 
     virtual bool IsOr() const { return false; }
+
+    void AddIterator(DocIterator *iter) override {
+        UniquePtr<DocIterator> it(iter);
+        children_.push_back(std::move(it));
+    }
+
+    const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
 
 protected:
     Vector<UniquePtr<DocIterator>> children_;

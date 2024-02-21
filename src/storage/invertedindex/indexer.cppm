@@ -72,6 +72,10 @@ public:
 
     std::shared_mutex &GetMutex() { return flush_mutex_; }
 
+    const Vector<u64> &GetColumnIDs() const { return column_ids_; }
+
+    const InvertedIndexConfig &GetIndexConfig() const { return index_config_; }
+
 private:
     void AddSegment();
 

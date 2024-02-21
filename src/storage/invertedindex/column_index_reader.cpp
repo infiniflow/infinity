@@ -71,6 +71,8 @@ PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *sessi
             seg_postings->push_back(seg_posting);
         }
     }
+    if (seg_postings->empty())
+        return nullptr;
     PostingIterator *iter =
         new ((session_pool)->Allocate(sizeof(PostingIterator))) PostingIterator(index_config_.GetPostingFormatOption(), session_pool);
     u32 state_pool_size = 0; // TODO

@@ -14,25 +14,33 @@
 
 module;
 
-export module and_iterator;
+export module query_builder;
 
 import stl;
-import index_defines;
-import multi_query_iterator;
+import doc_iterator;
+import term_queries;
+import column_index_reader;
+import indexer;
+import index_config;
 
 namespace infinity {
 
-export class AndIterator : public MultiQueryDocIterator {
+class QueryNode;
+export struct QueryContext {
+    UniquePtr<QueryNode> query_tree_;
+};
+
+export class QueryBuilder {
 public:
-    AndIterator(Vector<UniquePtr<DocIterator>> iterators);
+    QueryBuilder(Indexer *indexer);
 
-    virtual ~AndIterator();
+    ~QueryBuilder();
 
-    bool IsAnd() const override { return true; }
-
-    void DoSeek(docid_t doc_id) override;
+    UniquePtr<DocIterator> CreateSearch(QueryContext &context);
 
 private:
-    Vector<DocIterator *> sorted_iterators_;
+    Indexer *indexer_{nullptr};
+    Vector<u64> column_ids_;
+    IndexReader index_reader_;
 };
 } // namespace infinity

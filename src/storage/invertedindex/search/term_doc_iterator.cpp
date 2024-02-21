@@ -14,25 +14,20 @@
 
 module;
 
-export module and_iterator;
+module term_doc_iterator;
 
 import stl;
+import memory_pool;
+import posting_iterator;
+import bitmap;
 import index_defines;
-import multi_query_iterator;
-
+import term_meta;
+import doc_iterator;
 namespace infinity {
+TermDocIterator::TermDocIterator(const String &term, PostingIterator *iter) {}
 
-export class AndIterator : public MultiQueryDocIterator {
-public:
-    AndIterator(Vector<UniquePtr<DocIterator>> iterators);
+TermDocIterator::~TermDocIterator() {}
 
-    virtual ~AndIterator();
+void TermDocIterator::DoSeek(docid_t doc_id) {}
 
-    bool IsAnd() const override { return true; }
-
-    void DoSeek(docid_t doc_id) override;
-
-private:
-    Vector<DocIterator *> sorted_iterators_;
-};
 } // namespace infinity
