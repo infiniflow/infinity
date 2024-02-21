@@ -22,9 +22,24 @@ import index_defines;
 import index_config;
 import doc_iterator;
 import multi_query_iterator;
+import priority_queue;
 namespace infinity {
+
 export class OrIterator : public MultiQueryDocIterator {
 public:
+    class DocIteratorHeap : public PriorityQueue<DocIterator *> {
+    public:
+        DocIteratorHeap(u32 size) { Initialize(size); }
+
+    protected:
+        bool LessThan(DocIterator *iter1, DocIterator *iter2) override { return iter1->Doc() < iter2->Doc(); }
+    };
+
+    struct DocIteratorEntry {
+        docid_t doc_id_{INVALID_DOCID};
+        u32 entry_id_{0};
+    };
+
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
     virtual ~OrIterator();
@@ -34,6 +49,27 @@ public:
     void DoSeek(docid_t doc_id) override;
 
 private:
-    Vector<DocIterator *> iterator_heap_;
+    DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
+
+    void AdjustDown(u32 idx, u32 end, DocIteratorEntry *heap) {
+        u32 min = idx;
+        do {
+            idx = min;
+            u32 left = idx << 1;
+            u32 right = left + 1;
+            if (left <= end && heap[left].doc_id_ < heap[min].doc_id_) {
+                min = left;
+            }
+            if (right <= end && heap[right].doc_id_ < heap[min].doc_id_) {
+                min = right;
+            }
+            if (min != idx) {
+                std::swap(heap[idx], heap[min]);
+            }
+        } while (min != idx);
+    }
+
+    Vector<DocIteratorEntry> iterator_heap_;
+    u32 count_{0};
 };
 } // namespace infinity
