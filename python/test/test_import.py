@@ -90,7 +90,6 @@ class TestImport:
         assert res
 
     # import empty file
-    @pytest.mark.skip(reason="May cause core dumped.")
     @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
     def test_import_empty_file(self, file_format):
         # connect
