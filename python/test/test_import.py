@@ -17,7 +17,7 @@ import pytest
 import common_values
 import infinity
 
-TEST_DATA_DIR = "../../test/data/"
+TEST_DATA_DIR = "/test/data/"
 
 
 
@@ -89,16 +89,52 @@ class TestImport:
         res = infinity_obj.disconnect()
         assert res
 
-    # import empty file
-    @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
-    def test_import_empty_file(self, file_format):
+    # import empty FVECS file
+    @pytest.mark.parametrize("file_format", ["fvecs", "fvecs", "fvecs"])
+    def test_import_empty_file_fvecs(self, file_format):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_import_empty_file")
-        table_obj = db_obj.create_table("test_import_empty_file",
+        db_obj.drop_table("test_import_empty_file_fvecs")
+        table_obj = db_obj.create_table("test_import_empty_file_fvecs",
+                                        {"c1": "vector,128,float"}, None)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
+    # import empty CSV file
+    @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
+    def test_import_empty_file_csv(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_csv")
+        table_obj = db_obj.create_table("test_import_empty_file_csv",
                                         {"c1": "int", "c2": "vector,3,int"}, None)
-        table_obj.import_data(TEST_DATA_DIR + file_format + "/pysdk_test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
+    # import empty JSONL file
+    @pytest.mark.parametrize("file_format", ["jsonl", "jsonl", "jsonl"])
+    def test_import_empty_file_jsonl(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_jsonl")
+        table_obj = db_obj.create_table("test_import_empty_file_jsonl",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
