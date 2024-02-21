@@ -111,7 +111,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     if (!status.ok()) {
         return status;
     }
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
@@ -556,9 +556,9 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
-    local_catalog_delta_ops_entry_->operations().emplace_back(std::move(operation));
-}
+// called by worker thread when create new entry
+// Add lock because multiple threads may add catalog
+void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) { local_catalog_delta_ops_entry_->AddOperation(std::move(operation)); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {

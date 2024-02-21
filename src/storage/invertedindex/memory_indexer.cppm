@@ -31,7 +31,6 @@ import analyzer;
 import sequential_column_inverter;
 import parallel_column_inverter;
 import task_executor;
-import memory_posting;
 import third_party;
 import internal_types;
 import commit_task;
@@ -46,11 +45,8 @@ class ColumnIndexer;
 export class MemoryIndexer {
 public:
     using TermKey = String;
-    // using PostingPtr = MemoryPosting<false> *;
     using PostingPtr = SharedPtr<PostingWriter>;
-    using RTPostingPtr = SharedPtr<MemoryPosting<true>>;
     using PostingTable = Btree<TermKey, PostingPtr>;
-    using RTPostingTable = Btree<TermKey, RTPostingPtr>;
 
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -94,11 +90,7 @@ public:
 
     PostingTable *GetPostingTable() { return posting_store_.get(); }
 
-    RTPostingTable *GetRTPostingTable() { return rt_posting_store_.get(); }
-
     PostingPtr GetOrAddPosting(const TermKey &term);
-
-    RTPostingPtr GetOrAddRTPosting(const TermKey &term);
 
     void ReclaimMemory();
 
@@ -126,7 +118,6 @@ private:
     SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
     GenerationHandler generation_handler_;
     UniquePtr<PostingTable> posting_store_;
-    UniquePtr<RTPostingTable> rt_posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
     Vector<UniquePtr<SequentialColumnInverter>> free_inverters_;
