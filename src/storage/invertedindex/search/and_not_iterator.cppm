@@ -24,12 +24,14 @@ import segment;
 import index_config;
 import multi_query_iterator;
 namespace infinity {
-export class AndNotIterator : public MultiQueryIterator {
+export class AndNotIterator : public MultiQueryDocIterator {
 public:
-    AndNotIterator(Vector<UniquePtr<DocIterator>> &iterators);
+    AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
 
     ~AndNotIterator();
 
     bool IsAndNot() const override { return true; }
+
+    void DoSeek(docid_t doc_id) override {}
 };
 } // namespace infinity

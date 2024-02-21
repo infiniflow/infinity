@@ -17,6 +17,12 @@ module;
 module term_queries;
 
 import stl;
+import doc_iterator;
+import term_doc_iterator;
+import multi_query_iterator;
+import and_iterator;
+import and_not_iterator;
+import or_iterator;
 
 namespace infinity {
 
@@ -24,6 +30,11 @@ UniquePtr<TermQuery> TermQuery::Optimize(UniquePtr<TermQuery> query) {
     TermQuery *root = query.release();
     root->Optimize(root);
     return UniquePtr<TermQuery>(root);
+}
+
+UniquePtr<DocIterator> TermQuery::CreateSearch() {
+    UniquePtr<TermDocIterator> search;
+    return search;
 }
 
 MultiQuery &MultiQuery::AddChild(UniquePtr<TermQuery> child) {
@@ -58,6 +69,15 @@ void MultiQuery::Optimize(TermQuery *&self) {
     OptimizeSelf();
 }
 
+UniquePtr<DocIterator> MultiQuery::CreateSearch() {
+    Vector<UniquePtr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (u32 i = 0; i < children_.size(); ++i) {
+        sub_doc_iters.push_back(children_[i]->CreateSearch());
+    }
+    return CreateMultiSearch(std::move(sub_doc_iters));
+}
+
 void AndQuery::OptimizeSelf() {
     for (u32 i = 0; i < GetChildrenCount(); ++i) {
         TermQuery *child = GetChild(i);
@@ -69,6 +89,12 @@ void AndQuery::OptimizeSelf() {
             RemoveChild(i--);
         }
     }
+}
+
+UniquePtr<DocIterator> AndQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) {
+    UniquePtr<AndIterator> search = MakeUnique<AndIterator>(std::move(sub_doc_iters));
+
+    return search;
 }
 
 void AndNotQuery::OptimizeSelf() {
@@ -102,6 +128,12 @@ void AndNotQuery::OptimizeSelf() {
     }
 }
 
+UniquePtr<DocIterator> AndNotQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) {
+    UniquePtr<AndNotIterator> search = MakeUnique<AndNotIterator>(std::move(sub_doc_iters));
+
+    return search;
+}
+
 void OrQuery::OptimizeSelf() {
     for (u32 i = 0; (GetChildrenCount() > 1) && (i < GetChildrenCount()); ++i) {
         TermQuery *child = GetChild(i);
@@ -115,4 +147,11 @@ void OrQuery::OptimizeSelf() {
     }
 }
 
+UniquePtr<DocIterator> OrQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) {
+    UniquePtr<OrIterator> search = MakeUnique<OrIterator>(std::move(sub_doc_iters));
+
+    return search;
+}
+
+UniquePtr<DocIterator> WandQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) { return nullptr; }
 } // namespace infinity

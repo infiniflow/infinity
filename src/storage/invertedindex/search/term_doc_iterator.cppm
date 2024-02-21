@@ -32,6 +32,8 @@ public:
 
     ~TermDocIterator();
 
+    void DoSeek(docid_t doc_id) override {}
+
 private:
     PostingIterator *iter_ = nullptr;
 };
