@@ -187,18 +187,21 @@ class KnnDistanceType(object):
 class CopyFileType(object):
     CSV = 0
     JSON = 1
-    FVECS = 2
+    JSONL = 2
+    FVECS = 3
 
     _VALUES_TO_NAMES = {
         0: "CSV",
         1: "JSON",
-        2: "FVECS",
+        2: "JSONL",
+        3: "FVECS",
     }
 
     _NAMES_TO_VALUES = {
         "CSV": 0,
         "JSON": 1,
-        "FVECS": 2,
+        "JSONL": 2,
+        "FVECS": 3,
     }
 
 
