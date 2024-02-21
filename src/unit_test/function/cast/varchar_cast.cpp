@@ -48,8 +48,6 @@ TEST_F(VarcharTest, varchar_cast0) {
         String s1 = "true";
 
         {
-            DataType target_type(LogicalType::kBoolean);
-
             VarcharT v1;
             v1.InitAsValue(s1);
             EXPECT_EQ(v1.length_, s1.length());
@@ -106,8 +104,6 @@ TEST_F(VarcharTest, varchar_cast0) {
 
         s1 = "127";
         {
-            DataType target_type(LogicalType::kBoolean);
-
             VarcharT v1;
             v1.InitAsValue(s1);
             EXPECT_EQ(v1.length_, s1.length());
@@ -121,8 +117,6 @@ TEST_F(VarcharTest, varchar_cast0) {
 
         s1 = "190";
         {
-            DataType target_type(LogicalType::kBoolean);
-
             VarcharT v1;
             v1.InitAsValue(s1);
             EXPECT_EQ(v1.length_, s1.length());
@@ -130,13 +124,11 @@ TEST_F(VarcharTest, varchar_cast0) {
 
             TinyIntT target{0};
             bool result = TryCastVarchar::Run(v1, target);
-            EXPECT_TRUE(result);
+            EXPECT_FALSE(result);
         }
 
         s1 = "abc";
         {
-            DataType target_type(LogicalType::kBoolean);
-
             VarcharT v1;
             v1.InitAsValue(s1);
             EXPECT_EQ(v1.length_, s1.length());
@@ -155,9 +147,6 @@ TEST_F(VarcharTest, varchar_cast1) {
 
 
     {
-        DataType target_type(LogicalType::kBigInt);
-
-
         SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
         input_column_vector->Initialize();
@@ -206,9 +195,6 @@ TEST_F(VarcharTest, varchar_cast1) {
     }
 
     {
-        DataType target_type(LogicalType::kFloat);
-
-
         SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
         input_column_vector->Initialize();
@@ -258,9 +244,6 @@ TEST_F(VarcharTest, varchar_cast1) {
 
 
     {
-        DataType target_type(LogicalType::kDouble);
-
-
         SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
         input_column_vector->Initialize();

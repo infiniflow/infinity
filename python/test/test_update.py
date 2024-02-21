@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
+
 import pandas as pd
 import pytest
 from numpy import dtype
@@ -273,9 +275,138 @@ class TestUpdate:
         assert res.success
 
     # update before delete, select after delete and check the change.
+    def test_update_before_delete(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_before_delete")
+        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete("c1 = 1")
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 20}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update just inserted data and select to check
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_update_inserted_data(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_before_delete")
+        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 21}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update inserted long before and select to check
+    @pytest.mark.skip(reason="May cause core dumped, and cost too much time.")
+    def test_update_inserted_long_before(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_inserted_long_before")
+        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        time.sleep(3600)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 21}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update dropped table
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_update_dropped_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_inserted_long_before")
+        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_inserted_long_before")
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": 21}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update new value is invalid
+    @pytest.mark.skip(reason="Cast error.")
+    @pytest.mark.parametrize("types", common_values.types_array)
+    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    def test_update_invalid_value(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_invalid_value")
+        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": types_example}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # update new value type is not match with table
-    #
+    @pytest.mark.skip(reason="Invalid constant expression.")
+    @pytest.mark.parametrize("types", ["int", "float"])
+    @pytest.mark.parametrize("types_example", [1, 1.333, "1", [1, 2, 3]])
+    def test_update_new_value(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_update_invalid_value")
+        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
+
+        # update
+        table_obj.update("c1 = 1", [{"c2": types_example}])
+        update_res = table_obj.output(["*"]).to_df()
+        print(update_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
