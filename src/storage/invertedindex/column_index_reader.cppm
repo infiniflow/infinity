@@ -16,6 +16,7 @@ module;
 
 import stl;
 import memory_pool;
+import third_party;
 import segment_posting;
 import index_segment_reader;
 import posting_iterator;
@@ -28,6 +29,7 @@ export module column_index_reader;
 
 namespace infinity {
 class Indexer;
+
 export class ColumnIndexReader {
 public:
     ColumnIndexReader(u64 column_id, Indexer *indexer);
@@ -51,6 +53,20 @@ private:
     Indexer *indexer_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Vector<docid_t> base_doc_ids_;
+};
+
+namespace detail {
+template <class T>
+struct Hash {
+    inline SizeT operator()(const T &val) const { return val; }
+};
+} // namespace detail
+
+export struct IndexReader {
+    ColumnIndexReader *GetColumnIndexReader(u64 column_id) { return column_index_readers_[column_id].get(); }
+
+    FlatHashMap<u64, UniquePtr<ColumnIndexReader>, detail::Hash<u64>> column_index_readers_;
+    SharedPtr<MemoryPool> session_pool_;
 };
 
 } // namespace infinity

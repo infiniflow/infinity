@@ -17,19 +17,13 @@ module;
 export module query_builder;
 
 import stl;
-import third_party;
 import doc_iterator;
 import term_queries;
 import column_index_reader;
+import indexer;
+import index_config;
 
 namespace infinity {
-
-namespace detail {
-template <class T>
-struct Hash {
-    inline SizeT operator()(const T &val) const { return val; }
-};
-} // namespace detail
 
 class QueryNode;
 export struct QueryContext {
@@ -38,13 +32,15 @@ export struct QueryContext {
 
 export class QueryBuilder {
 public:
-    QueryBuilder();
+    QueryBuilder(Indexer *indexer);
 
     ~QueryBuilder();
 
     UniquePtr<DocIterator> CreateSearch(QueryContext &context);
 
 private:
-    FlatHashMap<u64, UniquePtr<ColumnIndexReader>, detail::Hash<u64>> column_index_readers_;
+    Indexer *indexer_{nullptr};
+    Vector<u64> column_ids_;
+    IndexReader index_reader_;
 };
 } // namespace infinity

@@ -32,6 +32,8 @@ public:
 
     ~TermDocIterator();
 
+    void AddIterator(DocIterator *iter) override {}
+
     void DoSeek(docid_t doc_id) override {}
 
 private:
