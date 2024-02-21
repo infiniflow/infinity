@@ -105,7 +105,8 @@ class RemoteTable(Table, ABC):
                 else:
                     raise Exception("Invalid constant expression")
 
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                expr_type = ttypes.ParsedExprType(
+                    constant_expr=constant_expression)
                 paser_expr = ttypes.ParsedExpr(type=expr_type)
 
                 parse_exprs.append(paser_expr)
@@ -177,7 +178,8 @@ class RemoteTable(Table, ABC):
                 where_expr = None
             case _:
                 where_expr = traverse_conditions(condition(cond))
-        res = self._conn.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
+        res = self._conn.delete(
+            db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
         if res.success:
             return res
         else:
@@ -210,9 +212,11 @@ class RemoteTable(Table, ABC):
                         else:
                             raise Exception("Invalid constant expression")
 
-                        expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                        expr_type = ttypes.ParsedExprType(
+                            constant_expr=constant_expression)
                         paser_expr = ttypes.ParsedExpr(type=expr_type)
-                        update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
+                        update_expr = ttypes.UpdateExpr(
+                            column_name=column_name, value=paser_expr)
 
                         update_expr_array.append(update_expr)
 
@@ -225,34 +229,32 @@ class RemoteTable(Table, ABC):
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int):
-        self.query_builder.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
-
+        self.query_builder.knn(
+            vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
         return self
 
-    def match(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, topn: int):
-        self.query_builder.match(vector_column_name, embedding_data, embedding_data_type, topn)
+    def match(self, fields: str, matching_text: str, options_text: str = ''):
+        self.query_builder.match(fields, matching_text, options_text)
+        return self
 
+    def fusion(self, method: str, options_text: str = ''):
+        self.query_builder.fusion(method, options_text)
         return self
 
     def output(self, columns: Optional[List[str]]):
         self.query_builder.output(columns)
-
         return self
 
     def filter(self, filter: Optional[str]):
         self.query_builder.filter(filter)
-
         return self
 
     def limit(self, limit: Optional[int]):
         self.query_builder.limit(limit)
-
         return self
 
     def offset(self, offset: Optional[int]):
-
         self.query_builder.offset(offset)
-
         return self
 
     def to_result(self):
