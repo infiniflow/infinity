@@ -163,6 +163,13 @@ void BufferObj::CloseFile() {
     rw_locker_.unlock();
 }
 
+void BufferObj::Cleanup() {
+    if (status_ != BufferStatus::kFreed) {
+        UnrecoverableError("Assert: buffer object status isn't freed.");
+    }
+    file_worker_->CleanupFile();
+}
+
 void BufferObj::CheckState() const {
     switch (status_) {
         case BufferStatus::kLoaded: {

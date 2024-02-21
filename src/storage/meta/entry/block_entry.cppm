@@ -26,6 +26,7 @@ import bitmask;
 import internal_types;
 import base_entry;
 import block_column_entry;
+import block_version;
 
 namespace infinity {
 
@@ -34,34 +35,6 @@ class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
-
-#pragma pack(4)
-struct CreateField {
-    //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
-
-    TxnTimeStamp create_ts_{};
-    i32 row_count_{};
-
-    bool operator==(const CreateField &rhs) const { return create_ts_ == rhs.create_ts_ && row_count_ == rhs.row_count_; }
-
-    bool operator!=(const CreateField &rhs) const { return !(*this == rhs); }
-};
-#pragma pack()
-
-export struct BlockVersion {
-    constexpr static std::string_view PATH = "version";
-
-    explicit BlockVersion(SizeT capacity) : deleted_(capacity, 0) {}
-    bool operator==(const BlockVersion &rhs) const;
-    bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
-    i32 GetRowCount(TxnTimeStamp begin_ts);
-    void LoadFromFile(const String &version_path);
-    void SaveToFile(const String &version_path);
-
-    Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
-                                    // risk to write uninitialized buffer. (ts, rows)
-    Vector<TxnTimeStamp> deleted_{};
-};
 
 /// class BlockEntry
 export struct BlockEntry : public BaseEntry {
@@ -116,6 +89,8 @@ protected:
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Flush(TxnTimeStamp checkpoint_ts);
+
+    void Cleanup();
 
     static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 

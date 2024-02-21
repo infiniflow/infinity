@@ -93,6 +93,8 @@ public:
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
+    void Cleanup();
+
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;

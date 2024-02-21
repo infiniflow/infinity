@@ -403,6 +403,14 @@ void SegmentEntry::FlushNewData() {
     }
 }
 
+void SegmentEntry::Cleanup() {
+    for (auto &block_entry : block_entries_) {
+        block_entry->Cleanup();
+    }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*segment_dir_);
+}
+
 SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
