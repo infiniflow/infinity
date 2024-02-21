@@ -253,6 +253,7 @@ class TestInsert:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.success
+
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
@@ -392,6 +393,7 @@ class TestInsert:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.success
+
     # batch insert, within limit
     @pytest.mark.parametrize("batch", [10, 1024, 2048])
     def test_batch_insert_within_limit(self, batch):
@@ -430,7 +432,7 @@ class TestInsert:
         assert res.success
 
     # batch insert, with invalid data type inside.
-    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.skip(reason="An error example.")
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
     def test_insert_with_invalid_data_type(self, batch, types):
