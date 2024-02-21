@@ -90,8 +90,11 @@ public:
     explicit CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type);
 
 public:
+    ~CompactSegmentsTask() override = default;
+
     String ToString() const override { return "Compact segments task"; }
 
+public:
     void BeginTxn() { txn_->Begin(); }
 
     void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); };

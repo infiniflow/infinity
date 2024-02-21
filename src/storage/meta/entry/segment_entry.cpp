@@ -131,12 +131,13 @@ void SegmentEntry::SetNoDelete() {
     compact_task_ = nullptr;
 }
 
-void SegmentEntry::SetDeprecated() {
+void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
         UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
     }
     status_ = SegmentStatus::kDeprecated;
+    deprecate_ts_ = deprecate_ts;
 }
 
 void SegmentEntry::RollbackCompact() {
@@ -145,6 +146,7 @@ void SegmentEntry::RollbackCompact() {
         UnrecoverableError("Assert: Rollbacked segment should be in No Delete state.");
     }
     status_ = SegmentStatus::kSealed;
+    deprecate_ts_ = UNCOMMIT_TS;
 }
 
 bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id) {
@@ -174,7 +176,12 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
 
 bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    return min_row_ts_ <= check_ts && status_ != SegmentStatus::kDeprecated;
+    return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
+}
+
+bool SegmentEntry::CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const {
+    std::shared_lock lock(rw_locker_);
+    return status_ == SegmentStatus::kDeprecated && deprecate_ts_ < oldest_txn_ts;
 }
 
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {

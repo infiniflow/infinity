@@ -199,6 +199,8 @@ public:
 
     Vector<SegmentEntry *> PickCompactSegments() const;
 
+    void CleanupDeprecatedSegments(TxnTimeStamp oldest_txn_ts);
+
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};

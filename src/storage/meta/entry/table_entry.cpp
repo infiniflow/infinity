@@ -342,7 +342,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
         std::unique_lock lock(this->rw_locker_);
         for (const auto &old_segment : old_segments) {
-            old_segment->SetDeprecated();
+            old_segment->SetDeprecated(commit_ts);
         }
         ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
@@ -697,6 +697,24 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         }
     }
     return result;
+}
+
+void TableEntry::CleanupDeprecatedSegments(TxnTimeStamp oldest_txn_ts) {
+    Vector<SharedPtr<SegmentEntry>> cleanup_segments;
+    {
+        std::unique_lock lock(this->rw_locker_);
+        for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
+            if (iter->second->CheckCanCleanup(oldest_txn_ts)) {
+                cleanup_segments.emplace_back(iter->second);
+                iter = segment_map_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
+    for (auto &segment : cleanup_segments) {
+        segment->Cleanup();
+    }
 }
 
 } // namespace infinity
