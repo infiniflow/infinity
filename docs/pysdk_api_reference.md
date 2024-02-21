@@ -14,7 +14,7 @@ This method connect to the Infinity server and return a infinity object.
 
 ## Parameters
 
-- `REMOTE_HOST = NetworkAddress("127.0.0.1", 9080)`
+- `REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)`
 
 ## Returns
 
