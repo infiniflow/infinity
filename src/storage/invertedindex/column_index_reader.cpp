@@ -16,6 +16,8 @@ module;
 
 #include <vector>
 
+module column_index_reader;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -29,7 +31,6 @@ import inmem_index_segment_reader;
 import indexer;
 import column_indexer;
 import dict_reader;
-module column_index_reader;
 
 namespace infinity {
 ColumnIndexReader::ColumnIndexReader(u64 column_id, Indexer *indexer) : column_id_(column_id), indexer_(indexer) {}

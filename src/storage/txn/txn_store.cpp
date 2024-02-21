@@ -184,7 +184,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
             continue;
         }
         auto [to_compacts, txn] = *ret;
-        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, to_compacts, txn);
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
         bg_task_processor->Submit(compact_task);
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
@@ -196,7 +196,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         if (to_compacts.empty()) {
             continue; // delete down layer but not trigger compaction
         }
-        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, to_compacts, txn);
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
         bg_task_processor->Submit(compact_task);
     }
 }

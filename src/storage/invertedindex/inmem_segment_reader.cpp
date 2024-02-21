@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.module;
 
+module;
+
+module inmem_index_segment_reader;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -19,8 +23,6 @@ import index_segment_reader;
 import index_defines;
 import posting_writer;
 import memory_indexer;
-
-module inmem_index_segment_reader;
 
 namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}

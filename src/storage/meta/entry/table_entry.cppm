@@ -154,7 +154,7 @@ public:
 
     virtual void MergeFrom(BaseEntry &other);
 
-    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *delete_txn);
+    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;
@@ -196,6 +196,8 @@ public:
     Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn);
 
     Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn);
+
+    Vector<SegmentEntry *> PickCompactSegments() const;
 
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock

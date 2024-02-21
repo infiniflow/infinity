@@ -12,38 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "query_builder.h"
-#include "query.h"
+#include "query_tree_builder.h"
+#include "query_node.h"
 
 import stl;
 import index_defines;
 import index_config;
 
 namespace infinity {
-QueryBuilder::QueryBuilder() {}
+QueryTreeBuilder::QueryTreeBuilder() {}
 
-QueryBuilder::~QueryBuilder() {}
+QueryTreeBuilder::~QueryTreeBuilder() {}
 
-UniquePtr<QueryNode> QueryBuilder::Build() { return std::move(root_); }
+UniquePtr<QueryNode> QueryTreeBuilder::Build() { return std::move(root_); }
 
-void QueryBuilder::AddTerm(const String &term, float weight) {
-    QueryNode *term_query = new QueryNode;
+void QueryTreeBuilder::AddTerm(const String &term, const String &column, float weight) {
+    TermQueryNode *term_query = new TermQueryNode;
     term_query->term_ = term;
+    term_query->column_ = column;
     term_query->weight_ = weight;
-    AddTermQuery(term_query);
+    AddCompleteNode(term_query);
 }
 
-void QueryBuilder::AddAnd(int child_count) { AddMultiQuery(new And, child_count); }
+void QueryTreeBuilder::AddAnd(int child_count) { AddIntermediateNode(new And, child_count); }
 
-void QueryBuilder::AddAndNot(int child_count) { AddMultiQuery(new AndNot, child_count); }
+void QueryTreeBuilder::AddAndNot(int child_count) { AddIntermediateNode(new AndNot, child_count); }
 
-void QueryBuilder::AddOr(int child_count) { AddMultiQuery(new Or, child_count); }
+void QueryTreeBuilder::AddOr(int child_count) { AddIntermediateNode(new Or, child_count); }
 
-void QueryBuilder::AddWAnd(int child_count) { AddMultiQuery(new Wand, child_count); }
+void QueryTreeBuilder::AddWAnd(int child_count) { AddIntermediateNode(new Wand, child_count); }
 
-void QueryBuilder::AddPhrase(int child_count) { AddMultiQuery(new Phrase, child_count); }
+void QueryTreeBuilder::AddPhrase(int child_count) { AddIntermediateNode(new Phrase, child_count); }
 
-void QueryBuilder::AddTermQuery(QueryNode *n) {
+void QueryTreeBuilder::AddCompleteNode(QueryNode *n) {
     UniquePtr<QueryNode> node(n);
     if (nodes_.empty()) {
         if (!root_) {
@@ -55,19 +56,19 @@ void QueryBuilder::AddTermQuery(QueryNode *n) {
     if (--nodes_.top().left_child_count_ == 0) {
         QueryNode *completed(nodes_.top().node_);
         nodes_.pop();
-        AddTermQuery(completed);
+        AddCompleteNode(completed);
     }
 }
 
-void QueryBuilder::AddMultiQuery(MultiQuery *n, int child_count) {
-    UniquePtr<MultiQuery> node(n);
+void QueryTreeBuilder::AddIntermediateNode(MultiQueryNode *n, int child_count) {
+    UniquePtr<MultiQueryNode> node(n);
     if (!root_) {
         node->children_.reserve(child_count);
         nodes_.push(NodeInfo(node.release(), child_count));
         if (child_count == 0) {
             QueryNode *completed(nodes_.top().node_);
             nodes_.pop();
-            AddTermQuery(completed);
+            AddCompleteNode(completed);
         }
     }
 }

@@ -16,7 +16,7 @@ types_array = [
     "int", "int8", "int16", "int32", "int64", "integer",
     # "int128",
     # float
-    "float", "float32", "double", "float64",
+    # "float", "float32", "double", "float64",
     # string
     # "varchar",
     # bool

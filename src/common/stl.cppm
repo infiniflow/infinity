@@ -83,6 +83,7 @@ export namespace std {
     using std::lower_bound;
 
     using std::condition_variable;
+    using std::condition_variable_any;
     using std::lock_guard;
     using std::memory_order;
     using std::memory_order_acq_rel;

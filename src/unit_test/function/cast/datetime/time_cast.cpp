@@ -59,7 +59,7 @@ TEST_F(TimeCastTest, date_cast0) {
         SharedPtr<ColumnVector> col_varchar = MakeShared<ColumnVector>(data_type);
         col_varchar->Initialize();
 
-        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, col_varchar), UnrecoverableException);
+        EXPECT_THROW(TimeTryCastToVarlen::Run(source, target, col_varchar.get()), UnrecoverableException);
     }
 }
 

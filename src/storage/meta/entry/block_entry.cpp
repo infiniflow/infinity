@@ -185,6 +185,8 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry 
 }
 
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
+    std::shared_lock lock(rw_locker_);
+
     auto &block_version = this->block_version_;
     auto &deleted = block_version->deleted_;
     BlockOffset block_offset_end = block_version->GetRowCount(begin_ts);
@@ -200,7 +202,7 @@ Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts
     return {block_offset_begin, row_idx};
 }
 
-bool BlockEntry::CheckVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
+bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     auto &block_version = this->block_version_;
     auto &deleted = block_version->deleted_;

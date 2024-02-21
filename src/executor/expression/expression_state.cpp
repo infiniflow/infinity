@@ -95,8 +95,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
     }
     result->AddChild(case_expr->ElseExpr());
 
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
+    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
+        if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
+            result_column_vector_type = ColumnVectorType::kFlat;
+            break;
+        }
+    }
+
     result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(case_expr->Type()));
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }
@@ -109,15 +117,14 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpr
     SharedPtr<ExpressionState> result = MakeShared<ExpressionState>();
     result->AddChild(cast_expr->arguments()[0]);
 
-    //    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    //    for(SizeT idx = 0; idx < block_count; ++ idx) {
-    //        if(result->Children()[0]->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-    //            result_column_vector_type[idx] = ColumnVectorType::kFlat;
-    //        }
-    //    }
+
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kFlat;
+    if (result->Children()[0]->OutputColumnVector()) {
+        result_column_vector_type = result->Children()[0]->OutputColumnVector()->vector_type();
+    }
 
     result->column_vector_ = MakeShared<ColumnVector>(MakeShared<DataType>(cast_expr->Type()));
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     //    result->output_data_block_.Init({cast_expr->Type()});
     return result;
@@ -188,15 +195,16 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<InExpres
         result->AddChild(argument_expr);
     }
 
-    //    Vector<ColumnVectorType> result_column_vector_type(block_count, ColumnVectorType::kConstant);
-    //    for(SizeT idx = 0; idx < block_count; ++ idx) {
-    //        if(result->Children()[0]->OutputColumnVectors()[idx]->vector_type() != ColumnVectorType::kConstant) {
-    //            result_column_vector_type[idx] = ColumnVectorType::kFlat;
-    //        }
-    //    }
+    ColumnVectorType result_column_vector_type = ColumnVectorType::kConstant;
+    for (SizeT idx = 0; idx < result->Children().size(); ++idx) {
+        if (result->Children()[idx]->OutputColumnVector()->vector_type() != ColumnVectorType::kConstant) {
+            result_column_vector_type = ColumnVectorType::kFlat;
+            break;
+        }
+    }
 
     result->column_vector_ = MakeShared<ColumnVector>(in_expr_data_type);
-    result->column_vector_->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+    result->column_vector_->Initialize(result_column_vector_type, DEFAULT_VECTOR_SIZE);
 
     return result;
 }

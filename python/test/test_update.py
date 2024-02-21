@@ -225,7 +225,6 @@ class TestUpdate:
 
     # update table with only one block
 
-    @pytest.mark.skip(reason="May cause core dumped.")
     def test_update_table_with_one_block(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -250,7 +249,6 @@ class TestUpdate:
         assert res.success
 
     # update table with multiple blocks, but only one segment
-    @pytest.mark.skip(reason="May cause core dumped.")
     def test_update_table_with_one_segment(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
