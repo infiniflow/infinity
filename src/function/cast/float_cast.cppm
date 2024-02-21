@@ -27,6 +27,7 @@ import third_party;
 import column_vector;
 import internal_types;
 import data_type;
+import status;
 
 namespace infinity {
 
@@ -65,6 +66,10 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
+        }
+        case LogicalType::kBoolean:
+        case LogicalType::kEmbedding: {
+            RecoverableError(Status::NotSupport(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString())));
         }
         default: {
             UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));

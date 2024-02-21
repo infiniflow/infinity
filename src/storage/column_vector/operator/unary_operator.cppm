@@ -85,11 +85,7 @@ public:
                     result_null->SetFalse(0);
                 } else {
                     result_null->SetAllTrue();
-                    if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                        if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> ||
-                                      !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                            UnrecoverableError("Unary operator input and output type error.");
-                        }
+                    if constexpr (std::is_same_v<InputType, BooleanT> and std::is_same_v<ResultType, BooleanT>) {
                         BooleanT result_value;
                         Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
