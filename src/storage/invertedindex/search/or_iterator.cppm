@@ -17,21 +17,23 @@ module;
 export module or_iterator;
 
 import stl;
-import memory_pool;
 import posting_iterator;
 import index_defines;
-import segment;
 import index_config;
+import doc_iterator;
 import multi_query_iterator;
 namespace infinity {
 export class OrIterator : public MultiQueryDocIterator {
 public:
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    ~OrIterator();
+    virtual ~OrIterator();
 
     bool IsOr() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override {}
+    void DoSeek(docid_t doc_id) override;
+
+private:
+    Vector<DocIterator *> iterator_heap_;
 };
 } // namespace infinity

@@ -26,7 +26,7 @@ import doc_iterator;
 namespace infinity {
 export class MultiQueryDocIterator : public DocIterator {
 public:
-    MultiQueryDocIterator();
+    MultiQueryDocIterator() = default;
 
     virtual ~MultiQueryDocIterator() = default;
 

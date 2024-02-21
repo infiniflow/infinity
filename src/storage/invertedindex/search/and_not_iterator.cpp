@@ -14,25 +14,18 @@
 
 module;
 
-export module and_iterator;
+module and_not_iterator;
 
 import stl;
 import index_defines;
+import index_config;
 import multi_query_iterator;
+import doc_iterator;
 
 namespace infinity {
 
-export class AndIterator : public MultiQueryDocIterator {
-public:
-    AndIterator(Vector<UniquePtr<DocIterator>> iterators);
+AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) {}
 
-    virtual ~AndIterator();
+AndNotIterator::~AndNotIterator() {}
 
-    bool IsAnd() const override { return true; }
-
-    void DoSeek(docid_t doc_id) override;
-
-private:
-    Vector<DocIterator *> sorted_iterators_;
-};
 } // namespace infinity
