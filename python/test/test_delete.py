@@ -221,7 +221,6 @@ class TestDelete:
         assert res
 
     # delete table with multiple blocks, but only one segment
-    @pytest.mark.skip(reason="May cause core dumped")
     def test_delete_table_with_one_segment(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)

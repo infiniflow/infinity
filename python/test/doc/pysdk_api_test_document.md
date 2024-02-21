@@ -40,12 +40,14 @@
 ### table_obj.create_index
 ### table_obj.drop_index
 ### table_obj.insert
+  PASS
 #### Big int to Huge int
   - [ ] int128
 ### table_obj.import
 ### table_obj.delete
   PASS
 ### table_obj.update
+  PASS
 ### table_obj.query_builder
 
 ## query builder

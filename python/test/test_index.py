@@ -91,7 +91,52 @@ class TestIndex:
         assert res.success
 
     # drop non-existent index
+    def test_drop_non_existent_index(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        res = db_obj.drop_table("test_drop_non_existent_index", if_exists=True)
+
+        table_obj = db_obj.create_table("test_drop_non_existent_index", {
+            "c1": "vector,3,float"}, None)
+        assert table_obj is not None
+
+        # drop none index
+        table_obj.drop_index("none_index")
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # create created index
+    def test_create_created_index(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_created_index", if_exists=True)
+        table_obj = db_obj.create_table("test_create_created_index", {
+            "c1": "vector,3,float"}, None)
+
+        # create index
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], None)
+        assert res.success
+
+        # create created index
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], None)
+        assert res.success
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # create / drop index with invalid options
     # create index on dropped table instance
 
