@@ -273,8 +273,11 @@ Status Status::ExceedIndexNameLength(u64 index_name_length) {
 }
 
 Status Status::NoColumnDefined(const infinity::String &table_name) {
-    return Status(ErrorCode::kNoColumnDefined,
-                  MakeUnique<String>(fmt::format("Try to define Table {} without any column.", table_name)));
+    return Status(ErrorCode::kNoColumnDefined, MakeUnique<String>(fmt::format("Try to define Table {} without any column.", table_name)));
+}
+
+Status Status::NotSupportedTypeConversion(const String &from_type, const String &to_type) {
+    return Status(ErrorCode::kNotSupportedTypeConversion, MakeUnique<String>(fmt::format("Not support to convert {} to {}", from_type, to_type)));
 }
 
 // 4. TXN fail

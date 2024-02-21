@@ -1,0 +1,5 @@
+statement error
+SELECT CAST ([1, 2] AS BIGINT);
+
+statement error
+SELECT CAST (10 AS VECTOR(BIGINT, 3));
