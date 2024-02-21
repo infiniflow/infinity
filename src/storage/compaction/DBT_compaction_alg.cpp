@@ -64,22 +64,21 @@ SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
     return segment;
 }
 
-void DBTCompactionAlg::AddInitSegments(Vector<SegmentEntry *> segment_entries) {
-    for (auto *segment : segment_entries) {
-        if (!segment->sealed()) {
-            UnrecoverableError("Segment must be sealed before compaction");
-        }
-        AddSegmentInner(segment); // TODO: check if the segment will trigger compaction
-    }
-}
-
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    auto layer_opt = AddSegmentInner(new_segment);
-    if (!layer_opt.has_value()) {
+    if (status_ != DBTStatus::kEnable) {
+        // If is disable, manual compaction is going
+        // new segment will be add after manual compaction is committed/rollback
         return None;
     }
-    int layer = *layer_opt;
+
+    int layer = AddSegmentNoCheck(new_segment);
+    // Now: prohibit the top layer to merge
+    // TODO: merge the top layer if possible
+    if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
+        return None;
+    }
+    status_ = DBTStatus::kRunning; // Do have compaction
 
     Txn *txn = generate_txn();
     TransactionID txn_id = txn->TxnID();
@@ -95,15 +94,22 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
+    if (status_ != DBTStatus::kEnable) {
+        // If is disable, manual compaction is going
+        return None;
+    }
+
     auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
     if (shrink_segment == nullptr) {
-        return None;
+        return None; // this segment is compacting, ignore it
     }
     SegmentOffset new_row_cnt = shrink_segment->actual_row_count();
     int new_layer = config_.CalculateLayer(new_row_cnt);
     if (old_layer == new_layer) {
         return None;
     }
+    status_ = DBTStatus::kRunning; // Do have compaction
+
     if (new_layer >= old_layer) {
         UnrecoverableError("Shrink segment has less rows than before");
     }
@@ -129,23 +135,32 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
 
 void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
+    if (status_ != DBTStatus::kRunning) {
+        UnrecoverableError("Commit compact when compaction not running");
+    }
+
     for (auto &segment_layer : segment_layers_) {
         segment_layer.CommitCompact(commit_txn_id);
     }
     for (auto *new_segment : new_segments) {
-        AddSegmentInner(new_segment);
+        AddSegmentNoCheck(new_segment);
     }
+    status_ = DBTStatus::kEnable;
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     std::unique_lock lock(mtx_);
+    if (status_ != DBTStatus::kRunning) {
+        UnrecoverableError("Rollback compact when compaction not running");
+    }
+
     for (auto &segment_layer : segment_layers_) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
+    status_ = DBTStatus::kEnable;
 }
 
-// Add the segment in layer, return the layer if it triggers compaction
-Optional<int> DBTCompactionAlg::AddSegmentInner(SegmentEntry *new_segment) {
+int DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
     SegmentOffset new_row_cnt = new_segment->actual_row_count();
     int layer = config_.CalculateLayer(new_row_cnt);
     if (layer >= (int)segment_layers_.size()) {
@@ -154,12 +169,6 @@ Optional<int> DBTCompactionAlg::AddSegmentInner(SegmentEntry *new_segment) {
     SegmentLayer &segment_layer = segment_layers_[layer];
     // segment_layer_map_.emplace(new_segment->segment_id(), Pair<SegmentEntry *, int>{new_segment, layer});
     segment_layer.AddSegmentInfo(new_segment);
-
-    // Now: prohibit the top layer to merge
-    // TODO: merge the top layer if possible
-    if (layer == max_layer_ || segment_layer.LayerSize() < config_.m_) {
-        return None;
-    }
     return layer;
 }
 
@@ -190,6 +199,25 @@ Pair<SegmentEntry *, int> DBTCompactionAlg::FindSegmentAndLayer(SegmentID segmen
     // the may happen because the segment is compacting. Ignore it
     // FIXME: do something
     return {nullptr, -1};
+}
+
+// Must be called when all segments are not compacting
+void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
+    std::unique_lock lock(mtx_);
+    if (status_ != DBTStatus::kDisable) {
+        UnrecoverableError("Enable compaction when compaction not disable");
+    }
+    segment_layers_.clear();
+    for (auto *segment_entry : segment_entries) {
+        AddSegmentNoCheck(segment_entry);
+    }
+    status_ = DBTStatus::kEnable;
+}
+
+void DBTCompactionAlg::Disable() {
+    std::unique_lock lock(mtx_);
+    cv_.wait(lock, [this]() { return status_ != DBTStatus::kRunning; });
+    status_ = DBTStatus::kDisable;
 }
 
 } // namespace infinity

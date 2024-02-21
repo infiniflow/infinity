@@ -22,10 +22,7 @@ import catalog;
 namespace infinity {
 
 BlockEntry *BlockEntryIter::Next() {
-    std::shared_lock<std::shared_mutex> lock;
-    if (segment_->sealed()) {
-        lock = std::shared_lock(segment_->rw_locker_);
-    }
+    std::shared_lock lock(segment_->rw_locker_);
     if (cur_block_idx_ >= segment_->block_entries_.size()) {
         return nullptr;
     }

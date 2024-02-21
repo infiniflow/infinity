@@ -61,7 +61,7 @@ class CatalogDeltaOperation;
 class BaseTableRef;
 enum class CompactSegmentsTaskType;
 
-export class Txn : public EnableSharedFromThis<Txn> {
+export class Txn {
 public:
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,

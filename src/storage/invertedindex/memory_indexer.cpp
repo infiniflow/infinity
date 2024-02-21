@@ -52,7 +52,6 @@ import parallel_column_inverter;
 import invert_task;
 import commit_task;
 import task_executor;
-import memory_posting;
 import indexer;
 import third_party;
 
@@ -84,6 +83,7 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
     : indexer_(indexer), column_indexer_(column_indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), num_inverters_(1), max_inverters_(4) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
+    posting_store_ = MakeUnique<PostingTable>(memory_allocator_.get());
     SetAnalyzer();
     if (index_config_.GetIndexingParallelism() > 1) {
         inverter_ = MakeUnique<SequentialColumnInverter>(this);
@@ -97,17 +97,7 @@ MemoryIndexer::MemoryIndexer(Indexer *indexer,
 
 MemoryIndexer::~MemoryIndexer() { Reset(); }
 
-void MemoryIndexer::SetIndexMode(IndexMode index_mode) {
-    index_mode_ = index_mode;
-    switch (index_mode_) {
-        case REAL_TIME:
-            rt_posting_store_ = MakeUnique<RTPostingTable>(memory_allocator_.get());
-        case NEAR_REAL_TIME:
-            posting_store_ = MakeUnique<PostingTable>(memory_allocator_.get());
-        default: {
-        }
-    }
-}
+void MemoryIndexer::SetIndexMode(IndexMode index_mode) { index_mode_ = index_mode; }
 
 void MemoryIndexer::SetAnalyzer() {
     String analyzer = index_config_.GetAnalyzer(column_id_);
@@ -207,23 +197,9 @@ MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
     if (iter.valid())
         return iter.getData();
     else {
-        // MemoryIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
-        // MemoryIndexer::PostingPtr posting = new PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         MemoryIndexer::PostingPtr posting =
             MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         posting_store_->insert(iter, term, posting);
-        return posting;
-    }
-}
-
-MemoryIndexer::RTPostingPtr MemoryIndexer::GetOrAddRTPosting(const TermKey &term) {
-    MemoryIndexer::RTPostingTable::Iterator iter = rt_posting_store_->find(term);
-    if (iter.valid())
-        return iter.getData();
-    else {
-        // MemoryIndexer::RTPostingPtr posting = new MemoryPosting<true>(GetPool(), index_config_.GetPostingFormatOption());
-        MemoryIndexer::RTPostingPtr posting = MakeShared<MemoryPosting<true>>(GetPool(), index_config_.GetPostingFormatOption());
-        rt_posting_store_->insert(iter, term, posting);
         return posting;
     }
 }
@@ -249,12 +225,6 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->clear();
     }
-    if (rt_posting_store_.get()) {
-        for (auto it = rt_posting_store_->begin(); it.valid(); ++it) {
-            // delete it.getData();
-        }
-        rt_posting_store_->clear();
-    }
     disable_commit_ = false;
     cv_.notify_all();
 }
@@ -270,13 +240,9 @@ template class BTreeNodeT<MemoryIndexer::TermKey, BTreeDefaultTraits::INTERNAL_S
 
 template class BTreeNodeTT<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeNodeTT<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeInternalNode<MemoryIndexer::TermKey, NoAggregated, BTreeDefaultTraits::INTERNAL_SLOTS>;
 
 template class BTreeLeafNode<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeLeafNode<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
 
 template class BTreeNodeStore<MemoryIndexer::TermKey,
                               MemoryIndexer::PostingPtr,
@@ -284,23 +250,11 @@ template class BTreeNodeStore<MemoryIndexer::TermKey,
                               BTreeDefaultTraits::INTERNAL_SLOTS,
                               BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeNodeStore<MemoryIndexer::TermKey,
-                              MemoryIndexer::RTPostingPtr,
-                              NoAggregated,
-                              BTreeDefaultTraits::INTERNAL_SLOTS,
-                              BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeIterator<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeIterator<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
 template class BTree<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
-template class BTree<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
 template class BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
 template class BTreeRootBase<MemoryIndexer::TermKey,
                              MemoryIndexer::PostingPtr,
@@ -308,20 +262,8 @@ template class BTreeRootBase<MemoryIndexer::TermKey,
                              BTreeDefaultTraits::INTERNAL_SLOTS,
                              BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeRootBase<MemoryIndexer::TermKey,
-                             MemoryIndexer::RTPostingPtr,
-                             NoAggregated,
-                             BTreeDefaultTraits::INTERNAL_SLOTS,
-                             BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeNodeAllocator<MemoryIndexer::TermKey,
                                   MemoryIndexer::PostingPtr,
-                                  NoAggregated,
-                                  BTreeDefaultTraits::INTERNAL_SLOTS,
-                                  BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeNodeAllocator<MemoryIndexer::TermKey,
-                                  MemoryIndexer::RTPostingPtr,
                                   NoAggregated,
                                   BTreeDefaultTraits::INTERNAL_SLOTS,
                                   BTreeDefaultTraits::LEAF_SLOTS>;
@@ -335,12 +277,8 @@ using namespace infinity;
 
 template class BufferType<
     BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, std::less<MemoryIndexer::TermKey>, BTreeDefaultTraits>>;
-template class BufferType<
-    BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, std::less<MemoryIndexer::TermKey>, BTreeDefaultTraits>>;
 template class BufferType<BTreeKeyData<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr>>;
-template class BufferType<BTreeKeyData<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr>>;
 
 VESPALIB_DATASTORE_INSTANTIATE_BUFFERTYPE_LEAFNODE(MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS);
-VESPALIB_DATASTORE_INSTANTIATE_BUFFERTYPE_LEAFNODE(MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS);
 
 } // namespace vespalib::datastore

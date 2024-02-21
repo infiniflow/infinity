@@ -38,7 +38,7 @@ import infinity_exception;
 
 import block_entry;
 import segment_entry;
-// #include "statement/extra/extra_ddl_info.h"
+import compact_segments_task;
 
 module wal_manager;
 
@@ -245,8 +245,8 @@ void WalManager::Checkpoint() {
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
         LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
-                             current_max_commit_ts,
-                             ckp_commit_ts));
+                              current_max_commit_ts,
+                              ckp_commit_ts));
         return;
     }
 
@@ -728,7 +728,11 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
 
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
         auto *segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
-        segment_entry->SetDeprecated(commit_ts);
+        if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
+            UnrecoverableError("Assert: Replay segment should be compactable.");
+        }
+        segment_entry->SetNoDelete();
+        segment_entry->SetDeprecated();
     }
 }
 

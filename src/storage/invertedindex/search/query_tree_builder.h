@@ -14,22 +14,22 @@
 
 #pragma once
 
-#include "query.h"
+#include "query_node.h"
 #include <stack>
 
 import stl;
 
 namespace infinity {
 
-class QueryBuilder {
+class QueryTreeBuilder {
 public:
-    QueryBuilder();
+    QueryTreeBuilder();
 
-    ~QueryBuilder();
+    ~QueryTreeBuilder();
 
     UniquePtr<QueryNode> Build();
 
-    void AddTerm(const String &term, float weight = 1.0);
+    void AddTerm(const String &term, const String &column, float weight = 1.0);
 
     void AddAnd(int child_count);
 
@@ -43,14 +43,14 @@ public:
 
 private:
     struct NodeInfo {
-        MultiQuery *node_;
+        MultiQueryNode *node_;
         int left_child_count_;
-        NodeInfo(MultiQuery *node, int c) : node_(node), left_child_count_(c) {}
+        NodeInfo(MultiQueryNode *node, int c) : node_(node), left_child_count_(c) {}
     };
 
-    void AddTermQuery(QueryNode *n);
+    void AddCompleteNode(QueryNode *n);
 
-    void AddMultiQuery(MultiQuery *n, int child_count);
+    void AddIntermediateNode(MultiQueryNode *n, int child_count);
 
     UniquePtr<QueryNode> root_;
     std::stack<NodeInfo> nodes_;

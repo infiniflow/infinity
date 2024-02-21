@@ -16,7 +16,6 @@ module;
 
 module cast_expression;
 
-
 import base_expression;
 import logical_type;
 import infinity_exception;
@@ -57,7 +56,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         case LogicalType::kBigInt:
         case LogicalType::kFloat:
         case LogicalType::kDouble:
-        case LogicalType::kDecimal:
+        case LogicalType::kDecimal: {
             switch (target.type()) {
                 case LogicalType::kBoolean:
                 case LogicalType::kTinyInt:
@@ -67,11 +66,13 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kFloat:
                 case LogicalType::kDouble:
                 case LogicalType::kDecimal:
+                case LogicalType::kVarchar:
                     return true;
                 default:
                     return false;
             }
-        case LogicalType::kDate:
+        }
+        case LogicalType::kDate: {
             switch (target.type()) {
                 case LogicalType::kDate:
                 case LogicalType::kDateTime:
@@ -80,7 +81,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 default:
                     return false;
             }
-        case LogicalType::kTime:
+        }
+        case LogicalType::kTime: {
             switch (target.type()) {
                 case LogicalType::kTime:
                 case LogicalType::kVarchar:
@@ -88,7 +90,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 default:
                     return false;
             }
-        case LogicalType::kDateTime:
+        }
+        case LogicalType::kDateTime: {
             switch (target.type()) {
                 case LogicalType::kDate:
                 case LogicalType::kDateTime:
@@ -97,7 +100,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 default:
                     return false;
             }
-        case LogicalType::kInterval:
+        }
+        case LogicalType::kInterval: {
             switch (target.type()) {
                 case LogicalType::kInterval:
                 case LogicalType::kVarchar:
@@ -105,7 +109,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 default:
                     return false;
             }
-        case LogicalType::kVarchar:
+        }
+        case LogicalType::kVarchar: {
             switch (target.type()) {
                 case LogicalType::kBoolean:
                 case LogicalType::kTinyInt:
@@ -124,6 +129,15 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 default:
                     return false;
             }
+        }
+        case LogicalType::kEmbedding: {
+            switch (target.type()) {
+                case LogicalType::kVarchar:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         default: {
             UnrecoverableError("Invalid data type");
         }
