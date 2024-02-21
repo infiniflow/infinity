@@ -55,7 +55,7 @@ export class Segment {
 public:
     enum SegmentStatus {
         BUILDING, // In memory segment
-        DUMPLING, // Flush
+        DUMPING,  // Flush
         BUILT     // Disk segment
     };
     Segment(SegmentStatus segment_status) : segment_status_(segment_status) {}

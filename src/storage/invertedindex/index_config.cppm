@@ -68,7 +68,7 @@ public:
 private:
     String index_name_{""};
     u64 memory_quota_{200 * 1024 * 1024};
-    u32 indexing_threads_{1};
+    u32 indexing_threads_{2};
     PostingFormatOption posting_format_option_;
     optionflag_t flag_{OPTION_FLAG_ALL};
     bool is_short_list_vbyte_compress_{false};

@@ -50,13 +50,14 @@ public:
 
     void Open(const InvertedIndexConfig &index_config, const String &directory);
 
-    // Exactly one thread can call this method
+    // One thread can call this method. This's non-blocking.
     void BatchInsert(const BlockEntry *block_entry, u32 row_offset, u32 row_count, BufferManager *buffer_mgr);
 
+    // A background thread of Indexer calls this method regularly (for example, every 2 seconds). This's non-blocking.
+    // Other threads can also call this method.
     void Commit();
 
-    void TryDump();
-
+    // One thread can call this method when memory limit reach (for example, 200MB). This's blocking.
     void Dump();
 
     SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(u64 column_id);
@@ -89,6 +90,10 @@ private:
     SharedPtr<IDGenerator> id_generator_;
     Vector<Segment> segments_;
     Atomic<Segment *> active_segment_;
+
+    ThreadPool thread_pool_{2};
+    std::thread thd_commit_;
+    Atomic<bool> stopped_;
     Atomic<u32> dump_ref_count_;
     mutable std::shared_mutex flush_mutex_;
 };
