@@ -30,6 +30,10 @@ public:
 
     bool IsAndNot() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override {}
+    void DoSeek(docid_t doc_id) override;
+
+private:
+    DocIterator *left_iterator_{nullptr};
+    DocIterator *right_iterator_{nullptr};
 };
 } // namespace infinity

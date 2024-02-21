@@ -24,8 +24,9 @@ import doc_iterator;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) {}
+AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) { children_ = std::move(iterators); }
 
 AndNotIterator::~AndNotIterator() {}
 
+void AndNotIterator::DoSeek(docid_t id) {}
 } // namespace infinity
