@@ -177,121 +177,48 @@ inline bool TryCastVarchar::Run(const VarcharT &source, BooleanT &target) {
 // Cast VarcharT to TinyT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, TinyIntT &target) {
-    i64 value{0};
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        value = std::strtol(source.short_.data_, &endptr, 10);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
         // No tiny int isn't inline
         return false;
     }
-    if (len != source.length_) {
-        return false;
-    }
-    target = static_cast<TinyIntT>(value);
+
     return true;
 }
 
 // Cast VarcharT to SmallIntT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, SmallIntT &target) {
-    i64 value{0};
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        value = std::strtol(source.short_.data_, &endptr, 10);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
-        // No tiny int isn't inline
+        // No small int isn't inline
         return false;
     }
-    if (len != source.length_) {
-        return false;
-    }
-    target = static_cast<SmallIntT>(value);
+
     return true;
 }
 
 // Cast VarcharT to IntegerT type
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
-    i64 value{0};
-    char *endptr{nullptr};
-    SizeT len{0};
     if (source.IsInlined()) {
-        value = std::strtol(source.short_.data_, &endptr, 10);
-        len = (endptr - source.short_.data_);
+        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        if (ec != std::errc()) {
+            return false;
+        }
     } else {
+        // No integer isn't inline
         return false;
     }
-    if (len != source.length_) {
-        return false;
-    }
-    target = static_cast<IntegerT>(value);
-    return true;
-}
 
-// Cast VarcharT to BigIntT type
-template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, i64 &target) {
-    if (!source.IsValue()) {
-        UnrecoverableError("No implementation to cast from column vector Varchar to big int");
-    }
-    char *endptr{nullptr};
-    SizeT len{0};
-    if (source.IsInlined()) {
-        target = std::strtol(source.short_.data_, &endptr, 10);
-        len = (endptr - source.short_.data_);
-    } else {
-        target = std::strtol(source.value_.ptr_, &endptr, 10);
-    }
-    if (len != source.length_) {
-        return false;
-    }
-    return true;
-}
-
-// Cast VarcharT to HugeIntT type
-template <>
-inline bool TryCastVarchar::Run(const VarcharT &, HugeIntT &) {
-    UnrecoverableError("Cast varchar to hugeint");
-    return false;
-}
-
-// Cast VarcharT to FloatT type
-template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, FloatT &target) {
-    if (!source.IsValue()) {
-        UnrecoverableError("No implementation to cast from column vector Varchar to big int");
-    }
-    char *endptr{nullptr};
-    SizeT len{0};
-    if (source.IsInlined()) {
-        target = std::strtof(source.short_.data_, &endptr);
-    } else {
-        target = std::strtof(source.value_.ptr_, &endptr);
-    }
-    if (len != source.length_) {
-        return false;
-    }
-    return true;
-}
-
-// Cast VarcharT to DoubleT type
-template <>
-inline bool TryCastVarchar::Run(const VarcharT &source, DoubleT &target) {
-    char *endptr{nullptr};
-    SizeT len{0};
-    if (source.IsInlined()) {
-        target = std::strtod(source.short_.data_, &endptr);
-    } else {
-        target = std::strtod(source.value_.ptr_, &endptr);
-    }
-    if (len != source.length_) {
-        return false;
-    }
     return true;
 }
 
