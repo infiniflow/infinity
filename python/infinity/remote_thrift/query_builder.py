@@ -58,6 +58,13 @@ class InfinityThriftQueryBuilder(ABC):
         self._limit = None
         self._offset = None
 
+    def reset(self):
+        self._columns = None
+        self._search = None
+        self._filter = None
+        self._limit = None
+        self._offset = None
+
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int) -> InfinityThriftQueryBuilder:
         if self._search is None:
@@ -139,14 +146,16 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def limit(self, limit: Optional[int]) -> InfinityThriftQueryBuilder:
-        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=limit)
+        constant_exp = ConstantExpr(
+            literal_type=LiteralType.Int64, i64_value=limit)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         limit_expr = ParsedExpr(type=expr_type)
         self._limit = limit_expr
         return self
 
     def offset(self, offset: Optional[int]) -> InfinityThriftQueryBuilder:
-        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=offset)
+        constant_exp = ConstantExpr(
+            literal_type=LiteralType.Int64, i64_value=offset)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         offset_expr = ParsedExpr(type=expr_type)
         self._offset = offset_expr
@@ -163,7 +172,8 @@ class InfinityThriftQueryBuilder(ABC):
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
                 case "_row_id":
-                    func_expr = FunctionExpr(function_name="row_id", arguments=[])
+                    func_expr = FunctionExpr(
+                        function_name="row_id", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
@@ -182,15 +192,16 @@ class InfinityThriftQueryBuilder(ABC):
             limit=self._limit,
             offset=self._offset
         )
+        self.reset()
         return self._table._execute_query(query)
 
     def to_df(self) -> pd.DataFrame:
         df_dict = {}
         data_dict, data_type_dict = self.to_result()
         for k, v in data_dict.items():
-            data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
+            data_series = pd.Series(
+                v, dtype=logic_type_to_dtype(data_type_dict[k]))
             df_dict[k] = data_series
-
         return pd.DataFrame(df_dict)
 
     def to_pl(self) -> pl.DataFrame:
