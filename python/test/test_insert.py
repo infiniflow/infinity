@@ -233,6 +233,26 @@ class TestInsert:
             table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
+    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.parametrize("types", common_values.types_array)
+    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition")
+        table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition",
+                                        {"c1": "int", "c2": types}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": types_example}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
@@ -410,4 +430,45 @@ class TestInsert:
         assert res.success
 
     # batch insert, with invalid data type inside.
+    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.parametrize("batch", [10, 1024])
+    @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
+    def test_insert_with_invalid_data_type(self, batch, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_data_type")
+        table_obj = db_obj.create_table("test_insert_with_invalid_data_type",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+
+        # insert
+        for i in range(5):
+            values = [{"c1": 1, "c2": types} for _ in range(batch)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # batch insert, with invalid column count
+    @pytest.mark.parametrize("batch", [10, 1024])
+    def test_insert_with_invalid_column_count(self, batch):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_column_count")
+        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {"c1": "int"}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            for i in range(5):
+                values = [{"c1": 1, "c2": 1} for _ in range(batch)]
+                table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
