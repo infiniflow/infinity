@@ -23,6 +23,7 @@ import bound_cast_func;
 import stl;
 import third_party;
 import cast_function;
+import status;
 
 namespace infinity {
 
@@ -35,7 +36,8 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         BoundCastFunc cast = CastFunction::GetBoundFunc(source_expr_ptr->Type(), target_type);
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
-        UnrecoverableError(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
+        RecoverableError(Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString()));
+//        UnrecoverableError(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
     return nullptr;
 }
