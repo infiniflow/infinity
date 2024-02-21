@@ -17,6 +17,7 @@ from numpy import dtype
 
 import common_values
 import infinity
+import infinity.index as index
 
 
 class TestInsert:
@@ -255,8 +256,84 @@ class TestInsert:
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
+    @pytest.mark.skip(reason="May cause core dumped.")
+    def test_insert_data_into_non_existent_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_into_non_existent_table")
+
+        # create and drop table
+        table_obj = db_obj.create_table("test_insert_data_into_non_existent_table",
+                                        {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_insert_data_into_non_existent_table")
+
+        # insert
+        values = [{"c1": 1, "c2": 1}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # insert empty into table
+    @pytest.mark.parametrize("types", common_values.types_array)
+    def test_insert_empty_into_table(self, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_empty_into_table")
+        table_obj = db_obj.create_table("test_insert_empty_into_table",
+                                        {"c1": "int", "c2": types}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            values = [{}]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
     # insert data into index created table
+    def test_insert_data_into_index_created_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_into_index_created_table")
+        table_obj = db_obj.create_table("test_insert_data_into_index_created_table",
+                                        {"c1": "vector,1024,float"}, None)
+
+        # create index
+        table_obj.create_index("my_index_1",
+                               [index.IndexInfo("c1",
+                                                index.IndexType.Hnsw,
+                                                [
+                                                    index.InitParameter("M", "16"),
+                                                    index.InitParameter("ef_construction", "50"),
+                                                    index.InitParameter("ef", "50"),
+                                                    index.InitParameter("metric", "l2")
+                                                ])], None)
+
+        table_obj.create_index("my_index_2",
+                               [index.IndexInfo("c1",
+                                                index.IndexType.IVFFlat,
+                                                [index.InitParameter("centroids_count", "128"),
+                                                 index.InitParameter("metric", "l2")])], None)
+
+        # insert
+        values = [{"c1": [1.1 for _ in range(1024)]}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_pl()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
 
     # insert table with 10000 columns.
     def test_insert_table_with_10000_columns(self):
@@ -278,8 +355,43 @@ class TestInsert:
         assert res.success
 
     # insert table with columns isn't matched (more and less)
-    # insert table with column value exceeding invalid value range
+    @pytest.mark.parametrize("values", [[{"c1": 1}], [{"c1": 1, "c2": 1, "c3": 1}]])
+    def test_insert_with_not_matched_columns(self, values):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_not_matched_columns")
+        table_obj = db_obj.create_table("test_insert_with_not_matched_columns",
+                                        {"c1": "int", "c2": "int"}, None)
 
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
+
+    # insert table with column value exceeding invalid value range
+    @pytest.mark.parametrize("values", [[{"c1": pow(2, 63) - 1, "c2": pow(2, 63) - 1}]])
+    def test_insert_with_exceeding_invalid_value_range(self, values):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_exceeding_invalid_value_range")
+        table_obj = db_obj.create_table("test_insert_with_exceeding_invalid_value_range",
+                                        {"c1": "int", "c2": "int32"}, None)
+
+        # insert
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_pl()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.success
     # batch insert, within limit
     @pytest.mark.parametrize("batch", [10, 1024, 2048])
     def test_batch_insert_within_limit(self, batch):
