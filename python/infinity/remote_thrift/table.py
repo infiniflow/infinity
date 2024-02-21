@@ -133,6 +133,8 @@ class RemoteTable(Table, ABC):
             options.delimiter = ","
         elif file_name.endswith('.json'):
             options.copy_file_type = ttypes.CopyFileType.JSON
+        elif file_name.endswith('.jsonl'):
+            options.copy_file_type = ttypes.CopyFileType.JSONL
         elif file_name.endswith('.fvecs'):
             options.copy_file_type = ttypes.CopyFileType.FVECS
 

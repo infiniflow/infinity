@@ -115,6 +115,13 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     int dimension = 0;
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
+    if (nbytes == 0) {
+        // file is empty
+        auto result_msg = MakeUnique<String>("IMPORT 0 Rows");
+        import_op_state->result_msg_ = std::move(result_msg);
+        return;
+    }
+    
     if (nbytes != sizeof(dimension)) {
         RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
     }
@@ -223,8 +230,10 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         auto *txn_store = parser_context->txn_->GetTxnTableStore(table_entry_);
         auto segment_entry = parser_context->segment_entry_;
         auto &block_entry = parser_context->block_entry_;
-        segment_entry->AppendBlockEntry(std::move(block_entry));
-        SaveSegmentData(txn_store, segment_entry);
+        if (block_entry->row_count() > 0) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            SaveSegmentData(txn_store, segment_entry);
+        }
     }
     fclose(fp);
 
