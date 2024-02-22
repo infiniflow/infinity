@@ -179,11 +179,6 @@ bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
 }
 
-bool SegmentEntry::CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const {
-    std::shared_lock lock(rw_locker_);
-    return status_ == SegmentStatus::kDeprecated && deprecate_ts_ < oldest_txn_ts;
-}
-
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     return first_delete_ts_ < check_ts;
@@ -410,14 +405,6 @@ void SegmentEntry::FlushNewData() {
     }
 }
 
-void SegmentEntry::Cleanup() {
-    for (auto &block_entry : block_entries_) {
-        block_entry->Cleanup();
-    }
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*segment_dir_);
-}
-
 SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {
     LocalFileSystem fs;
     SharedPtr<String> segment_dir;
@@ -480,5 +467,15 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     //     }
     // }
 }
+
+void SegmentEntry::Cleanup() {
+    for (auto &block_entry : block_entries_) {
+        block_entry->Cleanup();
+    }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*segment_dir_);
+}
+
+bool SegmentEntry::PickCleanup(CleanupScanner *scanner) { return this->Cleanupable(scanner->visible_ts()); }
 
 } // namespace infinity

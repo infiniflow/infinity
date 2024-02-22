@@ -25,7 +25,7 @@ import extra_ddl_info;
 import db_entry;
 import base_entry;
 import txn_manager;
-import base_meta;
+
 import entry_list;
 
 namespace infinity {
@@ -77,9 +77,7 @@ private:
 public:
     void Cleanup() override;
 
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
-
-    void CleanupMeta() override;
+    bool PickCleanup(CleanupScanner *scanner) override;
 
 private:
     EntryList<DBEntry> db_entry_list_{};

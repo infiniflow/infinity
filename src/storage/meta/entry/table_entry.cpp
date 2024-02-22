@@ -701,23 +701,24 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
     return result;
 }
 
-void TableEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    // this->BaseMetaEntry<TableIndexMeta>::CleanupDelete(oldest_txn_ts);
-    // Vector<SharedPtr<SegmentEntry>> cleanup_segments;
-    // {
-    //     std::unique_lock lock(this->rw_locker());
-    //     for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-    //         if (iter->second->CheckCanCleanup(oldest_txn_ts)) {
-    //             cleanup_segments.emplace_back(iter->second);
-    //             iter = segment_map_.erase(iter);
-    //         } else {
-    //             ++iter;
-    //         }
-    //     }
-    // }
-    // for (auto &segment : cleanup_segments) {
-    //     segment->Cleanup();
-    // }
+bool TableEntry::PickCleanup(CleanupScanner *scanner) {
+    if (Cleanupable(scanner->visible_ts())) {
+        return true;
+    }
+    index_meta_map_.PickCleanup(scanner);
+    {
+        std::unique_lock lock(this->rw_locker());
+        for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
+            SharedPtr<SegmentEntry> &segment = iter->second;
+            if (segment->Cleanupable(scanner->visible_ts())) {
+                scanner->AddEntry(std::move(segment));
+                iter = segment_map_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
+    return false;
 }
 
 // FIXME: not good impl. Use composition instead of inheritance

@@ -41,7 +41,7 @@ export enum class SegmentStatus : u8 {
     kDeprecated,
 };
 
-export struct SegmentEntry : public BaseEntry {
+export struct SegmentEntry : public BaseEntry, public EntryInterface {
 public:
     friend class BlockEntryIter;
     friend struct TableEntry;
@@ -93,15 +93,11 @@ public:
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void Cleanup();
-
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
     bool CheckVisible(TxnTimeStamp check_ts) const;
-
-    bool CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const;
 
     // Check if the segment has any delete before check_ts
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
@@ -201,6 +197,11 @@ private:
 
     std::condition_variable_any no_delete_complete_cv_{};
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
+
+public:
+    void Cleanup() override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

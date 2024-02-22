@@ -931,12 +931,5 @@ bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     return false;
 }
 
-void NewCatalog::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    //
-}
-
-void NewCatalog::Cleanup() {
-    //
-}
-
+void NewCatalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 } // namespace infinity

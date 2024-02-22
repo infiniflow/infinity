@@ -14,10 +14,10 @@
 
 module;
 
-import stl;
-import base_meta;
-
 export module meta_map;
+
+import stl;
+import base_entry;
 
 namespace infinity {
 
@@ -29,10 +29,10 @@ public:
 public:
     void Cleanup();
 
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts);
+    void PickCleanup(CleanupScanner *scanner);
 
 public: // TODO: make both private
-    mutable std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{}; // FIX
 
     HashMap<String, UniquePtr<Meta>> meta_map_;
 };
@@ -43,46 +43,18 @@ void MetaMap<Meta>::Cleanup() {
 }
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    //
+void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
+    std::unique_lock lock(rw_locker_);
+
+    for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+        UniquePtr<Meta> &meta = iter->second;
+        if (meta->PickCleanup(scanner)) {
+            scanner->AddMeta(std::move(meta));
+            iter = meta_map_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
-
-// template <MetaConcept Meta>
-// void BaseMetaEntry<Meta>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-//     // Vector<SharedPtr<InnerEntry>> cleanup_entries;
-//     // Vector<UniquePtr<Meta>> cleanup_metas;
-//     // Vector<Meta *> other_metas;
-//     // {
-//     //     std::unique_lock wlock(rw_locker_);
-//     //     for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-//     //         auto &[name, meta] = *iter;
-//     //         auto [deleted_entries, all_deleted] = meta->PickCleanup(oldest_txn_ts);
-//     //         if (all_deleted) {
-//     //             cleanup_metas.push_back(std::move(meta));
-//     //             iter = meta_map_.erase(iter);
-//     //         } else {
-//     //             other_metas.push_back(meta.get());
-//     //             ++iter;
-//     //         }
-//     //         cleanup_entries.insert(cleanup_entries.end(), deleted_entries.begin(), deleted_entries.end());
-//     //     }
-//     // }
-//     // for (auto &inner_entry : cleanup_entries) {
-//     //     inner_entry->Cleanup();
-//     // }
-//     // for (auto &meta : cleanup_metas) {
-//     //     meta->CleanupMeta();
-//     // }
-//     // for (auto &meta : other_metas) {
-//     //     meta->CleanupDelete(oldest_txn_ts);
-//     // }
-// }
-
-// template <MetaConcept Meta>
-// void BaseMetaEntry<Meta>::Cleanup() {
-//     for (auto &[name, meta] : meta_map_) {
-//         meta->Cleanup();
-//     }
-// }
 
 } // namespace infinity

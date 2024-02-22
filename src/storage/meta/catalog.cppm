@@ -111,7 +111,7 @@ public:
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
-export struct NewCatalog : public EntryInterface {
+export struct NewCatalog {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
@@ -268,9 +268,7 @@ private: // TODO: remove this
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
 public:
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
-
-    void Cleanup() override;
+    void PickCleanup(CleanupScanner *scanner);
 };
 
 } // namespace infinity

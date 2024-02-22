@@ -427,12 +427,6 @@ void DBMeta::Cleanup() {
     //
 }
 
-void DBMeta::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    //
-}
-
-void DBMeta::CleanupMeta() {
-    //
-}
+bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
 
 } // namespace infinity

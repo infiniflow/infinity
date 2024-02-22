@@ -297,8 +297,12 @@ void DBEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-void DBEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    //
+bool DBEntry::PickCleanup(CleanupScanner *scanner) {
+    if (Cleanupable(scanner->visible_ts())) {
+        return true;
+    }
+    table_meta_map_.PickCleanup(scanner);
+    return false;
 }
 
 void DBEntry::Cleanup() {

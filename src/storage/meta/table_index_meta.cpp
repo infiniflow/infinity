@@ -421,8 +421,6 @@ void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
 
 void TableIndexMeta::Cleanup() {}
 
-void TableIndexMeta::CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
-
-void TableIndexMeta::CleanupMeta() {}
+bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 
 } // namespace infinity

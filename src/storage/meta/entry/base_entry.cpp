@@ -14,10 +14,12 @@
 
 module;
 
+#include <vector>
+
 module base_entry;
 
 import stl;
-
+import catalog;
 import infinity_exception;
 
 namespace infinity {
@@ -49,7 +51,7 @@ void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &l
         }
     }
 
-    while(it2 != list2.end()) {
+    while (it2 != list2.end()) {
         if ((*it2)->entry_type_ != EntryType::kDummy) {
             list1.insert(it1, std::move(*it2));
         }
@@ -57,6 +59,20 @@ void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &l
     }
 
     list2.clear();
+}
+
+void CleanupScanner::AddMeta(UniquePtr<MetaInterface> meta) { metas_.emplace_back(std::move(meta)); }
+
+void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
+
+void CleanupScanner::Scan(TxnTimeStamp min_visible_ts) {
+    catalog_->PickCleanup(this);
+    for (auto &entry : entries_) {
+        entry->Cleanup();
+    }
+    for (auto &meta : metas_) {
+        meta->Cleanup();
+    }
 }
 
 } // namespace infinity

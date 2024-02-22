@@ -25,7 +25,7 @@ import status;
 import extra_ddl_info;
 import column_def;
 import base_entry;
-import base_meta;
+
 import table_entry;
 import entry_list;
 
@@ -96,9 +96,7 @@ private:
 public:
     void Cleanup() override;
 
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
-
-    void CleanupMeta() override;
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

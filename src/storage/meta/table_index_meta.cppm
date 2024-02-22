@@ -23,7 +23,6 @@ import third_party;
 import index_def;
 import status;
 import extra_ddl_info;
-import base_meta;
 import entry_list;
 
 namespace infinity {
@@ -102,8 +101,6 @@ public:
 public:
     void Cleanup() override;
 
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
-
-    void CleanupMeta() override;
+    bool PickCleanup(CleanupScanner *scanner) override ;
 };
 } // namespace infinity

@@ -99,7 +99,7 @@ private: // TODO: remote it
     HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+    bool PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() override;
 };

@@ -457,7 +457,8 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
             res->table_entry_list().emplace_back(std::move(table_entry));
         }
     }
-    res->table_entry_list().sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    res->table_entry_list().sort(
+        [](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     auto dummy_entry = MakeUnique<TableEntry>();
     dummy_entry->deleted_ = true;
     res->table_entry_list().emplace_back(std::move(dummy_entry));
@@ -475,8 +476,6 @@ void TableMeta::MergeFrom(TableMeta &other) {
 
 void TableMeta::Cleanup() {}
 
-void TableMeta::CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
-
-void TableMeta::CleanupMeta() {}
+bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 
 } // namespace infinity

@@ -299,6 +299,25 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 
 void TableIndexEntry::Cleanup() {}
 
-void TableIndexEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
+bool TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
+    if (this->Cleanupable(scanner->visible_ts())) {
+        return true;
+    }
+    std::unique_lock lock(rw_locker_);
+    // TODO
+    // for (auto iter = column_index_map_.begin(); iter != column_index_map_.end();) {
+    //     if (iter->Cleanupable(scanner->visible_ts())) {
+    //         scanner->AddEntry(iter->second);
+    //         iter = column_index_map_.erase(iter);
+    //     } else {
+    //         ++iter;
+    //     }
+    // }
+    // if (fulltext_index_entry != nullptr && fulltext_index_entry->Cleanupable(scanner->visible_ts())) {
+    //     scanner->AddEntry(fulltext_index_entry);
+    //     fulltext_index_entry = nullptr;
+    // }
+    return false;
+}
 
 } // namespace infinity

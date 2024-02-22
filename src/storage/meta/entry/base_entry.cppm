@@ -23,6 +23,8 @@ import default_values;
 
 namespace infinity {
 
+class NewCatalog;
+
 export enum class EntryType : i8 {
     kDummy,
     kCatalog,
@@ -37,13 +39,6 @@ export enum class EntryType : i8 {
     kSegment,
     kBlock,
     kBlockColumn,
-};
-
-export class EntryInterface {
-public:
-    virtual void Cleanup() = 0;
-
-    virtual void CleanupDelete(TxnTimeStamp oldest_txn_ts) = 0;
 };
 
 // TODO: remove inheritance
@@ -68,6 +63,8 @@ public:
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
+    bool Cleanupable(TxnTimeStamp visible_ts) const { return deleted_ && commit_ts_ <= visible_ts; }
+
 public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
@@ -80,7 +77,51 @@ public:
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
+export class CleanupScanner;
+
+export class MetaInterface {
+public:
+    virtual ~MetaInterface() = default;
+
+    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
+
+    virtual void Cleanup() = 0;
+};
+
+export template <typename Meta>
+concept MetaConcept = std::derived_from<Meta, MetaInterface>;
+
+export class EntryInterface {
+public:
+    virtual ~EntryInterface() = default;
+
+    virtual void Cleanup() = 0;
+
+    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
+};
+
 export template <typename Entry>
 concept EntryConcept = std::derived_from<Entry, EntryInterface>;
+
+export class CleanupScanner {
+public:
+    explicit CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
+
+    void Scan(TxnTimeStamp visible_ts);
+
+    void AddMeta(UniquePtr<MetaInterface> meta);
+
+    void AddEntry(SharedPtr<EntryInterface> entry);
+
+    TxnTimeStamp visible_ts() const { return visible_ts_; }
+
+private:
+    NewCatalog *const catalog_;
+    const TxnTimeStamp visible_ts_;
+
+    Vector<SharedPtr<EntryInterface>> entries_;
+
+    Vector<UniquePtr<MetaInterface>> metas_;
+};
 
 } // namespace infinity

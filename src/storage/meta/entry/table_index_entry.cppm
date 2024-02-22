@@ -110,7 +110,7 @@ private:
 public:
     void Cleanup() override;
 
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity
