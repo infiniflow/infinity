@@ -32,7 +32,7 @@ public:
     void CleanupDelete(TxnTimeStamp oldest_txn_ts);
 
 public: // TODO: make both private
-    std::shared_mutex rw_locker_{};
+    mutable std::shared_mutex rw_locker_{};
 
     HashMap<String, UniquePtr<Meta>> meta_map_;
 };

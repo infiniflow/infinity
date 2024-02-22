@@ -40,7 +40,7 @@ public:
     void MergeWith(EntryList<Entry> &other);
 
 public: // TODO: make both private
-    std::shared_mutex rw_locker_{}; 
+    mutable std::shared_mutex rw_locker_{}; 
 
     List<SharedPtr<Entry>> entry_list_;
 };
