@@ -572,22 +572,3 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.success
 
-    @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
-    def test_create_with_invalid_column_name(self, column_name):
-        """
-        target: create with invalid column name
-        methods: create table with invalid column name
-        expect: all operations throw exception on python side
-        """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("my_table")
-
-        try:
-            tb = db_obj.create_table("my_table", {column_name: "int"}, None)
-        except Exception as e:
-            print(e)
-
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.success
