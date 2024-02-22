@@ -85,13 +85,13 @@ private:
     DBEntry *db_entry_{};
 
 private:
-    EntryList<TableEntry> entry_list_{};
+    EntryList<TableEntry> table_entry_list_{};
 
     // TODO: remove
-    std::shared_mutex &rw_locker() { return entry_list_.rw_locker_; };
+    std::shared_mutex &rw_locker() { return table_entry_list_.rw_locker_; };
 
     // TODO: remove
-    List<SharedPtr<TableEntry>> &entry_list() { return entry_list_.entry_list_; }
+    List<SharedPtr<TableEntry>> &table_entry_list() { return table_entry_list_.entry_list_; }
 
 public:
     void Cleanup() override;

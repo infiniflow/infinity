@@ -89,7 +89,7 @@ private:
 
 public:
     // TODO: remove
-    List<SharedPtr<DBEntry>> &entry_list() { return db_entry_list_.entry_list_; }
+    List<SharedPtr<DBEntry>> &db_entry_list() { return db_entry_list_.entry_list_; }
 };
 
 } // namespace infinity
