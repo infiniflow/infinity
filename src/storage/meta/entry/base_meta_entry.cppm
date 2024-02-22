@@ -32,7 +32,7 @@ public:
 export template <typename MetaEntry>
 concept MetaEntryConcept1 = std::derived_from<MetaEntry, MetaEntryInterface>;
 
-export template <MetaConcept Meta>
+export template <MetaConcept1 Meta>
 class BaseMetaEntry : public BaseEntry {
     using InnerEntry = typename Meta::EntryT;
 
@@ -54,38 +54,38 @@ protected:
     mutable std::shared_mutex rw_locker_{}; // TODO
 };
 
-template <MetaConcept Meta>
+template <MetaConcept1 Meta>
 void BaseMetaEntry<Meta>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    Vector<SharedPtr<InnerEntry>> cleanup_entries;
-    Vector<UniquePtr<Meta>> cleanup_metas;
-    Vector<Meta *> other_metas;
-    {
-        std::unique_lock wlock(rw_locker_);
-        for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-            auto &[name, meta] = *iter;
-            auto [deleted_entries, all_deleted] = meta->PickCleanup(oldest_txn_ts);
-            if (all_deleted) {
-                cleanup_metas.push_back(std::move(meta));
-                iter = meta_map_.erase(iter);
-            } else {
-                other_metas.push_back(meta.get());
-                ++iter;
-            }
-            cleanup_entries.insert(cleanup_entries.end(), deleted_entries.begin(), deleted_entries.end());
-        }
-    }
-    for (auto &inner_entry : cleanup_entries) {
-        inner_entry->Cleanup();
-    }
-    for (auto &meta : cleanup_metas) {
-        meta->CleanupMeta();
-    }
-    for (auto &meta : other_metas) {
-        meta->CleanupDelete(oldest_txn_ts);
-    }
+    // Vector<SharedPtr<InnerEntry>> cleanup_entries;
+    // Vector<UniquePtr<Meta>> cleanup_metas;
+    // Vector<Meta *> other_metas;
+    // {
+    //     std::unique_lock wlock(rw_locker_);
+    //     for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+    //         auto &[name, meta] = *iter;
+    //         auto [deleted_entries, all_deleted] = meta->PickCleanup(oldest_txn_ts);
+    //         if (all_deleted) {
+    //             cleanup_metas.push_back(std::move(meta));
+    //             iter = meta_map_.erase(iter);
+    //         } else {
+    //             other_metas.push_back(meta.get());
+    //             ++iter;
+    //         }
+    //         cleanup_entries.insert(cleanup_entries.end(), deleted_entries.begin(), deleted_entries.end());
+    //     }
+    // }
+    // for (auto &inner_entry : cleanup_entries) {
+    //     inner_entry->Cleanup();
+    // }
+    // for (auto &meta : cleanup_metas) {
+    //     meta->CleanupMeta();
+    // }
+    // for (auto &meta : other_metas) {
+    //     meta->CleanupDelete(oldest_txn_ts);
+    // }
 }
 
-template <MetaConcept Meta>
+template <MetaConcept1 Meta>
 void BaseMetaEntry<Meta>::Cleanup() {
     for (auto &[name, meta] : meta_map_) {
         meta->Cleanup();

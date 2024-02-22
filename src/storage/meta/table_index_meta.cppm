@@ -24,6 +24,7 @@ import index_def;
 import status;
 import extra_ddl_info;
 import base_meta;
+import entry_list;
 
 namespace infinity {
 
@@ -32,7 +33,7 @@ class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
-export class TableIndexMeta : public BaseMeta<TableIndexEntry> {
+export class TableIndexMeta : public MetaInterface {
     friend struct TableEntry;
 
 public:
@@ -83,13 +84,26 @@ private:
 
 public:
     String index_name() const { return *index_name_; }
-    List<SharedPtr<TableIndexEntry>> &entry_list() { return entry_list_; }
 
 private:
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};
 
-    // std::shared_mutex rw_locker_{};
-    // List<SharedPtr<BaseEntry>> entry_list_{};
+    EntryList<TableIndexEntry> entry_list_{};
+
+private:
+    // TODO: remove it
+    std::shared_mutex &rw_locker() { return entry_list_.rw_locker_; }
+
+public:
+    // TODO: remove it
+    List<SharedPtr<TableIndexEntry>> &entry_list() { return entry_list_.entry_list_; }
+
+public:
+    void Cleanup() override;
+
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+
+    void CleanupMeta() override;
 };
 } // namespace infinity

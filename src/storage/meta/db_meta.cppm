@@ -26,7 +26,7 @@ import db_entry;
 import base_entry;
 import txn_manager;
 import base_meta;
-import meta_list;
+import entry_list;
 
 namespace infinity {
 
@@ -82,7 +82,7 @@ public:
     void CleanupMeta() override;
 
 private:
-    MetaList<DBEntry> db_entry_list_{};
+    EntryList<DBEntry> db_entry_list_{};
 
     // TODO: remove
     std::shared_mutex &rw_locker() { return db_entry_list_.rw_locker_; }

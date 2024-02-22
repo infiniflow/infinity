@@ -27,13 +27,14 @@ import column_def;
 import base_entry;
 import base_meta;
 import table_entry;
+import entry_list;
 
 namespace infinity {
 
 class DBEntry;
 class TxnManager;
 
-export struct TableMeta : public BaseMeta<TableEntry> {
+export struct TableMeta : public MetaInterface {
     using EntryT = TableEntry;
 
     friend class DBEntry;
@@ -82,6 +83,22 @@ private:
     SharedPtr<String> table_name_{};
 
     DBEntry *db_entry_{};
+
+private:
+    EntryList<TableEntry> entry_list_{};
+
+    // TODO: remove
+    std::shared_mutex &rw_locker() { return entry_list_.rw_locker_; };
+
+    // TODO: remove
+    List<SharedPtr<TableEntry>> &entry_list() { return entry_list_.entry_list_; }
+
+public:
+    void Cleanup() override;
+
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+
+    void CleanupMeta() override;
 };
 
 } // namespace infinity

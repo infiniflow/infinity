@@ -14,7 +14,7 @@
 
 module;
 
-export module meta_list;
+export module entry_list;
 
 import stl;
 import base_entry;
@@ -23,7 +23,7 @@ import infinity_exception;
 namespace infinity {
 
 export template <EntryConcept1 Entry>
-class MetaList {
+class EntryList {
 public:
     // Cleanup the delete inner entry under this meta, return true if all inner entry are deleted
     Pair<Vector<SharedPtr<Entry>>, bool> PickCleanup(TxnTimeStamp oldest_txn_ts);
@@ -37,7 +37,7 @@ public:
     // Cleanup All(no lock is needed)
     void Cleanup();
 
-    void MergeWith(MetaList<Entry> &other);
+    void MergeWith(EntryList<Entry> &other);
 
 public: // TODO: make both private
     std::shared_mutex rw_locker_{}; 
@@ -46,27 +46,27 @@ public: // TODO: make both private
 };
 
 template <EntryConcept1 Entry>
-Pair<Vector<SharedPtr<Entry>>, bool> MetaList<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
+Pair<Vector<SharedPtr<Entry>>, bool> EntryList<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
     //
 }
 
 template <EntryConcept1 Entry>
-void MetaList<Entry>::CleanupMeta() {
+void EntryList<Entry>::CleanupMeta() {
     //
 }
 
 template <EntryConcept1 Entry>
-void MetaList<Entry>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
+void EntryList<Entry>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
     //
 }
 
 template <EntryConcept1 Entry>
-void MetaList<Entry>::Cleanup() {
+void EntryList<Entry>::Cleanup() {
     //
 }
 
 template <EntryConcept1 Entry>
-void MetaList<Entry>::MergeWith(MetaList<Entry> &other) {
+void EntryList<Entry>::MergeWith(EntryList<Entry> &other) {
     auto &other_list = other.entry_list_;
     auto it1 = entry_list_.begin();
     auto it2 = other_list.begin();

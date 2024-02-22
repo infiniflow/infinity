@@ -529,11 +529,11 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                                                                    commit_ts,
                                                                    is_delete,
                                                                    row_count);
-                if (table_meta->entry_list_.empty()) {
+                if (table_meta->entry_list().empty()) {
                     auto dummy_entry = MakeUnique<TableEntry>();
-                    table_meta->entry_list_.emplace_front(std::move(dummy_entry));
+                    table_meta->entry_list().emplace_front(std::move(dummy_entry));
                 }
-                table_meta->entry_list_.emplace_front(std::move(table_entry));
+                table_meta->entry_list().emplace_front(std::move(table_entry));
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
