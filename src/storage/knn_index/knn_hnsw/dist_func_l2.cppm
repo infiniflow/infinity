@@ -53,8 +53,14 @@ public:
             } else {
                 SIMDFunc = F32L2AVXResidual;
             }
+#elif defined(USE_SSE)
+            if (dim % 16 == 0) {
+                SIMDFunc = F32L2SSE;
+            } else {
+                SIMDFunc = F32L2SSEResidual;
+            }
 #else
-            SIMDFunc = F32L2BF;
+            SIMDFunc = F32IPBF;
 #endif
         }
     }
@@ -108,6 +114,12 @@ public:
                 SIMDFunc = I8IPAVX;
             } else {
                 SIMDFunc = I8IPAVXResidual;
+            }
+#elif defined(USE_SSE)
+            if (dim % 16 == 0) {
+                SIMDFunc = I8IPSSE;
+            } else {
+                SIMDFunc = I8IPSSEResidual;
             }
 #else
             SIMDFunc = I8IPBF;
