@@ -53,7 +53,7 @@ import table_index_entry;
 import segment_entry;
 import db_meta;
 import meta_map;
-import base_meta_entry;
+import base_entry;
 
 namespace infinity {
 
@@ -111,7 +111,7 @@ public:
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
-export struct NewCatalog : public MetaEntryInterface {
+export struct NewCatalog : public EntryInterface {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
@@ -271,8 +271,6 @@ public:
     void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
 
     void Cleanup() override;
-
-    void CleanupMeta() override;
 };
 
 } // namespace infinity

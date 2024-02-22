@@ -36,7 +36,7 @@ class BufferManager;
 struct TableEntry;
 class BaseTableRef;
 
-export struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry : public BaseEntry, public EntryInterface {
 
     friend struct TableEntry;
 
@@ -89,8 +89,6 @@ public:
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
-    void Cleanup();
-
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
 
@@ -108,6 +106,11 @@ private:
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
+
+public:
+    void Cleanup() override;
+
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
 };
 
 } // namespace infinity

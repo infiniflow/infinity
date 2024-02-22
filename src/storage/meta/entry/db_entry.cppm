@@ -28,12 +28,13 @@ import buffer_manager;
 import status;
 import extra_ddl_info;
 import column_def;
+import meta_map;
 
 namespace infinity {
 
 class TxnManager;
 
-export class DBEntry : public BaseMetaEntry<TableMeta> {
+export class DBEntry : public BaseEntry, public EntryInterface {
     friend struct NewCatalog;
 
 public:
@@ -58,7 +59,7 @@ public:
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    virtual void MergeFrom(BaseEntry &other); // TODO: fix warning
 
     [[nodiscard]] const String &db_name() const { return *db_name_; }
 
@@ -67,8 +68,6 @@ public:
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
-
-    [[nodiscard]] HashMap<String, UniquePtr<TableMeta>> &tables() { return meta_map_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
@@ -92,5 +91,17 @@ private:
 private:
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
+
+    MetaMap<TableMeta> table_meta_map_{};
+
+private: // TODO: remote it
+    std::shared_mutex &rw_locker() { return table_meta_map_.rw_locker_; }
+
+    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+
+public:
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+
+    void Cleanup() override;
 };
 } // namespace infinity

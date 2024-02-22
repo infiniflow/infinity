@@ -501,7 +501,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = TableMeta::NewTableMeta(db_entry->db_entry_dir_, MakeShared<String>(table_name), db_entry);
-                db_entry->meta_map_.insert({table_name, std::move(table_meta)});
+                db_entry->table_meta_map().insert({table_name, std::move(table_meta)});
                 break;
             }
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
@@ -518,7 +518,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto table_entry = TableEntry::NewReplayTableEntry(table_meta,
                                                                    MakeUnique<String>(table_entry_dir),
                                                                    MakeUnique<String>(table_name),
@@ -554,7 +554,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -594,7 +594,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -625,7 +625,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -648,7 +648,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -670,7 +670,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -702,7 +702,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -735,7 +735,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -773,7 +773,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = db_entry->meta_map_.at(table_name).get();
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
@@ -937,10 +937,6 @@ void NewCatalog::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
 }
 
 void NewCatalog::Cleanup() {
-    //
-}
-
-void NewCatalog::CleanupMeta() {
     //
 }
 

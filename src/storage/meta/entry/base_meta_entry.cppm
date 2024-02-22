@@ -24,14 +24,6 @@ import base_meta;
 
 namespace infinity {
 
-export class MetaEntryInterface : public EntryInterface {
-public:
-    virtual void CleanupMeta() = 0;
-};
-
-export template <typename MetaEntry>
-concept MetaEntryConcept1 = std::derived_from<MetaEntry, MetaEntryInterface>;
-
 export template <MetaConcept1 Meta>
 class BaseMetaEntry : public BaseEntry {
     using InnerEntry = typename Meta::EntryT;

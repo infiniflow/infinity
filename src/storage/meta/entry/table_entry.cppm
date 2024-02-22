@@ -45,7 +45,7 @@ class TableMeta;
 class Txn;
 struct NewCatalog;
 
-export struct TableEntry : public BaseMetaEntry<TableIndexMeta> {
+export struct TableEntry : public BaseMetaEntry<TableIndexMeta>, public EntryInterface {
     friend struct NewCatalog;
 
 public:

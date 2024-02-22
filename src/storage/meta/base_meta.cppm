@@ -132,6 +132,6 @@ concept MetaConcept = std::derived_from<Meta, BaseMeta<typename Meta::EntryT>> &
 
 // new
 export template <typename Meta>
-concept MetaConcept1 = std::derived_from<Meta, MetaInterface> && std::derived_from<typename Meta::EntryT, BaseEntry>;
+concept MetaConcept1 = std::derived_from<Meta, MetaInterface> && std::derived_from<typename Meta::EntryT, EntryInterface>;
 
 } // namespace infinity

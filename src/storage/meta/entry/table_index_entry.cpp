@@ -290,11 +290,15 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
     return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
 }
 
-void TableIndexEntry::Cleanup() {
-    for (auto &[column_id, column_index_entry] : column_index_map_) {
-        column_index_entry->Cleanup();
-    }
-    // FIXME: to cleanup fulltext_index_entry_
-}
+// void TableIndexEntry::Cleanup() {
+//     for (auto &[column_id, column_index_entry] : column_index_map_) {
+//         column_index_entry->Cleanup();
+//     }
+//     // FIXME: to cleanup fulltext_index_entry_
+// }
+
+void TableIndexEntry::Cleanup() {}
+
+void TableIndexEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
 
 } // namespace infinity

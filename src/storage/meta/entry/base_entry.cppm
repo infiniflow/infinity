@@ -48,7 +48,7 @@ public:
 };
 
 // TODO: remove inheritance
-export struct BaseEntry : public EntryInterface {
+export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
@@ -62,12 +62,6 @@ export struct BaseEntry : public EntryInterface {
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
     static inline bool Committed(BaseEntry *base_entry) { return base_entry->commit_ts_ != UNCOMMIT_TS; }
-
-    // TODO: remove it
-    void Cleanup() override {}
-
-    // TODO: remove it
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override {}
 
 public:
     // Reserved
