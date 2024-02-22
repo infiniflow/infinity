@@ -228,18 +228,20 @@ struct ImportOption {
 
 struct UploadResponse {
 1:  bool success,
-2:  string error_msg,
-3:  bool can_skip,
-}
-
-struct CommonResponse {
-1:  bool success,
-2:  string error_msg,
-3:  i64 session_id,
+2:  i64 error_code,
+3:  string error_msg,
+4:  bool can_skip,
 }
 
 struct CommonRequest {
 1:  i64 session_id,
+}
+
+struct CommonResponse {
+1:  bool success,
+2:  i64 error_code,
+3:  string error_msg,
+4:  i64 session_id,
 }
 
 struct ListDatabaseRequest {
@@ -248,8 +250,9 @@ struct ListDatabaseRequest {
 
 struct ListDatabaseResponse {
 1: bool success,
-2: string error_msg,
-3: list<string> db_names = [],
+2: i64 error_code,
+3: string error_msg,
+4: list<string> db_names = [],
 }
 
 struct ListTableRequest {
@@ -259,8 +262,9 @@ struct ListTableRequest {
 
 struct ListTableResponse {
 1: bool success,
-2: string error_msg,
-3: list<string> table_names = [],
+2: i64 error_code,
+3: string error_msg,
+4: list<string> table_names = [],
 }
 
 struct DescribeDatabaseRequest {
@@ -270,10 +274,11 @@ struct DescribeDatabaseRequest {
 
 struct DescribeDatabaseResponse {
 1: bool success,
-2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+2: i64 error_code,
+3: string error_msg,
+4: i64 num_segments,
+5: i64 num_rows,
+6: i64 num_blocks,
 }
 
 struct DescribeTableRequest {
@@ -284,10 +289,11 @@ struct DescribeTableRequest {
 
 struct DescribeTableResponse {
 1: bool success,
-2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+2: i64 error_code,
+3: string error_msg,
+4: i64 num_segments,
+5: i64 num_rows,
+6: i64 num_blocks,
 }
 
 struct GetTableRequest {
@@ -412,9 +418,10 @@ struct ExplainRequest {
 
 struct ExplainResponse {
 1: bool success,
-2: string error_msg,
-3: list<ColumnDef> column_defs = [],
-4: list<ColumnField> column_fields = [];
+2: i64 error_code,
+3: string error_msg,
+4: list<ColumnDef> column_defs = [],
+5: list<ColumnField> column_fields = [];
 }
 
 struct SelectRequest {
@@ -433,9 +440,10 @@ struct SelectRequest {
 
 struct SelectResponse {
 1: bool success,
-2: string error_msg,
-3: list<ColumnDef> column_defs = [],
-4: list<ColumnField> column_fields = [];
+2: i64 error_code,
+3: string error_msg,
+4: list<ColumnDef> column_defs = [],
+5: list<ColumnField> column_fields = [];
 }
 
 struct DeleteRequest {

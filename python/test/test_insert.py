@@ -257,7 +257,6 @@ class TestInsert:
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
-    @pytest.mark.skip(reason="May cause core dumped.")
     def test_insert_data_into_non_existent_table(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -271,9 +270,8 @@ class TestInsert:
 
         # insert
         values = [{"c1": 1, "c2": 1}]
-        table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
-        print(insert_res)
+        with pytest.raises(Exception, match=".*Table not exist*"):
+            table_obj.insert(values)
 
         # disconnect
         res = infinity_obj.disconnect()

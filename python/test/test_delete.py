@@ -319,7 +319,7 @@ class TestDelete:
     def test_delete_dropped_table(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        with pytest.raises(Exception, match="Get Table Error"):
+        with pytest.raises(Exception, match="Table not exist"):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_delete_dropped_table")
             table_obj = db_obj.get_table("test_delete_dropped_table")

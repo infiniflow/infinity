@@ -247,9 +247,9 @@ class ImportOption;
 
 class UploadResponse;
 
-class CommonResponse;
-
 class CommonRequest;
+
+class CommonResponse;
 
 class ListDatabaseRequest;
 
@@ -1738,8 +1738,9 @@ void swap(ImportOption &a, ImportOption &b);
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
 
 typedef struct _UploadResponse__isset {
-  _UploadResponse__isset() : success(false), error_msg(false), can_skip(false) {}
+  _UploadResponse__isset() : success(false), error_code(false), error_msg(false), can_skip(false) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool can_skip :1;
 } _UploadResponse__isset;
@@ -1751,18 +1752,22 @@ class UploadResponse : public virtual ::apache::thrift::TBase {
   UploadResponse& operator=(const UploadResponse&);
   UploadResponse() noexcept
                  : success(0),
+                   error_code(0),
                    error_msg(),
                    can_skip(0) {
   }
 
   virtual ~UploadResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   bool can_skip;
 
   _UploadResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -1771,6 +1776,8 @@ class UploadResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const UploadResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -1793,63 +1800,6 @@ class UploadResponse : public virtual ::apache::thrift::TBase {
 void swap(UploadResponse &a, UploadResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const UploadResponse& obj);
-
-typedef struct _CommonResponse__isset {
-  _CommonResponse__isset() : success(false), error_msg(false), session_id(false) {}
-  bool success :1;
-  bool error_msg :1;
-  bool session_id :1;
-} _CommonResponse__isset;
-
-class CommonResponse : public virtual ::apache::thrift::TBase {
- public:
-
-  CommonResponse(const CommonResponse&);
-  CommonResponse& operator=(const CommonResponse&);
-  CommonResponse() noexcept
-                 : success(0),
-                   error_msg(),
-                   session_id(0) {
-  }
-
-  virtual ~CommonResponse() noexcept;
-  bool success;
-  std::string error_msg;
-  int64_t session_id;
-
-  _CommonResponse__isset __isset;
-
-  void __set_success(const bool val);
-
-  void __set_error_msg(const std::string& val);
-
-  void __set_session_id(const int64_t val);
-
-  bool operator == (const CommonResponse & rhs) const
-  {
-    if (!(success == rhs.success))
-      return false;
-    if (!(error_msg == rhs.error_msg))
-      return false;
-    if (!(session_id == rhs.session_id))
-      return false;
-    return true;
-  }
-  bool operator != (const CommonResponse &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const CommonResponse & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(CommonResponse &a, CommonResponse &b);
-
-std::ostream& operator<<(std::ostream& out, const CommonResponse& obj);
 
 typedef struct _CommonRequest__isset {
   _CommonRequest__isset() : session_id(false) {}
@@ -1893,6 +1843,70 @@ class CommonRequest : public virtual ::apache::thrift::TBase {
 void swap(CommonRequest &a, CommonRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const CommonRequest& obj);
+
+typedef struct _CommonResponse__isset {
+  _CommonResponse__isset() : success(false), error_code(false), error_msg(false), session_id(false) {}
+  bool success :1;
+  bool error_code :1;
+  bool error_msg :1;
+  bool session_id :1;
+} _CommonResponse__isset;
+
+class CommonResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  CommonResponse(const CommonResponse&);
+  CommonResponse& operator=(const CommonResponse&);
+  CommonResponse() noexcept
+                 : success(0),
+                   error_code(0),
+                   error_msg(),
+                   session_id(0) {
+  }
+
+  virtual ~CommonResponse() noexcept;
+  bool success;
+  int64_t error_code;
+  std::string error_msg;
+  int64_t session_id;
+
+  _CommonResponse__isset __isset;
+
+  void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
+
+  void __set_error_msg(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const CommonResponse & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
+      return false;
+    if (!(error_msg == rhs.error_msg))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const CommonResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CommonResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CommonResponse &a, CommonResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const CommonResponse& obj);
 
 typedef struct _ListDatabaseRequest__isset {
   _ListDatabaseRequest__isset() : session_id(false) {}
@@ -1938,8 +1952,9 @@ void swap(ListDatabaseRequest &a, ListDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const ListDatabaseRequest& obj);
 
 typedef struct _ListDatabaseResponse__isset {
-  _ListDatabaseResponse__isset() : success(false), error_msg(false), db_names(true) {}
+  _ListDatabaseResponse__isset() : success(false), error_code(false), error_msg(false), db_names(true) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool db_names :1;
 } _ListDatabaseResponse__isset;
@@ -1951,18 +1966,22 @@ class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
   ListDatabaseResponse& operator=(const ListDatabaseResponse&);
   ListDatabaseResponse() noexcept
                        : success(0),
+                         error_code(0),
                          error_msg() {
 
   }
 
   virtual ~ListDatabaseResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   std::vector<std::string>  db_names;
 
   _ListDatabaseResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -1971,6 +1990,8 @@ class ListDatabaseResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const ListDatabaseResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -2045,8 +2066,9 @@ void swap(ListTableRequest &a, ListTableRequest &b);
 std::ostream& operator<<(std::ostream& out, const ListTableRequest& obj);
 
 typedef struct _ListTableResponse__isset {
-  _ListTableResponse__isset() : success(false), error_msg(false), table_names(true) {}
+  _ListTableResponse__isset() : success(false), error_code(false), error_msg(false), table_names(true) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool table_names :1;
 } _ListTableResponse__isset;
@@ -2058,18 +2080,22 @@ class ListTableResponse : public virtual ::apache::thrift::TBase {
   ListTableResponse& operator=(const ListTableResponse&);
   ListTableResponse() noexcept
                     : success(0),
+                      error_code(0),
                       error_msg() {
 
   }
 
   virtual ~ListTableResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   std::vector<std::string>  table_names;
 
   _ListTableResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -2078,6 +2104,8 @@ class ListTableResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const ListTableResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -2152,8 +2180,9 @@ void swap(DescribeDatabaseRequest &a, DescribeDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const DescribeDatabaseRequest& obj);
 
 typedef struct _DescribeDatabaseResponse__isset {
-  _DescribeDatabaseResponse__isset() : success(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
+  _DescribeDatabaseResponse__isset() : success(false), error_code(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool num_segments :1;
   bool num_rows :1;
@@ -2167,6 +2196,7 @@ class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
   DescribeDatabaseResponse& operator=(const DescribeDatabaseResponse&);
   DescribeDatabaseResponse() noexcept
                            : success(0),
+                             error_code(0),
                              error_msg(),
                              num_segments(0),
                              num_rows(0),
@@ -2175,6 +2205,7 @@ class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~DescribeDatabaseResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   int64_t num_segments;
   int64_t num_rows;
@@ -2183,6 +2214,8 @@ class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
   _DescribeDatabaseResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -2195,6 +2228,8 @@ class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const DescribeDatabaseResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -2280,8 +2315,9 @@ void swap(DescribeTableRequest &a, DescribeTableRequest &b);
 std::ostream& operator<<(std::ostream& out, const DescribeTableRequest& obj);
 
 typedef struct _DescribeTableResponse__isset {
-  _DescribeTableResponse__isset() : success(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
+  _DescribeTableResponse__isset() : success(false), error_code(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool num_segments :1;
   bool num_rows :1;
@@ -2295,6 +2331,7 @@ class DescribeTableResponse : public virtual ::apache::thrift::TBase {
   DescribeTableResponse& operator=(const DescribeTableResponse&);
   DescribeTableResponse() noexcept
                         : success(0),
+                          error_code(0),
                           error_msg(),
                           num_segments(0),
                           num_rows(0),
@@ -2303,6 +2340,7 @@ class DescribeTableResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~DescribeTableResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   int64_t num_segments;
   int64_t num_rows;
@@ -2311,6 +2349,8 @@ class DescribeTableResponse : public virtual ::apache::thrift::TBase {
   _DescribeTableResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -2323,6 +2363,8 @@ class DescribeTableResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const DescribeTableResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -3280,8 +3322,9 @@ void swap(ExplainRequest &a, ExplainRequest &b);
 std::ostream& operator<<(std::ostream& out, const ExplainRequest& obj);
 
 typedef struct _ExplainResponse__isset {
-  _ExplainResponse__isset() : success(false), error_msg(false), column_defs(true), column_fields(true) {}
+  _ExplainResponse__isset() : success(false), error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool column_defs :1;
   bool column_fields :1;
@@ -3294,6 +3337,7 @@ class ExplainResponse : public virtual ::apache::thrift::TBase {
   ExplainResponse& operator=(const ExplainResponse&);
   ExplainResponse() noexcept
                   : success(0),
+                    error_code(0),
                     error_msg() {
 
 
@@ -3301,6 +3345,7 @@ class ExplainResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~ExplainResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   std::vector<ColumnDef>  column_defs;
   std::vector<ColumnField>  column_fields;
@@ -3308,6 +3353,8 @@ class ExplainResponse : public virtual ::apache::thrift::TBase {
   _ExplainResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -3318,6 +3365,8 @@ class ExplainResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const ExplainResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
@@ -3466,8 +3515,9 @@ void swap(SelectRequest &a, SelectRequest &b);
 std::ostream& operator<<(std::ostream& out, const SelectRequest& obj);
 
 typedef struct _SelectResponse__isset {
-  _SelectResponse__isset() : success(false), error_msg(false), column_defs(true), column_fields(true) {}
+  _SelectResponse__isset() : success(false), error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
   bool success :1;
+  bool error_code :1;
   bool error_msg :1;
   bool column_defs :1;
   bool column_fields :1;
@@ -3480,6 +3530,7 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   SelectResponse& operator=(const SelectResponse&);
   SelectResponse() noexcept
                  : success(0),
+                   error_code(0),
                    error_msg() {
 
 
@@ -3487,6 +3538,7 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
 
   virtual ~SelectResponse() noexcept;
   bool success;
+  int64_t error_code;
   std::string error_msg;
   std::vector<ColumnDef>  column_defs;
   std::vector<ColumnField>  column_fields;
@@ -3494,6 +3546,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   _SelectResponse__isset __isset;
 
   void __set_success(const bool val);
+
+  void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
@@ -3504,6 +3558,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   bool operator == (const SelectResponse & rhs) const
   {
     if (!(success == rhs.success))
+      return false;
+    if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;

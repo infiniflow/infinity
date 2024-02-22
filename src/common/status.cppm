@@ -116,8 +116,10 @@ export enum class ErrorCode : long {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
+    kConnectFailed = 7012,
+    kDisconnectFailed = 7013,
 
-    // meta
+    // 8. meta error
     kInvalidEntry = 8001,
     kNotFoundEntry = 8002,
     kEmptyEntryList = 8003,

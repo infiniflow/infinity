@@ -86,22 +86,25 @@ public:
     void Connect(infinity_thrift_rpc::CommonResponse &response) override {
         auto infinity = Infinity::RemoteConnect();
         if (infinity == nullptr) {
-            response.success = false;
-            response.error_msg = "Connect failed";
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kConnectFailed));
+            response.__set_error_msg("Connect failed");
             LOG_ERROR(fmt::format("THRIFT ERROR: Connect failed"));
         } else {
             std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
-            response.session_id = infinity->GetSessionId();
-            response.success = true;
+            response.__set_session_id(infinity->GetSessionId());
+            response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         }
     }
 
     void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         if (infinity == nullptr) {
-            response.success = false;
-            response.error_msg = "Disconnect failed";
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDisconnectFailed));
+            response.__set_error_msg("Disconnect failed");
             LOG_ERROR(fmt::format("THRIFT ERROR: Disconnect failed"));
         } else {
             auto session_id = infinity->GetSessionId();
@@ -109,7 +112,8 @@ public:
             std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
             infinity_session_map_.erase(session_id);
             LOG_TRACE(fmt::format("THRIFT : Disconnect success"));
-            response.success = true;
+            response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         }
     }
 
@@ -135,11 +139,15 @@ public:
 
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
-        CreateTableOptions create_table_opts;
         if (database == nullptr) {
-            UnrecoverableError("Database is null");
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
         }
 
+        CreateTableOptions create_table_opts;
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
         ProcessCommonResult(response, result);
     }
@@ -147,6 +155,14 @@ public:
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         DropTableOptions drop_table_opts;
         switch (request.options.conflict_type) {
             case infinity_thrift_rpc::ConflictType::Ignore:
@@ -167,7 +183,23 @@ public:
     void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
+
         auto columns = new Vector<String>();
         columns->reserve(request.column_names.size());
 
@@ -212,7 +244,22 @@ public:
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
 
         Path path(fmt::format("{}_{}_{}_{}",
                               *InfinityContext::instance().config()->temp_dir().get(),
@@ -252,6 +299,7 @@ public:
                     fs.DeleteFile(path.c_str());
                 } else {
                     response.__set_success(true);
+                    response.__set_error_code((i64)(ErrorCode::kOk));
                     response.__set_can_skip(true);
                     return;
                 }
@@ -262,6 +310,7 @@ public:
         }
         LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
         response.__set_success(true);
+        response.__set_error_code((i64)(ErrorCode::kOk));
         response.__set_can_skip(false);
     }
 
@@ -296,7 +345,6 @@ public:
 
     void
     HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
-
         String dst;
         SizeT total_varchar_data_size = 0;
         for (SizeT index = 0; index < row_count; ++index) {
@@ -359,7 +407,22 @@ public:
 
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
 
         // auto end1 = std::chrono::steady_clock::now();
         //
@@ -442,8 +505,10 @@ public:
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -473,10 +538,25 @@ public:
     }
 
     void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) override {
-
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
+
         if (request.__isset.select_list == false) {
             UnrecoverableError("Select list is empty");
         }
@@ -543,8 +623,10 @@ public:
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -562,8 +644,10 @@ public:
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -572,7 +656,22 @@ public:
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
@@ -587,7 +686,23 @@ public:
     void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
@@ -624,8 +739,10 @@ public:
             }
 
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -634,6 +751,14 @@ public:
     void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto result = database->ListTables();
         if (result.IsOk()) {
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -646,8 +771,10 @@ public:
             }
 
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -661,6 +788,14 @@ public:
     void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         String table_name = request.table_name;
 
         const QueryResult result = database->DescribeTable(table_name);
@@ -670,8 +805,10 @@ public:
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -680,6 +817,13 @@ public:
     void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
 
         const QueryResult result = database->ShowTables();
 
@@ -688,8 +832,10 @@ public:
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
@@ -700,10 +846,12 @@ public:
         auto database = infinity->GetDatabase(request.db_name);
         if (database != nullptr) {
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
-            response.__set_error_msg("Database not found");
-            LOG_ERROR(fmt::format("THRIFT ERROR: Database not found"));
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
         }
     }
 
@@ -711,17 +859,34 @@ public:
         const auto table = GetInfinityBySessionID(request.session_id)->GetDatabase(request.db_name)->GetTable(request.table_name);
         if (table != nullptr) {
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
-            response.__set_error_msg("Table not found");
-            LOG_ERROR(fmt::format("THRIFT ERROR: Table not found"));
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
         }
     }
 
     void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
 
         String index_name = request.index_name;
 
@@ -752,7 +917,23 @@ public:
     void DropIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropIndexRequest &request) override {
         auto infinity = GetInfinityBySessionID(request.session_id);
         auto database = infinity->GetDatabase(request.db_name);
+        if (database == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kDBNotExist));
+            response.__set_error_msg("Database not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Database not exist"));
+            return;
+        }
+
         auto table = database->GetTable(request.table_name);
+        if (table == nullptr) {
+            response.__set_success(false);
+            response.__set_error_code((i64)(ErrorCode::kTableNotExist));
+            response.__set_error_msg("Table not exist");
+            LOG_ERROR(fmt::format("THRIFT ERROR: Table not exist"));
+            return;
+        }
+
         QueryResult result = table->DropIndex(request.index_name);
 
         ProcessCommonResult(response, result);
@@ -784,8 +965,10 @@ private:
     static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {
         if (result.IsOk()) {
             response.__set_success(true);
+            response.__set_error_code((i64)(ErrorCode::kOk));
         } else {
             response.__set_success(false);
+            response.__set_error_code((i64)(result.ErrorCode()));
             response.__set_error_msg(result.ErrorStr());
             LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
         }
