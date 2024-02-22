@@ -131,9 +131,7 @@ void search_top_k_with_sgemm(u32 k,
     }
 }
 
-#endif
-
-#if defined(__SSE2__)
+#elif defined(__SSE2__)
 
 export template <typename ID>
 void search_top_k_with_sgemm(u32 k,

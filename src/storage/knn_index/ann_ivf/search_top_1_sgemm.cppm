@@ -150,9 +150,7 @@ void search_top_1_with_sgemm(u32 dimension,
     }
 }
 
-#endif
-
-#if defined(__SSE2__)
+#elif defined(__SSE2__)
 
 export template <typename ID>
 void search_top_1_with_sgemm(u32 dimension,
