@@ -32,6 +32,8 @@ public:
 
     void DoSeek(docid_t doc_id) override;
 
+    u32 GetDF() const override;
+
 private:
     Vector<DocIterator *> sorted_iterators_;
 };

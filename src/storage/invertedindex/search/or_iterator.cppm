@@ -48,19 +48,23 @@ public:
 
     void DoSeek(docid_t doc_id) override;
 
+    u32 GetDF() const override;
+
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
 
-    void AdjustDown(u32 idx, u32 end, DocIteratorEntry *heap) {
+    void AdjustDown() {
+        DocIteratorEntry *heap = iterator_heap_.data();
+        u32 idx = 1;
         u32 min = idx;
         do {
             idx = min;
             u32 left = idx << 1;
             u32 right = left + 1;
-            if (left <= end && heap[left].doc_id_ < heap[min].doc_id_) {
+            if (left <= count_ && heap[left].doc_id_ < heap[min].doc_id_) {
                 min = left;
             }
-            if (right <= end && heap[right].doc_id_ < heap[min].doc_id_) {
+            if (right <= count_ && heap[right].doc_id_ < heap[min].doc_id_) {
                 min = right;
             }
             if (min != idx) {

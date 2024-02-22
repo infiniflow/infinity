@@ -38,7 +38,7 @@ UniquePtr<DocIterator> TermQuery::CreateSearch(IndexReader &index_reader) {
     PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
     if (posting_iterator == nullptr)
         return nullptr;
-    UniquePtr<TermDocIterator> search = MakeUnique<TermDocIterator>(term_, posting_iterator);
+    UniquePtr<TermDocIterator> search = MakeUnique<TermDocIterator>(posting_iterator);
     return std::move(search);
 }
 

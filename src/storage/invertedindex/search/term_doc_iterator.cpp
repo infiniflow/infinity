@@ -24,10 +24,10 @@ import index_defines;
 import term_meta;
 import doc_iterator;
 namespace infinity {
-TermDocIterator::TermDocIterator(const String &term, PostingIterator *iter) {}
+TermDocIterator::TermDocIterator(PostingIterator *iter) : iter_(iter) {}
 
 TermDocIterator::~TermDocIterator() {}
 
-void TermDocIterator::DoSeek(docid_t doc_id) {}
+void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
 
 } // namespace infinity

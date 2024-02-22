@@ -33,8 +33,17 @@ void OrIterator::DoSeek(docid_t id) {
         top->Seek(id);
         doc_id = top->Doc();
         iterator_heap_[1].doc_id_ = doc_id;
-        AdjustDown(1, count_, iterator_heap_.data());
+        AdjustDown();
     } while (id > iterator_heap_[1].doc_id_);
     doc_id_ = iterator_heap_[1].doc_id_;
 }
+
+u32 OrIterator::GetDF() const {
+    u32 sum = 0;
+    for (u32 i = 0; i < children_.size(); ++i) {
+        sum += children_[i]->GetDF();
+    }
+    return sum;
+}
+
 } // namespace infinity
