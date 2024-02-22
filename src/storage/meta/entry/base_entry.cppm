@@ -39,19 +39,16 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
+// new
 export class EntryInterface {
 public:
-    virtual ~EntryInterface() = default;
-
     virtual void Cleanup() = 0;
 
     virtual void CleanupDelete(TxnTimeStamp oldest_txn_ts) = 0;
 };
 
-export template <typename Entry>
-concept EntryConcept1 = std::derived_from<Entry, EntryInterface>;
-
-export struct BaseEntry {
+// TODO: remove inheritance
+export struct BaseEntry : public EntryInterface {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
@@ -66,11 +63,11 @@ export struct BaseEntry {
 
     static inline bool Committed(BaseEntry *base_entry) { return base_entry->commit_ts_ != UNCOMMIT_TS; }
 
-    // Do nothing by default.
-    void Cleanup() {}
+    // TODO: remove it
+    void Cleanup() override {}
 
-    // Do nothing by default.
-    void CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
+    // TODO: remove it
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override {}
 
 public:
     // Reserved
@@ -93,5 +90,9 @@ export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEnt
 // old, TODO: remove
 export template <typename Entry>
 concept EntryConcept = std::derived_from<Entry, BaseEntry>;
+
+// new
+export template <typename Entry>
+concept EntryConcept1 = std::derived_from<Entry, EntryInterface>;
 
 } // namespace infinity

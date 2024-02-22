@@ -39,14 +39,14 @@ UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &data_dir, const Sha
 
 // TODO: Use Txn* txn as parma instead of TransactionID txn_id and TxnManager *txn_mgr
 Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
     DBEntry *db_entry_ptr{nullptr};
     //    rw_locker_.lock();
-    if (this->entry_list_.empty()) {
+    if (this->entry_list().empty()) {
         // Insert a dummy entry.
         auto dummy_entry = MakeUnique<DBEntry>();
         dummy_entry->deleted_ = true;
-        this->entry_list_.emplace_back(std::move(dummy_entry));
+        this->entry_list().emplace_back(std::move(dummy_entry));
 
         // Insert the new db entry
         // physical wal log
@@ -61,13 +61,13 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
         }
 
         db_entry_ptr = db_entry.get();
-        this->entry_list_.emplace_front(std::move(db_entry));
+        this->entry_list().emplace_front(std::move(db_entry));
 
         LOG_TRACE("New database entry is added.");
         return {db_entry_ptr, Status::OK()};
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
-        BaseEntry *header_base_entry = this->entry_list_.front().get();
+        BaseEntry *header_base_entry = this->entry_list().front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
             // physical wal log
             SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
@@ -81,7 +81,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
             }
 
             db_entry_ptr = db_entry.get();
-            this->entry_list_.emplace_front(std::move(db_entry));
+            this->entry_list().emplace_front(std::move(db_entry));
             return {db_entry_ptr, Status::OK()};
         }
 
@@ -100,7 +100,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     }
 
                     db_entry_ptr = db_entry.get();
-                    this->entry_list_.emplace_front(std::move(db_entry));
+                    this->entry_list().emplace_front(std::move(db_entry));
                     return {db_entry_ptr, Status::OK()};
                 } else {
                     switch (conflict_type) {
@@ -141,7 +141,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                             }
 
                             db_entry_ptr = db_entry.get();
-                            this->entry_list_.emplace_front(std::move(db_entry));
+                            this->entry_list().emplace_front(std::move(db_entry));
                             return {db_entry_ptr, Status::OK()};
                         } else {
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
@@ -166,7 +166,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                 case TxnState::kRollbacked: {
                     // Remove the header entry
                     //
-                    this->entry_list_.erase(this->entry_list_.begin());
+                    this->entry_list().erase(this->entry_list().begin());
 
                     // Rollback Txn will not merge the txn catalog delta operations to global catalog delta operations.
                     // So, rollback catalog operations shouldn't be recorded.
@@ -180,7 +180,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
                     }
 
                     db_entry_ptr = db_entry.get();
-                    this->entry_list_.emplace_front(std::move(db_entry));
+                    this->entry_list().emplace_front(std::move(db_entry));
                     return {db_entry_ptr, Status::OK()};
                 }
                 default: {
@@ -195,14 +195,14 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
 
 Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     DBEntry *db_entry_ptr{nullptr};
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
+    if (this->entry_list().empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status::EmptyEntryList()};
     }
 
-    BaseEntry *header_base_entry = this->entry_list_.front().get();
+    BaseEntry *header_base_entry = this->entry_list().front().get();
 
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
@@ -236,7 +236,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
 
             db_entry_ptr = db_entry.get();
             db_entry_ptr->deleted_ = true;
-            this->entry_list_.emplace_front(std::move(db_entry));
+            this->entry_list().emplace_front(std::move(db_entry));
 
             return {db_entry_ptr, Status::OK()};
         } else {
@@ -250,7 +250,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
         // Uncommitted, check if the same txn
         if (txn_id == header_db_entry->txn_id_) {
             // Same txn, remove the header db entry
-            auto base_entry_ptr = this->entry_list_.front();
+            auto base_entry_ptr = this->entry_list().front();
             auto db_entry = std::static_pointer_cast<DBEntry>(base_entry_ptr);
             {
                 if (txn_mgr != nullptr) {
@@ -259,7 +259,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
                 }
             }
 
-            this->entry_list_.pop_front();
+            this->entry_list().pop_front();
             return {db_entry.get(), Status::OK()};
         } else {
             // Not same txn, issue WW conflict
@@ -271,32 +271,32 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
 }
 
 void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry) {
-    std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker_);
-    db_meta->entry_list_.emplace_front(std::move(db_entry));
+    std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker());
+    db_meta->entry_list().emplace_front(std::move(db_entry));
 }
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
+    if (this->entry_list().empty()) {
         LOG_TRACE("Empty db entry list.");
         return;
     }
 
     auto removed_iter =
-        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](auto &entry) -> bool { return entry->txn_id_ == txn_id; });
+        std::remove_if(this->entry_list().begin(), this->entry_list().end(), [&](auto &entry) -> bool { return entry->txn_id_ == txn_id; });
     // DeleteNewEntry is only called when txn is rollback, so no need to add physical log
-    this->entry_list_.erase(removed_iter, this->entry_list_.end());
+    this->entry_list().erase(removed_iter, this->entry_list().end());
 }
 
 Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
+    if (this->entry_list().empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status::EmptyEntryList()};
     }
 
-    for (const auto &db_entry : this->entry_list_) {
+    for (const auto &db_entry : this->entry_list()) {
         if (db_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
             LOG_ERROR(*err_msg);
@@ -336,8 +336,8 @@ Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp beg
 }
 
 Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (!this->entry_list_.empty()) {
-        const auto &entry = entry_list_.front();
+    if (!this->entry_list().empty()) {
+        const auto &entry = entry_list().front();
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
@@ -368,9 +368,9 @@ Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeSta
 }
 
 SharedPtr<String> DBMeta::ToString() {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list_.size()));
+        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->entry_list().size()));
     return res;
 }
 
@@ -378,12 +378,12 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkp
     nlohmann::json json_res;
     Vector<DBEntry *> db_candidates;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["data_dir"] = *this->data_dir_;
         json_res["db_name"] = *this->db_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        db_candidates.reserve(this->entry_list_.size());
-        for (auto &db_entry : this->entry_list_) {
+        db_candidates.reserve(this->entry_list().size());
+        for (auto &db_entry : this->entry_list()) {
             if (db_entry->entry_type_ == EntryType::kDatabase) {
                 // Put it to candidate list
                 db_candidates.push_back((DBEntry *)db_entry.get());
@@ -403,12 +403,12 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {
-            res->entry_list_.emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
+            res->entry_list().emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
         }
     }
-    res->entry_list_.sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    res->entry_list().sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
     auto dummy_entry = MakeShared<DBEntry>();
-    res->entry_list_.emplace_back(dummy_entry);
+    res->entry_list().emplace_back(dummy_entry);
     return res;
 }
 
@@ -420,7 +420,19 @@ void DBMeta::MergeFrom(DBMeta &other) {
     if (!IsEqual(*this->data_dir_, *other.data_dir_)) {
         UnrecoverableError("DBMeta::MergeFrom requires db_dir_ match");
     }
-    this->MergeWith(other);
+    this->db_entry_list_.MergeWith(db_entry_list_);
+}
+
+void DBMeta::Cleanup() {
+    //
+}
+
+void DBMeta::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
+    //
+}
+
+void DBMeta::CleanupMeta() {
+    //
 }
 
 } // namespace infinity

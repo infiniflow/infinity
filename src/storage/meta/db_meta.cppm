@@ -26,12 +26,13 @@ import db_entry;
 import base_entry;
 import txn_manager;
 import base_meta;
+import meta_list;
 
 namespace infinity {
 
 struct NewCatalog;
 
-export struct DBMeta : public BaseMeta<DBEntry> {
+export struct DBMeta : public MetaInterface {
     using EntryT = DBEntry;
 
     friend struct NewCatalog;
@@ -72,6 +73,23 @@ private:
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
+
+public:
+    void Cleanup() override;
+
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) override;
+
+    void CleanupMeta() override;
+
+private:
+    MetaList<DBEntry> db_entry_list_{};
+
+    // TODO: remove
+    std::shared_mutex &rw_locker() { return db_entry_list_.rw_locker_; }
+
+public:
+    // TODO: remove
+    List<SharedPtr<DBEntry>> &entry_list() { return db_entry_list_.entry_list_; }
 };
 
 } // namespace infinity

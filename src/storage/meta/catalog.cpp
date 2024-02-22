@@ -57,7 +57,7 @@ import base_meta_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : BaseMetaEntry(EntryType::kCatalog), current_dir_(std::move(dir)) {
+NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
     if (create_default_db) {
         // db current dir is same level as catalog
         Path catalog_path(*this->current_dir_);
@@ -70,7 +70,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : BaseMeta
         DBMeta::AddEntry(db_meta.get(), std::move(db_entry));
 
         this->rw_locker_.lock();
-        this->meta_map_["default"] = std::move(db_meta);
+        this->databases_["default"] = std::move(db_meta);
         this->rw_locker_.unlock();
     }
 }
@@ -86,8 +86,8 @@ NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeS
     DBMeta *db_meta{nullptr};
 
     this->rw_locker_.lock_shared();
-    auto db_iter = this->meta_map_.find(db_name);
-    if (db_iter != this->meta_map_.end()) {
+    auto db_iter = this->databases_.find(db_name);
+    if (db_iter != this->databases_.end()) {
         // Find the db
         db_meta = db_iter->second.get();
         this->rw_locker_.unlock_shared();
@@ -111,9 +111,9 @@ NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeS
 
         db_meta = new_db_meta.get();
         this->rw_locker_.lock();
-        auto db_iter2 = this->meta_map_.find(db_name);
-        if (db_iter2 == this->meta_map_.end()) {
-            this->meta_map_[db_name] = std::move(new_db_meta);
+        auto db_iter2 = this->databases_.find(db_name);
+        if (db_iter2 == this->databases_.end()) {
+            this->databases_[db_name] = std::move(new_db_meta);
         } else {
             db_meta = db_iter2->second.get();
         }
@@ -134,8 +134,8 @@ NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeSta
     this->rw_locker_.lock_shared();
 
     DBMeta *db_meta{nullptr};
-    if (this->meta_map_.find(db_name) != this->meta_map_.end()) {
-        db_meta = this->meta_map_[db_name].get();
+    if (this->databases_.find(db_name) != this->databases_.end()) {
+        db_meta = this->databases_[db_name].get();
     }
     this->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
@@ -156,8 +156,8 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, Transact
 
     DBMeta *db_meta{nullptr};
     this->rw_locker_.lock_shared();
-    auto iter = this->meta_map_.find(db_name);
-    if (iter != this->meta_map_.end()) {
+    auto iter = this->databases_.find(db_name);
+    if (iter != this->databases_.end()) {
         db_meta = iter->second.get();
     }
     this->rw_locker_.unlock_shared();
@@ -173,8 +173,8 @@ void NewCatalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnM
     this->rw_locker_.lock_shared();
 
     DBMeta *db_meta{nullptr};
-    if (this->meta_map_.find(db_name) != this->meta_map_.end()) {
-        db_meta = this->meta_map_[db_name].get();
+    if (this->databases_.find(db_name) != this->databases_.end()) {
+        db_meta = this->databases_[db_name].get();
     }
     this->rw_locker_.unlock_shared();
 
@@ -186,8 +186,8 @@ Vector<DBEntry *> NewCatalog::Databases(TransactionID txn_id, TxnTimeStamp begin
     this->rw_locker_.lock_shared();
 
     Vector<DBEntry *> res;
-    res.reserve(this->meta_map_.size());
-    for (const auto &db_meta_pair : this->meta_map_) {
+    res.reserve(this->databases_.size());
+    for (const auto &db_meta_pair : this->databases_) {
         DBMeta *db_meta = db_meta_pair.second.get();
         auto [db_entry, status] = db_meta->GetEntry(txn_id, begin_ts);
         if (status.ok()) {
@@ -405,8 +405,8 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
         json_res["current_dir"] = *this->current_dir_;
         json_res["next_txn_id"] = this->next_txn_id_;
         json_res["catalog_version"] = this->catalog_version_;
-        databases.reserve(this->meta_map_.size());
-        for (auto &db_meta : this->meta_map_) {
+        databases.reserve(this->databases_.size());
+        for (auto &db_meta : this->databases_) {
             databases.push_back(db_meta.second.get());
         }
     }
@@ -474,20 +474,20 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto db_name = add_db_meta_op->db_name();
                 UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(MakeShared<String>(db_dir), MakeShared<String>(db_name));
 
-                catalog->meta_map_.insert({db_name, std::move(new_db_meta)});
+                catalog->databases_.insert({db_name, std::move(new_db_meta)});
                 break;
             }
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
                 auto db_name = add_db_entry_op->db_name();
 
-                auto db_meta = catalog->meta_map_.at(db_name).get();
+                auto db_meta = catalog->databases_.at(db_name).get();
                 auto db_entry = DBEntry::NewReplayDBEntry(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
-                if (db_meta->entry_list_.empty()) {
+                if (db_meta->entry_list().empty()) {
                     auto dummy_entry = MakeUnique<DBEntry>();
-                    db_meta->entry_list_.emplace_front(std::move(dummy_entry));
+                    db_meta->entry_list().emplace_front(std::move(dummy_entry));
                 }
-                db_meta->entry_list_.emplace_front(std::move(db_entry));
+                db_meta->entry_list().emplace_front(std::move(db_entry));
                 break;
             }
             case CatalogDeltaOpType::ADD_TABLE_META: {
@@ -495,7 +495,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto db_name = add_table_meta_op->db_name();
                 auto table_name = add_table_meta_op->table_name();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -513,7 +513,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto entry_type = add_table_entry_op->table_entry_type();
                 auto row_count = add_table_entry_op->row_count();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -549,7 +549,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -589,7 +589,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto check_point_ts = add_block_entry_op->checkpoint_ts();
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -620,7 +620,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto block_id = add_column_entry_op->block_id();
                 auto column_id = add_column_entry_op->column_id();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -643,7 +643,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto table_name = add_index_meta_op->table_name();
                 auto index_name = add_index_meta_op->index_name();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -665,7 +665,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto index_dir = add_table_index_entry_op->index_dir();
                 auto index_def = add_table_index_entry_op->index_def();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -697,7 +697,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto index_name = add_fulltext_index_entry_op->index_name();
                 auto index_dir = add_fulltext_index_entry_op->index_dir();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -730,7 +730,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto index_base = add_column_index_entry_op->index_base();
                 auto column_index_dir = add_column_index_entry_op->col_index_dir();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
@@ -767,7 +767,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 auto max_ts = add_segment_column_index_entry_op->max_ts();
                 auto column_id = add_segment_column_index_entry_op->column_id();
 
-                auto *db_meta = catalog->meta_map_.at(db_name).get();
+                auto *db_meta = catalog->databases_.at(db_name).get();
                 LOG_TRACE(fmt::format("at db {}", db_name));
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
@@ -805,10 +805,10 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
 
 void NewCatalog::MergeFrom(NewCatalog &other) {
     // Merge databases.
-    for (auto &[db_name, db_meta2] : other.meta_map_) {
-        auto it = this->meta_map_.find(db_name);
-        if (it == this->meta_map_.end()) {
-            this->meta_map_.emplace(db_name, std::move(db_meta2));
+    for (auto &[db_name, db_meta2] : other.databases_) {
+        auto it = this->databases_.find(db_name);
+        if (it == this->databases_.end()) {
+            this->databases_.emplace(db_name, std::move(db_meta2));
         } else {
             it->second->MergeFrom(*db_meta2.get());
         }
@@ -841,7 +841,7 @@ void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
-            catalog->meta_map_.emplace(*db_meta->db_name(), std::move(db_meta));
+            catalog->databases_.emplace(*db_meta->db_name(), std::move(db_meta));
         }
     }
 }

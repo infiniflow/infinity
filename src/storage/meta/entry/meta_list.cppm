@@ -14,9 +14,7 @@
 
 module;
 
-#include <concepts>
-
-export module base_meta;
+export module meta_list;
 
 import stl;
 import base_entry;
@@ -24,21 +22,9 @@ import infinity_exception;
 
 namespace infinity {
 
-// new
-export class MetaInterface {
+export template <EntryConcept1 Entry>
+class MetaList {
 public:
-    virtual void Cleanup() = 0;
-
-    virtual void CleanupDelete(TxnTimeStamp oldest_txn_ts) = 0;
-
-    virtual void CleanupMeta() = 0;
-};
-
-export template <EntryConcept Entry>
-class BaseMeta {
-public:
-    virtual ~BaseMeta() = default;
-
     // Cleanup the delete inner entry under this meta, return true if all inner entry are deleted
     Pair<Vector<SharedPtr<Entry>>, bool> PickCleanup(TxnTimeStamp oldest_txn_ts);
 
@@ -48,20 +34,39 @@ public:
     // Cleanup the delete inner entry under this meta
     void CleanupDelete(TxnTimeStamp oldest_txn_ts);
 
+    // Cleanup All(no lock is needed)
     void Cleanup();
 
-protected:
-    void MergeWith(BaseMeta<Entry> &other);
+    void MergeWith(MetaList<Entry> &other);
 
-protected:
-    std::shared_mutex rw_locker_{};
+public: // TODO: make both private
+    std::shared_mutex rw_locker_{}; 
 
-    // Ordered by commit_ts from latest to oldest.
     List<SharedPtr<Entry>> entry_list_;
 };
 
-template <EntryConcept Entry>
-void BaseMeta<Entry>::MergeWith(BaseMeta<Entry> &other) {
+template <EntryConcept1 Entry>
+Pair<Vector<SharedPtr<Entry>>, bool> MetaList<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
+    //
+}
+
+template <EntryConcept1 Entry>
+void MetaList<Entry>::CleanupMeta() {
+    //
+}
+
+template <EntryConcept1 Entry>
+void MetaList<Entry>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
+    //
+}
+
+template <EntryConcept1 Entry>
+void MetaList<Entry>::Cleanup() {
+    //
+}
+
+template <EntryConcept1 Entry>
+void MetaList<Entry>::MergeWith(MetaList<Entry> &other) {
     auto &other_list = other.entry_list_;
     auto it1 = entry_list_.begin();
     auto it2 = other_list.begin();
@@ -97,41 +102,5 @@ void BaseMeta<Entry>::MergeWith(BaseMeta<Entry> &other) {
 
     other_list.clear();
 }
-
-template <EntryConcept Entry>
-Pair<Vector<SharedPtr<Entry>>, bool> BaseMeta<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
-    Vector<SharedPtr<Entry>> cleanup_entries;
-    bool all_delete = true;
-    {
-        std::unique_lock wlock(rw_locker_);
-        for (auto iter = entry_list_.begin(); iter != entry_list_.end();) {
-            // TODO
-        }
-    }
-    return {cleanup_entries, all_delete};
-}
-
-template <EntryConcept Entry>
-void BaseMeta<Entry>::CleanupMeta() {
-    //
-}
-
-template <EntryConcept Entry>
-void BaseMeta<Entry>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    //
-}
-
-template <EntryConcept Entry>
-void BaseMeta<Entry>::Cleanup() {
-    //
-}
-
-// old
-export template <typename Meta>
-concept MetaConcept = std::derived_from<Meta, BaseMeta<typename Meta::EntryT>> && std::derived_from<typename Meta::EntryT, BaseEntry>;
-
-// new
-export template <typename Meta>
-concept MetaConcept1 = std::derived_from<Meta, MetaInterface> && std::derived_from<typename Meta::EntryT, BaseEntry>;
 
 } // namespace infinity
