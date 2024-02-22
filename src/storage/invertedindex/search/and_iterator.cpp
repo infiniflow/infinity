@@ -27,6 +27,7 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
     for (u32 i = 0; i < children_.size(); ++i) {
         sorted_iterators_.push_back(children_[i].get());
     }
+    std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto lhs, const auto rhs) { return lhs->GetDF() < rhs->GetDF(); });
 }
 
 AndIterator::~AndIterator() {}
@@ -56,5 +57,13 @@ void AndIterator::DoSeek(docid_t doc_id) {
 
     } while (true);
     doc_id_ = current;
+}
+
+u32 AndIterator::GetDF() const {
+    u32 min_df = std::numeric_limits<u32>::max();
+    for (u32 i = 0; i < children_.size(); ++i) {
+        min_df = std::min(min_df, children_[i]->GetDF());
+    }
+    return min_df;
 }
 } // namespace infinity
