@@ -29,6 +29,7 @@ import extra_ddl_info;
 import column_def;
 import internal_types;
 import base_entry;
+import base_meta_entry;
 import txn_manager;
 import segment_entry;
 import block_entry;
@@ -44,10 +45,12 @@ class TableMeta;
 class Txn;
 struct NewCatalog;
 
-export struct TableEntry : public BaseEntry {
+export struct TableEntry : public BaseMetaEntry<TableIndexMeta> {
     friend struct NewCatalog;
 
 public:
+    explicit TableEntry();
+
     explicit TableEntry(const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -161,7 +164,7 @@ public:
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
-    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_; }
+    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return meta_map_; }
 
     Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
 
@@ -169,8 +172,6 @@ private:
     TableMeta *table_meta_{};
 
     HashMap<String, ColumnID> column_name2column_id_;
-
-    mutable std::shared_mutex rw_locker_{};
 
     SharedPtr<String> table_entry_dir_{};
 
@@ -186,9 +187,6 @@ private:
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
-    // Index meta
-    HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
-
 public:
     // set nullptr to close auto compaction
     void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
@@ -199,11 +197,14 @@ public:
 
     Vector<SegmentEntry *> PickCompactSegments() const;
 
-    void CleanupDeprecatedSegments(TxnTimeStamp oldest_txn_ts);
-
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
+
+public:
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts);
+
+    void Cleanup();
 };
 
 } // namespace infinity

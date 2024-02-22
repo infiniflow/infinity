@@ -51,7 +51,9 @@ import db_entry;
 import table_entry;
 import table_index_entry;
 import segment_entry;
+import block_entry;
 import db_meta;
+import base_meta_entry;
 
 namespace infinity {
 
@@ -109,7 +111,8 @@ public:
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
-export struct NewCatalog {
+
+export struct NewCatalog : public BaseMetaEntry<DBMeta> {
 public:
     explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
 
@@ -224,7 +227,7 @@ public:
 
     bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void MergeFrom(NewCatalog &other);
+    void MergeFrom(NewCatalog &other); // Warning override BaseEntry::MergeFrom
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
 
@@ -245,10 +248,8 @@ public:
 
 public:
     SharedPtr<String> current_dir_{nullptr};
-    HashMap<String, UniquePtr<DBMeta>> databases_{};
     TransactionID next_txn_id_{};
     u64 catalog_version_{}; // TODO seems useless
-    std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};

@@ -25,12 +25,14 @@ import extra_ddl_info;
 import db_entry;
 import base_entry;
 import txn_manager;
+import base_meta;
 
 namespace infinity {
 
 struct NewCatalog;
 
-export struct DBMeta {
+export struct DBMeta : public BaseMeta<DBEntry> {
+    using EntryT = DBEntry;
 
     friend struct NewCatalog;
 
@@ -63,19 +65,13 @@ private:
     Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-    // Thread-unsafe
-    List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
 
     // Used in initialization phase
-    static void AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry);
+    static void AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry);
 
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
-
-    std::shared_mutex rw_locker_{};
-    // Ordered by commit_ts from latest to oldest.
-    List<SharedPtr<BaseEntry>> entry_list_{};
 };
 
 } // namespace infinity

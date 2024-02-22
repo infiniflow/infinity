@@ -27,6 +27,7 @@ import txn_state;
 import status;
 import catalog_delta_entry;
 import infinity_exception;
+import base_entry;
 
 namespace infinity {
 
@@ -43,7 +44,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
     //    rw_locker_.lock();
     if (this->entry_list_.empty()) {
         // Insert a dummy entry.
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        auto dummy_entry = MakeUnique<DBEntry>();
         dummy_entry->deleted_ = true;
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
@@ -269,7 +270,7 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
     }
 }
 
-void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry) {
+void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry) {
     std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker_);
     db_meta->entry_list_.emplace_front(std::move(db_entry));
 }
@@ -406,7 +407,7 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
         }
     }
     res->entry_list_.sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
-    auto dummy_entry = MakeShared<BaseEntry>(EntryType::kDummy);
+    auto dummy_entry = MakeShared<DBEntry>();
     res->entry_list_.emplace_back(dummy_entry);
     return res;
 }
@@ -419,7 +420,7 @@ void DBMeta::MergeFrom(DBMeta &other) {
     if (!IsEqual(*this->data_dir_, *other.data_dir_)) {
         UnrecoverableError("DBMeta::MergeFrom requires db_dir_ match");
     }
-    MergeLists(this->entry_list_, other.entry_list_);
+    this->MergeWith(other);
 }
 
 } // namespace infinity

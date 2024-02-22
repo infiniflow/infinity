@@ -14,6 +14,8 @@
 
 module;
 
+#include <concepts>
+
 export module base_entry;
 
 import stl;
@@ -21,8 +23,9 @@ import default_values;
 
 namespace infinity {
 
-export enum EntryType : i8 {
+export enum class EntryType : i8 {
     kDummy,
+    kCatalog,
     kDatabase,
     kTable,
     kTableIndex,
@@ -35,6 +38,18 @@ export enum EntryType : i8 {
     kBlock,
     kBlockColumn,
 };
+
+export class EntryInterface {
+public:
+    virtual ~EntryInterface() = default;
+
+    virtual void Cleanup() = 0;
+
+    virtual void CleanupDelete(TxnTimeStamp oldest_txn_ts) = 0;
+};
+
+export template <typename Entry>
+concept EntryConcept1 = std::derived_from<Entry, EntryInterface>;
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
@@ -50,6 +65,12 @@ export struct BaseEntry {
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 
     static inline bool Committed(BaseEntry *base_entry) { return base_entry->commit_ts_ != UNCOMMIT_TS; }
+
+    // Do nothing by default.
+    void Cleanup() {}
+
+    // Do nothing by default.
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts) {}
 
 public:
     // Reserved
@@ -68,5 +89,9 @@ public:
 
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
+
+// old, TODO: remove
+export template <typename Entry>
+concept EntryConcept = std::derived_from<Entry, BaseEntry>;
 
 } // namespace infinity

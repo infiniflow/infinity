@@ -40,6 +40,8 @@ import block_entry;
 import segment_entry;
 import compact_segments_task;
 
+import default_values; // FIXME: remove it
+
 module wal_manager;
 
 namespace infinity {
@@ -734,7 +736,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
         segment_entry->SetNoDelete();
-        segment_entry->SetDeprecated();
+        segment_entry->SetDeprecated(UNCOMMIT_TS); // FIXME: use correct deprecate_ts
     }
 }
 

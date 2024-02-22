@@ -25,14 +25,16 @@ import status;
 import extra_ddl_info;
 import column_def;
 import base_entry;
+import base_meta;
+import table_entry;
 
 namespace infinity {
 
 class DBEntry;
-class TableEntry;
 class TxnManager;
 
-export struct TableMeta {
+export struct TableMeta : public BaseMeta<TableEntry> {
+    using EntryT = TableEntry;
 
     friend class DBEntry;
     friend struct NewCatalog;
@@ -76,14 +78,10 @@ private:
     Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
-    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 
     DBEntry *db_entry_{};
-
-    // Ordered by commit_ts from latest to oldest.
-    List<SharedPtr<BaseEntry>> entry_list_{};
 };
 
 } // namespace infinity

@@ -72,6 +72,10 @@ public:
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
 
+    void Cleanup();
+
+    void CleanupDelete(TxnTimeStamp oldest_txn_ts);
+
 public:
     // Getter
     const SharedPtr<String> &col_index_dir() const { return col_index_dir_; }

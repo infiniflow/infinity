@@ -147,6 +147,20 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
+void ColumnIndexEntry::Cleanup() {
+    for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
+        segment_column_index_entry->Cleanup();
+    }
+}
+
+void ColumnIndexEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
+    Vector<SharedPtr<SegmentColumnIndexEntry>> cleanup_entries;
+    {
+        std::unique_lock w_lock(this->rw_locker_);
+        // the same as segment_entry
+    }
+}
+
 SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
     LocalFileSystem fs;
     SharedPtr<String> index_dir;

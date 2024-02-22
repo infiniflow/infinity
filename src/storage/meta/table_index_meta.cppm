@@ -23,6 +23,7 @@ import third_party;
 import index_def;
 import status;
 import extra_ddl_info;
+import base_meta;
 
 namespace infinity {
 
@@ -31,10 +32,12 @@ class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
-export class TableIndexMeta {
+export class TableIndexMeta : public BaseMeta<TableIndexEntry> {
     friend struct TableEntry;
 
 public:
+    using EntryT = TableIndexEntry;
+
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
 
     static UniquePtr<TableIndexMeta> NewTableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
@@ -80,13 +83,13 @@ private:
 
 public:
     String index_name() const { return *index_name_; }
-    List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
+    List<SharedPtr<TableIndexEntry>> &entry_list() { return entry_list_; }
 
 private:
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};
 
-    std::shared_mutex rw_locker_{};
-    List<SharedPtr<BaseEntry>> entry_list_{};
+    // std::shared_mutex rw_locker_{};
+    // List<SharedPtr<BaseEntry>> entry_list_{};
 };
 } // namespace infinity

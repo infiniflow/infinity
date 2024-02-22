@@ -20,6 +20,7 @@ import stl;
 import table_entry_type;
 import table_meta;
 import base_entry;
+import base_meta_entry;
 import table_entry;
 import third_party;
 import table_detail;
@@ -32,10 +33,12 @@ namespace infinity {
 
 class TxnManager;
 
-export class DBEntry : public BaseEntry {
+export class DBEntry : public BaseMetaEntry<TableMeta> {
     friend struct NewCatalog;
 
 public:
+    explicit DBEntry();
+
     explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry>
@@ -65,7 +68,7 @@ public:
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
 
-    [[nodiscard]] HashMap<String, UniquePtr<TableMeta>> &tables() { return tables_; }
+    [[nodiscard]] HashMap<String, UniquePtr<TableMeta>> &tables() { return meta_map_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
@@ -87,9 +90,7 @@ private:
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
-    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableMeta>> tables_{};
 };
 } // namespace infinity

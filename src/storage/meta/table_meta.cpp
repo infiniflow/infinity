@@ -65,7 +65,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
     TableEntry *table_entry_ptr{nullptr};
 
     if (this->entry_list_.empty()) {
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        auto dummy_entry = MakeUnique<TableEntry>();
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
         SharedPtr<TableEntry> table_entry =
@@ -309,7 +309,7 @@ void TableMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
         return;
     }
 
-    auto removed_iter = std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<BaseEntry> &entry) -> bool {
+    auto removed_iter = std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<TableEntry> &entry) -> bool {
         return entry->txn_id_ == txn_id;
     });
 
@@ -458,7 +458,7 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
         }
     }
     res->entry_list_.sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
-    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+    auto dummy_entry = MakeUnique<TableEntry>();
     dummy_entry->deleted_ = true;
     res->entry_list_.emplace_back(std::move(dummy_entry));
 
@@ -470,7 +470,7 @@ void TableMeta::MergeFrom(TableMeta &other) {
     if (!IsEqual(*this->table_name_, *other.table_name_) || !IsEqual(*this->db_entry_dir_, *other.db_entry_dir_)) {
         UnrecoverableError("DBEntry::MergeFrom requires table_name_ and db_entry_dir_ match");
     }
-    MergeLists(this->entry_list_, other.entry_list_);
+    this->MergeWith(other);
 }
 
 } // namespace infinity

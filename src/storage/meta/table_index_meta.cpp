@@ -89,7 +89,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
 
     if (this->entry_list_.empty()) {
         // Insert a dummy entry.
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        // UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        auto dummy_entry = MakeUnique<TableIndexEntry>();
         dummy_entry->deleted_ = true;
         this->entry_list_.emplace_back(std::move(dummy_entry));
 
@@ -404,8 +405,9 @@ void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
 
     // `std::remove_if` move all elements that satisfy the predicate and move all the last element to the front of list. return value is the end of
     // the moved elements.
-    auto removed_iter =
-        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
+    auto removed_iter = std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<TableIndexEntry> &entry) {
+        return entry->txn_id_ == txn_id;
+    });
     // erase the all "moved" elements in the end of list
     this->entry_list_.erase(removed_iter, this->entry_list_.end());
 }
@@ -414,7 +416,7 @@ void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
     if (!IsEqual(*this->index_name_, *other.index_name_)) {
         UnrecoverableError("TableIndexMeta::MergeFrom requires index_name_ match");
     }
-    MergeLists(this->entry_list_, other.entry_list_);
+    this->MergeWith(other);
 }
 
 } // namespace infinity

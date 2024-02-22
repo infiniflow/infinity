@@ -46,8 +46,11 @@ import data_type;
 import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
+import base_meta_entry;
 
 namespace infinity {
+
+TableEntry::TableEntry() : BaseMetaEntry(EntryType::kDummy) {}
 
 TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        SharedPtr<String> table_collection_name,
@@ -56,7 +59,7 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        TableMeta *table_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_meta_(table_meta),
+    : BaseMetaEntry(EntryType::kTable), table_meta_(table_meta),
       table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
       table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
     SizeT column_count = columns.size();
@@ -120,7 +123,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
     // TODO: lock granularity can be narrowed.
     this->rw_locker_.lock_shared();
-    if (auto iter = this->index_meta_map_.find(*index_def->index_name_); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
         table_index_meta = iter->second.get();
     }
     this->rw_locker_.unlock_shared();
@@ -140,11 +143,11 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         this->rw_locker_.lock();
 
-        if (auto iter = this->index_meta_map_.find(*index_def->index_name_); iter != this->index_meta_map_.end()) {
+        if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
             table_index_meta = iter->second.get();
         } else {
 
-            this->index_meta_map_[*index_def->index_name_] = std::move(new_table_index_meta);
+            this->index_meta_map()[*index_def->index_name_] = std::move(new_table_index_meta);
         }
         this->rw_locker_.unlock();
     }
@@ -158,7 +161,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
     this->rw_locker_.lock_shared();
 
     TableIndexMeta *index_meta{nullptr};
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         index_meta = iter->second.get();
     }
     this->rw_locker_.unlock_shared();
@@ -184,7 +187,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         return iter->second->GetEntry(txn_id, begin_ts);
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
@@ -196,7 +199,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     this->rw_locker_.lock_shared();
 
     TableIndexMeta *table_index_meta{nullptr};
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         table_index_meta = iter->second.get();
     }
     this->rw_locker_.unlock_shared();
@@ -210,7 +213,7 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    for (auto &[_, table_index_meta] : this->index_meta_map_) {
+    for (auto &[_, table_index_meta] : this->index_meta_map()) {
         auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (status.ok()) {
             fulltext_index_entry = table_index_entry->fulltext_index_entry();
@@ -515,9 +518,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
             segment_candidates.emplace_back(segment_entry.get());
         }
 
-        table_index_meta_candidates.reserve(this->index_meta_map_.size());
-        table_index_name_candidates.reserve(this->index_meta_map_.size());
-        for (const auto &[index_name, table_index_meta] : this->index_meta_map_) {
+        table_index_meta_candidates.reserve(this->index_meta_map().size());
+        table_index_name_candidates.reserve(this->index_meta_map().size());
+        for (const auto &[index_name, table_index_meta] : this->index_meta_map()) {
             table_index_meta_candidates.emplace_back(table_index_meta.get());
             table_index_name_candidates.emplace_back(index_name);
         }
@@ -600,7 +603,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
             UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
             String index_name = index_def_meta_json["index_name"];
-            table_entry->index_meta_map_.emplace(std::move(index_name), std::move(table_index_meta));
+            table_entry->index_meta_map().emplace(std::move(index_name), std::move(table_index_meta));
         }
     }
 
@@ -644,10 +647,10 @@ void TableEntry::MergeFrom(BaseEntry &other) {
         }
     }
 
-    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {
-        auto it = this->index_meta_map_.find(index_name);
-        if (it == this->index_meta_map_.end()) {
-            this->index_meta_map_.emplace(index_name, std::move(table_index_meta));
+    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map()) {
+        auto it = this->index_meta_map().find(index_name);
+        if (it == this->index_meta_map().end()) {
+            this->index_meta_map().emplace(index_name, std::move(table_index_meta));
         } else {
             it->second->MergeFrom(*table_index_meta.get());
         }
@@ -699,7 +702,8 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
     return result;
 }
 
-void TableEntry::CleanupDeprecatedSegments(TxnTimeStamp oldest_txn_ts) {
+void TableEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
+    this->BaseMetaEntry<TableIndexMeta>::CleanupDelete(oldest_txn_ts);
     Vector<SharedPtr<SegmentEntry>> cleanup_segments;
     {
         std::unique_lock lock(this->rw_locker_);
@@ -713,6 +717,14 @@ void TableEntry::CleanupDeprecatedSegments(TxnTimeStamp oldest_txn_ts) {
         }
     }
     for (auto &segment : cleanup_segments) {
+        segment->Cleanup();
+    }
+}
+
+// FIXME: not good impl. Use composition instead of inheritance
+void TableEntry::Cleanup() {
+    this->BaseMetaEntry<TableIndexMeta>::Cleanup();
+    for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup();
     }
 }

@@ -32,8 +32,11 @@ import catalog_delta_entry;
 import base_table_ref;
 import iresearch_datastore;
 import create_index_info;
+import base_entry;
 
 namespace infinity {
+
+TableIndexEntry::TableIndexEntry() : BaseEntry(EntryType::kDummy) {}
 
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                                  TableIndexMeta *table_index_meta,
@@ -285,6 +288,13 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 
     const auto *column_def = table_entry->GetColumnDefByID(column_id);
     return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
+}
+
+void TableIndexEntry::Cleanup() {
+    for (auto &[column_id, column_index_entry] : column_index_map_) {
+        column_index_entry->Cleanup();
+    }
+    // FIXME: to cleanup fulltext_index_entry_
 }
 
 } // namespace infinity

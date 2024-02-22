@@ -41,6 +41,8 @@ export struct TableIndexEntry : public BaseEntry {
     friend struct TableEntry;
 
 public:
+    TableIndexEntry();
+
     TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
@@ -86,6 +88,8 @@ public:
     Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
+
+    void Cleanup();
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);

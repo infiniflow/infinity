@@ -418,6 +418,20 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
+bool SegmentColumnIndexEntry::CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const {
+    // not implemented
+    return false;
+}
+
+void SegmentColumnIndexEntry::Cleanup() {
+    for (auto *buffer_obj : vector_buffer_) {
+        if (buffer_obj == nullptr) {
+            UnrecoverableError("vector_buffer should not has nullptr.");
+        }
+        buffer_obj->CloseFile();
+    }
+}
+
 void SegmentColumnIndexEntry::SaveIndexFile() {
     String &index_name = *this->column_index_entry_->col_index_dir();
     u64 segment_id = this->segment_id_;
