@@ -32,6 +32,7 @@ import infinity_exception;
 import status;
 import catalog_delta_entry;
 import column_def;
+import local_file_system;
 
 namespace infinity {
 
@@ -261,7 +262,6 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
     res->entry_type_ = entry_type;
-    res->db_entry_dir_ = db_entry_dir;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
@@ -305,8 +305,11 @@ bool DBEntry::PickCleanup(CleanupScanner *scanner) {
     return false;
 }
 
-void DBEntry::Cleanup() {
-    //
+void DBEntry::Cleanup() && {
+    std::move(table_meta_map_).Cleanup();
+
+    LocalFileSystem fs;
+    fs.DeleteDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

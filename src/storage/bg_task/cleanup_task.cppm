@@ -18,30 +18,32 @@ export module cleanup_task;
 
 import stl;
 import bg_task;
-import txn;
+import base_entry;
 import catalog;
-import table_entry;
+import default_values;
 
 namespace infinity {
 
 export class CleanupTask final : public BGTask {
 public:
-    CleanupTask(NewCatalog *catalog, Txn *txn);
+    // Clean up is async task ?
+    CleanupTask(NewCatalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
 
 public:
     ~CleanupTask() override = default;
 
     String ToString() const override { return "CleanupTask"; }
 
-    void Execute();
-
-private:
-    void CleanupTable(TableEntry *table_entry);
+    void Execute() {
+        // CleanupScanner scanner;
+        CleanupScanner scanner(catalog_, visible_ts_);
+        scanner.Scan();
+    }
 
 private:
     NewCatalog *const catalog_;
 
-    Txn *const txn_;
+    const TxnTimeStamp visible_ts_;
 };
 
 } // namespace infinity

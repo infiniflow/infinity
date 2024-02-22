@@ -28,6 +28,7 @@ import status;
 import catalog_delta_entry;
 import infinity_exception;
 import base_entry;
+import local_file_system;
 
 namespace infinity {
 
@@ -423,8 +424,12 @@ void DBMeta::MergeFrom(DBMeta &other) {
     this->db_entry_list_.MergeWith(db_entry_list_);
 }
 
-void DBMeta::Cleanup() {
-    //
+void DBMeta::Cleanup() && {
+    std::move(db_entry_list_).Cleanup();
+
+    String db_meta_dir = fmt::format("{}/{}", *data_dir_, *db_name_);
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(db_meta_dir);
 }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }

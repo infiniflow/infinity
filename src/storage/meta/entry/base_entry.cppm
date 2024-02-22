@@ -63,7 +63,7 @@ public:
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
-    bool Cleanupable(TxnTimeStamp visible_ts) const { return deleted_ && commit_ts_ <= visible_ts; }
+    bool Cleanupable(TxnTimeStamp visible_ts) const;
 
 public:
     atomic_u64 txn_id_{0};
@@ -77,6 +77,7 @@ public:
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
+// forwarding declaration
 export class CleanupScanner;
 
 export class MetaInterface {
@@ -85,7 +86,7 @@ public:
 
     virtual bool PickCleanup(CleanupScanner *scanner) = 0;
 
-    virtual void Cleanup() = 0;
+    virtual void Cleanup() && = 0;
 };
 
 export template <typename Meta>
@@ -95,7 +96,7 @@ export class EntryInterface {
 public:
     virtual ~EntryInterface() = default;
 
-    virtual void Cleanup() = 0;
+    virtual void Cleanup() && = 0;
 
     virtual bool PickCleanup(CleanupScanner *scanner) = 0;
 };
@@ -105,9 +106,11 @@ concept EntryConcept = std::derived_from<Entry, EntryInterface>;
 
 export class CleanupScanner {
 public:
-    explicit CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
+    // CleanupScanner() : catalog_(nullptr), visible_ts_(0) {}
 
-    void Scan(TxnTimeStamp visible_ts);
+    CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts);
+
+    void Scan();
 
     void AddMeta(UniquePtr<MetaInterface> meta);
 

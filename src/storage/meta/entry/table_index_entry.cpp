@@ -297,7 +297,7 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 //     // FIXME: to cleanup fulltext_index_entry_
 // }
 
-void TableIndexEntry::Cleanup() {}
+void TableIndexEntry::Cleanup() && {}
 
 bool TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
     if (this->Cleanupable(scanner->visible_ts())) {

@@ -199,7 +199,7 @@ private:
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
 
 public:
-    void Cleanup() override;
+    void Cleanup() && override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 };

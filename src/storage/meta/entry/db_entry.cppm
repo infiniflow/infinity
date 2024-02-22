@@ -64,9 +64,7 @@ public:
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
-    [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
-
-    [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
+    [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
@@ -88,7 +86,7 @@ private:
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
-    SharedPtr<String> db_entry_dir_{};
+    const SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
 
     MetaMap<TableMeta> table_meta_map_{};
@@ -101,6 +99,6 @@ private: // TODO: remote it
 public:
     bool PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() override;
+    void Cleanup() && override;
 };
 } // namespace infinity

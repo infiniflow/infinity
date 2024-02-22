@@ -173,7 +173,7 @@ private:
 
     HashMap<String, ColumnID> column_name2column_id_;
 
-    SharedPtr<String> table_entry_dir_{};
+    const SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_name_{};
 
@@ -210,7 +210,7 @@ public: // TODO: remote it?
 public:
     bool PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() override;
+    void Cleanup() && override;
 };
 
 } // namespace infinity

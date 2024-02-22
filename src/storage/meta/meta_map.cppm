@@ -18,29 +18,22 @@ export module meta_map;
 
 import stl;
 import base_entry;
+import local_file_system;
 
 namespace infinity {
 
 export template <MetaConcept Meta>
 class MetaMap {
 public:
-    using InnerEntry = typename Meta::EntryT;
-
-public:
-    void Cleanup();
-
     void PickCleanup(CleanupScanner *scanner);
 
-public: // TODO: make both private
+    void Cleanup() &&;
+
+public:                                     // TODO: make both private
     mutable std::shared_mutex rw_locker_{}; // FIX
 
     HashMap<String, UniquePtr<Meta>> meta_map_;
 };
-
-template <MetaConcept Meta>
-void MetaMap<Meta>::Cleanup() {
-    //
-}
 
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
@@ -54,6 +47,13 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         } else {
             ++iter;
         }
+    }
+}
+
+template <MetaConcept Meta>
+void MetaMap<Meta>::Cleanup() && {
+    for (auto &[name, meta] : meta_map_) {
+        std::move(*meta).Cleanup();
     }
 }
 

@@ -46,6 +46,7 @@ import data_type;
 import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
+import local_file_system;
 
 namespace infinity {
 
@@ -577,7 +578,6 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
-    table_entry->table_entry_dir_ = table_entry_dir;
 
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {
@@ -721,12 +721,14 @@ bool TableEntry::PickCleanup(CleanupScanner *scanner) {
     return false;
 }
 
-// FIXME: not good impl. Use composition instead of inheritance
-void TableEntry::Cleanup() {
-    // this->BaseMetaEntry<TableIndexMeta>::Cleanup();
-    // for (auto &[segment_id, segment] : segment_map_) {
-    //     segment->Cleanup();
-    // }
+void TableEntry::Cleanup() && {
+    for (auto &[segment_id, segment] : segment_map_) {
+        std::move(*segment).Cleanup();
+    }
+    std::move(index_meta_map_).Cleanup();
+
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

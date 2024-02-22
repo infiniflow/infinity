@@ -75,7 +75,7 @@ private:
     SharedPtr<String> data_dir_{};
 
 public:
-    void Cleanup() override;
+    void Cleanup() && override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

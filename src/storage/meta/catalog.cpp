@@ -499,7 +499,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
-                auto table_meta = TableMeta::NewTableMeta(db_entry->db_entry_dir_, MakeShared<String>(table_name), db_entry);
+                auto table_meta = TableMeta::NewTableMeta(db_entry->db_entry_dir(), MakeShared<String>(table_name), db_entry);
                 db_entry->table_meta_map().insert({table_name, std::move(table_meta)});
                 break;
             }

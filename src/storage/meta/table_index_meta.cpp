@@ -31,7 +31,7 @@ import infinity_exception;
 import status;
 import iresearch_datastore;
 import extra_ddl_info;
-
+import local_file_system;
 import txn;
 
 namespace infinity {
@@ -419,7 +419,13 @@ void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
     this->index_entry_list_.MergeWith(other.index_entry_list_);
 }
 
-void TableIndexMeta::Cleanup() {}
+void TableIndexMeta::Cleanup() && {
+    std::move(index_entry_list_).Cleanup();
+
+    LocalFileSystem fs;
+    // FIXME(sys) remove table index meta dir
+
+}
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 

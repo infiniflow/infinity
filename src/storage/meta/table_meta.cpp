@@ -28,7 +28,7 @@ import txn_state;
 import txn_manager;
 import buffer_manager;
 import catalog_delta_entry;
-
+import local_file_system;
 import third_party;
 import status;
 import infinity_exception;
@@ -474,7 +474,13 @@ void TableMeta::MergeFrom(TableMeta &other) {
     this->table_entry_list_.MergeWith(other.table_entry_list_);
 }
 
-void TableMeta::Cleanup() {}
+void TableMeta::Cleanup() && {
+    std::move(table_entry_list_).Cleanup();
+
+    String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(table_meta_dir);
+}
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 

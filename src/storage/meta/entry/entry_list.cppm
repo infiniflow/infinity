@@ -27,7 +27,7 @@ class EntryList {
 public:
     bool PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup();
+    void Cleanup() &&;
 
     void MergeWith(EntryList<Entry> &other);
 
@@ -54,8 +54,10 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 }
 
 template <EntryConcept Entry>
-void EntryList<Entry>::Cleanup() {
-    //
+void EntryList<Entry>::Cleanup() && {
+    for (auto &entry : entry_list_) {
+        std::move(*entry).Cleanup();
+    }
 }
 
 template <EntryConcept Entry>
