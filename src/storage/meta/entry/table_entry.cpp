@@ -46,7 +46,6 @@ import data_type;
 import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
-import base_meta_entry;
 
 namespace infinity {
 

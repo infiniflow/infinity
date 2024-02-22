@@ -18,11 +18,12 @@ export module entry_list;
 
 import stl;
 import base_entry;
+import base_meta;
 import infinity_exception;
 
 namespace infinity {
 
-export template <EntryConcept1 Entry>
+export template <EntryConcept Entry>
 class EntryList {
 public:
     // Cleanup the delete inner entry under this meta, return true if all inner entry are deleted
@@ -40,32 +41,32 @@ public:
     void MergeWith(EntryList<Entry> &other);
 
 public: // TODO: make both private
-    mutable std::shared_mutex rw_locker_{}; 
+    mutable std::shared_mutex rw_locker_{};
 
     List<SharedPtr<Entry>> entry_list_;
 };
 
-template <EntryConcept1 Entry>
+template <EntryConcept Entry>
 Pair<Vector<SharedPtr<Entry>>, bool> EntryList<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
     //
 }
 
-template <EntryConcept1 Entry>
+template <EntryConcept Entry>
 void EntryList<Entry>::CleanupMeta() {
     //
 }
 
-template <EntryConcept1 Entry>
+template <EntryConcept Entry>
 void EntryList<Entry>::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
     //
 }
 
-template <EntryConcept1 Entry>
+template <EntryConcept Entry>
 void EntryList<Entry>::Cleanup() {
     //
 }
 
-template <EntryConcept1 Entry>
+template <EntryConcept Entry>
 void EntryList<Entry>::MergeWith(EntryList<Entry> &other) {
     auto &other_list = other.entry_list_;
     auto it1 = entry_list_.begin();
@@ -102,5 +103,56 @@ void EntryList<Entry>::MergeWith(EntryList<Entry> &other) {
 
     other_list.clear();
 }
+
+// template <EntryConcept Entry>
+// void BaseMeta<Entry>::MergeWith(BaseMeta<Entry> &other) {
+//     auto &other_list = other.entry_list_;
+//     auto it1 = entry_list_.begin();
+//     auto it2 = other_list.begin();
+
+//     while (it1 != entry_list_.end() && it2 != other_list.end()) {
+//         if ((*it1)->entry_type_ == EntryType::kDummy) {
+//             ++it1;
+//         } else if ((*it2)->entry_type_ == EntryType::kDummy) {
+//             ++it2;
+//         } else {
+//             if (!(*it1)->Committed() || !(*it2)->Committed()) {
+//                 UnrecoverableError("MergeLists requires entries be committed");
+//             }
+//             if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
+//                 ++it1;
+//             } else if ((*it1)->commit_ts_ < (*it2)->commit_ts_) {
+//                 entry_list_.insert(it1, std::move(*it2));
+//                 ++it2;
+//             } else {
+//                 (*it1)->MergeFrom(**it2);
+//                 ++it1;
+//                 ++it2;
+//             }
+//         }
+//     }
+
+//     while (it2 != other_list.end()) {
+//         if ((*it2)->entry_type_ != EntryType::kDummy) {
+//             entry_list_.insert(it1, std::move(*it2));
+//         }
+//         ++it2;
+//     }
+
+//     other_list.clear();
+// }
+
+// template <EntryConcept Entry>
+// Pair<Vector<SharedPtr<Entry>>, bool> BaseMeta<Entry>::PickCleanup(TxnTimeStamp oldest_txn_ts) {
+//     Vector<SharedPtr<Entry>> cleanup_entries;
+//     bool all_delete = true;
+//     {
+//         std::unique_lock wlock(rw_locker_);
+//         for (auto iter = entry_list_.begin(); iter != entry_list_.end();) {
+//             // TODO
+//         }
+//     }
+//     return {cleanup_entries, all_delete};
+// }
 
 } // namespace infinity

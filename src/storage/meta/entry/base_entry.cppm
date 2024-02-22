@@ -39,7 +39,6 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
-// new
 export class EntryInterface {
 public:
     virtual void Cleanup() = 0;
@@ -81,12 +80,7 @@ public:
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
-// old, TODO: remove
 export template <typename Entry>
-concept EntryConcept = std::derived_from<Entry, BaseEntry>;
-
-// new
-export template <typename Entry>
-concept EntryConcept1 = std::derived_from<Entry, EntryInterface>;
+concept EntryConcept = std::derived_from<Entry, EntryInterface>;
 
 } // namespace infinity

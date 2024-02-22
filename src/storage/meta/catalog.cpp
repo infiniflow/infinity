@@ -52,7 +52,6 @@ import block_column_entry;
 import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
-import base_meta_entry;
 
 namespace infinity {
 

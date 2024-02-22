@@ -29,7 +29,6 @@ import extra_ddl_info;
 import column_def;
 import internal_types;
 import base_entry;
-import base_meta_entry;
 import txn_manager;
 import segment_entry;
 import block_entry;

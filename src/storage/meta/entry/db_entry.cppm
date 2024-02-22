@@ -20,7 +20,6 @@ import stl;
 import table_entry_type;
 import table_meta;
 import base_entry;
-import base_meta_entry;
 import table_entry;
 import third_party;
 import table_detail;
