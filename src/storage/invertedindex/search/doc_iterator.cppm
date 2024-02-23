@@ -45,6 +45,8 @@ public:
 
     virtual void DoSeek(docid_t doc_id) = 0;
 
+    virtual u32 GetDF() const = 0;
+
 protected:
     docid_t doc_id_;
 };

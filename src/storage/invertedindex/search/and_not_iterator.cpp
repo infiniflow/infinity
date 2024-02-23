@@ -28,5 +28,19 @@ AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) { child
 
 AndNotIterator::~AndNotIterator() {}
 
-void AndNotIterator::DoSeek(docid_t id) {}
+void AndNotIterator::DoSeek(docid_t doc_id) {
+    if (!children_[0]->Seek(doc_id)) {
+        // not match in positive child
+        return;
+    }
+    for (u32 i = 1; i < children_.size(); ++i) {
+        if (children_[i]->Seek(doc_id)) {
+            // match in negative child
+            return;
+        }
+    }
+    doc_id_ = doc_id;
+}
+
+u32 AndNotIterator::GetDF() const { return children_[0]->GetDF(); }
 } // namespace infinity

@@ -32,8 +32,6 @@ public:
 
     void DoSeek(docid_t doc_id) override;
 
-private:
-    DocIterator *left_iterator_{nullptr};
-    DocIterator *right_iterator_{nullptr};
+    u32 GetDF() const override;
 };
 } // namespace infinity
