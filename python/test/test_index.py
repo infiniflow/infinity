@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pytest
 
 import common_values
 import infinity
@@ -138,7 +139,53 @@ class TestIndex:
         assert res
 
     # create / drop index with invalid options
+    @pytest.mark.skip(reason="Expected error.")
+    @pytest.mark.parametrize("cl_name", [1, 2.2, (1, 2), "c1", [1, 2, 3]])
+    @pytest.mark.parametrize("index_type", [
+        1, 2.2, [1, 2], "$#%dfva", (1, 2), {"1": 2},
+        index.IndexType.Hnsw, index.IndexType.IVFFlat, index.IndexType.FullText
+    ])
+    @pytest.mark.parametrize("params", [
+        1, 2.2, [1, 2], "$#%dfva", (1, 2), {"1": 2},
+        [index.InitParameter("centroids_count", "128"),
+         index.InitParameter("metric", "l2")]
+    ])
+    def test_create_drop_index_invalid_options(self, cl_name, index_type, params):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+        table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
+            "c1": "vector,3,float"}, None)
+
+        index_info = [cl_name, index_type, params]
+        table_obj.create_index("my_index", index_info, None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
+
     # create index on dropped table instance
+    @pytest.mark.skip(reason="Cause core dumped.")
+    def test_create_index_on_dropped_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+        table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
+            "c1": "vector,3,float"}, None)
+        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+
+        # create created index
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res
 
     # create index then show index
     # drop index then show index

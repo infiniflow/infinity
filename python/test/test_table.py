@@ -451,7 +451,6 @@ class TestTable:
         pass
 
     # create/drop/list/get 1K table to reach the limit
-    @pytest.mark.skip(reason="Cause service termination")
     def test_create_1K_table(self):
         """
         target: create/drop/list/get 1K table
