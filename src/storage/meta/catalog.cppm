@@ -121,7 +121,11 @@ public:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<DBEntry *, Status> DropDatabase(const String &db_name,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts,
+                                          TxnManager *txn_mgr,
+                                          ConflictType conflict_type = ConflictType::kError);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
