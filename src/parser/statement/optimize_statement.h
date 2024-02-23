@@ -39,7 +39,7 @@ public:
 
     OptimizeType type_;
 
-    std::string schema_name_{"default"};
+    std::string schema_name_{};
     std::string table_name_{};
 };
 

@@ -108,7 +108,6 @@ void Connection::HandleRequest() {
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
-    query_context_ptr->set_current_schema(session_->current_database());
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {
