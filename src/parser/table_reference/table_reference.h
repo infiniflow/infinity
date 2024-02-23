@@ -27,7 +27,7 @@ public:
 
     std::string ToString() override;
 
-    std::string db_name_{"default"};
+    std::string db_name_{};
     std::string table_name_{};
 
     [[nodiscard]] std::string GetTableName() const;
