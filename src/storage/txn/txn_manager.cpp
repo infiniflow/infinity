@@ -115,7 +115,10 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     return;
 }
 
-void TxnManager::Start() { is_running_.store(true, std::memory_order::relaxed); }
+void TxnManager::Start() {
+    is_running_.store(true, std::memory_order::relaxed);
+    LOG_INFO("TxnManager is started.");
+}
 
 void TxnManager::Stop() {
     bool expected = true;
@@ -125,7 +128,7 @@ void TxnManager::Stop() {
         return;
     }
 
-    LOG_INFO("TxnManager is stopping...");
+    LOG_INFO("Txn manager is stopping...");
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = priority_que_.begin();
     while (it != priority_que_.end()) {
