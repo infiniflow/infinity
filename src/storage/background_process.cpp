@@ -28,8 +28,8 @@ namespace infinity {
 BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager) : wal_manager_(wal_manager) {}
 
 void BGTaskProcessor::Start() {
-    LOG_INFO("Start the background processor.");
     processor_thread_ = Thread([this] { Process(); });
+    LOG_INFO("Background processor is started.");
 }
 
 void BGTaskProcessor::Stop() {
@@ -37,7 +37,7 @@ void BGTaskProcessor::Stop() {
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
-    LOG_INFO("Shutdown the background processor.");
+    LOG_INFO("Background processor is stopped.");
 }
 
 void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
