@@ -352,7 +352,7 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindDDLInfo(statement->create_info_.get());
+    BindSchemaName(statement->create_info_->schema_name_);
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildCreateTable(statement, bind_context_ptr);
@@ -608,7 +608,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 }
 
 Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindDDLInfo(statement->drop_info_.get());
+    BindSchemaName(statement->drop_info_->schema_name_);
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildDropTable(statement, bind_context_ptr);
@@ -1130,8 +1130,6 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     this->logical_plan_ = explain_node;
     return Status::OK();
 }
-
-void LogicalPlanner::BindDDLInfo(ExtraDDLInfo *ddl_info) const { BindSchemaName(ddl_info->schema_name_); }
 
 void LogicalPlanner::BindSchemaName(String &schema_name) const {
     if (schema_name.empty()) {
