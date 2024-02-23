@@ -26,7 +26,7 @@ namespace infinity {
 
 CleanupScanner::CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
 
-bool BaseEntry::Cleanupable(TxnTimeStamp visible_ts) const { return deleted_ && commit_ts_ <= visible_ts; }
+bool BaseEntry::Cleanupable(TxnTimeStamp visible_ts) const { return entry_type_ != EntryType::kDummy && deleted_ && commit_ts_ <= visible_ts; }
 
 // Merge two reverse-ordered list inplace.
 void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2) {

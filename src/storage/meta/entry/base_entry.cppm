@@ -106,8 +106,6 @@ concept EntryConcept = std::derived_from<Entry, EntryInterface>;
 
 export class CleanupScanner {
 public:
-    // CleanupScanner() : catalog_(nullptr), visible_ts_(0) {}
-
     CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts);
 
     void Scan();
