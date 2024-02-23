@@ -571,3 +571,4 @@ class TestTable:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.success
+

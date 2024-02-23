@@ -33,7 +33,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self.disconnect()
 
     def create_database(self, db_name: str, options=None):
-        check_valid_name(db_name)
+        check_valid_name(db_name, "DB")
         res = self._client.create_database(db_name=db_name)
         if res.success is True:
             return RemoteDatabase(self._client, db_name)
@@ -48,7 +48,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise Exception(res.error_msg)
 
     def describe_database(self, db_name: str):
-        check_valid_name(db_name)
+        check_valid_name(db_name, "DB")
         res = self._client.describe_database(db_name=db_name)
         if res.success is True:
             return res
@@ -56,7 +56,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise Exception(res.error_msg)
 
     def drop_database(self, db_name: str, options=None):
-        check_valid_name(db_name)
+        check_valid_name(db_name, "DB")
         res = self._client.drop_database(db_name=db_name)
         if res.success is True:
             return res
@@ -64,7 +64,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             raise Exception(res.error_msg)
 
     def get_database(self, db_name: str):
-        check_valid_name(db_name)
+        check_valid_name(db_name, "DB")
         res = self._client.get_database(db_name)
         if res.success is True:
             return RemoteDatabase(self._client, db_name)
