@@ -53,4 +53,11 @@ public:
     std::string text_{};
 };
 
+class SchemaStatement : public BaseStatement {
+public:
+    explicit SchemaStatement(StatementType type) : BaseStatement(type) {}
+
+    std::string schema_name_{};
+};
+
 } // namespace infinity

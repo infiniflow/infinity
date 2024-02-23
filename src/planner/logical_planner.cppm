@@ -56,7 +56,7 @@ public:
 
     Status BuildSelect(const SelectStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildInsert(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildInsert(InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildInsertValue(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -100,7 +100,7 @@ public:
     // Execute operator
     Status BuildExecute(const ExecuteStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildCopy(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCopy(CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Export operator
     Status BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
@@ -112,7 +112,7 @@ public:
     Status BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Show operator
-    Status BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -146,7 +146,7 @@ public:
     Status BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Optimize
-    Status BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -156,7 +156,11 @@ public:
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:
-    void BindCreateStatement(SchemaDDLInfo *statement);
+    void BindSchemaStatement(SchemaStatement *statement) const;
+
+    void BindDDLInfo(SchemaDDLInfo *ddl_info) const;
+
+    void BindSchemaName(String &schema_name) const;
 
 private:
     static Status ValidIdentifier(const String &identifier);

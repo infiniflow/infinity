@@ -34,14 +34,13 @@ enum class ShowStmtType {
     kVar,
 };
 
-class ShowStatement : public BaseStatement {
+class ShowStatement : public SchemaStatement {
 public:
-    explicit ShowStatement() : BaseStatement(StatementType::kShow) {}
+    explicit ShowStatement() : SchemaStatement(StatementType::kShow) {}
 
     [[nodiscard]] std::string ToString() const final;
 
     ShowStmtType show_type_{ShowStmtType::kTables};
-    std::string schema_name_{"default"};
     std::string table_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
