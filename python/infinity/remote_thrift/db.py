@@ -116,9 +116,10 @@ class RemoteDatabase(Database, ABC):
         # {"c1":'int, primary key',"c2":'vector,1024,float32'}
         # db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "vector,1024,float32"}, None)
         # to column_defs
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
+            check_valid_name(column_name, "Column")
             column_big_info = [item.strip() for item in column_info.split(",")]
             if column_big_info[0] == "vector":
                 get_embedding_info(
@@ -137,7 +138,7 @@ class RemoteDatabase(Database, ABC):
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def drop_table(self, table_name, if_exists=True):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
@@ -148,7 +149,7 @@ class RemoteDatabase(Database, ABC):
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def describe_table(self, table_name):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         res = self._conn.describe_table(
             db_name=self._db_name, table_name=table_name)
         if res.success:
@@ -157,7 +158,7 @@ class RemoteDatabase(Database, ABC):
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def get_table(self, table_name):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         res = self._conn.get_table(
             db_name=self._db_name, table_name=table_name)
         if res.success:
