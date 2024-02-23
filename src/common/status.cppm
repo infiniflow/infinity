@@ -87,6 +87,9 @@ export enum class ErrorCode : long {
     kExceedIndexNameLength = 3047,
     kNoColumnDefined = 3048,
     kNotSupportedTypeConversion = 3049,
+    kParseMatchExprFailed = 3052,
+    kFTSIndexNotExist = 3053,
+    kUnknownFTSFault = 3054,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -188,6 +191,9 @@ public:
     static Status ExceedIndexNameLength(u64 index_name_length);
     static Status NoColumnDefined(const String& table_name);
     static Status NotSupportedTypeConversion(const String& from_type, const String& to_type);
+    static Status ParseMatchExprFailed(const String& fields, const String& matching_text);
+    static Status FTSIndexNotExist(const String& table_name);
+    static Status UnknownFTSFault();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
