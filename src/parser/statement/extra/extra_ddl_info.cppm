@@ -20,7 +20,7 @@ export module extra_ddl_info;
 
 namespace infinity {
 
-export using infinity::SchemaDDLInfo;
+export using infinity::ExtraDDLInfo;
 export using infinity::DDLType;
 export using infinity::ConflictType;
 export using infinity::ConflictTypeToStr;

@@ -19,9 +19,9 @@
 
 namespace infinity {
 
-class CreateViewInfo final : public SchemaDDLInfo {
+class CreateViewInfo final : public ExtraDDLInfo {
 public:
-    explicit CreateViewInfo() : SchemaDDLInfo(DDLType::kView) {}
+    explicit CreateViewInfo() : ExtraDDLInfo(DDLType::kView) {}
 
     ~CreateViewInfo() final;
 

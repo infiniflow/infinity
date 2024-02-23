@@ -28,9 +28,9 @@
 
 namespace infinity {
 
-class CreateTableInfo final : public SchemaDDLInfo {
+class CreateTableInfo final : public ExtraDDLInfo {
 public:
-    explicit CreateTableInfo() : SchemaDDLInfo(DDLType::kTable) {}
+    explicit CreateTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
 
     ~CreateTableInfo() final;
 

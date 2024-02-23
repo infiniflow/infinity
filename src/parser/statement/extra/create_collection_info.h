@@ -18,12 +18,13 @@
 
 namespace infinity {
 
-class CreateCollectionInfo final : public SchemaDDLInfo {
+class CreateCollectionInfo final : public ExtraDDLInfo {
 public:
-    explicit CreateCollectionInfo() : SchemaDDLInfo(DDLType::kCollection) {}
+    explicit CreateCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
 
     [[nodiscard]] virtual std::string ToString() const final;
 
+    std::string schema_name_;
     std::string collection_name_{};
 };
 

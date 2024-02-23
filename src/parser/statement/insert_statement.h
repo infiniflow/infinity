@@ -19,14 +19,15 @@
 
 namespace infinity {
 
-class InsertStatement final : public SchemaStatement {
+class InsertStatement final : public BaseStatement {
 public:
-    InsertStatement() : SchemaStatement(StatementType::kInsert) {}
+    InsertStatement() : BaseStatement(StatementType::kInsert) {}
 
     ~InsertStatement() final;
 
     [[nodiscard]] std::string ToString() const final;
 
+    std::string schema_name_{};
     std::string table_name_{};
 
     std::vector<std::string> *columns_{nullptr};

@@ -39,14 +39,15 @@ struct IndexInfo {
     static IndexType StringToIndexType(const std::string& index_type_str);
 };
 
-class CreateIndexInfo final : public SchemaDDLInfo {
+class CreateIndexInfo final : public ExtraDDLInfo {
 public:
-    explicit CreateIndexInfo() : SchemaDDLInfo(DDLType::kIndex) {}
+    explicit CreateIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
 
     ~CreateIndexInfo() final;
 
     [[nodiscard]] std::string ToString() const final;
 
+    std::string schema_name_{};
     std::string table_name_{};
     std::string index_name_{};
 

@@ -19,9 +19,9 @@
 
 namespace infinity {
 
-class DropCollectionInfo final : public SchemaDDLInfo {
+class DropCollectionInfo final : public ExtraDDLInfo {
 public:
-    explicit DropCollectionInfo() : SchemaDDLInfo(DDLType::kCollection) {}
+    explicit DropCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
 
     [[nodiscard]] std::string ToString() const final;
 

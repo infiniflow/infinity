@@ -22,6 +22,5 @@ namespace infinity {
 
 export using infinity::StatementType;
 export using infinity::BaseStatement;
-export using infinity::SchemaStatement;
 
 } // namespace infinity

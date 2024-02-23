@@ -29,9 +29,9 @@ enum class OptimizeType {
     kIRS,
 };
 
-class OptimizeStatement : public SchemaStatement {
+class OptimizeStatement : public BaseStatement {
 public:
-    explicit OptimizeStatement() : SchemaStatement(StatementType::kOptimize) {}
+    explicit OptimizeStatement() : BaseStatement(StatementType::kOptimize) {}
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -39,6 +39,7 @@ public:
 
     OptimizeType type_;
 
+    std::string schema_name_{};
     std::string table_name_{};
 };
 

@@ -156,9 +156,7 @@ public:
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
 
 private:
-    void BindSchemaStatement(SchemaStatement *statement) const;
-
-    void BindDDLInfo(SchemaDDLInfo *ddl_info) const;
+    void BindDDLInfo(ExtraDDLInfo *ddl_info) const;
 
     void BindSchemaName(String &schema_name) const;
 

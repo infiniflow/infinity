@@ -189,7 +189,7 @@ Status LogicalPlanner::BuildSelect(const SelectStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildInsert(InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindSchemaStatement(statement);
+    BindSchemaName(statement->schema_name_);
     if (statement->select_ == nullptr) {
         return BuildInsertValue(statement, bind_context_ptr);
     } else {
@@ -352,7 +352,7 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<B
 }
 
 Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindDDLInfo(static_cast<SchemaDDLInfo *>(statement->create_info_.get()));
+    BindDDLInfo(statement->create_info_.get());
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildCreateTable(statement, bind_context_ptr);
@@ -608,7 +608,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
 }
 
 Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindDDLInfo(static_cast<SchemaDDLInfo *>(statement->drop_info_.get()));
+    BindDDLInfo(statement->drop_info_.get());
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildDropTable(statement, bind_context_ptr);
@@ -747,7 +747,7 @@ Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindCont
 }
 
 Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindSchemaStatement(statement);
+    BindSchemaName(statement->schema_name_);
     if (statement->copy_from_) {
         // Import
         return BuildImport(statement, bind_context_ptr);
@@ -786,7 +786,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildImport(const  CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
     auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
@@ -884,7 +884,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 }
 
 Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindSchemaStatement(statement);
+    BindSchemaName(statement->schema_name_);
     switch (statement->show_type_) {
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
@@ -1090,7 +1090,7 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindCo
 }
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
-    BindSchemaStatement(statement);
+    BindSchemaName(statement->schema_name_);
     switch (statement->type()) {
         case OptimizeType::kIRS: {
             SharedPtr<LogicalNode> logical_optimize =
@@ -1131,9 +1131,7 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
     return Status::OK();
 }
 
-void LogicalPlanner::BindSchemaStatement(SchemaStatement *statement) const { BindSchemaName(statement->schema_name_); }
-
-void LogicalPlanner::BindDDLInfo(SchemaDDLInfo *ddl_info) const { BindSchemaName(ddl_info->schema_name_); }
+void LogicalPlanner::BindDDLInfo(ExtraDDLInfo *ddl_info) const { BindSchemaName(ddl_info->schema_name_); }
 
 void LogicalPlanner::BindSchemaName(String &schema_name) const {
     if (schema_name.empty()) {

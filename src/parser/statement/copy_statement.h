@@ -32,15 +32,16 @@ struct CopyOption {
     char delimiter_{','};
 };
 
-class CopyStatement : public SchemaStatement {
+class CopyStatement : public BaseStatement {
 public:
-    CopyStatement() : SchemaStatement(StatementType::kCopy) {}
+    CopyStatement() : BaseStatement(StatementType::kCopy) {}
 
     [[nodiscard]] std::string ToString() const final;
 
     bool copy_from_{false};
     std::string file_path_{};
     std::string table_name_{};
+    std::string schema_name_{};
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};
