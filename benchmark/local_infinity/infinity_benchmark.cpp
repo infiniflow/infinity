@@ -148,8 +148,8 @@ int main() {
         {
             // Init Table
             SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-            __attribute__((unused)) auto ignored =
-                infinity->GetDatabase("default")->CreateTable("benchmark_test", column_defs, Vector<TableConstraint *>(), create_table_opts);
+            auto [ database, status ] = infinity->GetDatabase("default");
+            __attribute__((unused)) auto ignored = database->CreateTable("benchmark_test", column_defs, Vector<TableConstraint *>(), create_table_opts);
             infinity->LocalDisconnect();
         }
         // {
@@ -161,13 +161,15 @@ int main() {
         // }
         {
             auto tims_costing_second = Measurement("Get Tables", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->GetTable("benchmark_test");
+                auto [ database, status ] = infinity->GetDatabase("default");
+                __attribute__((unused)) auto ignored = database->GetTable("benchmark_test");
             });
             results.push_back(fmt::format("-> Get Tables QPS: {}", total_times / tims_costing_second));
         }
         {
             auto tims_costing_second = Measurement("Describe Tables", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->DescribeTable("benchmark_test");
+                auto [ database, status ] = infinity->GetDatabase("default");
+                __attribute__((unused)) auto ignored = database->DescribeTable("benchmark_test");
             });
             results.push_back(fmt::format("-> Describe Tables QPS: {}", total_times / tims_costing_second));
         }
@@ -187,14 +189,15 @@ int main() {
                 auto col_def_2 = new ColumnDef(1, col_type, col_name_2, HashSet<ConstraintType>());
                 column_definitions.emplace_back(col_def_2);
 
-                __attribute__((unused)) auto ignored =
-                    infinity->GetDatabase("default")->CreateTable(std::to_string(i), column_definitions, Vector<TableConstraint *>(), create_table_opts);
+                auto [ database, status ] = infinity->GetDatabase("default");
+                __attribute__((unused)) auto ignored = database->CreateTable(std::to_string(i), column_definitions, Vector<TableConstraint *>(), create_table_opts);
             });
             results.push_back(fmt::format("-> Create Table QPS: {}", total_times / tims_costing_second));
         }
         {
             auto tims_costing_second = Measurement("Drop Table", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->DropTable(std::to_string(i), drop_table_options);
+                auto [ database, status ] = infinity->GetDatabase("default");
+                __attribute__((unused)) auto ignored = database->DropTable(std::to_string(i), drop_table_options);
             });
             results.push_back(fmt::format("-> Drop Table QPS: {}", total_times / tims_costing_second));
         }
@@ -211,8 +214,9 @@ int main() {
                         col2->names_.emplace_back("col2");
                         output_columns->emplace_back(col2);
 
-                        __attribute__((unused)) auto ignored =
-                            infinity->GetDatabase("default")->GetTable("benchmark_test")->Search(nullptr, nullptr, output_columns);
+                        auto [ database, status1 ] = infinity->GetDatabase("default");
+                        auto [ table, status2 ] = database->GetTable("benchmark_test");
+                        __attribute__((unused)) auto ignored = table->Search(nullptr, nullptr, output_columns);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }
@@ -234,7 +238,9 @@ int main() {
                 value2->integer_value_ = i;
                 values->at(0)->emplace_back(value2);
 
-                __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->GetTable("benchmark_test")->Insert(columns, values);
+                auto [ database, status1 ] = infinity->GetDatabase("default");
+                auto [ table, status2 ] = database->GetTable("benchmark_test");
+                __attribute__((unused)) auto ignored = table->Insert(columns, values);
             });
         results.push_back(fmt::format("-> Insert QPS: {}", total_times / tims_costing_second));
     }
@@ -262,15 +268,18 @@ int main() {
                         values->push_back(update_expr1);
                         values->push_back(update_expr2);
 
-                        __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->GetTable("benchmark_test")->Update(nullptr,
-                        values);
+                        auto [ database, status1 ] = infinity->GetDatabase("default");
+                        auto [ table, status2 ] = database->GetTable("benchmark_test");
+                        __attribute__((unused)) auto ignored = table->Update(nullptr, values);
                     });
                 results.push_back(fmt::format("-> Update QPS: {}", total_times / tims_costing_second));
             }
             {
                 auto tims_costing_second =
                     Measurement("Delete", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
-                        __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->GetTable("benchmark_test")->Delete(nullptr);
+                        auto [ database, status1 ] = infinity->GetDatabase("default");
+                        auto [ table, status2 ] = database->GetTable("benchmark_test");
+                        __attribute__((unused)) auto ignored = table->Delete(nullptr);
                     });
                 results.push_back(fmt::format("-> Delete QPS: {}", total_times / tims_costing_second));
             }
@@ -300,8 +309,8 @@ int main() {
             column_definitions.emplace_back(col_def_2);
 
             SharedPtr<Infinity> infinity = Infinity::LocalConnect();
-            __attribute__((unused)) auto ignored =
-                infinity->GetDatabase("default")->CreateTable("benchmark_sort", column_definitions, Vector<TableConstraint *>(), create_table_opts);
+            auto [ database, status ] = infinity->GetDatabase("default");
+            __attribute__((unused)) auto ignored = database->CreateTable("benchmark_sort", column_definitions, Vector<TableConstraint *>(), create_table_opts);
             infinity->LocalDisconnect();
         }
         {
@@ -322,7 +331,9 @@ int main() {
                     value2->integer_value_ = std::rand();
                     values->at(0)->emplace_back(value2);
 
-                    __attribute__((unused)) auto ignored = infinity->GetDatabase("default")->GetTable("benchmark_sort")->Insert(columns, values);
+                    auto [ database, status1 ] = infinity->GetDatabase("default");
+                    auto [ table, status2 ] = database->GetTable("benchmark_test");
+                    __attribute__((unused)) auto ignored = table->Insert(columns, values);
                 });
             results.push_back(fmt::format("-> Insert for Sort Time: {}s", tims_costing_second));
         }
@@ -364,12 +375,12 @@ int main() {
         create_db_options.conflict_type_ = ConflictType::kIgnore;
         auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
 
-        std::shared_ptr<Database> data_base = infinity->GetDatabase(db_name);
+        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;
         auto r2 = data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
-        std::shared_ptr<Table> table = data_base->GetTable(table_name);
+        auto [ table, status2 ] = data_base->GetTable(table_name);
 
         std::string sift_base_path = std::string(test_data_path()) + "/benchmark/sift/base.fvecs";
         if (!fs.Exists(sift_base_path)) {

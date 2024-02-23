@@ -2397,15 +2397,15 @@ class ImportOption(object):
 class UploadResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - can_skip
 
     """
 
 
-    def __init__(self, success=None, error_msg=None, can_skip=None,):
-        self.success = success
+    def __init__(self, error_code=None, error_msg=None, can_skip=None,):
+        self.error_code = error_code
         self.error_msg = error_msg
         self.can_skip = can_skip
 
@@ -2419,8 +2419,8 @@ class UploadResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -2443,9 +2443,9 @@ class UploadResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('UploadResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -2454,85 +2454,6 @@ class UploadResponse(object):
         if self.can_skip is not None:
             oprot.writeFieldBegin('can_skip', TType.BOOL, 3)
             oprot.writeBool(self.can_skip)
-            oprot.writeFieldEnd()
-        oprot.writeFieldStop()
-        oprot.writeStructEnd()
-
-    def validate(self):
-        return
-
-    def __repr__(self):
-        L = ['%s=%r' % (key, value)
-             for key, value in self.__dict__.items()]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not (self == other)
-
-
-class CommonResponse(object):
-    """
-    Attributes:
-     - success
-     - error_msg
-     - session_id
-
-    """
-
-
-    def __init__(self, success=None, error_msg=None, session_id=None,):
-        self.success = success
-        self.error_msg = error_msg
-        self.session_id = session_id
-
-    def read(self, iprot):
-        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
-            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
-            return
-        iprot.readStructBegin()
-        while True:
-            (fname, ftype, fid) = iprot.readFieldBegin()
-            if ftype == TType.STOP:
-                break
-            if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 2:
-                if ftype == TType.STRING:
-                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 3:
-                if ftype == TType.I64:
-                    self.session_id = iprot.readI64()
-                else:
-                    iprot.skip(ftype)
-            else:
-                iprot.skip(ftype)
-            iprot.readFieldEnd()
-        iprot.readStructEnd()
-
-    def write(self, oprot):
-        if oprot._fast_encode is not None and self.thrift_spec is not None:
-            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
-            return
-        oprot.writeStructBegin('CommonResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
-            oprot.writeFieldEnd()
-        if self.error_msg is not None:
-            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
-            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
-            oprot.writeFieldEnd()
-        if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 3)
-            oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -2589,6 +2510,85 @@ class CommonRequest(object):
         oprot.writeStructBegin('CommonRequest')
         if self.session_id is not None:
             oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class CommonResponse(object):
+    """
+    Attributes:
+     - error_code
+     - error_msg
+     - session_id
+
+    """
+
+
+    def __init__(self, error_code=None, error_msg=None, session_id=None,):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.error_msg = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CommonResponse')
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
+            oprot.writeFieldEnd()
+        if self.error_msg is not None:
+            oprot.writeFieldBegin('error_msg', TType.STRING, 2)
+            oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 3)
             oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -2669,16 +2669,16 @@ class ListDatabaseRequest(object):
 class ListDatabaseResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - db_names
 
     """
 
 
-    def __init__(self, success=None, error_msg=None, db_names=[
+    def __init__(self, error_code=None, error_msg=None, db_names=[
     ],):
-        self.success = success
+        self.error_code = error_code
         self.error_msg = error_msg
         if db_names is self.thrift_spec[3][4]:
             db_names = [
@@ -2695,8 +2695,8 @@ class ListDatabaseResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -2724,9 +2724,9 @@ class ListDatabaseResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('ListDatabaseResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -2828,16 +2828,16 @@ class ListTableRequest(object):
 class ListTableResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - table_names
 
     """
 
 
-    def __init__(self, success=None, error_msg=None, table_names=[
+    def __init__(self, error_code=None, error_msg=None, table_names=[
     ],):
-        self.success = success
+        self.error_code = error_code
         self.error_msg = error_msg
         if table_names is self.thrift_spec[3][4]:
             table_names = [
@@ -2854,8 +2854,8 @@ class ListTableResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -2883,9 +2883,9 @@ class ListTableResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('ListTableResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -2987,7 +2987,7 @@ class DescribeDatabaseRequest(object):
 class DescribeDatabaseResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - num_segments
      - num_rows
@@ -2996,8 +2996,8 @@ class DescribeDatabaseResponse(object):
     """
 
 
-    def __init__(self, success=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
-        self.success = success
+    def __init__(self, error_code=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
+        self.error_code = error_code
         self.error_msg = error_msg
         self.num_segments = num_segments
         self.num_rows = num_rows
@@ -3013,8 +3013,8 @@ class DescribeDatabaseResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -3047,9 +3047,9 @@ class DescribeDatabaseResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('DescribeDatabaseResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -3167,7 +3167,7 @@ class DescribeTableRequest(object):
 class DescribeTableResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - num_segments
      - num_rows
@@ -3176,8 +3176,8 @@ class DescribeTableResponse(object):
     """
 
 
-    def __init__(self, success=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
-        self.success = success
+    def __init__(self, error_code=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
+        self.error_code = error_code
         self.error_msg = error_msg
         self.num_segments = num_segments
         self.num_rows = num_rows
@@ -3193,8 +3193,8 @@ class DescribeTableResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -3227,9 +3227,9 @@ class DescribeTableResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('DescribeTableResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -4684,7 +4684,7 @@ class ExplainRequest(object):
 class ExplainResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - column_defs
      - column_fields
@@ -4692,10 +4692,10 @@ class ExplainResponse(object):
     """
 
 
-    def __init__(self, success=None, error_msg=None, column_defs=[
+    def __init__(self, error_code=None, error_msg=None, column_defs=[
     ], column_fields=[
     ],):
-        self.success = success
+        self.error_code = error_code
         self.error_msg = error_msg
         if column_defs is self.thrift_spec[3][4]:
             column_defs = [
@@ -4716,8 +4716,8 @@ class ExplainResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -4757,9 +4757,9 @@ class ExplainResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('ExplainResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -5011,7 +5011,7 @@ class SelectRequest(object):
 class SelectResponse(object):
     """
     Attributes:
-     - success
+     - error_code
      - error_msg
      - column_defs
      - column_fields
@@ -5019,10 +5019,10 @@ class SelectResponse(object):
     """
 
 
-    def __init__(self, success=None, error_msg=None, column_defs=[
+    def __init__(self, error_code=None, error_msg=None, column_defs=[
     ], column_fields=[
     ],):
-        self.success = success
+        self.error_code = error_code
         self.error_msg = error_msg
         if column_defs is self.thrift_spec[3][4]:
             column_defs = [
@@ -5043,8 +5043,8 @@ class SelectResponse(object):
             if ftype == TType.STOP:
                 break
             if fid == 1:
-                if ftype == TType.BOOL:
-                    self.success = iprot.readBool()
+                if ftype == TType.I64:
+                    self.error_code = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             elif fid == 2:
@@ -5084,9 +5084,9 @@ class SelectResponse(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('SelectResponse')
-        if self.success is not None:
-            oprot.writeFieldBegin('success', TType.BOOL, 1)
-            oprot.writeBool(self.success)
+        if self.error_code is not None:
+            oprot.writeFieldBegin('error_code', TType.I64, 1)
+            oprot.writeI64(self.error_code)
             oprot.writeFieldEnd()
         if self.error_msg is not None:
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
@@ -5640,21 +5640,21 @@ ImportOption.thrift_spec = (
 all_structs.append(UploadResponse)
 UploadResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.BOOL, 'can_skip', None, None, ),  # 3
-)
-all_structs.append(CommonResponse)
-CommonResponse.thrift_spec = (
-    None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
-    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
-    (3, TType.I64, 'session_id', None, None, ),  # 3
 )
 all_structs.append(CommonRequest)
 CommonRequest.thrift_spec = (
     None,  # 0
     (1, TType.I64, 'session_id', None, None, ),  # 1
+)
+all_structs.append(CommonResponse)
+CommonResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'error_code', None, None, ),  # 1
+    (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
+    (3, TType.I64, 'session_id', None, None, ),  # 3
 )
 all_structs.append(ListDatabaseRequest)
 ListDatabaseRequest.thrift_spec = (
@@ -5664,7 +5664,7 @@ ListDatabaseRequest.thrift_spec = (
 all_structs.append(ListDatabaseResponse)
 ListDatabaseResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.LIST, 'db_names', (TType.STRING, 'UTF8', False), [
     ], ),  # 3
@@ -5678,7 +5678,7 @@ ListTableRequest.thrift_spec = (
 all_structs.append(ListTableResponse)
 ListTableResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.LIST, 'table_names', (TType.STRING, 'UTF8', False), [
     ], ),  # 3
@@ -5692,7 +5692,7 @@ DescribeDatabaseRequest.thrift_spec = (
 all_structs.append(DescribeDatabaseResponse)
 DescribeDatabaseResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.I64, 'num_segments', None, None, ),  # 3
     (4, TType.I64, 'num_rows', None, None, ),  # 4
@@ -5708,7 +5708,7 @@ DescribeTableRequest.thrift_spec = (
 all_structs.append(DescribeTableResponse)
 DescribeTableResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.I64, 'num_segments', None, None, ),  # 3
     (4, TType.I64, 'num_rows', None, None, ),  # 4
@@ -5844,7 +5844,7 @@ ExplainRequest.thrift_spec = (
 all_structs.append(ExplainResponse)
 ExplainResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.LIST, 'column_defs', (TType.STRUCT, [ColumnDef, None], False), [
     ], ),  # 3
@@ -5872,7 +5872,7 @@ SelectRequest.thrift_spec = (
 all_structs.append(SelectResponse)
 SelectResponse.thrift_spec = (
     None,  # 0
-    (1, TType.BOOL, 'success', None, None, ),  # 1
+    (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.LIST, 'column_defs', (TType.STRUCT, [ColumnDef, None], False), [
     ], ),  # 3
