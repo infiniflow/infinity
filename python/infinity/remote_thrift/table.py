@@ -56,7 +56,7 @@ class RemoteTable(Table, ABC):
                                       index_info_list=index_info_list_to_use,
                                       option=options)
 
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -65,7 +65,7 @@ class RemoteTable(Table, ABC):
         check_valid_name(index_name, "Index")
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -117,7 +117,7 @@ class RemoteTable(Table, ABC):
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                 fields=fields)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -159,7 +159,7 @@ class RemoteTable(Table, ABC):
                     case None:
                         raise Exception("upload failed")
                     case _:
-                        if not res.success:
+                        if res.error_code != ErrorCode.OK:
                             raise Exception(f"ERROR:{res.error_code} upload failed: {res.error_msg}")
                         if res.error_msg:
                             raise Exception(f"upload failed: {res.error_msg}")
@@ -170,7 +170,7 @@ class RemoteTable(Table, ABC):
                                      table_name=self._table_name,
                                      file_name=file_name,
                                      import_options=options)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -183,7 +183,7 @@ class RemoteTable(Table, ABC):
                 where_expr = traverse_conditions(condition(cond))
         res = self._conn.delete(
             db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -225,7 +225,7 @@ class RemoteTable(Table, ABC):
 
         res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
                                 update_expr_array=update_expr_array)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -288,7 +288,7 @@ class RemoteTable(Table, ABC):
                                 offset_expr=query.offset)
 
         # process the results
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return build_result(res)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -303,7 +303,7 @@ class RemoteTable(Table, ABC):
                                  limit_expr=query.limit,
                                  offset_expr=query.offset,
                                  explain_type=query.explain_type.to_ttype())
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)

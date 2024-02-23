@@ -17,6 +17,7 @@ import pytest
 import common_values
 import infinity
 
+from infinity.errors import ErrorCode
 
 class TestCreateTable:
 
@@ -134,4 +135,4 @@ class TestCreateTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK

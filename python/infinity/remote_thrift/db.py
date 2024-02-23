@@ -132,7 +132,7 @@ class RemoteDatabase(Database, ABC):
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       option=options)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -143,7 +143,7 @@ class RemoteDatabase(Database, ABC):
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -152,7 +152,7 @@ class RemoteDatabase(Database, ABC):
         check_valid_name(table_name, "Table")
         res = self._conn.describe_table(
             db_name=self._db_name, table_name=table_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
@@ -161,14 +161,14 @@ class RemoteDatabase(Database, ABC):
         check_valid_name(table_name, "Table")
         res = self._conn.get_table(
             db_name=self._db_name, table_name=table_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def show_tables(self):
         res = self._conn.show_tables(self._db_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
             raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)

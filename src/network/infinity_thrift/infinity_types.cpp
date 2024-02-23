@@ -4112,10 +4112,6 @@ UploadResponse::~UploadResponse() noexcept {
 }
 
 
-void UploadResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void UploadResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -4156,14 +4152,6 @@ uint32_t UploadResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -4171,7 +4159,7 @@ uint32_t UploadResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -4179,7 +4167,7 @@ uint32_t UploadResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_BOOL) {
           xfer += iprot->readBool(this->can_skip);
           this->__isset.can_skip = true;
@@ -4204,19 +4192,15 @@ uint32_t UploadResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("UploadResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("can_skip", ::apache::thrift::protocol::T_BOOL, 4);
+  xfer += oprot->writeFieldBegin("can_skip", ::apache::thrift::protocol::T_BOOL, 3);
   xfer += oprot->writeBool(this->can_skip);
   xfer += oprot->writeFieldEnd();
 
@@ -4227,7 +4211,6 @@ uint32_t UploadResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
 
 void swap(UploadResponse &a, UploadResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.can_skip, b.can_skip);
@@ -4235,14 +4218,12 @@ void swap(UploadResponse &a, UploadResponse &b) {
 }
 
 UploadResponse::UploadResponse(const UploadResponse& other161) {
-  success = other161.success;
   error_code = other161.error_code;
   error_msg = other161.error_msg;
   can_skip = other161.can_skip;
   __isset = other161.__isset;
 }
 UploadResponse& UploadResponse::operator=(const UploadResponse& other162) {
-  success = other162.success;
   error_code = other162.error_code;
   error_msg = other162.error_msg;
   can_skip = other162.can_skip;
@@ -4252,8 +4233,7 @@ UploadResponse& UploadResponse::operator=(const UploadResponse& other162) {
 void UploadResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "UploadResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "can_skip=" << to_string(can_skip);
   out << ")";
@@ -4356,10 +4336,6 @@ CommonResponse::~CommonResponse() noexcept {
 }
 
 
-void CommonResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void CommonResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -4400,14 +4376,6 @@ uint32_t CommonResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -4415,7 +4383,7 @@ uint32_t CommonResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -4423,7 +4391,7 @@ uint32_t CommonResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->session_id);
           this->__isset.session_id = true;
@@ -4448,19 +4416,15 @@ uint32_t CommonResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("CommonResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 3);
   xfer += oprot->writeI64(this->session_id);
   xfer += oprot->writeFieldEnd();
 
@@ -4471,7 +4435,6 @@ uint32_t CommonResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
 
 void swap(CommonResponse &a, CommonResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.session_id, b.session_id);
@@ -4479,14 +4442,12 @@ void swap(CommonResponse &a, CommonResponse &b) {
 }
 
 CommonResponse::CommonResponse(const CommonResponse& other165) {
-  success = other165.success;
   error_code = other165.error_code;
   error_msg = other165.error_msg;
   session_id = other165.session_id;
   __isset = other165.__isset;
 }
 CommonResponse& CommonResponse::operator=(const CommonResponse& other166) {
-  success = other166.success;
   error_code = other166.error_code;
   error_msg = other166.error_msg;
   session_id = other166.session_id;
@@ -4496,8 +4457,7 @@ CommonResponse& CommonResponse::operator=(const CommonResponse& other166) {
 void CommonResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "CommonResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "session_id=" << to_string(session_id);
   out << ")";
@@ -4600,10 +4560,6 @@ ListDatabaseResponse::~ListDatabaseResponse() noexcept {
 }
 
 
-void ListDatabaseResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void ListDatabaseResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -4644,14 +4600,6 @@ uint32_t ListDatabaseResponse::read(::apache::thrift::protocol::TProtocol* iprot
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -4659,7 +4607,7 @@ uint32_t ListDatabaseResponse::read(::apache::thrift::protocol::TProtocol* iprot
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -4667,7 +4615,7 @@ uint32_t ListDatabaseResponse::read(::apache::thrift::protocol::TProtocol* iprot
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->db_names.clear();
@@ -4704,19 +4652,15 @@ uint32_t ListDatabaseResponse::write(::apache::thrift::protocol::TProtocol* opro
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("ListDatabaseResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("db_names", ::apache::thrift::protocol::T_LIST, 4);
+  xfer += oprot->writeFieldBegin("db_names", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->db_names.size()));
     std::vector<std::string> ::const_iterator _iter174;
@@ -4735,7 +4679,6 @@ uint32_t ListDatabaseResponse::write(::apache::thrift::protocol::TProtocol* opro
 
 void swap(ListDatabaseResponse &a, ListDatabaseResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.db_names, b.db_names);
@@ -4743,14 +4686,12 @@ void swap(ListDatabaseResponse &a, ListDatabaseResponse &b) {
 }
 
 ListDatabaseResponse::ListDatabaseResponse(const ListDatabaseResponse& other175) {
-  success = other175.success;
   error_code = other175.error_code;
   error_msg = other175.error_msg;
   db_names = other175.db_names;
   __isset = other175.__isset;
 }
 ListDatabaseResponse& ListDatabaseResponse::operator=(const ListDatabaseResponse& other176) {
-  success = other176.success;
   error_code = other176.error_code;
   error_msg = other176.error_msg;
   db_names = other176.db_names;
@@ -4760,8 +4701,7 @@ ListDatabaseResponse& ListDatabaseResponse::operator=(const ListDatabaseResponse
 void ListDatabaseResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ListDatabaseResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "db_names=" << to_string(db_names);
   out << ")";
@@ -4884,10 +4824,6 @@ ListTableResponse::~ListTableResponse() noexcept {
 }
 
 
-void ListTableResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void ListTableResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -4928,14 +4864,6 @@ uint32_t ListTableResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -4943,7 +4871,7 @@ uint32_t ListTableResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -4951,7 +4879,7 @@ uint32_t ListTableResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->table_names.clear();
@@ -4988,19 +4916,15 @@ uint32_t ListTableResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("ListTableResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("table_names", ::apache::thrift::protocol::T_LIST, 4);
+  xfer += oprot->writeFieldBegin("table_names", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->table_names.size()));
     std::vector<std::string> ::const_iterator _iter184;
@@ -5019,7 +4943,6 @@ uint32_t ListTableResponse::write(::apache::thrift::protocol::TProtocol* oprot) 
 
 void swap(ListTableResponse &a, ListTableResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.table_names, b.table_names);
@@ -5027,14 +4950,12 @@ void swap(ListTableResponse &a, ListTableResponse &b) {
 }
 
 ListTableResponse::ListTableResponse(const ListTableResponse& other185) {
-  success = other185.success;
   error_code = other185.error_code;
   error_msg = other185.error_msg;
   table_names = other185.table_names;
   __isset = other185.__isset;
 }
 ListTableResponse& ListTableResponse::operator=(const ListTableResponse& other186) {
-  success = other186.success;
   error_code = other186.error_code;
   error_msg = other186.error_msg;
   table_names = other186.table_names;
@@ -5044,8 +4965,7 @@ ListTableResponse& ListTableResponse::operator=(const ListTableResponse& other18
 void ListTableResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ListTableResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "table_names=" << to_string(table_names);
   out << ")";
@@ -5168,10 +5088,6 @@ DescribeDatabaseResponse::~DescribeDatabaseResponse() noexcept {
 }
 
 
-void DescribeDatabaseResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void DescribeDatabaseResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -5220,14 +5136,6 @@ uint32_t DescribeDatabaseResponse::read(::apache::thrift::protocol::TProtocol* i
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -5235,7 +5143,7 @@ uint32_t DescribeDatabaseResponse::read(::apache::thrift::protocol::TProtocol* i
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -5243,7 +5151,7 @@ uint32_t DescribeDatabaseResponse::read(::apache::thrift::protocol::TProtocol* i
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_segments);
           this->__isset.num_segments = true;
@@ -5251,7 +5159,7 @@ uint32_t DescribeDatabaseResponse::read(::apache::thrift::protocol::TProtocol* i
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_rows);
           this->__isset.num_rows = true;
@@ -5259,7 +5167,7 @@ uint32_t DescribeDatabaseResponse::read(::apache::thrift::protocol::TProtocol* i
           xfer += iprot->skip(ftype);
         }
         break;
-      case 6:
+      case 5:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_blocks);
           this->__isset.num_blocks = true;
@@ -5284,27 +5192,23 @@ uint32_t DescribeDatabaseResponse::write(::apache::thrift::protocol::TProtocol* 
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("DescribeDatabaseResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_segments", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeFieldBegin("num_segments", ::apache::thrift::protocol::T_I64, 3);
   xfer += oprot->writeI64(this->num_segments);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_rows", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeFieldBegin("num_rows", ::apache::thrift::protocol::T_I64, 4);
   xfer += oprot->writeI64(this->num_rows);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_blocks", ::apache::thrift::protocol::T_I64, 6);
+  xfer += oprot->writeFieldBegin("num_blocks", ::apache::thrift::protocol::T_I64, 5);
   xfer += oprot->writeI64(this->num_blocks);
   xfer += oprot->writeFieldEnd();
 
@@ -5315,7 +5219,6 @@ uint32_t DescribeDatabaseResponse::write(::apache::thrift::protocol::TProtocol* 
 
 void swap(DescribeDatabaseResponse &a, DescribeDatabaseResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.num_segments, b.num_segments);
@@ -5325,7 +5228,6 @@ void swap(DescribeDatabaseResponse &a, DescribeDatabaseResponse &b) {
 }
 
 DescribeDatabaseResponse::DescribeDatabaseResponse(const DescribeDatabaseResponse& other189) {
-  success = other189.success;
   error_code = other189.error_code;
   error_msg = other189.error_msg;
   num_segments = other189.num_segments;
@@ -5334,7 +5236,6 @@ DescribeDatabaseResponse::DescribeDatabaseResponse(const DescribeDatabaseRespons
   __isset = other189.__isset;
 }
 DescribeDatabaseResponse& DescribeDatabaseResponse::operator=(const DescribeDatabaseResponse& other190) {
-  success = other190.success;
   error_code = other190.error_code;
   error_msg = other190.error_msg;
   num_segments = other190.num_segments;
@@ -5346,8 +5247,7 @@ DescribeDatabaseResponse& DescribeDatabaseResponse::operator=(const DescribeData
 void DescribeDatabaseResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "DescribeDatabaseResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "num_segments=" << to_string(num_segments);
   out << ", " << "num_rows=" << to_string(num_rows);
@@ -5492,10 +5392,6 @@ DescribeTableResponse::~DescribeTableResponse() noexcept {
 }
 
 
-void DescribeTableResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void DescribeTableResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -5544,14 +5440,6 @@ uint32_t DescribeTableResponse::read(::apache::thrift::protocol::TProtocol* ipro
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -5559,7 +5447,7 @@ uint32_t DescribeTableResponse::read(::apache::thrift::protocol::TProtocol* ipro
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -5567,7 +5455,7 @@ uint32_t DescribeTableResponse::read(::apache::thrift::protocol::TProtocol* ipro
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_segments);
           this->__isset.num_segments = true;
@@ -5575,7 +5463,7 @@ uint32_t DescribeTableResponse::read(::apache::thrift::protocol::TProtocol* ipro
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_rows);
           this->__isset.num_rows = true;
@@ -5583,7 +5471,7 @@ uint32_t DescribeTableResponse::read(::apache::thrift::protocol::TProtocol* ipro
           xfer += iprot->skip(ftype);
         }
         break;
-      case 6:
+      case 5:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->num_blocks);
           this->__isset.num_blocks = true;
@@ -5608,27 +5496,23 @@ uint32_t DescribeTableResponse::write(::apache::thrift::protocol::TProtocol* opr
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("DescribeTableResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_segments", ::apache::thrift::protocol::T_I64, 4);
+  xfer += oprot->writeFieldBegin("num_segments", ::apache::thrift::protocol::T_I64, 3);
   xfer += oprot->writeI64(this->num_segments);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_rows", ::apache::thrift::protocol::T_I64, 5);
+  xfer += oprot->writeFieldBegin("num_rows", ::apache::thrift::protocol::T_I64, 4);
   xfer += oprot->writeI64(this->num_rows);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("num_blocks", ::apache::thrift::protocol::T_I64, 6);
+  xfer += oprot->writeFieldBegin("num_blocks", ::apache::thrift::protocol::T_I64, 5);
   xfer += oprot->writeI64(this->num_blocks);
   xfer += oprot->writeFieldEnd();
 
@@ -5639,7 +5523,6 @@ uint32_t DescribeTableResponse::write(::apache::thrift::protocol::TProtocol* opr
 
 void swap(DescribeTableResponse &a, DescribeTableResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.num_segments, b.num_segments);
@@ -5649,7 +5532,6 @@ void swap(DescribeTableResponse &a, DescribeTableResponse &b) {
 }
 
 DescribeTableResponse::DescribeTableResponse(const DescribeTableResponse& other193) {
-  success = other193.success;
   error_code = other193.error_code;
   error_msg = other193.error_msg;
   num_segments = other193.num_segments;
@@ -5658,7 +5540,6 @@ DescribeTableResponse::DescribeTableResponse(const DescribeTableResponse& other1
   __isset = other193.__isset;
 }
 DescribeTableResponse& DescribeTableResponse::operator=(const DescribeTableResponse& other194) {
-  success = other194.success;
   error_code = other194.error_code;
   error_msg = other194.error_msg;
   num_segments = other194.num_segments;
@@ -5670,8 +5551,7 @@ DescribeTableResponse& DescribeTableResponse::operator=(const DescribeTableRespo
 void DescribeTableResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "DescribeTableResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "num_segments=" << to_string(num_segments);
   out << ", " << "num_rows=" << to_string(num_rows);
@@ -8080,10 +7960,6 @@ ExplainResponse::~ExplainResponse() noexcept {
 }
 
 
-void ExplainResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void ExplainResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -8128,14 +8004,6 @@ uint32_t ExplainResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -8143,7 +8011,7 @@ uint32_t ExplainResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -8151,7 +8019,7 @@ uint32_t ExplainResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->column_defs.clear();
@@ -8171,7 +8039,7 @@ uint32_t ExplainResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->column_fields.clear();
@@ -8208,19 +8076,15 @@ uint32_t ExplainResponse::write(::apache::thrift::protocol::TProtocol* oprot) co
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("ExplainResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("column_defs", ::apache::thrift::protocol::T_LIST, 4);
+  xfer += oprot->writeFieldBegin("column_defs", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->column_defs.size()));
     std::vector<ColumnDef> ::const_iterator _iter281;
@@ -8232,7 +8096,7 @@ uint32_t ExplainResponse::write(::apache::thrift::protocol::TProtocol* oprot) co
   }
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("column_fields", ::apache::thrift::protocol::T_LIST, 5);
+  xfer += oprot->writeFieldBegin("column_fields", ::apache::thrift::protocol::T_LIST, 4);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->column_fields.size()));
     std::vector<ColumnField> ::const_iterator _iter282;
@@ -8251,7 +8115,6 @@ uint32_t ExplainResponse::write(::apache::thrift::protocol::TProtocol* oprot) co
 
 void swap(ExplainResponse &a, ExplainResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.column_defs, b.column_defs);
@@ -8260,7 +8123,6 @@ void swap(ExplainResponse &a, ExplainResponse &b) {
 }
 
 ExplainResponse::ExplainResponse(const ExplainResponse& other283) {
-  success = other283.success;
   error_code = other283.error_code;
   error_msg = other283.error_msg;
   column_defs = other283.column_defs;
@@ -8268,7 +8130,6 @@ ExplainResponse::ExplainResponse(const ExplainResponse& other283) {
   __isset = other283.__isset;
 }
 ExplainResponse& ExplainResponse::operator=(const ExplainResponse& other284) {
-  success = other284.success;
   error_code = other284.error_code;
   error_msg = other284.error_msg;
   column_defs = other284.column_defs;
@@ -8279,8 +8140,7 @@ ExplainResponse& ExplainResponse::operator=(const ExplainResponse& other284) {
 void ExplainResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "ExplainResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "column_defs=" << to_string(column_defs);
   out << ", " << "column_fields=" << to_string(column_fields);
@@ -8658,10 +8518,6 @@ SelectResponse::~SelectResponse() noexcept {
 }
 
 
-void SelectResponse::__set_success(const bool val) {
-  this->success = val;
-}
-
 void SelectResponse::__set_error_code(const int64_t val) {
   this->error_code = val;
 }
@@ -8706,14 +8562,6 @@ uint32_t SelectResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_BOOL) {
-          xfer += iprot->readBool(this->success);
-          this->__isset.success = true;
-        } else {
-          xfer += iprot->skip(ftype);
-        }
-        break;
-      case 2:
         if (ftype == ::apache::thrift::protocol::T_I64) {
           xfer += iprot->readI64(this->error_code);
           this->__isset.error_code = true;
@@ -8721,7 +8569,7 @@ uint32_t SelectResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 3:
+      case 2:
         if (ftype == ::apache::thrift::protocol::T_STRING) {
           xfer += iprot->readString(this->error_msg);
           this->__isset.error_msg = true;
@@ -8729,7 +8577,7 @@ uint32_t SelectResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 4:
+      case 3:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->column_defs.clear();
@@ -8749,7 +8597,7 @@ uint32_t SelectResponse::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
-      case 5:
+      case 4:
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->column_fields.clear();
@@ -8786,19 +8634,15 @@ uint32_t SelectResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("SelectResponse");
 
-  xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_BOOL, 1);
-  xfer += oprot->writeBool(this->success);
-  xfer += oprot->writeFieldEnd();
-
-  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 2);
+  xfer += oprot->writeFieldBegin("error_code", ::apache::thrift::protocol::T_I64, 1);
   xfer += oprot->writeI64(this->error_code);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeFieldBegin("error_msg", ::apache::thrift::protocol::T_STRING, 2);
   xfer += oprot->writeString(this->error_msg);
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("column_defs", ::apache::thrift::protocol::T_LIST, 4);
+  xfer += oprot->writeFieldBegin("column_defs", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->column_defs.size()));
     std::vector<ColumnDef> ::const_iterator _iter315;
@@ -8810,7 +8654,7 @@ uint32_t SelectResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
   }
   xfer += oprot->writeFieldEnd();
 
-  xfer += oprot->writeFieldBegin("column_fields", ::apache::thrift::protocol::T_LIST, 5);
+  xfer += oprot->writeFieldBegin("column_fields", ::apache::thrift::protocol::T_LIST, 4);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRUCT, static_cast<uint32_t>(this->column_fields.size()));
     std::vector<ColumnField> ::const_iterator _iter316;
@@ -8829,7 +8673,6 @@ uint32_t SelectResponse::write(::apache::thrift::protocol::TProtocol* oprot) con
 
 void swap(SelectResponse &a, SelectResponse &b) {
   using ::std::swap;
-  swap(a.success, b.success);
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.column_defs, b.column_defs);
@@ -8838,7 +8681,6 @@ void swap(SelectResponse &a, SelectResponse &b) {
 }
 
 SelectResponse::SelectResponse(const SelectResponse& other317) {
-  success = other317.success;
   error_code = other317.error_code;
   error_msg = other317.error_msg;
   column_defs = other317.column_defs;
@@ -8846,7 +8688,6 @@ SelectResponse::SelectResponse(const SelectResponse& other317) {
   __isset = other317.__isset;
 }
 SelectResponse& SelectResponse::operator=(const SelectResponse& other318) {
-  success = other318.success;
   error_code = other318.error_code;
   error_msg = other318.error_msg;
   column_defs = other318.column_defs;
@@ -8857,8 +8698,7 @@ SelectResponse& SelectResponse::operator=(const SelectResponse& other318) {
 void SelectResponse::printTo(std::ostream& out) const {
   using ::apache::thrift::to_string;
   out << "SelectResponse(";
-  out << "success=" << to_string(success);
-  out << ", " << "error_code=" << to_string(error_code);
+  out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "column_defs=" << to_string(column_defs);
   out << ", " << "column_fields=" << to_string(column_fields);

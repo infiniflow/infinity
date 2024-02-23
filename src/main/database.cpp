@@ -19,6 +19,7 @@ module database;
 import stl;
 import query_options;
 import query_result;
+import status;
 import table;
 import infinity_context;
 import query_context;
@@ -110,7 +111,7 @@ QueryResult Database::ShowTables() {
     return result;
 }
 
-UniquePtr<Table> Database::GetTable(const String &table_name) {
+Tuple<UniquePtr<Table>, Status> Database::GetTable(const String &table_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -120,11 +121,7 @@ UniquePtr<Table> Database::GetTable(const String &table_name) {
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<CheckTable>(table_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
-    if (result.status_.ok()) {
-        return MakeUnique<Table>(table_name, session_);
-    } else {
-        return nullptr;
-    }
+    return {result.IsOk() ? MakeUnique<Table>(table_name, session_) : nullptr, result.status_};
 }
 
 } // namespace infinity

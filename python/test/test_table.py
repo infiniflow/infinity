@@ -16,6 +16,7 @@ import pytest
 
 import common_values
 import infinity
+from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
 
 
@@ -82,17 +83,17 @@ class TestTable:
         # FIXME: res = db_obj.describe_table("my_table")
 
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_table_with_different_column_name(self):
         """
@@ -206,7 +207,7 @@ class TestTable:
 
         # list table
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # get table
         try:
@@ -216,11 +217,11 @@ class TestTable:
 
         # drop table
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop/describe/get table with 10000 columns with various column types.
     def test_table_with_various_column_types(self):
@@ -256,7 +257,7 @@ class TestTable:
 
         # list table
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # get table
         try:
@@ -267,11 +268,11 @@ class TestTable:
 
         # drop table
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop table with different invalid options
     def test_table_with_different_invalid_options(self):
@@ -294,7 +295,7 @@ class TestTable:
 
         # # disconnect
         # res = infinity_obj.disconnect()
-        # assert res.success
+        # assert res.error_code == ErrorCode.OK
 
         try:
             res = infinity_obj.disconnect()
@@ -334,7 +335,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # after disconnection, create / drop / describe / list / get table
     def test_after_disconnect_use_table(self):
@@ -352,7 +353,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # create table
         try:
@@ -438,7 +439,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # describe created table, describe not-created table, describe dropped table
     @pytest.mark.skip(reason="Feature request")
@@ -492,7 +493,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop/list/get 1M table to reach the limit
     @pytest.mark.skip(reason="Cost too much times")
@@ -518,7 +519,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop same table in different thread to test conflict
     @trace_expected_exceptions
@@ -549,7 +550,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create empty column table
     def test_create_empty_column_table(self):
@@ -570,5 +571,5 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 

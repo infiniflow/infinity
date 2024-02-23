@@ -16,9 +16,10 @@ import time
 import pandas as pd
 import pytest
 from numpy import dtype
-from utils import trace_expected_exceptions
 import common_values
 import infinity
+from infinity.errors import ErrorCode
+from utils import trace_expected_exceptions
 
 
 class TestDelete:
@@ -65,29 +66,29 @@ class TestDelete:
         res = table_obj.insert(
             [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
              {"c1": 4, "c2": 40, "c3": 400}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.delete("c1 = 1")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = table_obj.delete()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = db_obj.drop_table("table_3")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # delete empty table
     def test_delete_empty_table(self):
@@ -112,7 +113,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete non-existent table
     def test_delete_non_existent_table(self):
@@ -131,7 +132,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete table, all rows are met the condition
     @trace_expected_exceptions
@@ -161,7 +162,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete table, no row is met the condition
     @pytest.mark.skip(reason="Cast error.")
@@ -195,7 +196,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete table with only one block
     def test_delete_table_with_one_block(self):
@@ -218,7 +219,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete table with multiple blocks, but only one segment
     def test_delete_table_with_one_segment(self):
@@ -243,7 +244,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # select before delete, select after delete and check the change.
     def test_select_before_after_delete(self):
@@ -267,7 +268,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete just inserted data and select to check
     def test_delete_insert_data(self):
@@ -288,7 +289,7 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete inserted long before and select to check
     @pytest.mark.skip(reason="Cost too much time.")
@@ -313,13 +314,13 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # delete dropped table
     def test_delete_dropped_table(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        with pytest.raises(Exception, match="Table not exist"):
+        with pytest.raises(Exception, match="ERROR:3022*"):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_delete_dropped_table")
             table_obj = db_obj.get_table("test_delete_dropped_table")
@@ -328,7 +329,7 @@ class TestDelete:
             db_obj.drop_table("test_delete_dropped_table")
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # various expression will be given in where clause, and check result correctness
     @pytest.mark.parametrize('column_types', common_values.types_array)
@@ -354,4 +355,4 @@ class TestDelete:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK

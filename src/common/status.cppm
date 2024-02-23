@@ -87,6 +87,8 @@ export enum class ErrorCode : long {
     kExceedIndexNameLength = 3047,
     kNoColumnDefined = 3048,
     kNotSupportedTypeConversion = 3049,
+    kEmptySelectFields = 3050,
+    kInvalidDataType = 3051,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -116,8 +118,6 @@ export enum class ErrorCode : long {
     kDirNotFound = 7009,
     kDataIOError = 7010,
     kUnexpectedError = 7011,
-    kConnectFailed = 7012,
-    kDisconnectFailed = 7013,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -190,6 +190,8 @@ public:
     static Status ExceedIndexNameLength(u64 index_name_length);
     static Status NoColumnDefined(const String& table_name);
     static Status NotSupportedTypeConversion(const String& from_type, const String& to_type);
+    static Status EmptySelectFields();
+    static Status InvalidDataType();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

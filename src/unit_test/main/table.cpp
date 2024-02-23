@@ -59,7 +59,7 @@ TEST_F(InfinityTableTest, test1) {
         CreateDatabaseOptions create_db_opts;
         infinity->CreateDatabase("db1", create_db_opts);
 
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("db1");
+        auto [db1_ptr, _] = infinity->GetDatabase("db1");
         EXPECT_EQ(db1_ptr->db_name(), "db1");
     }
 
@@ -84,7 +84,7 @@ TEST_F(InfinityTableTest, test1) {
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;
 
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase(db_name);
+        auto [ db1_ptr, st1 ] = infinity->GetDatabase(db_name);
 
         QueryResult create_result =
             db1_ptr->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
@@ -92,7 +92,7 @@ TEST_F(InfinityTableTest, test1) {
 
         EXPECT_EQ(db1_ptr->db_name(), "db1");
 
-        auto get_table = db1_ptr->GetTable(table_name);
+        auto [ get_table, st2 ] = db1_ptr->GetTable(table_name);
         EXPECT_TRUE(get_table != nullptr);
 
         {

@@ -280,6 +280,14 @@ Status Status::NotSupportedTypeConversion(const String &from_type, const String 
     return Status(ErrorCode::kNotSupportedTypeConversion, MakeUnique<String>(fmt::format("Not support to convert {} to {}", from_type, to_type)));
 }
 
+Status Status::EmptySelectFields() {
+    return Status(ErrorCode::kEmptySelectFields, MakeUnique<String>("Select fields are empty"));
+}
+
+Status Status::InvalidDataType() {
+    return Status(ErrorCode::kInvalidDataType, MakeUnique<String>("Invalid data type"));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
