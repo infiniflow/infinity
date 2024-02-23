@@ -290,33 +290,20 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
     return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
 }
 
-// void TableIndexEntry::Cleanup() {
-//     for (auto &[column_id, column_index_entry] : column_index_map_) {
-//         column_index_entry->Cleanup();
-//     }
-//     // FIXME: to cleanup fulltext_index_entry_
-// }
-
-void TableIndexEntry::Cleanup() && {}
+void TableIndexEntry::Cleanup() && {
+    for (auto &[column_id, column_index_entry] : column_index_map_) {
+        std::move(*column_index_entry).Cleanup();
+    }
+    // FIXME: to cleanup fulltext_index_entry_
+}
 
 bool TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
     if (this->Cleanupable(scanner->visible_ts())) {
         return true;
     }
     std::unique_lock lock(rw_locker_);
-    // TODO
-    // for (auto iter = column_index_map_.begin(); iter != column_index_map_.end();) {
-    //     if (iter->Cleanupable(scanner->visible_ts())) {
-    //         scanner->AddEntry(iter->second);
-    //         iter = column_index_map_.erase(iter);
-    //     } else {
-    //         ++iter;
-    //     }
-    // }
-    // if (fulltext_index_entry != nullptr && fulltext_index_entry->Cleanupable(scanner->visible_ts())) {
-    //     scanner->AddEntry(fulltext_index_entry);
-    //     fulltext_index_entry = nullptr;
-    // }
+    // TODO(sys)
+
     return false;
 }
 

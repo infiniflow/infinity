@@ -25,7 +25,6 @@ class NewCatalog;
 
 export enum class EntryType : i8 {
     kDummy,
-    kCatalog,
     kDatabase,
     kTable,
     kTableIndex,
@@ -39,7 +38,6 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
-// TODO: remove inheritance
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {

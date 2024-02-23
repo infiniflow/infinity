@@ -40,8 +40,6 @@ import block_entry;
 import segment_entry;
 import compact_segments_task;
 
-import default_values; // FIXME: remove it
-
 module wal_manager;
 
 namespace infinity {
@@ -248,10 +246,9 @@ void WalManager::Checkpoint() {
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
-        //        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {},
-        //        last_ckp_commit_ts: {}",
-        //                              current_max_commit_ts,
-        //                              ckp_commit_ts));
+//        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
+//                              current_max_commit_ts,
+//                              ckp_commit_ts));
         return;
     }
 
@@ -737,7 +734,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
         segment_entry->SetNoDelete();
-        segment_entry->SetDeprecated(UNCOMMIT_TS); // FIXME: use correct deprecate_ts
+        segment_entry->SetDeprecated(commit_ts);
     }
 }
 

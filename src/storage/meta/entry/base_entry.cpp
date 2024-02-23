@@ -19,7 +19,7 @@ module;
 module base_entry;
 
 import stl;
-import catalog;
+
 import infinity_exception;
 
 namespace infinity {

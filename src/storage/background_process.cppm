@@ -18,7 +18,6 @@ import wal_manager;
 import blocking_queue;
 import bg_task;
 import stl;
-import interval_checker;
 
 export module backgroud_process;
 
@@ -26,7 +25,7 @@ namespace infinity {
 
 export class BGTaskProcessor {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, std::chrono::seconds cleanup_interval);
+    explicit BGTaskProcessor(WalManager* wal_manager);
     void Start();
     void Stop();
 
@@ -39,9 +38,7 @@ private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_;
     Thread processor_thread_{};
 
-    WalManager *wal_manager_{};
-
-    IntervalChecker cleanup_interval_checker_;
+    WalManager* wal_manager_{};
 };
 
-} // namespace infinity
+}

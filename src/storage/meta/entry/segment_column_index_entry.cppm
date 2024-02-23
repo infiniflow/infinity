@@ -72,8 +72,6 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    bool CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const;
-
     void Cleanup();
 
 public:

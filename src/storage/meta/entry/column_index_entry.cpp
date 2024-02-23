@@ -153,14 +153,6 @@ void ColumnIndexEntry::Cleanup() {
     }
 }
 
-void ColumnIndexEntry::CleanupDelete(TxnTimeStamp oldest_txn_ts) {
-    Vector<SharedPtr<SegmentColumnIndexEntry>> cleanup_entries;
-    {
-        std::unique_lock w_lock(this->rw_locker_);
-        // the same as segment_entry
-    }
-}
-
 SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
     LocalFileSystem fs;
     SharedPtr<String> index_dir;

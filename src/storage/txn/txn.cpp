@@ -47,7 +47,6 @@ import bg_task;
 import backgroud_process;
 import base_table_ref;
 import compact_segments_task;
-import cleanup_task;
 
 namespace infinity {
 

@@ -418,11 +418,6 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-bool SegmentColumnIndexEntry::CheckCanCleanup(TxnTimeStamp oldest_txn_ts) const {
-    // not implemented
-    return false;
-}
-
 void SegmentColumnIndexEntry::Cleanup() {
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {

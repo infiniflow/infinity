@@ -149,8 +149,8 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp txn_ts = txn->Commit();
     rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
     min_uncommit_ts_ = std::min(min_uncommit_ts_, txn->BeginTS() + 1);
+    txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
     return txn_ts;
 }
@@ -158,8 +158,8 @@ TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
     rw_locker_.lock();
-    txn_map_.erase(txn->TxnID());
     min_uncommit_ts_ = std::min(min_uncommit_ts_, txn->BeginTS() + 1);
+    txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
 }
 
