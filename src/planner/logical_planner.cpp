@@ -142,7 +142,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildDelete(static_cast<const DeleteStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kCreate: {
-            return BuildCreate(static_cast<const CreateStatement *>(statement), bind_context_ptr);
+            return BuildCreate(const_cast<CreateStatement *>(static_cast<const CreateStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kDrop: {
             return BuildDrop(static_cast<const DropStatement *>(statement), bind_context_ptr);
@@ -350,7 +350,8 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<B
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindCreateStatement(static_cast<SchemaDDLInfo *>(statement->create_info_.get()));
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildCreateTable(statement, bind_context_ptr);
@@ -1123,6 +1124,12 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
 
     this->logical_plan_ = explain_node;
     return Status::OK();
+}
+
+void LogicalPlanner::BindCreateStatement(SchemaDDLInfo *statement) {
+    if (statement->schema_name_.empty()) {
+        statement->schema_name_ = query_context_ptr_->schema_name();
+    }
 }
 
 } // namespace infinity

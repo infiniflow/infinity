@@ -19,15 +19,14 @@
 
 namespace infinity {
 
-class CreateViewInfo final : public ExtraDDLInfo {
+class CreateViewInfo final : public SchemaDDLInfo {
 public:
-    explicit CreateViewInfo() : ExtraDDLInfo(DDLType::kView) {}
+    explicit CreateViewInfo() : SchemaDDLInfo(DDLType::kView) {}
 
     ~CreateViewInfo() final;
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{};
     std::string view_name_{};
 
     std::vector<std::string> *view_columns_{};

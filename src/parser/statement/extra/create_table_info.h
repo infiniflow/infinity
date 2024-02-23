@@ -28,15 +28,14 @@
 
 namespace infinity {
 
-class CreateTableInfo final : public ExtraDDLInfo {
+class CreateTableInfo final : public SchemaDDLInfo {
 public:
-    explicit CreateTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
+    explicit CreateTableInfo() : SchemaDDLInfo(DDLType::kTable) {}
 
     ~CreateTableInfo() final;
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
     std::string table_name_{};
 
     std::vector<ColumnDef *> column_defs_{};

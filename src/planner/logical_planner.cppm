@@ -41,6 +41,7 @@ import alter_statement;
 import explain_statement;
 import command_statement;
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -68,7 +69,7 @@ public:
     Status BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Create operator
-    Status BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildCreateDatabase(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -153,6 +154,9 @@ public:
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
+
+private:
+    void BindCreateStatement(SchemaDDLInfo *statement);
 
 private:
     static Status ValidIdentifier(const String &identifier);

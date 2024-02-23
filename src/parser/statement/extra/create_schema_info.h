@@ -18,13 +18,12 @@
 
 namespace infinity {
 
-class CreateSchemaInfo final : public ExtraDDLInfo {
+class CreateSchemaInfo final : public SchemaDDLInfo {
 public:
-    explicit CreateSchemaInfo() : ExtraDDLInfo(DDLType::kDatabase) {}
+    explicit CreateSchemaInfo() : SchemaDDLInfo(DDLType::kDatabase) {}
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_;
 };
 
 } // namespace infinity

@@ -44,4 +44,11 @@ public:
     ConflictType conflict_type_{ConflictType::kInvalid};
 };
 
+class SchemaDDLInfo : public ExtraDDLInfo {
+public:
+    explicit SchemaDDLInfo(DDLType type) : ExtraDDLInfo(type) {}
+
+    std::string schema_name_{};
+};
+
 } // namespace infinity
