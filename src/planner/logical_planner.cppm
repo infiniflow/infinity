@@ -82,7 +82,7 @@ public:
     Status BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Drop operator
-    Status BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildDropTable(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

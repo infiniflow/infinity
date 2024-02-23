@@ -19,13 +19,12 @@
 
 namespace infinity {
 
-class DropTableInfo : public ExtraDDLInfo {
+class DropTableInfo : public SchemaDDLInfo {
 public:
-    explicit DropTableInfo() : ExtraDDLInfo(DDLType::kTable) {}
+    explicit DropTableInfo() : SchemaDDLInfo(DDLType::kTable) {}
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
     std::string table_name_{};
 };
 

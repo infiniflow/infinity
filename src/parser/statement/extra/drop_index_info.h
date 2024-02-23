@@ -19,13 +19,12 @@
 
 namespace infinity {
 
-class DropIndexInfo : public ExtraDDLInfo {
+class DropIndexInfo : public SchemaDDLInfo {
 public:
-    explicit DropIndexInfo() : ExtraDDLInfo(DDLType::kIndex) {}
+    explicit DropIndexInfo() : SchemaDDLInfo(DDLType::kIndex) {}
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{};
     std::string table_name_{};
     std::string index_name_{};
 };

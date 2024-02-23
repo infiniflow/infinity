@@ -19,13 +19,12 @@
 
 namespace infinity {
 
-class DropCollectionInfo final : public ExtraDDLInfo {
+class DropCollectionInfo final : public SchemaDDLInfo {
 public:
-    explicit DropCollectionInfo() : ExtraDDLInfo(DDLType::kCollection) {}
+    explicit DropCollectionInfo() : SchemaDDLInfo(DDLType::kCollection) {}
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
     std::string collection_name_{};
 };
 

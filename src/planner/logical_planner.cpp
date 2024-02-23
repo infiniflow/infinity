@@ -145,7 +145,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildCreate(const_cast<CreateStatement *>(static_cast<const CreateStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kDrop: {
-            return BuildDrop(static_cast<const DropStatement *>(statement), bind_context_ptr);
+            return BuildDrop(const_cast<DropStatement *>(static_cast<const DropStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kShow: {
             return BuildShow(static_cast<const ShowStatement *>(statement), bind_context_ptr);
@@ -606,7 +606,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindCreateStatement(static_cast<SchemaDDLInfo *>(statement->drop_info_.get()));
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildDropTable(statement, bind_context_ptr);

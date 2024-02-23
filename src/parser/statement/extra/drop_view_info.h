@@ -19,13 +19,12 @@
 
 namespace infinity {
 
-class DropViewInfo : public ExtraDDLInfo {
+class DropViewInfo : public SchemaDDLInfo {
 public:
-    explicit DropViewInfo() : ExtraDDLInfo(DDLType::kView) {}
+    explicit DropViewInfo() : SchemaDDLInfo(DDLType::kView) {}
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
     std::string view_name_{};
 };
 
