@@ -41,6 +41,7 @@ import segment_iter;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
+import cleanup_scanner;
 
 namespace infinity {
 

@@ -12,36 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#include "unit_test/base_test.h"
 
-import wal_manager;
-import blocking_queue;
-import bg_task;
 import stl;
-import interval_checker;
+import storage;
+import cleanup_task;
+import infinity_context;
 
-export module backgroud_process;
+using namespace infinity;
 
-namespace infinity {
+class CleanupTaskTest : public BaseTest {
+    void SetUp() override {
+        // system("rm -rf /tmp/infinity");
+    }
 
-export class BGTaskProcessor {
-public:
-    explicit BGTaskProcessor(WalManager *wal_manager, std::chrono::seconds cleanup_interval);
-    void Start();
-    void Stop();
-
-public:
-    void Submit(SharedPtr<BGTask> bg_task);
-
-private:
-    void Process();
-
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
-    Thread processor_thread_{};
-
-    WalManager *wal_manager_{};
-
-    IntervalChecker cleanup_interval_checker_;
+    void TearDown() override {
+        // system("tree  /tmp/infinity");
+    }
 };
 
-} // namespace infinity
+TEST_F(CleanupTaskTest, simple_test) {
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    //
+}

@@ -26,6 +26,9 @@ import base_entry;
 import infinity_exception;
 import txn;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class TxnTableStore;

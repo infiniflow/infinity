@@ -48,7 +48,6 @@ import backgroud_process;
 import base_table_ref;
 import compact_segments_task;
 import cleanup_task;
-import default_values; //FIXME(sys)
 
 namespace infinity {
 
@@ -504,11 +503,6 @@ void Txn::CommitBottom() noexcept {
         local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
         auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
-    }
-
-    if (true) { // FIXME (sys)
-        auto cleanup_task = MakeShared<CleanupTask>(catalog_, UNCOMMIT_TS);
-        bg_task_processor_->Submit(cleanup_task);
     }
 
     LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));

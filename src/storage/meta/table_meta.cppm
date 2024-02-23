@@ -29,6 +29,9 @@ import base_entry;
 import table_entry;
 import entry_list;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class DBEntry;

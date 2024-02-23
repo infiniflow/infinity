@@ -14,34 +14,30 @@
 
 module;
 
-import wal_manager;
-import blocking_queue;
-import bg_task;
 import stl;
-import interval_checker;
 
-export module backgroud_process;
+export module interval_checker;
 
 namespace infinity {
 
-export class BGTaskProcessor {
+export class IntervalChecker {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, std::chrono::seconds cleanup_interval);
-    void Start();
-    void Stop();
+    explicit IntervalChecker(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
 
-public:
-    void Submit(SharedPtr<BGTask> bg_task);
+    bool Check() {
+        const auto now = std::chrono::system_clock::now();
+        if (now - last_check_ < interval_) {
+            return false;
+        }
+        last_check_ = now;
+        return true;
+    }
+
+    void Reset() { last_check_ = std::chrono::system_clock::now(); }
 
 private:
-    void Process();
-
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
-    Thread processor_thread_{};
-
-    WalManager *wal_manager_{};
-
-    IntervalChecker cleanup_interval_checker_;
+    const std::chrono::milliseconds interval_;
+    std::chrono::system_clock::time_point last_check_;
 };
 
 } // namespace infinity

@@ -135,6 +135,7 @@ export namespace std {
         using std::chrono::milliseconds;
         using std::chrono::nanoseconds;
         using std::chrono::seconds;
+        using std::chrono::system_clock;
 
         using std::chrono::operator>;
         using std::chrono::operator>=;

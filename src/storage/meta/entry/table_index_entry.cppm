@@ -28,6 +28,9 @@ import block_index;
 import third_party;
 import status;
 
+import cleanup_scanner;
+import meta_entry_interface;
+
 namespace infinity {
 
 class Txn;

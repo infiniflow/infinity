@@ -24,8 +24,6 @@ import infinity_exception;
 
 namespace infinity {
 
-CleanupScanner::CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
-
 bool BaseEntry::Cleanupable(TxnTimeStamp visible_ts) const { return entry_type_ != EntryType::kDummy && deleted_ && commit_ts_ <= visible_ts; }
 
 // Merge two reverse-ordered list inplace.
@@ -63,20 +61,6 @@ void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &l
     }
 
     list2.clear();
-}
-
-void CleanupScanner::AddMeta(UniquePtr<MetaInterface> meta) { metas_.emplace_back(std::move(meta)); }
-
-void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
-
-void CleanupScanner::Scan() {
-    catalog_->PickCleanup(this);
-    for (auto &entry : entries_) {
-        std::move(*entry).Cleanup();
-    }
-    for (auto &meta : metas_) {
-        std::move(*meta).Cleanup();
-    }
 }
 
 } // namespace infinity

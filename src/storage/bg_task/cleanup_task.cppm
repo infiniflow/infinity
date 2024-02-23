@@ -18,16 +18,15 @@ export module cleanup_task;
 
 import stl;
 import bg_task;
-import base_entry;
+import cleanup_scanner;
 import catalog;
-import default_values;
 
 namespace infinity {
 
 export class CleanupTask final : public BGTask {
 public:
-    // Clean up is async task ?
-    CleanupTask(NewCatalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
+    // Try clean up is async task?
+    CleanupTask(NewCatalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kTryCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
 
 public:
     ~CleanupTask() override = default;
@@ -35,9 +34,10 @@ public:
     String ToString() const override { return "CleanupTask"; }
 
     void Execute() {
-        // CleanupScanner scanner;
         CleanupScanner scanner(catalog_, visible_ts_);
         scanner.Scan();
+        // FIXME(sys): This is a blocking call, should it be async?
+        std::move(scanner).Cleanup();
     }
 
 private:

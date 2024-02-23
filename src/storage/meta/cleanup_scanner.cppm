@@ -14,34 +14,38 @@
 
 module;
 
-import wal_manager;
-import blocking_queue;
-import bg_task;
-import stl;
-import interval_checker;
+export module cleanup_scanner;
 
-export module backgroud_process;
+import stl;
+// import meta_entry_interface;
 
 namespace infinity {
 
-export class BGTaskProcessor {
-public:
-    explicit BGTaskProcessor(WalManager *wal_manager, std::chrono::seconds cleanup_interval);
-    void Start();
-    void Stop();
+class NewCatalog;
+class EntryInterface;
+class MetaInterface;
 
+export class CleanupScanner {
 public:
-    void Submit(SharedPtr<BGTask> bg_task);
+    CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts);
+
+    void Scan();
+
+    void Cleanup() &&;
+
+    void AddMeta(UniquePtr<MetaInterface> meta);
+
+    void AddEntry(SharedPtr<EntryInterface> entry);
+
+    TxnTimeStamp visible_ts() const { return visible_ts_; }
 
 private:
-    void Process();
+    NewCatalog *const catalog_;
+    const TxnTimeStamp visible_ts_;
 
-    BlockingQueue<SharedPtr<BGTask>> task_queue_;
-    Thread processor_thread_{};
+    Vector<SharedPtr<EntryInterface>> entries_;
 
-    WalManager *wal_manager_{};
-
-    IntervalChecker cleanup_interval_checker_;
+    Vector<UniquePtr<MetaInterface>> metas_;
 };
 
 } // namespace infinity

@@ -24,6 +24,8 @@ import index_def;
 import status;
 import extra_ddl_info;
 import entry_list;
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 

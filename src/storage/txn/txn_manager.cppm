@@ -69,6 +69,8 @@ public:
 
     void RollBackTxn(Txn *txn);
 
+    TxnTimeStamp GetMinUncommitTs() const { return min_uncommit_ts_; }
+
 private:
     TransactionID GetNewTxnID();
 
@@ -84,7 +86,9 @@ private:
     TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
-    TxnTimeStamp start_ts_{};
+    TxnTimeStamp start_ts_{};        // The next txn ts
+    TxnTimeStamp min_uncommit_ts_{}; // the min ts that is not committed
+
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};

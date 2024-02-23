@@ -36,6 +36,9 @@ import table_index_meta;
 import compaction_alg;
 import meta_map;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class IndexDef;

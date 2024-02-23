@@ -28,6 +28,9 @@ import txn_manager;
 
 import entry_list;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 struct NewCatalog;

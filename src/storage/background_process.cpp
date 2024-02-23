@@ -26,7 +26,8 @@ import third_party;
 
 namespace infinity {
 
-BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager) : wal_manager_(wal_manager) {}
+BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, std::chrono::seconds cleanup_interval)
+    : wal_manager_(wal_manager), cleanup_interval_checker_(cleanup_interval) {}
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -76,7 +77,15 @@ void BGTaskProcessor::Process() {
                 task->CommitTxn();
                 break;
             }
+            case BGTaskType::kTryCleanup: {
+                if (cleanup_interval_checker_.Check()) {
+                    auto task = static_cast<CleanupTask *>(bg_task.get());
+                    task->Execute();
+                }
+                break;
+            }
             case BGTaskType::kCleanup: {
+                cleanup_interval_checker_.Reset();
                 auto task = static_cast<CleanupTask *>(bg_task.get());
                 task->Execute();
                 break;

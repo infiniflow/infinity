@@ -14,8 +14,6 @@
 
 module;
 
-#include <concepts>
-
 export module base_entry;
 
 import stl;
@@ -76,53 +74,5 @@ public:
 
 // Merge two reverse-ordered list inplace.
 export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
-
-// forwarding declaration
-export class CleanupScanner;
-
-export class MetaInterface {
-public:
-    virtual ~MetaInterface() = default;
-
-    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
-
-    virtual void Cleanup() && = 0;
-};
-
-export template <typename Meta>
-concept MetaConcept = std::derived_from<Meta, MetaInterface>;
-
-export class EntryInterface {
-public:
-    virtual ~EntryInterface() = default;
-
-    virtual void Cleanup() && = 0;
-
-    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
-};
-
-export template <typename Entry>
-concept EntryConcept = std::derived_from<Entry, EntryInterface>;
-
-export class CleanupScanner {
-public:
-    CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts);
-
-    void Scan();
-
-    void AddMeta(UniquePtr<MetaInterface> meta);
-
-    void AddEntry(SharedPtr<EntryInterface> entry);
-
-    TxnTimeStamp visible_ts() const { return visible_ts_; }
-
-private:
-    NewCatalog *const catalog_;
-    const TxnTimeStamp visible_ts_;
-
-    Vector<SharedPtr<EntryInterface>> entries_;
-
-    Vector<UniquePtr<MetaInterface>> metas_;
-};
 
 } // namespace infinity

@@ -55,6 +55,9 @@ import db_meta;
 import meta_map;
 import base_entry;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class TxnManager;

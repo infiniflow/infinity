@@ -17,8 +17,9 @@ module;
 export module meta_map;
 
 import stl;
-import base_entry;
 import local_file_system;
+import cleanup_scanner;
+import meta_entry_interface;
 
 namespace infinity {
 

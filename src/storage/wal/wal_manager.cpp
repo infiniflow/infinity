@@ -248,9 +248,10 @@ void WalManager::Checkpoint() {
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
-//        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
-//                              current_max_commit_ts,
-//                              ckp_commit_ts));
+        //        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {},
+        //        last_ckp_commit_ts: {}",
+        //                              current_max_commit_ts,
+        //                              ckp_commit_ts));
         return;
     }
 
