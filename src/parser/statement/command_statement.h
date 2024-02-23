@@ -170,7 +170,7 @@ public:
     const std::string &table_name() const { return table_name_; }
 
 private:
-    std::string schema_name_;
+    std::string schema_name_{};
 
     std::string table_name_;
 };

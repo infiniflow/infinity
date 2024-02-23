@@ -372,9 +372,10 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    @pytest.mark.skip(reason="Cast error.")
-    @pytest.mark.parametrize("types", common_values.types_array)
-    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    # @pytest.mark.skip(reason="Cast error.")
+    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
+    @pytest.mark.parametrize("types", ["varchar"])
+    @pytest.mark.parametrize("types_example", [[1,2,3]])
     def test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)

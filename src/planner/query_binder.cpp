@@ -393,7 +393,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
 SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
     String schema_name;
     if (from_table->db_name_.empty()) {
-        schema_name = DEFAULT_DB_NAME;
+        schema_name = query_context->schema_name();
     } else {
         schema_name = from_table->db_name_;
     }

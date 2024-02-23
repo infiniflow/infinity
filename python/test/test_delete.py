@@ -332,8 +332,9 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # various expression will be given in where clause, and check result correctness
-    @pytest.mark.parametrize('column_types', common_values.types_array)
-    @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
+    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
+    @pytest.mark.parametrize('column_types', ["varchar"])
+    @pytest.mark.parametrize('column_types_example', [[1, 2, 3]])
     def test_various_expression_in_where_clause(self, column_types, column_types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)

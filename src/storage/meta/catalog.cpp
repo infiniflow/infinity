@@ -127,7 +127,8 @@ NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeS
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::DropDatabase instead
-Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<DBEntry *, Status>
+NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
 
     this->rw_locker_.lock_shared();
 
@@ -137,13 +138,17 @@ Tuple<DBEntry *, Status> NewCatalog::DropDatabase(const String &db_name, Transac
     }
     this->rw_locker_.unlock_shared();
     if (db_meta == nullptr) {
+        if (conflict_type == ConflictType::kIgnore) {
+            LOG_TRACE(fmt::format("Ignore drop a not existed table/collection entry {}", db_name));
+            return {nullptr, Status::OK()};
+        }
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
     }
 
     LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
-    return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr);
+    return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {

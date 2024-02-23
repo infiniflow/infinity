@@ -164,7 +164,7 @@ TEST_F(SQLParserTest, good_test2) {
             EXPECT_EQ(create_statement->create_info_->conflict_type_, ConflictType::kError);
 
             auto *create_table_info = (CreateTableInfo *)(create_statement->create_info_.get());
-            EXPECT_EQ(create_table_info->schema_name_, String("default"));
+            EXPECT_EQ(create_table_info->schema_name_, String(""));
             EXPECT_EQ(create_table_info->table_name_, String("t1"));
             EXPECT_EQ(create_table_info->column_defs_.size(), 27u);
 
@@ -563,7 +563,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
         auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
         EXPECT_EQ(create_index_info->index_name_, "idx1");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
@@ -592,7 +592,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
         auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
         EXPECT_EQ(create_index_info->index_name_, "idx1");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
@@ -650,7 +650,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
         auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
         EXPECT_EQ(create_index_info->index_name_, "idx2");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
@@ -685,7 +685,7 @@ TEST_F(SQLParserTest, good_create_index_1) {
 
         auto create_index_info = static_cast<CreateIndexInfo *>(create_statement->create_info_.get());
         EXPECT_EQ(create_index_info->index_name_, "idx3");
-        EXPECT_EQ(create_index_info->schema_name_, "default");
+        EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);

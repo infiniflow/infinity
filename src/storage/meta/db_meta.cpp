@@ -192,8 +192,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeSta
     }
 }
 
-Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-
+Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     DBEntry *db_entry_ptr{nullptr};
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
     if (this->entry_list_.empty()) {
@@ -215,6 +214,10 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
         if (begin_ts > header_db_entry->commit_ts_) {
             // No conflict
             if (header_db_entry->deleted_) {
+                if (conflict_type == ConflictType::kIgnore) {
+                    LOG_TRACE(fmt::format("Ignore drop a not existed table entry."));
+                    return {nullptr, Status::OK()};
+                }
                 UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
                 LOG_TRACE(*err_msg);
                 return {nullptr, Status::DBNotExist(*this->db_name_)};

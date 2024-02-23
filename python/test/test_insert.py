@@ -474,3 +474,25 @@ class TestInsert:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
+    @pytest.mark.parametrize('column_types', ["varchar"])
+    @pytest.mark.parametrize('column_types_example', [[1, 2, 3]])
+    def test_various_insert_types(self, column_types, column_types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_various_insert_types")
+        db_obj.create_table("test_various_insert_types", {"c1": column_types}, None)
+
+        table_obj = db_obj.get_table("test_various_insert_types")
+
+        values = [{"c1": column_types_example} for _ in range(5)]
+        table_obj.insert(values)
+
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
