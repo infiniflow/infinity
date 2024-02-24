@@ -27,10 +27,10 @@ namespace infinity {
 using PutWalEntryFn = std::function<void(SharedPtr<WalEntry>)>;
 
 class BGTaskProcessor;
-struct NewCatalog;
+struct Catalog;
 export class TxnManager {
 public:
-    explicit TxnManager(NewCatalog *catalog,
+    explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
@@ -75,7 +75,7 @@ private:
     TransactionID GetNewTxnID();
 
 private:
-    NewCatalog *catalog_{};
+    Catalog *catalog_{};
     std::shared_mutex rw_locker_{};
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};

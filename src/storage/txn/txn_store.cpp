@@ -134,11 +134,11 @@ void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 void TxnTableStore::Rollback() {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
-        NewCatalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
+        Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
 
-    NewCatalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
 }
 
@@ -149,19 +149,19 @@ void TxnTableStore::PrepareCommit() {
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
     Txn *txn_ptr = (Txn *)txn_;
-    NewCatalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
+    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
         const SharedPtr<SegmentEntry> &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
-        NewCatalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
+        Catalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
     // Attention: "compact" needs to be ahead of "delete"
-    NewCatalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
-    NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
-    NewCatalog::CommitCreateIndex(txn_indexes_store_);
+    Catalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
@@ -170,8 +170,8 @@ void TxnTableStore::PrepareCommit() {
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit() const {
-    NewCatalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
-    NewCatalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
+    Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
 }
 
 void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {

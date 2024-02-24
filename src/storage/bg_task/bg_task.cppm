@@ -97,7 +97,7 @@ export struct ForceCheckpointTask final : public BGTask {
 
 export struct CatalogDeltaOpsMergeTask final : public BGTask {
 
-    explicit CatalogDeltaOpsMergeTask(UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry, NewCatalog *catalog)
+    explicit CatalogDeltaOpsMergeTask(UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry, Catalog *catalog)
         : BGTask(BGTaskType::kCatalogDeltaOpsMerge, true), local_catalog_delta_entry_(std::move(local_catalog_delta_entry)), catalog_(catalog) {}
 
     ~CatalogDeltaOpsMergeTask() = default;
@@ -105,7 +105,7 @@ export struct CatalogDeltaOpsMergeTask final : public BGTask {
     String ToString() const final { return "Catalog delta operation merge task"; }
 
     UniquePtr<CatalogDeltaEntry> local_catalog_delta_entry_{};
-    NewCatalog *catalog_{};
+    Catalog *catalog_{};
 };
 
 } // namespace infinity

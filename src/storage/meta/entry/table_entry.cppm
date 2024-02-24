@@ -46,10 +46,10 @@ struct TableIndexEntry;
 class FulltextIndexEntry;
 class TableMeta;
 class Txn;
-struct NewCatalog;
+struct Catalog;
 
 export struct TableEntry : public BaseEntry, public EntryInterface {
-    friend struct NewCatalog;
+    friend struct Catalog;
 
 public:
     explicit TableEntry();

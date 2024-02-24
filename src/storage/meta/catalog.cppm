@@ -114,9 +114,9 @@ public:
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
-export struct NewCatalog {
+export struct Catalog {
 public:
-    explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
+    explicit Catalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
     // Database related functions
@@ -208,13 +208,13 @@ public:
 
 public:
     // Function related methods
-    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
+    static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);
 
-    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+    static void AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
+    static void AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
-    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name);
 
 public:
     // Serialization and Deserialization
@@ -224,15 +224,15 @@ public:
 
     bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void MergeFrom(NewCatalog &other);
+    void MergeFrom(Catalog &other);
 
-    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
+    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
-    static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
-    static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
 
-    static void LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
+    static void LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods

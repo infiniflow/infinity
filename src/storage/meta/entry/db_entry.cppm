@@ -37,7 +37,7 @@ namespace infinity {
 class TxnManager;
 
 export class DBEntry : public BaseEntry, public EntryInterface {
-    friend struct NewCatalog;
+    friend struct Catalog;
 
 public:
     explicit DBEntry();

@@ -56,7 +56,7 @@ import segment_column_index_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
+Catalog::Catalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
     if (create_default_db) {
         // db current dir is same level as catalog
         Path catalog_path(*this->current_dir_);
@@ -79,7 +79,7 @@ NewCatalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) : current_
 // it will lose operation
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
-NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
 
     // Check if there is db_meta with the db_name
     DBMeta *db_meta{nullptr};
@@ -128,7 +128,7 @@ NewCatalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeS
 // it will lose operation
 // use Txn::DropDatabase instead
 Tuple<DBEntry *, Status>
-NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
 
     this->rw_locker().lock_shared();
 
@@ -151,7 +151,7 @@ NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeSta
     return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
 
     DBMeta *db_meta{nullptr};
     this->rw_locker().lock_shared();
@@ -168,7 +168,7 @@ Tuple<DBEntry *, Status> NewCatalog::GetDatabase(const String &db_name, Transact
     return db_meta->GetEntry(txn_id, begin_ts);
 }
 
-void NewCatalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr) {
+void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr) {
     this->rw_locker().lock_shared();
 
     DBMeta *db_meta{nullptr};
@@ -181,7 +181,7 @@ void NewCatalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnM
     db_meta->DeleteNewEntry(txn_id, txn_mgr);
 }
 
-Vector<DBEntry *> NewCatalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
+Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
     this->rw_locker().lock_shared();
 
     Vector<DBEntry *> res;
@@ -197,7 +197,7 @@ Vector<DBEntry *> NewCatalog::Databases(TransactionID txn_id, TxnTimeStamp begin
     return res;
 }
 
-Tuple<TableEntry *, Status> NewCatalog::CreateTable(const String &db_name,
+Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
                                                     TransactionID txn_id,
                                                     TxnTimeStamp begin_ts,
                                                     const SharedPtr<TableDef> &table_def,
@@ -213,7 +213,7 @@ Tuple<TableEntry *, Status> NewCatalog::CreateTable(const String &db_name,
     return db_entry->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr);
 }
 
-Tuple<TableEntry *, Status> NewCatalog::DropTableByName(const String &db_name,
+Tuple<TableEntry *, Status> Catalog::DropTableByName(const String &db_name,
                                                         const String &table_name,
                                                         ConflictType conflict_type,
                                                         TransactionID txn_id,
@@ -228,7 +228,7 @@ Tuple<TableEntry *, Status> NewCatalog::DropTableByName(const String &db_name,
     return db_entry->DropTable(table_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Status Catalog::GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts) {
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -239,7 +239,7 @@ Status NewCatalog::GetTables(const String &db_name, Vector<TableDetail> &output_
     return db_entry->GetTablesDetail(txn_id, begin_ts, output_table_array);
 }
 
-Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     // Check the db entries
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
@@ -251,7 +251,7 @@ Tuple<TableEntry *, Status> NewCatalog::GetTableByName(const String &db_name, co
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr) {
+Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
     table_meta->DeleteNewEntry(txn_id, txn_mgr);
@@ -259,7 +259,7 @@ Status NewCatalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_i
     return Status::OK();
 }
 
-Tuple<TableIndexEntry *, Status> NewCatalog::CreateIndex(TableEntry *table_entry,
+Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
                                                          const SharedPtr<IndexDef> &index_def,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
@@ -271,7 +271,7 @@ Tuple<TableIndexEntry *, Status> NewCatalog::CreateIndex(TableEntry *table_entry
     return table_entry->CreateIndex(index_def, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
-Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,
+Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
                                                        const String &table_name,
                                                        const String &index_name,
                                                        ConflictType conflict_type,
@@ -287,62 +287,62 @@ Tuple<TableIndexEntry *, Status> NewCatalog::DropIndex(const String &db_name,
     return table_entry->DropIndex(index_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status NewCatalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr) {
+Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();
     table_entry->RemoveIndexEntry(index_name, txn_id, txn_mgr);
     return Status::OK();
 }
 
-void NewCatalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
+void Catalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     return TableEntry::CommitCreateIndex(txn_indexes_store_, is_replay);
 }
 
-void NewCatalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
+void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
     return table_entry->Append(txn_id, txn_store, buffer_mgr);
 }
 
-void NewCatalog::CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
+void Catalog::CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
     return table_entry->CommitAppend(txn_id, commit_ts, append_state_ptr);
 }
 
-void NewCatalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
+void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     return table_entry->RollbackAppend(txn_id, commit_ts, txn_store);
 }
 
-Status NewCatalog::Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+Status Catalog::Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     return table_entry->Delete(txn_id, commit_ts, delete_state);
 }
 
-void NewCatalog::CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
+void Catalog::CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
     return table_entry->CommitDelete(txn_id, commit_ts, append_state);
 }
 
-Status NewCatalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
+Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status NewCatalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
     return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
 }
 
-Status NewCatalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
     return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
 }
 
-Status NewCatalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
+Status Catalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
     return table_entry->CommitImport(commit_ts, segment);
 }
 
-SegmentID NewCatalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
+SegmentID Catalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
-void NewCatalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry) {
+void Catalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry) {
     table_entry->segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
 }
 
-SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, String function_name) {
+SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);
 
@@ -352,7 +352,7 @@ SharedPtr<FunctionSet> NewCatalog::GetFunctionSetByName(NewCatalog *catalog, Str
     return catalog->function_sets_[function_name];
 }
 
-void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+void Catalog::AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set) {
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
@@ -361,7 +361,7 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     catalog->function_sets_.emplace(name, function_set);
 }
 
-void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
+void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
     String name = special_function->name();
     StringToLower(name);
     if (catalog->special_functions_.contains(name)) {
@@ -370,7 +370,7 @@ void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<Special
     catalog->special_functions_.emplace(name, special_function);
 }
 
-Tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name) {
+Tuple<SpecialFunction *, Status> Catalog::GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name) {
     StringToLower(function_name);
     if (!catalog->special_functions_.contains(function_name)) {
         return {nullptr, Status::SpecialFunctionNotFound()};
@@ -378,7 +378,7 @@ Tuple<SpecialFunction *, Status> NewCatalog::GetSpecialFunctionByNameNoExcept(Ne
     return {catalog->special_functions_[function_name].get(), Status::OK()};
 }
 
-nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     nlohmann::json json_res;
     Vector<DBMeta *> databases;
     {
@@ -398,20 +398,20 @@ nlohmann::json NewCatalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     return json_res;
 }
 
-UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
-    auto catalog = MakeUnique<NewCatalog>(nullptr);
+UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
+    auto catalog = MakeUnique<Catalog>(nullptr);
     if (catalog_paths.empty()) {
         UnrecoverableError(fmt::format("Catalog path is empty"));
     }
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", catalog_paths[0]));
-    catalog = NewCatalog::LoadFromFile(catalog_paths[0], buffer_mgr);
+    catalog = Catalog::LoadFromFile(catalog_paths[0], buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     for (SizeT i = 1; i < catalog_paths.size(); i++) {
         LOG_INFO(fmt::format("Load catalog DELTA entry binary from: {}", catalog_paths[i]));
-        NewCatalog::LoadFromEntry(catalog.get(), catalog_paths[i], buffer_mgr);
+        Catalog::LoadFromEntry(catalog.get(), catalog_paths[i], buffer_mgr);
     }
 
     LOG_TRACE(fmt::format("Catalog Delta Op is done"));
@@ -420,7 +420,7 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFiles(const Vector<String> &catalog_pa
 }
 
 // called by Replay
-void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
+void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr) {
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     i32 file_size = fs.GetFileSize(*catalog_file_handler);
@@ -784,7 +784,7 @@ void NewCatalog::LoadFromEntry(NewCatalog *catalog, const String &catalog_path, 
     }
 }
 
-void NewCatalog::MergeFrom(NewCatalog &other) {
+void Catalog::MergeFrom(Catalog &other) {
     // Merge databases.
     for (auto &[db_name, db_meta2] : other.db_meta_map()) {
         auto it = this->db_meta_map().find(db_name);
@@ -796,8 +796,8 @@ void NewCatalog::MergeFrom(NewCatalog &other) {
     }
 }
 
-UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
-    UniquePtr<NewCatalog> catalog = nullptr;
+UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
+    UniquePtr<Catalog> catalog = nullptr;
     LocalFileSystem fs;
     UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
@@ -812,11 +812,11 @@ UniquePtr<NewCatalog> NewCatalog::LoadFromFile(const String &catalog_path, Buffe
     return catalog;
 }
 
-void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog) {
+void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog) {
     SharedPtr<String> current_dir = MakeShared<String>(catalog_json["current_dir"]);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    catalog = MakeUnique<NewCatalog>(current_dir);
+    catalog = MakeUnique<Catalog>(current_dir);
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->catalog_version_ = catalog_json["catalog_version"];
     if (catalog_json.contains("databases")) {
@@ -827,7 +827,7 @@ void NewCatalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *
     }
 }
 
-void NewCatalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts) {
+void Catalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts) {
     nlohmann::json catalog_json = Serialize(max_commit_ts, true);
     String catalog_str = catalog_json.dump();
 
@@ -854,7 +854,7 @@ void NewCatalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_
 }
 
 // called by bg_task
-bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
 
     this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
@@ -913,5 +913,5 @@ bool NewCatalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, 
     return false;
 }
 
-void NewCatalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
 } // namespace infinity
