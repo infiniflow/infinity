@@ -31,7 +31,7 @@ import infinity_exception;
 import status;
 import iresearch_datastore;
 import extra_ddl_info;
-
+import local_file_system;
 import txn;
 
 namespace infinity {
@@ -85,27 +85,28 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         txn = txn_mgr->GetTxn(txn_id);
     }
 
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
 
-    if (this->entry_list_.empty()) {
+    if (this->index_entry_list().empty()) {
         // Insert a dummy entry.
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        // UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+        auto dummy_entry = MakeUnique<TableIndexEntry>();
         dummy_entry->deleted_ = true;
-        this->entry_list_.emplace_back(std::move(dummy_entry));
+        this->index_entry_list().emplace_back(std::move(dummy_entry));
 
         // Create a new table index entry
         auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
         table_index_entry_ptr = table_index_entry.get();
-        this->entry_list_.emplace_front(std::move(table_index_entry));
+        this->index_entry_list().emplace_front(std::move(table_index_entry));
         LOG_TRACE("New table index entry is added.");
         return {table_index_entry_ptr, Status::OK()};
     } else {
         // Already have a db_entry, check if the db_entry is valid here.
-        BaseEntry *header_base_entry = this->entry_list_.front().get();
+        BaseEntry *header_base_entry = this->index_entry_list().front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
             auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
             table_index_entry_ptr = table_index_entry.get();
-            this->entry_list_.emplace_front(std::move(table_index_entry));
+            this->index_entry_list().emplace_front(std::move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
             return {table_index_entry_ptr, Status::OK()};
         }
@@ -118,7 +119,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                     auto table_index_entry =
                         TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
-                    this->entry_list_.emplace_front(std::move(table_index_entry));
+                    this->index_entry_list().emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
                     return {table_index_entry_ptr, Status::OK()};
                 } else {
@@ -148,7 +149,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                             auto table_index_entry =
                                 TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                             table_index_entry_ptr = table_index_entry.get();
-                            this->entry_list_.emplace_front(std::move(table_index_entry));
+                            this->index_entry_list().emplace_front(std::move(table_index_entry));
                             LOG_TRACE("New table index entry is added.");
                             return {table_index_entry_ptr, Status::OK()};
                         } else {
@@ -173,13 +174,13 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
                     // Remove the header entry
-                    this->entry_list_.erase(this->entry_list_.begin());
+                    this->index_entry_list().erase(this->index_entry_list().begin());
 
                     // Append new one
                     auto table_index_entry =
                         TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
-                    this->entry_list_.emplace_front(std::move(table_index_entry));
+                    this->index_entry_list().emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
                     return {table_index_entry_ptr, Status::OK()};
                 }
@@ -218,15 +219,15 @@ TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, TransactionID tx
 Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *) {
 
     TableIndexEntry *table_index_entry_ptr{nullptr};
-    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker());
 
-    if (this->entry_list_.empty()) {
+    if (this->index_entry_list().empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty index entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
     }
 
-    BaseEntry *header_base_entry = this->entry_list_.front().get();
+    BaseEntry *header_base_entry = this->index_entry_list().front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid index entry.");
         LOG_ERROR(*err_msg);
@@ -247,7 +248,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(Tra
             auto table_index_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
             table_index_entry_ptr = table_index_entry.get();
             table_index_entry_ptr->deleted_ = true;
-            this->entry_list_.emplace_front(std::move(table_index_entry));
+            this->index_entry_list().emplace_front(std::move(table_index_entry));
             return {table_index_entry_ptr, Status::OK()};
         } else {
             // Write-Write conflict
@@ -261,7 +262,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntryInternal(Tra
         if (txn_id == header_index_entry->txn_id_) {
             // Same txn, remove the header db entry
             table_index_entry_ptr = header_index_entry;
-            this->entry_list_.erase(this->entry_list_.begin());
+            this->index_entry_list().erase(this->index_entry_list().begin());
             return {table_index_entry_ptr, Status::OK()};
         } else {
             // Not same txn, issue WW conflict
@@ -282,11 +283,11 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
 
     Vector<TableIndexEntry *> table_index_entry_candidates;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["index_name"] = *this->index_name_;
 
-        table_index_entry_candidates.reserve(this->entry_list_.size());
-        for (const auto &base_entry : this->entry_list_) {
+        table_index_entry_candidates.reserve(this->index_entry_list().size());
+        for (const auto &base_entry : this->index_entry_list()) {
             if (base_entry->entry_type_ == EntryType::kDummy) {
                 continue;
             }
@@ -317,7 +318,7 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
         // traverse reversely because a dummy head has been inserted
         for (auto iter = entries.rbegin(); iter != entries.rend(); iter++) {
             auto entry = TableIndexEntry::Deserialize(*iter, res.get(), buffer_mgr, table_entry);
-            res->entry_list_.emplace_front(std::move(entry));
+            res->index_entry_list().emplace_front(std::move(entry));
         }
     }
     return res;
@@ -327,8 +328,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
 
     TableIndexEntry *table_index_entry{nullptr};
 
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
-    for (const auto &entry : this->entry_list_) {
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
+    for (const auto &entry : this->index_entry_list()) {
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
@@ -362,8 +363,8 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, 
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
 
-    if (!this->entry_list_.empty()) {
-        const auto &entry = entry_list_.front();
+    if (!this->index_entry_list().empty()) {
+        const auto &entry = index_entry_list().front();
 
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
@@ -396,25 +397,35 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID tx
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
-    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::unique_lock<std::shared_mutex> w_locker(this->rw_locker());
+    if (this->index_entry_list().empty()) {
         LOG_TRACE("Attempt to delete not existed entry.");
         return;
     }
 
     // `std::remove_if` move all elements that satisfy the predicate and move all the last element to the front of list. return value is the end of
     // the moved elements.
-    auto removed_iter =
-        std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<BaseEntry> &entry) { return entry->txn_id_ == txn_id; });
+    auto removed_iter = std::remove_if(this->index_entry_list().begin(), this->index_entry_list().end(), [&](SharedPtr<TableIndexEntry> &entry) {
+        return entry->txn_id_ == txn_id;
+    });
     // erase the all "moved" elements in the end of list
-    this->entry_list_.erase(removed_iter, this->entry_list_.end());
+    this->index_entry_list().erase(removed_iter, this->index_entry_list().end());
 }
 
 void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
     if (!IsEqual(*this->index_name_, *other.index_name_)) {
         UnrecoverableError("TableIndexMeta::MergeFrom requires index_name_ match");
     }
-    MergeLists(this->entry_list_, other.entry_list_);
+    this->index_entry_list_.MergeWith(other.index_entry_list_);
 }
+
+void TableIndexMeta::Cleanup() && {
+    std::move(index_entry_list_).Cleanup();
+
+    // LocalFileSystem fs;
+    // FIXME(sys) remove table index meta dir
+}
+
+bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 
 } // namespace infinity

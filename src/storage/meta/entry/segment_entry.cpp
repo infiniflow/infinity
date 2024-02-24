@@ -41,6 +41,7 @@ import segment_iter;
 import catalog_delta_entry;
 import status;
 import compact_segments_task;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -131,12 +132,13 @@ void SegmentEntry::SetNoDelete() {
     compact_task_ = nullptr;
 }
 
-void SegmentEntry::SetDeprecated() {
+void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
         UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
     }
     status_ = SegmentStatus::kDeprecated;
+    deprecate_ts_ = deprecate_ts;
 }
 
 void SegmentEntry::RollbackCompact() {
@@ -145,6 +147,7 @@ void SegmentEntry::RollbackCompact() {
         UnrecoverableError("Assert: Rollbacked segment should be in No Delete state.");
     }
     status_ = SegmentStatus::kSealed;
+    deprecate_ts_ = UNCOMMIT_TS;
 }
 
 bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id) {
@@ -174,7 +177,7 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
 
 bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    return min_row_ts_ <= check_ts && status_ != SegmentStatus::kDeprecated;
+    return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
 }
 
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
@@ -465,5 +468,15 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     //     }
     // }
 }
+
+void SegmentEntry::Cleanup() && {
+    for (auto &block_entry : block_entries_) {
+        block_entry->Cleanup();
+    }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*segment_dir_);
+}
+
+bool SegmentEntry::PickCleanup(CleanupScanner *scanner) { return this->Cleanupable(scanner->visible_ts()); }
 
 } // namespace infinity

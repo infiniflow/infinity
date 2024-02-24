@@ -874,10 +874,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
             EXPECT_NE(table_index_meta, nullptr);
             EXPECT_EQ(table_index_meta->index_name(), "idx1");
-            EXPECT_EQ(table_index_meta->entry_list().size(), 2);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->entry_list().front().get());
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "idx1");
-            auto entry_back = table_index_meta->entry_list().back().get();
+            auto entry_back = table_index_meta->index_entry_list().back().get();
             EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }
@@ -897,7 +897,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
+        // BufferManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
         {
@@ -981,10 +981,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);
             EXPECT_EQ(table_index_meta->index_name(), "hnsw_index");
-            EXPECT_EQ(table_index_meta->entry_list().size(), 2);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->entry_list().front().get());
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "hnsw_index");
-            auto entry_back = table_index_meta->entry_list().back().get();
+            auto entry_back = table_index_meta->index_entry_list().back().get();
             EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }

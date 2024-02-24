@@ -20,6 +20,7 @@ from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import INSERT_DATA, VEC
+from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
@@ -36,7 +37,7 @@ class RemoteTable(Table, ABC):
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
     def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
-        check_valid_name(index_name)
+        check_valid_name(index_name, "Index")
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -55,19 +56,19 @@ class RemoteTable(Table, ABC):
                                       index_info_list=index_info_list_to_use,
                                       option=options)
 
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def drop_index(self, index_name: str):
-        check_valid_name(index_name)
+        check_valid_name(index_name, "Index")
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -116,10 +117,10 @@ class RemoteTable(Table, ABC):
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                 fields=fields)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def import_data(self, file_path: str, options=None):
 
@@ -158,8 +159,8 @@ class RemoteTable(Table, ABC):
                     case None:
                         raise Exception("upload failed")
                     case _:
-                        if not res.success:
-                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.error_code != ErrorCode.OK:
+                            raise Exception(f"ERROR:{res.error_code} upload failed: {res.error_msg}")
                         if res.error_msg:
                             raise Exception(f"upload failed: {res.error_msg}")
                         if res.can_skip:
@@ -169,10 +170,10 @@ class RemoteTable(Table, ABC):
                                      table_name=self._table_name,
                                      file_name=file_name,
                                      import_options=options)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -182,10 +183,10 @@ class RemoteTable(Table, ABC):
                 where_expr = traverse_conditions(condition(cond))
         res = self._conn.delete(
             db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         # {"c1": 1, "c2": 1.1}
@@ -224,10 +225,10 @@ class RemoteTable(Table, ABC):
 
         res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
                                 update_expr_array=update_expr_array)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int):
@@ -287,10 +288,10 @@ class RemoteTable(Table, ABC):
                                 offset_expr=query.offset)
 
         # process the results
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return build_result(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def _explain_query(self, query: ExplainQuery) -> Any:
         res = self._conn.explain(db_name=self._db_name,
@@ -302,7 +303,7 @@ class RemoteTable(Table, ABC):
                                  limit_expr=query.limit,
                                  offset_expr=query.offset,
                                  explain_type=query.explain_type.to_ttype())
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)

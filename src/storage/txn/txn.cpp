@@ -179,7 +179,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Status Txn::DropDatabase(const String &db_name, ConflictType) {
+Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -189,8 +189,8 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_);
-    if (!status.ok()) {
+    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
+    if (!status.ok() || dropped_db_entry == nullptr) {
         return status;
     }
 

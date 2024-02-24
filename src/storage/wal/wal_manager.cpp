@@ -62,6 +62,7 @@ WalManager::~WalManager() {
 }
 
 void WalManager::Start() {
+    LOG_INFO("WAL manager is starting...");
     bool expected = false;
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
@@ -83,17 +84,19 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
+    LOG_INFO("WAL manager is started.");
 }
 
 void WalManager::Stop() {
+    LOG_INFO("WAL manager is stopping...");
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
     if (!changed) {
-        LOG_INFO("WalManager::Stop already stopped");
+        LOG_INFO("WAL manager was stopped...");
         return;
     }
 
-    LOG_INFO("WalManager::Stop begin to stop txn manager");
+    LOG_TRACE("WalManager::Stop begin to stop txn manager.");
     // Notify txn manager to stop.
     TxnManager *txn_mgr = storage_->txn_manager();
     txn_mgr->Stop();
@@ -109,16 +112,15 @@ void WalManager::Stop() {
     que_.clear();
 
     // Wait for checkpoint thread to stop.
-    LOG_INFO("WalManager::Stop checkpoint thread join");
+    LOG_TRACE("WalManager::Stop checkpoint thread join");
     checkpoint_thread_.join();
 
     // Wait for flush thread to stop
-    LOG_INFO("WalManager::Stop flush thread join");
+    LOG_TRACE("WalManager::Stop flush thread join");
     flush_thread_.join();
 
     ofs_.close();
-
-    LOG_INFO("WalManager is stopped");
+    LOG_INFO("WAL manager is stopped.");
 }
 
 // Session request to persist an entry. Assuming txn_id of the entry has
@@ -244,9 +246,9 @@ void WalManager::Checkpoint() {
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
-        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
-                              current_max_commit_ts,
-                              ckp_commit_ts));
+//        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
+//                              current_max_commit_ts,
+//                              ckp_commit_ts));
         return;
     }
 
@@ -732,7 +734,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
         segment_entry->SetNoDelete();
-        segment_entry->SetDeprecated();
+        segment_entry->SetDeprecated(commit_ts);
     }
 }
 

@@ -16,6 +16,7 @@ from abc import ABC
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.db import Database
+from infinity.errors import ErrorCode
 from infinity.remote_thrift.table import RemoteTable
 from infinity.remote_thrift.utils import check_valid_name, select_res_to_polars
 
@@ -115,9 +116,10 @@ class RemoteDatabase(Database, ABC):
         # {"c1":'int, primary key',"c2":'vector,1024,float32'}
         # db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "vector,1024,float32"}, None)
         # to column_defs
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
+            check_valid_name(column_name, "Column")
             column_big_info = [item.strip() for item in column_info.split(",")]
             if column_big_info[0] == "vector":
                 get_embedding_info(
@@ -130,43 +132,43 @@ class RemoteDatabase(Database, ABC):
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       option=options)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def drop_table(self, table_name, if_exists=True):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def describe_table(self, table_name):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         res = self._conn.describe_table(
             db_name=self._db_name, table_name=table_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def get_table(self, table_name):
-        check_valid_name(table_name)
+        check_valid_name(table_name, "Table")
         res = self._conn.get_table(
             db_name=self._db_name, table_name=table_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception("Get Table Error")
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def show_tables(self):
         res = self._conn.show_tables(self._db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)

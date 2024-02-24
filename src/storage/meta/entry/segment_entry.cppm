@@ -26,6 +26,9 @@ import base_entry;
 import infinity_exception;
 import txn;
 
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class TxnTableStore;
@@ -41,7 +44,7 @@ export enum class SegmentStatus : u8 {
     kDeprecated,
 };
 
-export struct SegmentEntry : public BaseEntry {
+export struct SegmentEntry : public BaseEntry, public EntryInterface {
 public:
     friend class BlockEntryIter;
     friend struct TableEntry;
@@ -85,7 +88,7 @@ public:
 
     void SetNoDelete();
 
-    void SetDeprecated();
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
 
     void RollbackCompact();
 
@@ -188,6 +191,7 @@ private:
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{UNCOMMIT_TS};
     TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS}; // FIXME: need persist to disk
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
@@ -196,6 +200,11 @@ private:
 
     std::condition_variable_any no_delete_complete_cv_{};
     HashSet<TransactionID> delete_txns_; // current number of delete txn that write this segment
+
+public:
+    void Cleanup() && override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

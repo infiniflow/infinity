@@ -31,11 +31,11 @@ import connection;
 namespace infinity {
 
 void DBServer::Run() {
-    if (initialized) {
+    if (initialized_) {
         return;
     }
 
-    initialized = true;
+    initialized_ = true;
 
     u16 pg_port = InfinityContext::instance().config()->pg_port();
     const String &pg_listen_addr = InfinityContext::instance().config()->listen_address();
@@ -58,13 +58,14 @@ void DBServer::Run() {
 
 void DBServer::Shutdown() {
     fmt::print("Shutdown infinity server ...\n");
+    initialized_ = false;
+
     while (running_connection_count_ > 0) {
         // Running connection exists.
         std::this_thread::yield();
     }
 
     io_service_.stop();
-    initialized = false;
     acceptor_ptr_->close();
 
     infinity::InfinityContext::instance().UnInit();
@@ -77,13 +78,15 @@ void DBServer::CreateConnection() {
 }
 
 void DBServer::StartConnection(SharedPtr<Connection> &connection) {
-    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
-        ++num_running_connections;
-        connection->Run();
+    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = this->initialized_]() mutable {
+        if(initialized) {
+            ++num_running_connections;
+            connection->Run();
 
-        // User disconnected
-        connection.reset();
-        --num_running_connections;
+            // User disconnected
+            connection.reset();
+            --num_running_connections;
+        }
     });
 
     connection_thread.detach();

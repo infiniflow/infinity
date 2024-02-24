@@ -28,6 +28,9 @@ import block_index;
 import third_party;
 import status;
 
+import cleanup_scanner;
+import meta_entry_interface;
+
 namespace infinity {
 
 class Txn;
@@ -36,11 +39,13 @@ class BufferManager;
 struct TableEntry;
 class BaseTableRef;
 
-export struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry : public BaseEntry, public EntryInterface {
 
     friend struct TableEntry;
 
 public:
+    TableIndexEntry();
+
     TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
@@ -104,6 +109,11 @@ private:
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
+
+public:
+    void Cleanup() && override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

@@ -41,6 +41,7 @@ import alter_statement;
 import explain_statement;
 import command_statement;
 import data_type;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -55,7 +56,7 @@ public:
 
     Status BuildSelect(const SelectStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildInsert(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildInsert(InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildInsertValue(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -68,7 +69,7 @@ public:
     Status BuildDelete(const DeleteStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Create operator
-    Status BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildCreateDatabase(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -81,7 +82,7 @@ public:
     Status BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Drop operator
-    Status BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildDropTable(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -99,7 +100,7 @@ public:
     // Execute operator
     Status BuildExecute(const ExecuteStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
-    Status BuildCopy(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildCopy(CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Export operator
     Status BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
@@ -111,7 +112,7 @@ public:
     Status BuildAlter(const AlterStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Show operator
-    Status BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowColumns(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -145,7 +146,7 @@ public:
     Status BuildFlushBuffer(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Optimize
-    Status BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+    Status BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildCommand(const CommandStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
@@ -153,6 +154,9 @@ public:
     Status BuildExplain(const ExplainStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     [[nodiscard]] SharedPtr<LogicalNode> LogicalPlan() const { return logical_plan_; }
+
+private:
+    void BindSchemaName(String &schema_name) const;
 
 private:
     static Status ValidIdentifier(const String &identifier);

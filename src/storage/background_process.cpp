@@ -17,6 +17,7 @@ module backgroud_process;
 import stl;
 import bg_task;
 import compact_segments_task;
+import cleanup_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
@@ -28,8 +29,8 @@ namespace infinity {
 BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager) : wal_manager_(wal_manager) {}
 
 void BGTaskProcessor::Start() {
-    LOG_INFO("Start the background processor.");
     processor_thread_ = Thread([this] { Process(); });
+    LOG_INFO("Background processor is started.");
 }
 
 void BGTaskProcessor::Stop() {
@@ -37,7 +38,7 @@ void BGTaskProcessor::Stop() {
     task_queue_.Enqueue(stop_task);
     stop_task->Wait();
     processor_thread_.join();
-    LOG_INFO("Shutdown the background processor.");
+    LOG_INFO("Background processor is stopped.");
 }
 
 void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
@@ -73,6 +74,11 @@ void BGTaskProcessor::Process() {
                 task->BeginTxn();
                 task->Execute();
                 task->CommitTxn();
+                break;
+            }
+            case BGTaskType::kCleanup: {
+                auto task = static_cast<CleanupTask *>(bg_task.get());
+                task->Execute();
                 break;
             }
             case BGTaskType::kInvalid: {

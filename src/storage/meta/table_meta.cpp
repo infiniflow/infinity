@@ -28,7 +28,7 @@ import txn_state;
 import txn_manager;
 import buffer_manager;
 import catalog_delta_entry;
-
+import local_file_system;
 import third_party;
 import status;
 import infinity_exception;
@@ -59,14 +59,14 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                       TransactionID txn_id,
                                                       TxnTimeStamp begin_ts,
                                                       TxnManager *txn_mgr) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
     const String &table_collection_name = *table_collection_name_ptr;
 
     TableEntry *table_entry_ptr{nullptr};
 
-    if (this->entry_list_.empty()) {
-        UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
-        this->entry_list_.emplace_back(std::move(dummy_entry));
+    if (this->table_entry_list().empty()) {
+        auto dummy_entry = MakeUnique<TableEntry>();
+        this->table_entry_list().emplace_back(std::move(dummy_entry));
 
         SharedPtr<TableEntry> table_entry =
             TableEntry::NewTableEntry(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
@@ -79,13 +79,13 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
         }
 
         table_entry_ptr = table_entry.get();
-        this->entry_list_.emplace_front(std::move(table_entry));
+        this->table_entry_list().emplace_front(std::move(table_entry));
 
         LOG_TRACE(fmt::format("New table entry is added: {}.", table_collection_name));
         return {table_entry_ptr, Status::OK()};
     } else {
         // Already have a table entry, check if the table entry is valid here.
-        BaseEntry *header_base_entry = this->entry_list_.front().get();
+        BaseEntry *header_base_entry = this->table_entry_list().front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
             // Dummy entry in the header of the list, insert the new table entry to the front.
             SharedPtr<TableEntry> table_entry =
@@ -100,7 +100,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
             }
 
             table_entry_ptr = table_entry.get();
-            this->entry_list_.emplace_front(std::move(table_entry));
+            this->table_entry_list().emplace_front(std::move(table_entry));
             return {table_entry_ptr, Status::OK()};
         }
 
@@ -122,7 +122,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     }
 
                     table_entry_ptr = table_entry.get();
-                    this->entry_list_.emplace_front(std::move(table_entry));
+                    this->table_entry_list().emplace_front(std::move(table_entry));
                     return {table_entry_ptr, Status::OK()};
                 } else {
                     // Duplicated table
@@ -164,7 +164,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                             }
 
                             table_entry_ptr = table_entry.get();
-                            this->entry_list_.emplace_front(std::move(table_entry));
+                            this->table_entry_list().emplace_front(std::move(table_entry));
                             return {table_entry_ptr, Status::OK()};
                         } else {
                             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Create a duplicated table {}.", table_collection_name));
@@ -188,7 +188,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
                     // Remove the header entry
-                    this->entry_list_.erase(this->entry_list_.begin());
+                    this->table_entry_list().erase(this->table_entry_list().begin());
 
                     // Append new one
                     SharedPtr<TableEntry> table_entry =
@@ -203,7 +203,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                     }
 
                     table_entry_ptr = table_entry.get();
-                    this->entry_list_.emplace_front(std::move(table_entry));
+                    this->table_entry_list().emplace_front(std::move(table_entry));
                     return {table_entry_ptr, Status::OK()};
                 }
                 default: {
@@ -222,14 +222,14 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
 
     TableEntry *table_entry_ptr{nullptr};
 
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
+    if (this->table_entry_list().empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
     }
 
-    BaseEntry *header_base_entry = this->entry_list_.front().get();
+    BaseEntry *header_base_entry = this->table_entry_list().front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
         UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry.");
         LOG_ERROR(*err_msg);
@@ -265,7 +265,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
 
             table_entry_ptr = table_entry.get();
             table_entry_ptr->deleted_ = true;
-            this->entry_list_.emplace_front(std::move(table_entry));
+            this->table_entry_list().emplace_front(std::move(table_entry));
 
             return {table_entry_ptr, Status::OK()};
         } else {
@@ -281,7 +281,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
             // Same txn, remove the header table entry
             table_entry_ptr = header_table_entry;
 
-            auto base_entry_ptr = this->entry_list_.front();
+            auto base_entry_ptr = this->table_entry_list().front();
             auto table_entry_ptr = std::static_pointer_cast<TableEntry>(base_entry_ptr);
 
             // Physical log
@@ -291,7 +291,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
                     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
                 }
             }
-            this->entry_list_.pop_front();
+            this->table_entry_list().pop_front();
             return {table_entry_ptr.get(), Status::OK()};
         } else {
             // Not same txn, issue WW conflict
@@ -303,17 +303,17 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
 }
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
+    if (this->table_entry_list().empty()) {
         LOG_TRACE("Empty table entry list.");
         return;
     }
 
-    auto removed_iter = std::remove_if(this->entry_list_.begin(), this->entry_list_.end(), [&](SharedPtr<BaseEntry> &entry) -> bool {
+    auto removed_iter = std::remove_if(this->table_entry_list().begin(), this->table_entry_list().end(), [&](SharedPtr<TableEntry> &entry) -> bool {
         return entry->txn_id_ == txn_id;
     });
 
-    this->entry_list_.erase(removed_iter, this->entry_list_.end());
+    this->table_entry_list().erase(removed_iter, this->table_entry_list().end());
 }
 
 /**
@@ -329,14 +329,14 @@ void TableMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *) {
  * @return Status
  */
 Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
-    if (this->entry_list_.empty()) {
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
+    if (this->table_entry_list().empty()) {
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status::EmptyEntryList()};
     }
 
-    for (const auto &table_entry : this->entry_list_) {
+    for (const auto &table_entry : this->table_entry_list()) {
         if (table_entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry. dummy entry");
             LOG_ERROR(*err_msg);
@@ -370,8 +370,8 @@ Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeSta
 
 Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
 
-    if (!this->entry_list_.empty()) {
-        const auto &entry = entry_list_.front();
+    if (!this->table_entry_list().empty()) {
+        const auto &entry = table_entry_list().front();
         if (entry->entry_type_ == EntryType::kDummy) {
             UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
             LOG_ERROR(*err_msg);
@@ -406,9 +406,9 @@ const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_n
 const String &TableMeta::db_name() const { return db_entry_->db_name(); }
 
 SharedPtr<String> TableMeta::ToString() {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, entry_list_.size()));
+        fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, table_entry_list().size()));
     return res;
 }
 
@@ -416,12 +416,12 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts, bool is_full_che
     nlohmann::json json_res;
     Vector<TableEntry *> table_candidates;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["db_entry_dir"] = *this->db_entry_dir_;
         json_res["table_name"] = *this->table_name_;
         // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        table_candidates.reserve(this->entry_list_.size());
-        for (auto &table_entry : this->entry_list_) {
+        table_candidates.reserve(this->table_entry_list().size());
+        for (auto &table_entry : this->table_entry_list()) {
             if (table_entry->entry_type_ == EntryType::kTable) {
                 // Put it to candidate list
                 table_candidates.push_back((TableEntry *)table_entry.get());
@@ -454,13 +454,14 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-            res->entry_list_.emplace_back(std::move(table_entry));
+            res->table_entry_list().emplace_back(std::move(table_entry));
         }
     }
-    res->entry_list_.sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
-    UniquePtr<BaseEntry> dummy_entry = MakeUnique<BaseEntry>(EntryType::kDummy);
+    res->table_entry_list().sort(
+        [](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    auto dummy_entry = MakeUnique<TableEntry>();
     dummy_entry->deleted_ = true;
-    res->entry_list_.emplace_back(std::move(dummy_entry));
+    res->table_entry_list().emplace_back(std::move(dummy_entry));
 
     return res;
 }
@@ -470,7 +471,17 @@ void TableMeta::MergeFrom(TableMeta &other) {
     if (!IsEqual(*this->table_name_, *other.table_name_) || !IsEqual(*this->db_entry_dir_, *other.db_entry_dir_)) {
         UnrecoverableError("DBEntry::MergeFrom requires table_name_ and db_entry_dir_ match");
     }
-    MergeLists(this->entry_list_, other.entry_list_);
+    this->table_entry_list_.MergeWith(other.table_entry_list_);
 }
+
+void TableMeta::Cleanup() && {
+    std::move(table_entry_list_).Cleanup();
+
+    String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(table_meta_dir);
+}
+
+bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 
 } // namespace infinity

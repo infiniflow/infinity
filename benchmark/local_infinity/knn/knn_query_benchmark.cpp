@@ -68,10 +68,11 @@ template <typename Function>
 inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-    std::shared_ptr<Database> data_base = infinity->GetDatabase("default");
-    std::shared_ptr<Table> table = data_base->GetTable(table_name);
+    auto [ data_base, status1 ] = infinity->GetDatabase("default");
+    auto [ table, status2 ] = data_base->GetTable(table_name);
+    std::shared_ptr<Table> shared_table(std::move(table));
     for (auto id = id_begin; id < id_end; ++id) {
-        fn(id, table, threadId);
+        fn(id, shared_table, threadId);
     }
 }
 

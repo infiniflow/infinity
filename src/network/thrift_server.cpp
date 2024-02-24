@@ -79,50 +79,51 @@ using namespace apache::thrift::server;
 
 namespace infinity {
 
+constexpr String kErrorMsgHeader = "THRIFT ERROR";
+
 class InfinityServiceHandler : virtual public infinity_thrift_rpc::InfinityServiceIf {
 public:
     InfinityServiceHandler() = default;
 
     void Connect(infinity_thrift_rpc::CommonResponse &response) override {
         auto infinity = Infinity::RemoteConnect();
-        if (infinity == nullptr) {
-            response.success = false;
-            response.error_msg = "Connect failed";
-            LOG_ERROR(fmt::format("THRIFT ERROR: Connect failed"));
-        } else {
-            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
-            infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
-            response.session_id = infinity->GetSessionId();
-            response.success = true;
-        }
+        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
+        infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
+        response.__set_session_id(infinity->GetSessionId());
+        response.__set_error_code((i64)(ErrorCode::kOk));
+        LOG_TRACE(fmt::format("THRIFT: Connect success, new session {}", response.session_id));
     }
 
     void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        if (infinity == nullptr) {
-            response.success = false;
-            response.error_msg = "Disconnect failed";
-            LOG_ERROR(fmt::format("THRIFT ERROR: Disconnect failed"));
+        auto status = GetAndRemoveSessionID(request.session_id);
+        if (status.ok()) {
+            response.__set_error_code((i64)(status.code()));
+            LOG_TRACE(fmt::format("THRIFT: Disconnect session {} success", request.session_id));
         } else {
-            auto session_id = infinity->GetSessionId();
-            infinity->RemoteDisconnect();
-            std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
-            infinity_session_map_.erase(session_id);
-            LOG_TRACE(fmt::format("THRIFT : Disconnect success"));
-            response.success = true;
+            response.__set_error_code((i64)(status.code()));
+            response.__set_error_msg(status.message());
+            LOG_TRACE(fmt::format("THRIFT: Disconnect session {} failed", request.session_id));
         }
     }
 
     void CreateDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto result = infinity->CreateDatabase(request.db_name, (const CreateDatabaseOptions &)request.option);
-        ProcessCommonResult(response, result);
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (status.ok()) {
+            auto result = infinity->CreateDatabase(request.db_name, (const CreateDatabaseOptions &)request.option);
+            ProcessQueryResult(response, result);
+        } else {
+            ProcessStatus(response, status);
+        }
     }
 
     void DropDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropDatabaseRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto result = infinity->DropDatabase(request.db_name, (const DropDatabaseOptions &)request.option);
-        ProcessCommonResult(response, result);
+        auto [infinity, status] = GetInfinityBySessionID(request.session_id);
+        if (status.ok()) {
+            auto result = infinity->DropDatabase(request.db_name, (const DropDatabaseOptions &)request.option);
+            ProcessQueryResult(response, result);
+        } else {
+            ProcessStatus(response, status);
+        }
     }
 
     void CreateTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableRequest &request) override {
@@ -133,20 +134,36 @@ public:
             column_defs.emplace_back(column_def);
         }
 
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        CreateTableOptions create_table_opts;
-        if (database == nullptr) {
-            UnrecoverableError("Database is null");
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
         }
 
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        CreateTableOptions create_table_opts;
         auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
         DropTableOptions drop_table_opts;
         switch (request.options.conflict_type) {
             case infinity_thrift_rpc::ConflictType::Ignore:
@@ -160,24 +177,38 @@ public:
                 drop_table_opts.conflict_type_ = ConflictType::kError;
                 break;
         }
+
         auto result = database->DropTable(request.table_name, drop_table_opts);
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
+
         auto columns = new Vector<String>();
         columns->reserve(request.column_names.size());
-
         for (auto &column : request.column_names) {
             columns->emplace_back(column);
         }
 
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
-
         for (auto &value : request.fields) {
             auto value_list = new Vector<ParsedExpr *>();
             value_list->reserve(value.parse_exprs.size());
@@ -189,8 +220,7 @@ public:
         }
 
         auto result = table->Insert(columns, values);
-
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     CopyFileType GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
@@ -210,9 +240,23 @@ public:
     }
 
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
 
         Path path(fmt::format("{}_{}_{}_{}",
                               *InfinityContext::instance().config()->temp_dir().get(),
@@ -224,12 +268,12 @@ public:
         import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
         auto &delimiter_string = request.import_option.delimiter;
         if (import_options.copy_file_type_ == CopyFileType::kCSV && delimiter_string.size() != 1) {
-            RecoverableError(Status::SyntaxError("CSV file delimiter isn't a char."));
+            ProcessStatus(response, Status::SyntaxError("CSV file delimiter isn't a char."));
         }
         import_options.delimiter_ = delimiter_string[0];
 
         const QueryResult result = table->Import(path.c_str(), import_options);
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
@@ -251,7 +295,7 @@ public:
                     LOG_TRACE(fmt::format("Exist file size: {} , request total size: {}", exist_file_size, request.total_size));
                     fs.DeleteFile(path.c_str());
                 } else {
-                    response.__set_success(true);
+                    response.__set_error_code((i64)(ErrorCode::kOk));
                     response.__set_can_skip(true);
                     return;
                 }
@@ -260,106 +304,32 @@ public:
             file_writer.Write(request.data.data(), request.data.size());
             file_writer.Flush();
         }
-        LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
-        response.__set_success(true);
+        response.__set_error_code((i64)(ErrorCode::kOk));
         response.__set_can_skip(false);
-    }
-
-    void HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
-                         SizeT column_count,
-                         SharedPtr<TableDef> table_def,
-                         Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
-        if (column_count != all_column_vectors.size()) {
-            UnrecoverableError("Column count not match");
-        }
-        for (SizeT col_index = 0; col_index < column_count; ++col_index) {
-            auto column_def = table_def->columns()[col_index];
-            infinity_thrift_rpc::ColumnDef proto_column_def;
-            proto_column_def.__set_id(column_def->id());
-            proto_column_def.__set_name(column_def->name());
-
-            infinity_thrift_rpc::DataType proto_data_type;
-            proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
-
-            response.column_defs.emplace_back(proto_column_def);
-        }
-    }
-
-    static void
-    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
-        auto size = column_vector->data_type()->Size() * row_count;
-        String dst;
-        dst.resize(size);
-        std::memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(std::move(dst));
-    }
-
-    void
-    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
-
-        String dst;
-        SizeT total_varchar_data_size = 0;
-        for (SizeT index = 0; index < row_count; ++index) {
-            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-            total_varchar_data_size += varchar.length_;
-        }
-
-        auto all_size = total_varchar_data_size + row_count * sizeof(i32);
-        dst.resize(all_size);
-
-        i32 current_offset = 0;
-        for (SizeT index = 0; index < row_count; ++index) {
-            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-            i32 length = varchar.length_;
-            if (varchar.IsInlined()) {
-                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
-            } else {
-                auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
-                column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
-                                                                    varchar.vector_.chunk_id_,
-                                                                    varchar.vector_.chunk_offset_,
-                                                                    varchar.length_);
-                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
-            }
-            current_offset += sizeof(i32) + varchar.length_;
-        }
-
-        if (current_offset != (i32)all_size) {
-            UnrecoverableError("Varchar data size not match");
-        }
-
-        output_column_field.column_vectors.emplace_back(std::move(dst));
-        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-    }
-
-    void
-    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
-        auto size = column_vector->data_type()->Size() * row_count;
-        String dst;
-        dst.resize(size);
-        std::memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(std::move(dst));
-        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
-    }
-
-    void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
-        auto size = column_vector->data_type()->Size() * row_count;
-        String dst;
-        dst.resize(size);
-        std::memcpy(dst.data(), column_vector->data(), size);
-        output_column_field.column_vectors.emplace_back(std::move(dst));
-        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+        LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
     }
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
         // ++count_;
         // auto start1 = std::chrono::steady_clock::now();
 
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
 
         // auto end1 = std::chrono::steady_clock::now();
         //
@@ -369,7 +339,8 @@ public:
 
         // select list
         if (request.__isset.select_list == false) {
-            UnrecoverableError("Select list is empty");
+            ProcessStatus(response, Status::EmptySelectFields());
+            return;
         }
 
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
@@ -441,11 +412,8 @@ public:
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
 
         // auto end4 = std::chrono::steady_clock::now();
@@ -473,12 +441,27 @@ public:
     }
 
     void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) override {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
+
         if (request.__isset.select_list == false) {
-            UnrecoverableError("Select list is empty");
+            ProcessStatus(response, Status::EmptySelectFields());
+            return;
         }
 
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
@@ -535,59 +518,80 @@ public:
 
         // Explain type
         auto explain_type = GetExplainTypeTypeFromProto(request.explain_type);
-
         const QueryResult result = table->Explain(explain_type, search_expr, filter, output_columns);
 
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
     void ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) override {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        String variable_name = request.variable_name;
-
-        const QueryResult result = infinity->ShowVariable(variable_name);
-
+        const QueryResult result = infinity->ShowVariable(request.variable_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
     void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
             filter = GetParsedExprFromProto(request.where_expr);
         }
 
-        const auto result = table->Delete(filter);
-
-        ProcessCommonResult(response, result);
+        const QueryResult result = table->Delete(filter);
+        ProcessQueryResult(response, result);
     };
 
     void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
@@ -605,51 +609,56 @@ public:
         }
 
         const QueryResult result = table->Update(filter, update_expr_array_);
-
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto result = infinity->ListDatabases();
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
+        auto result = infinity->ListDatabases();
+        response.__set_error_code((i64)(result.ErrorCode()));
         if (result.IsOk()) {
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
             auto row_count = data_block->row_count();
-
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(0, i);
                 const String &db_name = value.GetVarchar();
                 response.db_names.emplace_back(db_name);
             }
-
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
     void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
         auto result = database->ListTables();
         if (result.IsOk()) {
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
-
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
                 Value value = data_block->GetValue(1, i);
                 const String &table_name = value.GetVarchar();
                 response.table_names.emplace_back(table_name);
             }
-
-            response.__set_success(true);
+            response.__set_error_code((i64)(result.ErrorCode()));
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
@@ -659,74 +668,99 @@ public:
     }
 
     void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        String table_name = request.table_name;
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
-        const QueryResult result = database->DescribeTable(table_name);
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
 
+        const QueryResult result = database->DescribeTable(request.table_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
     void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
 
         const QueryResult result = database->ShowTables();
-
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
             ProcessDataBlocks(result, response, columns);
-            response.__set_success(true);
         } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+            ProcessQueryResult(response, result);
         }
     }
 
     void GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        if (database != nullptr) {
-            response.__set_success(true);
-        } else {
-            response.__set_success(false);
-            response.__set_error_msg("Database not found");
-            LOG_ERROR(fmt::format("THRIFT ERROR: Database not found"));
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
         }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        ProcessStatus(response, database_status);
     }
 
     void GetTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetTableRequest &request) override {
-        const auto table = GetInfinityBySessionID(request.session_id)->GetDatabase(request.db_name)->GetTable(request.table_name);
-        if (table != nullptr) {
-            response.__set_success(true);
-        } else {
-            response.__set_success(false);
-            response.__set_error_msg("Table not found");
-            LOG_ERROR(fmt::format("THRIFT ERROR: Table not found"));
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
         }
+
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        ProcessStatus(response, table_status);
     }
 
     void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
-        String index_name = request.index_name;
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
 
         auto *index_info_list_to_use = new Vector<IndexInfo *>();
-
         for (auto &index_info : request.index_info_list) {
             auto index_info_to_use = new IndexInfo();
             index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
@@ -745,17 +779,30 @@ public:
         }
 
         QueryResult result = table->CreateIndex(request.index_name, index_info_list_to_use, (CreateIndexOptions &)request.option);
-
-        ProcessCommonResult(response, result);
+        ProcessQueryResult(response, result);
     }
 
     void DropIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropIndexRequest &request) override {
-        auto infinity = GetInfinityBySessionID(request.session_id);
-        auto database = infinity->GetDatabase(request.db_name);
-        auto table = database->GetTable(request.table_name);
-        QueryResult result = table->DropIndex(request.index_name);
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
 
-        ProcessCommonResult(response, result);
+        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+        if (!database_status.ok()) {
+            ProcessStatus(response, database_status);
+            return;
+        }
+
+        auto [table, table_status] = database->GetTable(request.table_name);
+        if (!table_status.ok()) {
+            ProcessStatus(response, table_status);
+            return;
+        }
+
+        QueryResult result = table->DropIndex(request.index_name);
+        ProcessQueryResult(response, result);
     }
 
 private:
@@ -769,26 +816,24 @@ private:
     // std::chrono::duration<double> phase_4_duration_{};
 
 private:
-    Infinity *GetInfinityBySessionID(i64 session_id) {
-        infinity_session_map_mutex_.lock();
+    Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id) {
+        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
         auto iter = infinity_session_map_.find(session_id);
-        infinity_session_map_mutex_.unlock();
-
         if (iter == infinity_session_map_.end()) {
-            RecoverableError(Status::SessionNotFound(session_id));
+            return {nullptr, Status::SessionNotFound(session_id)};
         }
-
-        return iter->second.get();
+        return {iter->second.get(), Status::OK()};
     }
 
-    static void ProcessCommonResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result) {
-        if (result.IsOk()) {
-            response.__set_success(true);
-        } else {
-            response.__set_success(false);
-            response.__set_error_msg(result.ErrorStr());
-            LOG_ERROR(fmt::format("THRIFT ERROR: {}", result.ErrorStr()));
+    Status GetAndRemoveSessionID(i64 session_id) {
+        std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
+        auto iter = infinity_session_map_.find(session_id);
+        if (iter == infinity_session_map_.end()) {
+            return Status::SessionNotFound(session_id);
         }
+        iter->second->RemoteDisconnect();
+        infinity_session_map_.erase(session_id);
+        return Status::OK();
     }
 
     static ColumnDef *GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def) {
@@ -1208,22 +1253,52 @@ private:
         SizeT blocks_count = result.result_table_->DataBlockCount();
         for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
             auto data_block = result.result_table_->GetDataBlockById(block_idx);
-            ProcessColumns(data_block, result.result_table_->ColumnCount(), columns);
+            Status status = ProcessColumns(data_block, result.result_table_->ColumnCount(), columns);
+            if (!status.ok()) {
+                ProcessStatus(response, status);
+                return;
+            }
         }
         HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
     }
 
-    void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
+    Status ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<infinity_thrift_rpc::ColumnField> &columns) {
         auto row_count = data_block->row_count();
         for (SizeT col_index = 0; col_index < column_count; ++col_index) {
             auto &result_column_vector = data_block->column_vectors[col_index];
             infinity_thrift_rpc::ColumnField &output_column_field = columns[col_index];
             output_column_field.__set_column_type(DataTypeToProtoColumnType(result_column_vector->data_type()));
-            ProcessColumnFieldType(output_column_field, row_count, result_column_vector);
+            Status status = ProcessColumnFieldType(output_column_field, row_count, result_column_vector);
+            if (!status.ok()) {
+                return status;
+            }
         }
+        return Status::OK();
     }
 
-    void
+    void HandleColumnDef(infinity_thrift_rpc::SelectResponse &response,
+                         SizeT column_count,
+                         SharedPtr<TableDef> table_def,
+                         Vector<infinity_thrift_rpc::ColumnField> &all_column_vectors) {
+        if (column_count != all_column_vectors.size()) {
+            ProcessStatus(response, Status::ColumnCountMismatch(fmt::format("expect: {}, actual: {}", column_count, all_column_vectors.size())));
+            return;
+        }
+        for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+            auto column_def = table_def->columns()[col_index];
+            infinity_thrift_rpc::ColumnDef proto_column_def;
+            proto_column_def.__set_id(column_def->id());
+            proto_column_def.__set_name(column_def->name());
+
+            infinity_thrift_rpc::DataType proto_data_type;
+            proto_column_def.__set_data_type(*DataTypeToProtoDataType(column_def->type()));
+
+            response.column_defs.emplace_back(proto_column_def);
+        }
+        response.__set_error_code((i64)(ErrorCode::kOk));
+    }
+
+    Status
     ProcessColumnFieldType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const shared_ptr<ColumnVector> &column_vector) {
         switch (column_vector->data_type()->type()) {
             case LogicalType::kBoolean:
@@ -1250,8 +1325,141 @@ private:
                 break;
             }
             default: {
-                UnrecoverableError("Not implemented data type");
+                return Status::InvalidDataType();
             }
+        }
+        return Status::OK();
+    }
+
+    static void
+    HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+        auto size = column_vector->data_type()->Size() * row_count;
+        String dst;
+        dst.resize(size);
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
+    }
+
+    void
+    HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+        String dst;
+        SizeT total_varchar_data_size = 0;
+        for (SizeT index = 0; index < row_count; ++index) {
+            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
+            total_varchar_data_size += varchar.length_;
+        }
+
+        auto all_size = total_varchar_data_size + row_count * sizeof(i32);
+        dst.resize(all_size);
+
+        i32 current_offset = 0;
+        for (SizeT index = 0; index < row_count; ++index) {
+            VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
+            i32 length = varchar.length_;
+            if (varchar.IsInlined()) {
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
+            } else {
+                auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
+                column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
+                                                                    varchar.vector_.chunk_id_,
+                                                                    varchar.vector_.chunk_offset_,
+                                                                    varchar.length_);
+                std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+                std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+            }
+            current_offset += sizeof(i32) + varchar.length_;
+        }
+
+        output_column_field.column_vectors.emplace_back(std::move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+    }
+
+    void
+    HandleEmbeddingType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+        auto size = column_vector->data_type()->Size() * row_count;
+        String dst;
+        dst.resize(size);
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+    }
+
+    void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const std::shared_ptr<ColumnVector> &column_vector) {
+        auto size = column_vector->data_type()->Size() * row_count;
+        String dst;
+        dst.resize(size);
+        std::memcpy(dst.data(), column_vector->data(), size);
+        output_column_field.column_vectors.emplace_back(std::move(dst));
+        output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void
+    ProcessStatus(infinity_thrift_rpc::ListDatabaseResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::ListTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ListDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
         }
     }
 };

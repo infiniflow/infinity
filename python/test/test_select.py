@@ -14,10 +14,10 @@
 import os
 
 import pandas as pd
-from numpy import dtype
-
 import common_values
 import infinity
+from numpy import dtype
+from infinity.errors import ErrorCode
 
 
 class TestSelect:
@@ -89,12 +89,12 @@ class TestSelect:
         res = table_obj.insert(
             [{"c1": -3, "c2": -3}, {"c1": -2, "c2": -2}, {"c1": -1, "c2": -1}, {"c1": 0, "c2": 0}, {"c1": 1, "c2": 1},
              {"c1": 2, "c2": 2}, {"c1": 3, "c2": 3}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.insert(
             [{"c1": -8, "c2": -8}, {"c1": -7, "c2": -7}, {"c1": -6, "c2": -6}, {"c1": 7, "c2": 7}, {"c1": 8, "c2": 8},
              {"c1": 9, "c2": 9}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-3, -2, -1, 0, 1, 2, 3, -8, -7, -6, 7, 8, 9),
@@ -274,7 +274,7 @@ class TestSelect:
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["c2"]).to_df()
         print(res)
@@ -317,7 +317,7 @@ class TestSelect:
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["c2"]).to_df()
         print(res)
@@ -370,7 +370,7 @@ class TestSelect:
 
         for i in range(1000):
             res = table_obj.import_data(test_csv_dir, None)
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
     def test_select_same_output(self):
 

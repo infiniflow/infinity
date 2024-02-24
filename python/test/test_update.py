@@ -19,6 +19,7 @@ from numpy import dtype
 
 import common_values
 import infinity
+from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
 
 
@@ -71,10 +72,10 @@ class TestUpdate:
         res = table_obj.insert(
             [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
              {"c1": 4, "c2": 40, "c3": 400}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -90,12 +91,12 @@ class TestUpdate:
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = db_obj.drop_table("table_4")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update empty table
     @trace_expected_exceptions
@@ -123,7 +124,7 @@ class TestUpdate:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update non-existent table
     def test_update_non_existent_table(self):
@@ -149,7 +150,7 @@ class TestUpdate:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update table, no row is met the condition
     @trace_expected_exceptions
@@ -248,7 +249,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update table with multiple blocks, but only one segment
     def test_update_table_with_one_segment(self):
@@ -272,7 +273,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update before delete, select after delete and check the change.
     def test_update_before_delete(self):
@@ -300,7 +301,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update just inserted data and select to check
     def test_update_inserted_data(self):
@@ -323,7 +324,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
     @pytest.mark.skip(reason="May cause core dumped, and cost too much time.")
@@ -349,7 +350,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update dropped table
     @pytest.mark.skip(reason="May cause core dumped.")
@@ -368,12 +369,13 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    @pytest.mark.skip(reason="Cast error.")
-    @pytest.mark.parametrize("types", common_values.types_array)
-    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    # @pytest.mark.skip(reason="Cast error.")
+    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
+    @pytest.mark.parametrize("types", ["varchar"])
+    @pytest.mark.parametrize("types_example", [[1,2,3]])
     def test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -388,7 +390,7 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
     @pytest.mark.skip(reason="Invalid constant expression.")
@@ -408,4 +410,4 @@ class TestUpdate:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK

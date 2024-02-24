@@ -83,6 +83,7 @@ export struct SystemOptions {
 
     // Resource
     String resource_dict_path_{};
+    std::chrono::seconds cleanup_interval_{};
 };
 
 } // namespace infinity

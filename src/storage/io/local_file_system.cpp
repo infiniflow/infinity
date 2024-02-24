@@ -232,6 +232,16 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
     return removed_count;
 }
 
+u64 LocalFileSystem::DeleteEmptyDirectory(const String &path) {
+    std::error_code error_code;
+    Path p{path};
+    u64 removed_count = std::filesystem::remove(p, error_code);
+    if (error_code.value() != 0) {
+        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+    }
+    return removed_count;
+}
+
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
     Path dir_path(path);
     if (!is_directory(dir_path)) {
