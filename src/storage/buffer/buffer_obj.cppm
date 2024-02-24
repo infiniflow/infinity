@@ -62,6 +62,8 @@ public:
 
     void CloseFile();
 
+    void Cleanup();
+
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }

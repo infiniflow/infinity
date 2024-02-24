@@ -72,6 +72,8 @@ public:
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
 
+    void Cleanup();
+
 public:
     // Getter
     const SharedPtr<String> &col_index_dir() const { return col_index_dir_; }

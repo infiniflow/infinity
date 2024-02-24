@@ -734,7 +734,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
         segment_entry->SetNoDelete();
-        segment_entry->SetDeprecated();
+        segment_entry->SetDeprecated(commit_ts);
     }
 }
 

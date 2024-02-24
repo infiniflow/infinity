@@ -72,6 +72,8 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
+    void Cleanup();
+
 public:
     // Getter
     inline SegmentID segment_id() const { return segment_id_; }

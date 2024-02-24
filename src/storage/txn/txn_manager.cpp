@@ -38,7 +38,7 @@ TxnManager::TxnManager(NewCatalog *catalog,
                        TransactionID start_txn_id,
                        TxnTimeStamp start_ts)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
-      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {}
+      start_txn_id_(start_txn_id), start_ts_(start_ts), min_uncommit_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
@@ -76,6 +76,7 @@ u64 TxnManager::GetNewTxnID() {
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
     TxnTimeStamp ts = ++start_ts_;
+    min_uncommit_ts_ = ts;
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }
@@ -148,6 +149,7 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp txn_ts = txn->Commit();
     rw_locker_.lock();
+    min_uncommit_ts_ = std::min(min_uncommit_ts_, txn->BeginTS() + 1);
     txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
     return txn_ts;
@@ -156,6 +158,7 @@ TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
     rw_locker_.lock();
+    min_uncommit_ts_ = std::min(min_uncommit_ts_, txn->BeginTS() + 1);
     txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
 }

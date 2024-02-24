@@ -26,13 +26,19 @@ import extra_ddl_info;
 import column_def;
 import base_entry;
 
+import table_entry;
+import entry_list;
+
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 class DBEntry;
-class TableEntry;
 class TxnManager;
 
-export struct TableMeta {
+export struct TableMeta : public MetaInterface {
+    using EntryT = TableEntry;
 
     friend class DBEntry;
     friend struct NewCatalog;
@@ -76,14 +82,24 @@ private:
     Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
-    std::shared_mutex rw_locker_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 
     DBEntry *db_entry_{};
 
-    // Ordered by commit_ts from latest to oldest.
-    List<SharedPtr<BaseEntry>> entry_list_{};
+private:
+    EntryList<TableEntry> table_entry_list_{};
+
+    // TODO: remove
+    std::shared_mutex &rw_locker() { return table_entry_list_.rw_locker_; };
+
+    // TODO: remove
+    List<SharedPtr<TableEntry>> &table_entry_list() { return table_entry_list_.entry_list_; }
+
+public:
+    void Cleanup() && override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

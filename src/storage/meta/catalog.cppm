@@ -52,6 +52,11 @@ import table_entry;
 import table_index_entry;
 import segment_entry;
 import db_meta;
+import meta_map;
+import base_entry;
+
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -245,10 +250,11 @@ public:
 
 public:
     SharedPtr<String> current_dir_{nullptr};
-    HashMap<String, UniquePtr<DBMeta>> databases_{};
+
+    MetaMap<DBMeta> db_meta_map_{};
+
     TransactionID next_txn_id_{};
     u64 catalog_version_{}; // TODO seems useless
-    std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
@@ -258,6 +264,14 @@ public:
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
+
+private: // TODO: remove this
+    std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
+
+    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+
+public:
+    void PickCleanup(CleanupScanner *scanner);
 };
 
 } // namespace infinity

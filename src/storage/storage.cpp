@@ -87,6 +87,9 @@ void Storage::Init() {
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
     txn_mgr_->CommitTxn(txn);
+
+    // TODO(sys): interval task trigger add here
+    // config_ptr_->cleanup_interval();
 }
 
 void Storage::UnInit() {

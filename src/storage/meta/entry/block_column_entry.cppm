@@ -84,6 +84,8 @@ public:
 
     static void Flush(BlockColumnEntry *block_column_entry, SizeT row_count);
 
+    void Cleanup();
+
 private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};
