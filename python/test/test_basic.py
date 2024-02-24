@@ -20,6 +20,8 @@ import common_values
 import infinity
 import infinity.index as index
 
+from infinity.errors import ErrorCode
+
 
 class TestCase:
 
@@ -82,13 +84,13 @@ class TestCase:
             assert db_obj is not None
 
             res = infinity_obj.list_databases()
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             for db in res.db_names:
                 assert db in ['my_db', 'default']
 
             res = infinity_obj.drop_database("my_db")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("my_table1", if_exists=True)
@@ -97,10 +99,10 @@ class TestCase:
             assert table_obj is not None
 
             res = db_obj.list_tables()
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             res = db_obj.drop_table("my_table1")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             # index
             db_obj.drop_table("my_table2", if_exists=True)
@@ -116,13 +118,13 @@ class TestCase:
                                                           index.IndexType.IVFFlat,
                                                           [index.InitParameter("centroids_count", "128"),
                                                            index.InitParameter("metric", "l2")])], None)
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             res = table_obj.drop_index("my_index")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             res = db_obj.drop_table("my_table2")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             # insert
             db_obj.drop_table("my_table3", if_exists=True)
@@ -135,7 +137,7 @@ class TestCase:
 
             res = table_obj.insert(
                 [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
-            assert res.success
+            assert res.error_code == ErrorCode.OK
             # search
             res = table_obj.output(["c1 + 0.1"]).to_df()
             pd.testing.assert_frame_equal(res,
@@ -149,7 +151,7 @@ class TestCase:
                                               {'c1': dtype('int32'), 'c2': dtype('float32')}))
 
             res = db_obj.drop_table("my_table3")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             # import
             db_obj.drop_table("my_table4", if_exists=True)
@@ -164,15 +166,15 @@ class TestCase:
             assert os.path.exists(test_csv_dir)
 
             res = table_obj.import_data(test_csv_dir, None)
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             # search
             res = table_obj.output(
                 ["c1"]).filter("c1 > 1").to_df()
             print(res)
             res = db_obj.drop_table("my_table4")
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
             # disconnect
             res = infinity_obj.disconnect()
-            assert res.success
+            assert res.error_code == ErrorCode.OK

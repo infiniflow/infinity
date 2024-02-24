@@ -15,6 +15,7 @@
 from abc import ABC
 
 from infinity import InfinityConnection
+from infinity.errors import ErrorCode
 from infinity.infinity import ShowVariable
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
@@ -35,49 +36,49 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
     def create_database(self, db_name: str, options=None):
         check_valid_name(db_name, "DB")
         res = self._client.create_database(db_name=db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def list_databases(self):
         res = self._client.list_databases()
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def describe_database(self, db_name: str):
         check_valid_name(db_name, "DB")
         res = self._client.describe_database(db_name=db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def drop_database(self, db_name: str, options=None):
         check_valid_name(db_name, "DB")
         res = self._client.drop_database(db_name=db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def get_database(self, db_name: str):
         check_valid_name(db_name, "DB")
         res = self._client.get_database(db_name)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception("Get db error")
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def disconnect(self):
         res = self._client.disconnect()
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             self._is_connected = False
             return res
         else:
-            raise Exception("Disconnect error")
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     @property
     def client(self):
@@ -85,7 +86,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
 
     def show_variable(self, variable: ShowVariable):
         res = self._client.show_variable(variable)
-        if res.success is True:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
