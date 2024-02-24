@@ -16,10 +16,9 @@ import os
 import pytest
 import common_values
 import infinity
+from infinity.errors import ErrorCode
 
 TEST_DATA_DIR = "/test/data/"
-
-
 
 
 class TestImport:
@@ -52,13 +51,13 @@ class TestImport:
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # search
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("test_import")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # import different file format data
     @pytest.mark.skip(reason="Python sdk not support.")
@@ -87,7 +86,7 @@ class TestImport:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # import empty FVECS file
     @pytest.mark.parametrize("file_format", ["fvecs", "fvecs", "fvecs"])
@@ -105,7 +104,7 @@ class TestImport:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # import empty CSV file
     @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
@@ -123,7 +122,7 @@ class TestImport:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # import empty JSONL file
     @pytest.mark.parametrize("file_format", ["jsonl", "jsonl", "jsonl"])
@@ -141,7 +140,7 @@ class TestImport:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res
+        assert res.error_code == ErrorCode.OK
 
     # import format unrecognized data
     # import csv with different delimiter

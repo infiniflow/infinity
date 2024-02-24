@@ -78,17 +78,17 @@ TEST_F(InfinityTest, test1) {
         const String &s3 = value.GetVarchar();
         EXPECT_STREQ(s3.c_str(), "default");
 
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("db1");
+        auto [ db1_ptr, st1 ] = infinity->GetDatabase("db1");
         EXPECT_EQ(db1_ptr->db_name(), "db1");
 
-        SharedPtr<Database> db2_ptr = infinity->GetDatabase("db2");
+        auto [ db2_ptr, st2 ] = infinity->GetDatabase("db2");
         EXPECT_EQ(db2_ptr, nullptr);
 
         DropDatabaseOptions drop_db_opts;
         result = infinity->DropDatabase("db1", drop_db_opts);
         EXPECT_FALSE(result.IsOk());
 
-        SharedPtr<Database> default_db_ptr = infinity->GetDatabase("default");
+        auto [ default_db_ptr, st3 ] = infinity->GetDatabase("default");
         EXPECT_EQ(default_db_ptr->db_name(), "default");
 
         result = infinity->DropDatabase("db1", drop_db_opts);
@@ -100,11 +100,11 @@ TEST_F(InfinityTest, test1) {
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
         EXPECT_STREQ(s4.c_str(), "default");
-        SharedPtr<Database> db_instance = infinity->GetDatabase("default");
+        auto [ db_instance, st4 ] = infinity->GetDatabase("default");
     }
 
     {
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("default");
+        auto [ db1_ptr, st1 ] = infinity->GetDatabase("default");
         EXPECT_EQ(db1_ptr->db_name(), "default");
 
         CreateTableOptions create_table_opts;
@@ -134,7 +134,7 @@ TEST_F(InfinityTest, test1) {
         const String &s2 = value.GetVarchar();
         EXPECT_STREQ(s2.c_str(), "table1");
 
-        SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
+        auto [ table1, st2 ] = db1_ptr->GetTable("table1");
         EXPECT_NE(table1, nullptr);
 
         DropTableOptions drop_table_opts;
@@ -144,12 +144,12 @@ TEST_F(InfinityTest, test1) {
         data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 0);
 
-        table1 = db1_ptr->GetTable("table1");
-        EXPECT_EQ(table1, nullptr);
+        auto [ table2, st3 ] = db1_ptr->GetTable("table1");
+        EXPECT_EQ(table2, nullptr);
     }
 
     {
-        SharedPtr<Database> db1_ptr = infinity->GetDatabase("default");
+        auto [ db1_ptr, st1 ] = infinity->GetDatabase("default");
         EXPECT_EQ(db1_ptr->db_name(), "default");
 
         CreateTableOptions create_table_opts;
@@ -171,7 +171,7 @@ TEST_F(InfinityTest, test1) {
         QueryResult result = db1_ptr->CreateTable("table1", column_defs, Vector<TableConstraint *>(), create_table_opts);
         EXPECT_TRUE(result.IsOk());
 
-        SharedPtr<Table> table1 = db1_ptr->GetTable("table1");
+        auto [ table1, st2 ] = db1_ptr->GetTable("table1");
         EXPECT_NE(table1, nullptr);
 
         //        Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values
@@ -248,7 +248,7 @@ TEST_F(InfinityTest, test1) {
         value = data_block->GetValue(0, 0);
         const String &s4 = value.GetVarchar();
         EXPECT_STREQ(s4.c_str(), "default");
-        SharedPtr<Database> db_instance = infinity->GetDatabase("default");
+        auto [ db_instance, st1 ] = infinity->GetDatabase("default");
     }
     infinity->LocalDisconnect();
 
