@@ -361,28 +361,10 @@ void NewCatalog::AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet
     catalog->function_sets_.emplace(name, function_set);
 }
 
-// Table Function related methods
-SharedPtr<TableFunction> NewCatalog::GetTableFunctionByName(NewCatalog *catalog, String function_name) {
-    StringToLower(function_name);
-    if (!catalog->table_functions_.contains(function_name)) {
-        RecoverableError(Status::FunctionNotFound(function_name));
-    }
-    return catalog->table_functions_[function_name];
-}
-
-void NewCatalog::AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function) {
-    String name = table_function->name();
-    StringToLower(name);
-    if (catalog->table_functions_.contains(name)) {
-        UnrecoverableError(fmt::format("Trying to add duplicated table function into catalog: {}", name));
-    }
-    catalog->table_functions_.emplace(name, table_function);
-}
-
 void NewCatalog::AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
     String name = special_function->name();
     StringToLower(name);
-    if (catalog->table_functions_.contains(name)) {
+    if (catalog->special_functions_.contains(name)) {
         UnrecoverableError(fmt::format("Trying to add duplicated special function into catalog: {}", name));
     }
     catalog->special_functions_.emplace(name, special_function);

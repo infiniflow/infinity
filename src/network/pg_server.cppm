@@ -19,7 +19,7 @@ import singleton;
 import boost;
 import connection;
 
-export module db_server;
+export module pg_server;
 
 namespace infinity {
 
@@ -27,7 +27,7 @@ export struct StartupParameter {
     SharedPtr<String> config_path{};
 };
 
-export class DBServer {
+export class PGServer {
 public:
     void Run();
 

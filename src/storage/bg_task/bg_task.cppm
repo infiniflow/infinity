@@ -26,7 +26,7 @@ namespace infinity {
 
 export enum class BGTaskType {
     kTryCheckpoint,   // Periodically triggered by timer
-    kForceCheckpoint, // Manually triggered by PhysicalImport
+    kForceCheckpoint, // Manually triggered by PhysicalFlush
     kStopProcessor,
     kCatalogDeltaOpsMerge, // Merge
     kCompactSegments,

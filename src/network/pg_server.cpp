@@ -17,7 +17,7 @@ module;
 #include <boost/bind.hpp>
 #include <thread>
 
-module db_server;
+module pg_server;
 
 import thrift_server;
 import infinity_context;
@@ -30,7 +30,7 @@ import connection;
 
 namespace infinity {
 
-void DBServer::Run() {
+void PGServer::Run() {
     if (initialized_) {
         return;
     }
@@ -56,8 +56,8 @@ void DBServer::Run() {
     io_service_.run();
 }
 
-void DBServer::Shutdown() {
-    fmt::print("Shutdown infinity server ...\n");
+void PGServer::Shutdown() {
+
     initialized_ = false;
 
     while (running_connection_count_ > 0) {
@@ -67,17 +67,14 @@ void DBServer::Shutdown() {
 
     io_service_.stop();
     acceptor_ptr_->close();
-
-    infinity::InfinityContext::instance().UnInit();
-    fmt::print("Shutdown infinity server successfully\n");
 }
 
-void DBServer::CreateConnection() {
+void PGServer::CreateConnection() {
     SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
-    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&DBServer::StartConnection, this, connection_ptr));
+    acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&PGServer::StartConnection, this, connection_ptr));
 }
 
-void DBServer::StartConnection(SharedPtr<Connection> &connection) {
+void PGServer::StartConnection(SharedPtr<Connection> &connection) {
     Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = this->initialized_]() mutable {
         if(initialized) {
             ++num_running_connections;

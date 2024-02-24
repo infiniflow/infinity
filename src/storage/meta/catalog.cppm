@@ -212,11 +212,6 @@ public:
 
     static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    // Table Function related methods
-    static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
-
-    static void AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function);
-
     static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
     static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
@@ -258,7 +253,6 @@ public:
 
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
-    HashMap<String, SharedPtr<TableFunction>> table_functions_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
