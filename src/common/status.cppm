@@ -89,6 +89,9 @@ export enum class ErrorCode : long {
     kNotSupportedTypeConversion = 3049,
     kEmptySelectFields = 3050,
     kInvalidDataType = 3051,
+    kParseMatchExprFailed = 3052,
+    kFTSIndexNotExist = 3053,
+    kUnknownFTSFault = 3054,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -192,6 +195,9 @@ public:
     static Status NotSupportedTypeConversion(const String& from_type, const String& to_type);
     static Status EmptySelectFields();
     static Status InvalidDataType();
+    static Status ParseMatchExprFailed(const String& fields, const String& matching_text);
+    static Status FTSIndexNotExist(const String& table_name);
+    static Status UnknownFTSFault();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
