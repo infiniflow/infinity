@@ -27,15 +27,21 @@ import buffer_manager;
 import status;
 import extra_ddl_info;
 import column_def;
+import meta_map;
+
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
 class TxnManager;
 
-export class DBEntry : public BaseEntry {
+export class DBEntry : public BaseEntry, public EntryInterface {
     friend struct NewCatalog;
 
 public:
+    explicit DBEntry();
+
     explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry>
@@ -55,17 +61,13 @@ public:
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    virtual void MergeFrom(BaseEntry &other); // TODO: fix warning
 
     [[nodiscard]] const String &db_name() const { return *db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
-    [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
-
-    [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
-
-    [[nodiscard]] HashMap<String, UniquePtr<TableMeta>> &tables() { return tables_; }
+    [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
 
 private:
     Tuple<TableEntry *, Status> CreateTable(TableEntryType table_entry_type,
@@ -87,9 +89,19 @@ private:
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
 private:
-    std::shared_mutex rw_locker_{};
-    SharedPtr<String> db_entry_dir_{};
+    const SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> db_name_{};
-    HashMap<String, UniquePtr<TableMeta>> tables_{};
+
+    MetaMap<TableMeta> table_meta_map_{};
+
+private: // TODO: remote it
+    std::shared_mutex &rw_locker() { return table_meta_map_.rw_locker_; }
+
+    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+
+public:
+    bool PickCleanup(CleanupScanner *scanner) override;
+
+    void Cleanup() && override;
 };
 } // namespace infinity

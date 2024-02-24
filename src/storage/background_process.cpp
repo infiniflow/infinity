@@ -17,6 +17,7 @@ module backgroud_process;
 import stl;
 import bg_task;
 import compact_segments_task;
+import cleanup_task;
 import logger;
 import blocking_queue;
 import infinity_exception;
@@ -73,6 +74,11 @@ void BGTaskProcessor::Process() {
                 task->BeginTxn();
                 task->Execute();
                 task->CommitTxn();
+                break;
+            }
+            case BGTaskType::kCleanup: {
+                auto task = static_cast<CleanupTask *>(bg_task.get());
+                task->Execute();
                 break;
             }
             case BGTaskType::kInvalid: {

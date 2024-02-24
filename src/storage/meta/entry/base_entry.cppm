@@ -21,7 +21,9 @@ import default_values;
 
 namespace infinity {
 
-export enum EntryType : i8 {
+class NewCatalog;
+
+export enum class EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,
@@ -56,6 +58,8 @@ public:
     inline void Commit(TxnTimeStamp commit_ts) { commit_ts_.store(commit_ts); }
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
+
+    bool Cleanupable(TxnTimeStamp visible_ts) const;
 
 public:
     atomic_u64 txn_id_{0};

@@ -103,4 +103,14 @@ void FileWorker::MoveFile() {
     fs.Rename(src_path, dest_path);
 }
 
+void FileWorker::CleanupFile() {
+    LocalFileSystem fs;
+
+    String file_path = fmt::format("{}/{}", *file_dir_, *file_name_);
+    if (!fs.Exists(file_path)) {
+        UnrecoverableError(fmt::format("File {} not found.", file_path));
+    }
+    fs.DeleteFile(file_path);
+}
+
 } // namespace infinity

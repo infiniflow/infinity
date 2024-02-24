@@ -34,6 +34,10 @@ import segment_entry;
 import block_entry;
 import table_index_meta;
 import compaction_alg;
+import meta_map;
+
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -44,10 +48,12 @@ class TableMeta;
 class Txn;
 struct NewCatalog;
 
-export struct TableEntry : public BaseEntry {
+export struct TableEntry : public BaseEntry, public EntryInterface {
     friend struct NewCatalog;
 
 public:
+    explicit TableEntry();
+
     explicit TableEntry(const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -161,18 +167,16 @@ public:
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
-    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_; }
-
     Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
 
 private:
     TableMeta *table_meta_{};
 
+    MetaMap<TableIndexMeta> index_meta_map_{};
+
     HashMap<String, ColumnID> column_name2column_id_;
 
-    mutable std::shared_mutex rw_locker_{};
-
-    SharedPtr<String> table_entry_dir_{};
+    const SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_name_{};
 
@@ -185,9 +189,6 @@ private:
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
-
-    // Index meta
-    HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
 
 public:
     // set nullptr to close auto compaction
@@ -202,6 +203,17 @@ public:
 private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
+
+private: // TODO: remote it
+    std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
+
+public: // TODO: remote it?
+    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+
+public:
+    bool PickCleanup(CleanupScanner *scanner) override;
+
+    void Cleanup() && override;
 };
 
 } // namespace infinity

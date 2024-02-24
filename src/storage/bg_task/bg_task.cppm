@@ -30,6 +30,7 @@ export enum class BGTaskType {
     kStopProcessor,
     kCatalogDeltaOpsMerge, // Merge
     kCompactSegments,
+    kCleanup,
     kInvalid
 };
 

@@ -26,11 +26,17 @@ import db_entry;
 import base_entry;
 import txn_manager;
 
+import entry_list;
+
+import meta_entry_interface;
+import cleanup_scanner;
+
 namespace infinity {
 
 struct NewCatalog;
 
-export struct DBMeta {
+export struct DBMeta : public MetaInterface {
+    using EntryT = DBEntry;
 
     friend struct NewCatalog;
 
@@ -63,19 +69,28 @@ private:
     Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-    // Thread-unsafe
-    List<SharedPtr<BaseEntry>> &entry_list() { return entry_list_; }
 
     // Used in initialization phase
-    static void AddEntry(DBMeta *db_meta, UniquePtr<BaseEntry> db_entry);
+    static void AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry);
 
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
-    std::shared_mutex rw_locker_{};
-    // Ordered by commit_ts from latest to oldest.
-    List<SharedPtr<BaseEntry>> entry_list_{};
+public:
+    void Cleanup() && override;
+
+    bool PickCleanup(CleanupScanner *scanner) override;
+
+private:
+    EntryList<DBEntry> db_entry_list_{};
+
+    // TODO: remove
+    std::shared_mutex &rw_locker() { return db_entry_list_.rw_locker_; }
+
+public:
+    // TODO: remove
+    List<SharedPtr<DBEntry>> &db_entry_list() { return db_entry_list_.entry_list_; }
 };
 
 } // namespace infinity

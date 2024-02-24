@@ -113,6 +113,8 @@ public:
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
+    [[nodiscard]] inline std::chrono::seconds cleanup_interval() const { return system_option_.cleanup_interval_;}
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 

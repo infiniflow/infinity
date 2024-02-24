@@ -46,8 +46,11 @@ import data_type;
 import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
+import local_file_system;
 
 namespace infinity {
+
+TableEntry::TableEntry() : BaseEntry(EntryType::kDummy) {}
 
 TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        SharedPtr<String> table_collection_name,
@@ -119,11 +122,11 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
     TableIndexMeta *table_index_meta{nullptr};
 
     // TODO: lock granularity can be narrowed.
-    this->rw_locker_.lock_shared();
-    if (auto iter = this->index_meta_map_.find(*index_def->index_name_); iter != this->index_meta_map_.end()) {
+    this->rw_locker().lock_shared();
+    if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
         table_index_meta = iter->second.get();
     }
-    this->rw_locker_.unlock_shared();
+    this->rw_locker().unlock_shared();
 
     if (table_index_meta == nullptr) {
 
@@ -138,15 +141,15 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         table_index_meta = new_table_index_meta.get();
 
-        this->rw_locker_.lock();
+        this->rw_locker().lock();
 
-        if (auto iter = this->index_meta_map_.find(*index_def->index_name_); iter != this->index_meta_map_.end()) {
+        if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
             table_index_meta = iter->second.get();
         } else {
 
-            this->index_meta_map_[*index_def->index_name_] = std::move(new_table_index_meta);
+            this->index_meta_map()[*index_def->index_name_] = std::move(new_table_index_meta);
         }
-        this->rw_locker_.unlock();
+        this->rw_locker().unlock();
     }
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_def->index_name_));
@@ -155,13 +158,13 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
 Tuple<TableIndexEntry *, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    this->rw_locker_.lock_shared();
+    this->rw_locker().lock_shared();
 
     TableIndexMeta *index_meta{nullptr};
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         index_meta = iter->second.get();
     }
-    this->rw_locker_.unlock_shared();
+    this->rw_locker().unlock_shared();
     if (index_meta == nullptr) {
         switch (conflict_type) {
 
@@ -184,7 +187,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         return iter->second->GetEntry(txn_id, begin_ts);
     }
     UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
@@ -193,13 +196,13 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr) {
-    this->rw_locker_.lock_shared();
+    this->rw_locker().lock_shared();
 
     TableIndexMeta *table_index_meta{nullptr};
-    if (auto iter = this->index_meta_map_.find(index_name); iter != this->index_meta_map_.end()) {
+    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
         table_index_meta = iter->second.get();
     }
-    this->rw_locker_.unlock_shared();
+    this->rw_locker().unlock_shared();
 
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
     table_index_meta->DeleteNewEntry(txn_id, txn_mgr);
@@ -210,7 +213,7 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    for (auto &[_, table_index_meta] : this->index_meta_map_) {
+    for (auto &[_, table_index_meta] : this->index_meta_map()) {
         auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (status.ok()) {
             fulltext_index_entry = table_index_entry->fulltext_index_entry();
@@ -245,7 +248,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
 
     while (!append_state_ptr->Finished()) {
         {
-            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker_); // prevent another read conflict with this append operation
+            std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_ != nullptr) {
@@ -340,9 +343,9 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
         return Status::OK();
     }
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-        std::unique_lock lock(this->rw_locker_);
+        std::unique_lock lock(this->rw_locker());
         for (const auto &old_segment : old_segments) {
-            old_segment->SetDeprecated();
+            old_segment->SetDeprecated(commit_ts);
         }
         ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
@@ -376,7 +379,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
         return Status::OK();
     }
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-        std::unique_lock lock(this->rw_locker_);
+        std::unique_lock lock(this->rw_locker());
         for (const auto &old_segment : old_segments) {
             old_segment->RollbackCompact();
         }
@@ -430,7 +433,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 
     std::unique_lock<std::shared_mutex> rw_locker;
     if (!call_with_lock) {
-        rw_locker = std::unique_lock(this->rw_locker_);
+        rw_locker = std::unique_lock(this->rw_locker());
     }
     this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
@@ -438,7 +441,7 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
 
 SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
     try {
-        std::shared_lock lock(rw_locker_);
+        std::shared_lock lock(this->rw_locker());
         auto *segment = segment_map_.at(segment_id).get();
         if ( // TODO: read deprecate segment is allowed
              // segment->deprecate_ts() < ts ||
@@ -468,7 +471,7 @@ const SharedPtr<String> &TableEntry::GetDBName() const { return table_meta_->db_
 SharedPtr<BlockIndex> TableEntry::GetBlockIndex(TxnTimeStamp begin_ts) {
     //    SharedPtr<MultiIndex<u64, u64, SegmentEntry*>> result = MakeShared<MultiIndex<u64, u64, SegmentEntry*>>();
     SharedPtr<BlockIndex> result = MakeShared<BlockIndex>();
-    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker_);
+    std::shared_lock<std::shared_mutex> rw_locker(this->rw_locker());
     result->Reserve(this->segment_map_.size());
 
     // Add segment that is not deprecated
@@ -486,7 +489,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     Vector<TableIndexMeta *> table_index_meta_candidates;
     Vector<String> table_index_name_candidates;
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
+        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
         json_res["table_entry_dir"] = *this->table_entry_dir_;
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
@@ -515,9 +518,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
             segment_candidates.emplace_back(segment_entry.get());
         }
 
-        table_index_meta_candidates.reserve(this->index_meta_map_.size());
-        table_index_name_candidates.reserve(this->index_meta_map_.size());
-        for (const auto &[index_name, table_index_meta] : this->index_meta_map_) {
+        table_index_meta_candidates.reserve(this->index_meta_map().size());
+        table_index_name_candidates.reserve(this->index_meta_map().size());
+        for (const auto &[index_name, table_index_meta] : this->index_meta_map()) {
             table_index_meta_candidates.emplace_back(table_index_meta.get());
             table_index_name_candidates.emplace_back(index_name);
         }
@@ -575,7 +578,6 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
-    table_entry->table_entry_dir_ = table_entry_dir;
 
     if (table_entry_json.contains("segments")) {
         for (const auto &segment_json : table_entry_json["segments"]) {
@@ -600,7 +602,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
             UniquePtr<TableIndexMeta> table_index_meta = TableIndexMeta::Deserialize(index_def_meta_json, table_entry.get(), buffer_mgr);
             String index_name = index_def_meta_json["index_name"];
-            table_entry->index_meta_map_.emplace(std::move(index_name), std::move(table_index_meta));
+            table_entry->index_meta_map().emplace(std::move(index_name), std::move(table_index_meta));
         }
     }
 
@@ -644,10 +646,10 @@ void TableEntry::MergeFrom(BaseEntry &other) {
         }
     }
 
-    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map_) {
-        auto it = this->index_meta_map_.find(index_name);
-        if (it == this->index_meta_map_.end()) {
-            this->index_meta_map_.emplace(index_name, std::move(table_index_meta));
+    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map()) {
+        auto it = this->index_meta_map().find(index_name);
+        if (it == this->index_meta_map().end()) {
+            this->index_meta_map().emplace(index_name, std::move(table_index_meta));
         } else {
             it->second->MergeFrom(*table_index_meta.get());
         }
@@ -660,7 +662,7 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
         delete_row_map[row_id.segment_id_].emplace_back(row_id.segment_offset_);
     }
     Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> check_segments;
-    std::shared_lock lock(this->rw_locker_);
+    std::shared_lock lock(this->rw_locker());
     for (const auto &[segment_id, segment_offsets] : delete_row_map) {
         check_segments.emplace_back(this->segment_map_.at(segment_id).get(), std::move(segment_offsets));
     }
@@ -687,7 +689,7 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         compaction_alg_->Disable(); // wait for current compaction to finish
     }
     Vector<SegmentEntry *> result;
-    std::shared_lock lock(this->rw_locker_);
+    std::shared_lock lock(this->rw_locker());
     for (const auto &[segment_id, segment] : this->segment_map_) {
         auto status = segment->status();
         if (status == SegmentStatus::kSealed) {
@@ -697,6 +699,36 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         }
     }
     return result;
+}
+
+bool TableEntry::PickCleanup(CleanupScanner *scanner) {
+    if (Cleanupable(scanner->visible_ts())) {
+        return true;
+    }
+    index_meta_map_.PickCleanup(scanner);
+    {
+        std::unique_lock lock(this->rw_locker());
+        for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
+            SharedPtr<SegmentEntry> &segment = iter->second;
+            if (segment->Cleanupable(scanner->visible_ts())) {
+                scanner->AddEntry(std::move(segment));
+                iter = segment_map_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
+    return false;
+}
+
+void TableEntry::Cleanup() && {
+    for (auto &[segment_id, segment] : segment_map_) {
+        std::move(*segment).Cleanup();
+    }
+    std::move(index_meta_map_).Cleanup();
+
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

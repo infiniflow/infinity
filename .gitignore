@@ -82,7 +82,6 @@ test/data/csv/*big*.csv
 test/data/fvecs/*big*.fvecs
 test/sql/**/*big*.slt
 test/sql/**/*fvecs*.slt
-test/data/fvecs/test.fvecs
 
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h

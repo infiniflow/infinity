@@ -55,6 +55,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
+    // TODO(sys): Add interval triggered task trigger thread here
 };
 
 } // namespace infinity
