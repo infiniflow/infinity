@@ -13,4 +13,5 @@ Issue link:#[Link the issue here]
 - [ ] Refactoring
 - [ ] Performance Improvement
 - [ ] Test cases
+- [ ] Python SDK impacted, Need to update PyPI
 - [ ] Other (please describe):

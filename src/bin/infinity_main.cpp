@@ -18,14 +18,14 @@
 import compilation_config;
 import stl;
 import third_party;
-import db_server;
+import pg_server;
 import infinity_exception;
 import infinity_context;
 import thrift_server;
 
 namespace {
 
-infinity::DBServer db_server;
+infinity::PGServer pg_server;
 
 // infinity::Thread threaded_thrift_thread;
 // infinity::ThreadedThriftServer threaded_thrift_server;
@@ -39,7 +39,7 @@ std::condition_variable server_cv;
 
 bool server_running = false;
 
-infinity::Thread shut_down_thread;
+infinity::Thread shutdown_thread;
 
 void ShutdownServer() {
 
@@ -55,7 +55,10 @@ void ShutdownServer() {
 
     //            non_block_pool_thrift_server.Shutdown();
 
-    db_server.Shutdown();
+    pg_server.Shutdown();
+
+    infinity::InfinityContext::instance().UnInit();
+    fmt::print("Shutdown infinity server successfully\n");
 }
 
 void SignalHandler(int signal_number, siginfo_t *, void *) {
@@ -66,6 +69,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
+            fmt::print("Shutdown infinity server ...\n");
 
             std::unique_lock<std::mutex> lock(server_mutex);
             server_running = false;
@@ -148,10 +152,10 @@ auto main(int argc, char **argv) -> int {
 
     //    non_block_pool_thrift_server.Init(9070, 64);
     //    non_block_pool_thrift_server.Start();
-    shut_down_thread = infinity::Thread([&]() { ShutdownServer(); });
-    db_server.Run();
+    shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
+    pg_server.Run();
 
-    shut_down_thread.join();
+    shutdown_thread.join();
 
     fmt::print("Server is shutdown\n");
     return 0;

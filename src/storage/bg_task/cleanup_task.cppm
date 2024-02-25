@@ -26,7 +26,7 @@ namespace infinity {
 export class CleanupTask final : public BGTask {
 public:
     // Try clean up is async task?
-    CleanupTask(NewCatalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
 
 public:
     ~CleanupTask() override = default;
@@ -41,7 +41,7 @@ public:
     }
 
 private:
-    NewCatalog *const catalog_;
+    Catalog *const catalog_;
 
     const TxnTimeStamp visible_ts_;
 };

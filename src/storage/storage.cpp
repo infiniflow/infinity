@@ -116,7 +116,7 @@ void Storage::AttachCatalog(const Vector<String> &catalog_files) {
     for (const auto &catalog_file : catalog_files) {
         LOG_TRACE(fmt::format("Catalog file: {}", catalog_file.c_str()));
     }
-    new_catalog_ = NewCatalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
+    new_catalog_ = Catalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {
@@ -126,7 +126,7 @@ void Storage::InitNewCatalog() {
     if (!fs.Exists(catalog_dir)) {
         fs.CreateDirectory(catalog_dir);
     }
-    new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
+    new_catalog_ = MakeUnique<Catalog>(MakeShared<String>(catalog_dir), true);
 }
 
 } // namespace infinity

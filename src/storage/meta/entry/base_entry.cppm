@@ -21,7 +21,7 @@ import default_values;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
 export enum class EntryType : i8 {
     kDummy,

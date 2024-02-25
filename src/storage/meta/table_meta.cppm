@@ -41,7 +41,7 @@ export struct TableMeta : public MetaInterface {
     using EntryT = TableEntry;
 
     friend class DBEntry;
-    friend struct NewCatalog;
+    friend struct Catalog;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)

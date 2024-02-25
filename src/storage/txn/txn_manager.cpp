@@ -31,7 +31,7 @@ import catalog_delta_entry;
 
 namespace infinity {
 
-TxnManager::TxnManager(NewCatalog *catalog,
+TxnManager::TxnManager(Catalog *catalog,
                        BufferManager *buffer_mgr,
                        BGTaskProcessor *bg_task_processor,
                        PutWalEntryFn put_wal_entry_fn,
