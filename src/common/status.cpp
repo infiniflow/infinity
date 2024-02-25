@@ -129,8 +129,20 @@ Status Status::InvalidIndexName(const String &index_name) {
     return Status(ErrorCode::kInvalidIndexName, MakeUnique<String>(fmt::format("{} is a invalid index name", index_name)));
 }
 
+Status Status::InvalidColumnDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidColumnDefinition, MakeUnique<String>(detailed_info));
+}
+
+Status Status::InvalidTableDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidTableDefinition, MakeUnique<String>(detailed_info));
+}
+
+Status Status::InvalidIndexDefinition(const String &detailed_info) {
+    return Status(ErrorCode::kInvalidIndexDefinition, MakeUnique<String>(detailed_info));
+}
+
 Status Status::DataTypeMismatch(const String &type1, const String &type2) {
-    return Status(ErrorCode::kInvalidDataTypeMismatch, MakeUnique<String>(fmt::format("Expected: {}, but {} is given.", type1, type2)));
+    return Status(ErrorCode::kDataTypeMismatch, MakeUnique<String>(fmt::format("Expected: {}, but {} is given.", type1, type2)));
 }
 Status Status::NameTooLong(const String &name, const String &object_type) {
     return Status(ErrorCode::kNameTooLong, MakeUnique<String>(fmt::format("{} is too long for a {} name", name, object_type)));

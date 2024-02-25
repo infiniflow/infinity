@@ -47,7 +47,7 @@ export enum class ErrorCode : long {
     kInvalidColumnDefinition = 3007,
     kInvalidTableDefinition = 3008,
     kInvalidIndexDefinition = 3009,
-    kInvalidDataTypeMismatch = 3010,
+    kDataTypeMismatch = 3010,
     kNameTooLong = 3011,
     kReservedName = 3012,
     kSyntaxError = 3013,
@@ -153,6 +153,9 @@ public:
     static Status InvalidTableName(const String &table_name);
     static Status InvalidColumnName(const String &column_name);
     static Status InvalidIndexName(const String &index_name);
+    static Status InvalidColumnDefinition(const String &detailed_info);
+    static Status InvalidTableDefinition(const String &detailed_info);
+    static Status InvalidIndexDefinition(const String &detailed_info);
     static Status DataTypeMismatch(const String &type1, const String &type2);
     static Status NameTooLong(const String &name, const String &object_type);
     static Status ReservedName(const String &name);
