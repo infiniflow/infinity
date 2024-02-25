@@ -47,7 +47,7 @@ struct ScanParam {
 };
 
 class TxnManager;
-struct NewCatalog;
+struct Catalog;
 class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
@@ -65,13 +65,13 @@ export class Txn {
 public:
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,
-                 NewCatalog *catalog,
+                 Catalog *catalog,
                  BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id);
 
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
     // Txn OPs
     void Begin();
@@ -148,7 +148,7 @@ public:
 
     BufferManager *buffer_manager() const { return buffer_mgr_; }
 
-    NewCatalog *GetCatalog() { return catalog_; }
+    Catalog *GetCatalog() { return catalog_; }
 
     inline TransactionID TxnID() const { return txn_id_; }
 
@@ -184,7 +184,7 @@ private:
     // This BufferManager ptr Only for replaying wal
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
-    NewCatalog *catalog_{};
+    Catalog *catalog_{};
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};

@@ -162,7 +162,7 @@ inline void ExtractSecondFunction::Run(TimeT left, BigIntT &result) {
     result = TimeT::GetTimePart(left, TimeUnit::kSecond);
 }
 
-void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
     {
         String func_name = "extract_year";
         SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -181,7 +181,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                    DataType(kBigInt),
                                                    &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractYearFunction>);
         function_set_ptr->AddFunction(extract_year_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -202,7 +202,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                     DataType(kBigInt),
                                                     &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractMonthFunction>);
         function_set_ptr->AddFunction(extract_month_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -223,7 +223,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                   DataType(kBigInt),
                                                   &ScalarFunction::UnaryFunction<TimestampT, BigIntT, ExtractDayFunction>);
         function_set_ptr->AddFunction(extract_day_from_timestamp);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -244,7 +244,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                               DataType(kBigInt),
                                               &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractHourFunction>);
         function_set_ptr->AddFunction(extract_hour_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -265,7 +265,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                 DataType(kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractMinuteFunction>);
         function_set_ptr->AddFunction(extract_minute_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 
     {
@@ -286,7 +286,7 @@ void RegisterExtractFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                 DataType(kBigInt),
                                                 &ScalarFunction::UnaryFunction<TimeT, BigIntT, ExtractSecondFunction>);
         function_set_ptr->AddFunction(extract_second_from_time);
-        NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+        Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
     }
 }
 

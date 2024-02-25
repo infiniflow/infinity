@@ -544,7 +544,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
-            u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
+            u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4, false);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
@@ -706,7 +706,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto [table_entry, status] = txn2->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, true);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
