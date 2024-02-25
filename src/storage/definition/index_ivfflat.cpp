@@ -22,7 +22,7 @@ module index_ivfflat;
 import infinity_exception;
 import stl;
 import index_def;
-
+import status;
 import third_party;
 import serialize;
 import index_base;
@@ -97,10 +97,10 @@ void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        UnrecoverableError(fmt::format("Invalid parameter for IVFFlat index: column name not found: {}.", column_name));
+        RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
-        UnrecoverableError(
-            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString()));
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
     }
 }
 
