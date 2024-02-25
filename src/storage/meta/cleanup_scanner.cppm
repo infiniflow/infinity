@@ -21,13 +21,13 @@ import stl;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 class EntryInterface;
 class MetaInterface;
 
 export class CleanupScanner {
 public:
-    CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts);
+    CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts);
 
     void Scan();
 
@@ -40,7 +40,7 @@ public:
     TxnTimeStamp visible_ts() const { return visible_ts_; }
 
 private:
-    NewCatalog *const catalog_;
+    Catalog *const catalog_;
     const TxnTimeStamp visible_ts_;
 
     Vector<SharedPtr<EntryInterface>> entries_;

@@ -59,7 +59,7 @@ protected:
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
-            SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, true);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 

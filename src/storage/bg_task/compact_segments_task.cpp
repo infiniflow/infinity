@@ -251,7 +251,7 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, Vector<SegmentOffset
 }
 
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments) {
-    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, NewCatalog::GetNextSegmentID(table_entry_), txn_, true);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry_, Catalog::GetNextSegmentID(table_entry_), txn_, true);
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry_->ColumnCount();

@@ -24,7 +24,7 @@ import base_entry;
 
 namespace infinity {
 
-CleanupScanner::CleanupScanner(NewCatalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
+CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
 
 void CleanupScanner::AddMeta(UniquePtr<MetaInterface> meta) { metas_.emplace_back(std::move(meta)); }
 

@@ -50,15 +50,15 @@ import compact_segments_task;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, NewCatalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
       local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id) {
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
     return txn;
 }
@@ -532,11 +532,11 @@ void Txn::Rollback() {
 
     for (const auto &base_entry : txn_tables_) {
         auto *table_entry = (TableEntry *)(base_entry);
-        NewCatalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        NewCatalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &db_name : db_names_) {

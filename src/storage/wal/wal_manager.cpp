@@ -657,7 +657,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    NewCatalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
+    Catalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
     table_index_entry->Commit(commit_ts);
 }
 
@@ -691,7 +691,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
 
-    NewCatalog::AddSegment(table_entry, segment_entry);
+    Catalog::AddSegment(table_entry, segment_entry);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -714,8 +714,8 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
-    NewCatalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
-    NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -753,8 +753,8 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
-    NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
+    Catalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
+    Catalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
 }
 
 } // namespace infinity
