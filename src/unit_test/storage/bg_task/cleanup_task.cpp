@@ -33,6 +33,7 @@ import physical_import;
 import status;
 import compilation_config;
 import cleanup_task;
+import compact_segments_task;
 
 using namespace infinity;
 
@@ -256,6 +257,104 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
         EXPECT_EQ(table_entry, nullptr);
 
         txn_mgr->CommitTxn(txn);
+    }
+
+    infinity::InfinityContext::instance().UnInit();
+}
+
+TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
+    constexpr int kImportN = 5;
+    constexpr int kImportSize = 100;
+
+    // close auto cleanup task
+    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
+
+    infinity::InfinityContext::instance().Init(config_path);
+    Storage *storage = infinity::InfinityContext::instance().storage();
+    EXPECT_NE(storage, nullptr);
+
+    TxnManager *txn_mgr = storage->txn_manager();
+    BufferManager *buffer_mgr = storage->buffer_manager();
+    Catalog *catalog = storage->catalog();
+
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    {
+        HashSet<ConstraintType> constraints;
+        ColumnID column_id = 0;
+        column_defs.push_back(MakeShared<ColumnDef>(column_id++, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints));
+    }
+    auto db_name = MakeShared<String>("default");
+    auto table_name = MakeShared<String>("table1");
+    {
+
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        EXPECT_TRUE(table_entry != nullptr);
+        table_entry->SetCompactionAlg(nullptr);
+
+        for (int i = 0; i < kImportN; ++i) {
+            Vector<SharedPtr<ColumnVector>> column_vectors;
+            {
+                SharedPtr<ColumnVector> column_vector = ColumnVector::Make(MakeShared<DataType>(column_defs[0]->type()->type()));
+                column_vector->Initialize();
+                Value v = Value::MakeInt(i);
+                for (int i = 0; i < kImportSize; ++i) {
+                    column_vector->AppendValue(v);
+                }
+                column_vectors.push_back(column_vector);
+            }
+            SizeT column_count = column_vectors.size();
+
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, false);
+            auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
+            int row_count = -1;
+            for (SizeT i = 0; i < column_count; ++i) {
+                auto *column_vector = column_vectors[i].get();
+                auto column_block_entry = block_entry->GetColumnBlockEntry(i);
+                if (row_count == -1) {
+                    row_count = column_vector->Size();
+                } else {
+                    EXPECT_EQ(row_count, column_vector->Size());
+                }
+                column_block_entry->Append(column_vector, 0, row_count, buffer_mgr);
+            }
+            block_entry->IncreaseRowCount(row_count);
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+
+            auto *txn_store = txn->GetTxnTableStore(table_entry);
+            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            segment_entry->SetSealed();
+        }
+        txn_mgr->CommitTxn(txn);
+    }
+    {
+        auto txn = txn_mgr->CreateTxn();
+        txn->Begin();
+
+        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        EXPECT_TRUE(table_entry != nullptr);
+
+        {
+            auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn);
+            compact_task->Execute();
+        }
+        txn_mgr->CommitTxn(txn);
+    }
+
+    {
+        TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+        cleanup_task->Execute();
     }
 
     infinity::InfinityContext::instance().UnInit();

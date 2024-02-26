@@ -177,7 +177,12 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
 
 bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
+    return min_row_ts_ <= check_ts && !CheckDeprecate(check_ts);
+}
+
+bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    return check_ts >= deprecate_ts_;
 }
 
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
@@ -477,8 +482,6 @@ void SegmentEntry::Cleanup() && {
     fs.DeleteEmptyDirectory(*segment_dir_);
 }
 
-void SegmentEntry::PickCleanup(CleanupScanner *scanner) {
-    // TODO(sys)
-}
+void SegmentEntry::PickCleanup(CleanupScanner *scanner) { UnrecoverableError("should not reach here"); }
 
 } // namespace infinity

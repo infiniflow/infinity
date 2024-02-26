@@ -102,6 +102,8 @@ public:
 
     bool CheckVisible(TxnTimeStamp check_ts) const;
 
+    bool CheckDeprecate(TxnTimeStamp check_ts) const;
+
     // Check if the segment has any delete before check_ts
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
 

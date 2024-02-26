@@ -703,19 +703,19 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
     index_meta_map_.PickCleanup(scanner);
-    // TODO(sys)
-    // {
-    //     std::unique_lock lock(this->rw_locker());
-    //     for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-    //         SharedPtr<SegmentEntry> &segment = iter->second;
-    //         if (segment->Cleanupable(scanner->visible_ts())) {
-    //             scanner->AddEntry(std::move(segment));
-    //             iter = segment_map_.erase(iter);
-    //         } else {
-    //             ++iter;
-    //         }
-    //     }
-    // }
+    { // FIXME(sys)
+        std::unique_lock lock(this->rw_locker());
+        TxnTimeStamp visible_ts = scanner->visible_ts();
+        for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
+            SharedPtr<SegmentEntry> &segment = iter->second;
+            if (segment->CheckDeprecate(visible_ts)) {
+                scanner->AddEntry(std::move(segment));
+                iter = segment_map_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
 }
 
 void TableEntry::Cleanup() && {
