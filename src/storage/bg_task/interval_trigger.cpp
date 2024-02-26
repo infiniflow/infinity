@@ -30,13 +30,15 @@ namespace infinity {
 void CleanupIntervalTrigger::Do() {
     TxnTimeStamp visible_ts = txn_mgr_->GetMinUncommitTs();
     if (visible_ts == last_visible_ts_) {
+        LOG_INFO(fmt::format("No need to cleanup visible timestamp: {}", visible_ts));
         return;
     } else if (visible_ts < last_visible_ts_) {
         UnrecoverableException("The visible timestamp is not monotonic.");
         return;
     }
-    LOG_WARN(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-    // bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts));
+    last_visible_ts_ = visible_ts;
+    LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
+    bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts));
 }
 
 } // namespace infinity

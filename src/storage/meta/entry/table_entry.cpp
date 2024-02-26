@@ -702,7 +702,7 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
-    index_meta_map_.PickCleanup(scanner);
+    // index_meta_map_.PickCleanup(scanner); FIXME(sys): implement it
     { // FIXME(sys)
         std::unique_lock lock(this->rw_locker());
         TxnTimeStamp visible_ts = scanner->visible_ts();
@@ -725,7 +725,8 @@ void TableEntry::Cleanup() && {
     std::move(index_meta_map_).Cleanup();
 
     LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*table_entry_dir_);
+    // FIXME(sys): delete all index cache in buffer_manager.
+    // fs.DeleteDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

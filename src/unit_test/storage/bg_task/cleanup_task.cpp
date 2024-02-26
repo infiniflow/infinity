@@ -112,6 +112,12 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
         txn->CreateDatabase(*db_name, ConflictType::kError);
+        txn_mgr->RollBackTxn(txn);
+    }
+    {
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        txn->CreateDatabase(*db_name, ConflictType::kError);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -227,6 +233,14 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
+    }
+    {
+        auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);
+        auto *txn = txn_mgr->CreateTxn();
+        txn->Begin();
+        auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        txn_mgr->RollBackTxn(txn);
     }
     {
         auto table_def = MakeUnique<TableDef>(db_name, table_name, column_defs);

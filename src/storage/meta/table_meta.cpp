@@ -478,8 +478,8 @@ void TableMeta::Cleanup() && {
     std::move(table_entry_list_).Cleanup();
 
     String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(table_meta_dir);
+    // LocalFileSystem fs;
+    // fs.DeleteEmptyDirectory(table_meta_dir);
 }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }

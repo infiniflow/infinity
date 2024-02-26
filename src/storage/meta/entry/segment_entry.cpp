@@ -485,6 +485,6 @@ void SegmentEntry::Cleanup() && {
     fs.DeleteEmptyDirectory(*segment_dir_);
 }
 
-void SegmentEntry::PickCleanup(CleanupScanner *scanner) { UnrecoverableError("Should not reach here"); }
+void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 
 } // namespace infinity

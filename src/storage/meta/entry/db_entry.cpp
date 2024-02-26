@@ -302,8 +302,8 @@ void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup
 void DBEntry::Cleanup() && {
     std::move(table_meta_map_).Cleanup();
 
-    LocalFileSystem fs;
-    fs.DeleteDirectory(*db_entry_dir_);
+    // LocalFileSystem fs;
+    // fs.DeleteDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

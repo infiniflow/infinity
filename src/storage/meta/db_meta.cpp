@@ -432,8 +432,8 @@ void DBMeta::Cleanup() && {
     std::move(db_entry_list_).Cleanup();
 
     String db_meta_dir = fmt::format("{}/{}", *data_dir_, *db_name_);
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(db_meta_dir);
+    // LocalFileSystem fs;
+    // fs.DeleteEmptyDirectory(db_meta_dir);
 }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
