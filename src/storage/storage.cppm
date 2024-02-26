@@ -20,7 +20,8 @@ import catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
-import backgroud_process;
+import background_process;
+import interval_trigger_thread;
 
 export module storage;
 
@@ -55,7 +56,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
-    // TODO(sys): Add interval triggered task trigger thread here
+    UniquePtr<IntervalTriggerThread> interval_trigger_thread_{};
 };
 
 } // namespace infinity

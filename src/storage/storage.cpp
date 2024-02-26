@@ -36,9 +36,11 @@ import logger;
 import txn;
 import infinity_exception;
 import status;
-import backgroud_process;
+import background_process;
 import status;
 import bg_task;
+import interval_trigger_thread;
+import interval_trigger;
 
 namespace infinity {
 
@@ -88,8 +90,15 @@ void Storage::Init() {
     force_ckp_task->Wait();
     txn_mgr_->CommitTxn(txn);
 
-    // TODO(sys): interval task trigger add here
-    // config_ptr_->cleanup_interval();
+    {
+        interval_trigger_thread_ = MakeUnique<IntervalTriggerThread>();
+
+        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
+        interval_trigger_thread_->AddTrigger(
+            MakeUnique<CleanupIntervalTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
+
+        interval_trigger_thread_->Start();
+    }
 }
 
 void Storage::UnInit() {
@@ -108,6 +117,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
 
     config_ptr_ = nullptr;
+    interval_trigger_thread_->Stop();
     fmt::print("Shutdown storage successfully\n");
 }
 
