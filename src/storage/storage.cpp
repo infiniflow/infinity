@@ -107,6 +107,7 @@ void Storage::Init() {
 
 void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
+    interval_trigger_thread_->Stop();
     bg_processor_->Stop();
 
     wal_mgr_->Stop();
@@ -121,7 +122,6 @@ void Storage::UnInit() {
     new_catalog_.reset();
 
     config_ptr_ = nullptr;
-    interval_trigger_thread_->Stop();
     fmt::print("Shutdown storage successfully\n");
 }
 
