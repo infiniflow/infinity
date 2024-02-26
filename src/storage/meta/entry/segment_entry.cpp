@@ -405,7 +405,10 @@ void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_chec
     }
 }
 
-void SegmentEntry::FlushNewData() {
+void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
+    if (this->min_row_ts_ == UNCOMMIT_TS) {
+        this->min_row_ts_ = flush_ts;
+    }
     for (const auto &block_entry : this->block_entries_) {
         block_entry->FlushData(block_entry->row_count());
     }
@@ -482,6 +485,6 @@ void SegmentEntry::Cleanup() && {
     fs.DeleteEmptyDirectory(*segment_dir_);
 }
 
-void SegmentEntry::PickCleanup(CleanupScanner *scanner) { UnrecoverableError("should not reach here"); }
+void SegmentEntry::PickCleanup(CleanupScanner *scanner) { UnrecoverableError("Should not reach here"); }
 
 } // namespace infinity

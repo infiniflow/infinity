@@ -92,7 +92,7 @@ public:
 
     void RollbackCompact();
 
-    void FlushNewData();
+    void FlushNewData(TxnTimeStamp flush_ts);
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 

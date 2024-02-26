@@ -297,8 +297,6 @@ void TableIndexEntry::Cleanup() && {
     // FIXME: to cleanup fulltext_index_entry_
 }
 
-void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
-    // TODO(sys)
-}
+void TableIndexEntry::PickCleanup(CleanupScanner *scanner) { UnrecoverableError("Should not reach here"); }
 
 } // namespace infinity

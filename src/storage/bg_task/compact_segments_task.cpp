@@ -205,9 +205,10 @@ void CompactSegmentsTask::SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, 
     Vector<WalSegmentInfo> segment_infos;
     Vector<SegmentID> old_segment_ids;
 
+    TxnTimeStamp flush_ts = txn_->BeginTS();
     for (auto &[new_segment, old_segments] : segment_data) {
         if (new_segment->row_count() > 0) {
-            new_segment->FlushNewData();
+            new_segment->FlushNewData(flush_ts);
 
             const auto [block_cnt, last_block_row_count] = new_segment->GetWalInfo();
             segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
