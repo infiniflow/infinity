@@ -27,7 +27,7 @@ void IntervalTriggerThread::Run() {
     while (running_.load()) {
         for (auto &trigger : triggers_) {
             if (trigger->Check()) {
-                trigger->Do();
+                trigger->Trigger();
             }
         }
         // sleep for 1s

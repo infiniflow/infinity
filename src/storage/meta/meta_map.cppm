@@ -43,8 +43,8 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
     for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
         UniquePtr<Meta> &meta = iter->second;
         if (meta->PickCleanup(scanner)) {
-            scanner->AddMeta(std::move(meta));
-            iter = meta_map_.erase(iter);
+            // scanner->AddMeta(std::move(meta));
+            // iter = meta_map_.erase(iter);
         } else {
             ++iter;
         }

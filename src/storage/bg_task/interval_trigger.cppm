@@ -38,7 +38,7 @@ public:
         return true;
     }
 
-    virtual void Do() = 0;
+    virtual void Trigger() = 0;
 
     void Reset() { last_check_ = std::chrono::system_clock::now(); }
 
@@ -47,12 +47,12 @@ private:
     std::chrono::system_clock::time_point last_check_;
 };
 
-export class CleanupIntervalTrigger : public IntervalTrigger {
+export class CleanupIntervalTrigger final : public IntervalTrigger {
 public:
     CleanupIntervalTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
         : IntervalTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
-    virtual void Do() override;
+    virtual void Trigger() override;
 
 private:
     BGTaskProcessor *const bg_processor_{};
