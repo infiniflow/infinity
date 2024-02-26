@@ -297,14 +297,8 @@ void TableIndexEntry::Cleanup() && {
     // FIXME: to cleanup fulltext_index_entry_
 }
 
-bool TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
-    if (this->Cleanupable(scanner->visible_ts())) {
-        return true;
-    }
-    std::unique_lock lock(rw_locker_);
+void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
     // TODO(sys)
-
-    return false;
 }
 
 } // namespace infinity

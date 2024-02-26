@@ -477,6 +477,8 @@ void SegmentEntry::Cleanup() && {
     fs.DeleteEmptyDirectory(*segment_dir_);
 }
 
-bool SegmentEntry::PickCleanup(CleanupScanner *scanner) { return this->Cleanupable(scanner->visible_ts()); }
+void SegmentEntry::PickCleanup(CleanupScanner *scanner) {
+    // TODO(sys)
+}
 
 } // namespace infinity

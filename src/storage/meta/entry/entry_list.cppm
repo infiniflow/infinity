@@ -43,16 +43,36 @@ template <EntryConcept Entry>
 bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
     std::unique_lock lock(rw_locker_);
 
-    for (auto iter = entry_list_.begin(); iter != entry_list_.end();) {
+    if (entry_list_.empty()) {
+        return true;
+    }
+
+    TxnTimeStamp visible_ts = scanner->visible_ts();
+    auto iter = entry_list_.begin();
+    while (iter != Prev(entry_list_.end())) {
         SharedPtr<Entry> &entry = *iter;
-        if (entry->PickCleanup(scanner)) {
+        if (entry->commit_ts_ < visible_ts) {
+            if (entry->deleted_) {
+                scanner->AddEntry(std::move(entry));
+                iter = entry_list_.erase(iter);
+            } else {
+                entry->PickCleanup(scanner);
+                ++iter;
+            }
+            break;
+        }
+        ++iter;
+    }
+    while (iter != Prev(entry_list_.end())) {
+        SharedPtr<Entry> &entry = *iter;
+        if (entry->Committed()) {
             scanner->AddEntry(std::move(entry));
             iter = entry_list_.erase(iter);
         } else {
             ++iter;
         }
     }
-    return entry_list_.empty();
+    return entry_list_.size() == 1;
 }
 
 template <EntryConcept Entry>

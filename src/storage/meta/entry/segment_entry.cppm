@@ -191,7 +191,7 @@ private:
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{UNCOMMIT_TS};
     TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
-    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS}; // FIXME: need persist to disk
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // FIXME: need persist to disk
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
@@ -204,7 +204,7 @@ private:
 public:
     void Cleanup() && override;
 
-    bool PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

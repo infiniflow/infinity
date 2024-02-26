@@ -14,9 +14,9 @@
 
 module;
 
+#include <bits/chrono.h>
 #include <cctype>
 #include <unistd.h>
-#include <bits/chrono.h>
 
 module config;
 //
@@ -174,7 +174,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
     // Default resource config
     String default_resource_dict_path = String("/tmp/infinity/resource");
-    u64 cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
+    u64 default_cleanup_interval_sec = DEFAULT_CLEANUP_INTERVAL_SEC;
 
     LocalFileSystem fs;
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
@@ -254,7 +254,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         // Resource
         {
             system_option_.resource_dict_path_ = default_resource_dict_path;
-            system_option_.cleanup_interval_ = std::chrono::seconds(cleanup_interval_sec);
+            system_option_.cleanup_interval_ = std::chrono::seconds(default_cleanup_interval_sec);
         }
     } else {
         fmt::print("Read config from: {}\n", *config_path);
@@ -393,7 +393,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             } else if (IsEqual(log_level, "critical")) {
                 system_option_.log_level = LogLevel::kFatal;
             } else {
-                return Status::InvalidLogLevel(log_level);
+                system_option_.log_level = default_log_level;
             }
         }
 
@@ -449,6 +449,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         {
             auto resource_config = config["resource"];
             system_option_.resource_dict_path_ = resource_config["dictionary_dir"].value_or(default_resource_dict_path);
+            system_option_.cleanup_interval_ = std::chrono::seconds(resource_config["cleanup_interval"].value_or(default_cleanup_interval_sec));
         }
     }
 

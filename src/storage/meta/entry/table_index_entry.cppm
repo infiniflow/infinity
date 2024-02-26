@@ -113,7 +113,7 @@ private:
 public:
     void Cleanup() && override;
 
-    bool PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

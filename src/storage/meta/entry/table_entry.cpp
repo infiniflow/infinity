@@ -701,24 +701,21 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
     return result;
 }
 
-bool TableEntry::PickCleanup(CleanupScanner *scanner) {
-    if (Cleanupable(scanner->visible_ts())) {
-        return true;
-    }
+void TableEntry::PickCleanup(CleanupScanner *scanner) {
     index_meta_map_.PickCleanup(scanner);
-    {
-        std::unique_lock lock(this->rw_locker());
-        for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-            SharedPtr<SegmentEntry> &segment = iter->second;
-            if (segment->Cleanupable(scanner->visible_ts())) {
-                scanner->AddEntry(std::move(segment));
-                iter = segment_map_.erase(iter);
-            } else {
-                ++iter;
-            }
-        }
-    }
-    return false;
+    // TODO(sys)
+    // {
+    //     std::unique_lock lock(this->rw_locker());
+    //     for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
+    //         SharedPtr<SegmentEntry> &segment = iter->second;
+    //         if (segment->Cleanupable(scanner->visible_ts())) {
+    //             scanner->AddEntry(std::move(segment));
+    //             iter = segment_map_.erase(iter);
+    //         } else {
+    //             ++iter;
+    //         }
+    //     }
+    // }
 }
 
 void TableEntry::Cleanup() && {

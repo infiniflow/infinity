@@ -94,8 +94,12 @@ void Storage::Init() {
         interval_trigger_thread_ = MakeUnique<IntervalTriggerThread>();
 
         std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
-        interval_trigger_thread_->AddTrigger(
-            MakeUnique<CleanupIntervalTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
+        if (cleanup_interval.count() > 0) {
+            interval_trigger_thread_->AddTrigger(
+                MakeUnique<CleanupIntervalTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
+        } else {
+            LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
+        }
 
         interval_trigger_thread_->Start();
     }
