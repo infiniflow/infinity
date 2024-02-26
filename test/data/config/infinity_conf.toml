@@ -1,6 +1,6 @@
 [general]
 version                 = "0.1.0"
-timezone                = "utc-8"
+timezone                = "utc-9"
 
 [system]
 worker_cpu_limit        = 2
