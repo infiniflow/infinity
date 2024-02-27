@@ -56,7 +56,9 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
                 scanner->AddEntry(std::move(entry));
                 iter = entry_list_.erase(iter);
             } else {
+                lock.unlock();
                 entry->PickCleanup(scanner);
+                lock.lock();
                 ++iter;
             }
             break;
