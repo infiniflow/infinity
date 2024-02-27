@@ -81,6 +81,9 @@ void PhysicalExplain::Init() {
             output_names_->emplace_back("Task");
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+        }
     }
     output_types_->emplace_back(varchar_type);
 
@@ -125,6 +128,9 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
         case ExplainType::kPipeline: {
             title = "Pipeline";
             break;
+        }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
         }
     }
 

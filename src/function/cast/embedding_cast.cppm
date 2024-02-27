@@ -43,7 +43,7 @@ template <typename SourceElemType>
 BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target);
 
 export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const DataType &target) {
-    if(source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kVarchar) {
+    if (source.type() == LogicalType::kEmbedding && target.type() == LogicalType::kVarchar) {
         return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlenWithType<EmbeddingT, VarcharT, EmbeddingTryCastToVarlen>);
     }
 
@@ -54,7 +54,7 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
         RecoverableError(Status::DataTypeMismatch(source.ToString(), target.ToString()));
-//        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
+        //        UnrecoverableError(fmt::format("Can't cast from Embedding type to {}", target.ToString()));
     }
     switch (source_info->Type()) {
         case EmbeddingDataType::kElemInt8: {
@@ -136,7 +136,7 @@ struct EmbeddingTryCastToFixlen {
 
 struct EmbeddingTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, ColumnVector*) {
+    static inline bool Run(const SourceType &, const DataType &, TargetType &, const DataType &, ColumnVector *) {
         UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -147,22 +147,20 @@ template <>
 inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &source_type,
                                           VarcharT &target,
-                                          const DataType &,
-                                          ColumnVector* vector_ptr) {
+                                          const DataType &target_type,
+                                          ColumnVector *vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
         UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
     }
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
 
-    for (SizeT j = 0; j < embedding_info->Dimension(); ++j) {
-        LOG_TRACE(fmt::format("{}", ((float *)(source.ptr))[j]));
-    }
+    LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
 
     String res = EmbeddingT::Embedding2String(source, embedding_info->Type(), embedding_info->Dimension());
     target.length_ = static_cast<u64>(res.size());
     target.is_value_ = false;
-    if (target.length_ <= VARCHAR_PREFIX_LEN) {
+    if (target.IsInlined()) {
         // inline varchar
         std::memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
