@@ -14,7 +14,7 @@
 
 module;
 
-export module interval_trigger;
+export module periodic_trigger;
 
 import stl;
 import background_process;
@@ -23,11 +23,11 @@ import txn_manager;
 
 namespace infinity {
 
-export class IntervalTrigger {
+export class PeriodicTrigger {
 public:
-    explicit IntervalTrigger(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
+    explicit PeriodicTrigger(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
 
-    virtual ~IntervalTrigger() = default;
+    virtual ~PeriodicTrigger() = default;
 
     bool Check() {
         const auto now = std::chrono::system_clock::now();
@@ -47,10 +47,10 @@ private:
     std::chrono::system_clock::time_point last_check_;
 };
 
-export class CleanupIntervalTrigger final : public IntervalTrigger {
+export class CleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
-    CleanupIntervalTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
-        : IntervalTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
+    CleanupPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
+        : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
     virtual void Trigger() override;
 

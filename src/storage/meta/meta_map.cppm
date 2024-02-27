@@ -45,6 +45,7 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         if (meta->PickCleanup(scanner)) {
             // scanner->AddMeta(std::move(meta));
             // iter = meta_map_.erase(iter);
+            ++iter;
         } else {
             ++iter;
         }

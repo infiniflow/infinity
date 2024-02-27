@@ -14,16 +14,16 @@
 
 module;
 
-#include <vector>
 #include <thread>
+#include <vector>
 
-module interval_trigger_thread;
+module periodic_trigger_thread;
 
 import stl;
 
 namespace infinity {
 
-void IntervalTriggerThread::Run() {
+void PeriodicTriggerThread::Run() {
     while (running_.load()) {
         for (auto &trigger : triggers_) {
             if (trigger->Check()) {

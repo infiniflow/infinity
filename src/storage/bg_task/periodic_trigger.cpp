@@ -14,7 +14,7 @@
 
 module;
 
-module interval_trigger;
+module periodic_trigger;
 
 import stl;
 import logger;
@@ -27,7 +27,7 @@ import third_party;
 
 namespace infinity {
 
-void CleanupIntervalTrigger::Trigger() {
+void CleanupPeriodicTrigger::Trigger() {
     TxnTimeStamp visible_ts = txn_mgr_->GetMinUncommitTs();
     if (visible_ts == last_visible_ts_) {
         LOG_TRACE(fmt::format("No need to cleanup visible timestamp: {}", visible_ts));

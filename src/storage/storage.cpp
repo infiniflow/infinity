@@ -39,8 +39,8 @@ import status;
 import background_process;
 import status;
 import bg_task;
-import interval_trigger_thread;
-import interval_trigger;
+import periodic_trigger_thread;
+import periodic_trigger;
 
 namespace infinity {
 
@@ -91,23 +91,23 @@ void Storage::Init() {
     txn_mgr_->CommitTxn(txn);
 
     {
-        interval_trigger_thread_ = MakeUnique<IntervalTriggerThread>();
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
         std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
         if (cleanup_interval.count() > 0) {
-            interval_trigger_thread_->AddTrigger(
-                MakeUnique<CleanupIntervalTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
+            periodic_trigger_thread_->AddTrigger(
+                MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
         } else {
             LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
         }
 
-        interval_trigger_thread_->Start();
+        periodic_trigger_thread_->Start();
     }
 }
 
 void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
-    interval_trigger_thread_->Stop();
+    periodic_trigger_thread_->Stop();
     bg_processor_->Stop();
 
     wal_mgr_->Stop();

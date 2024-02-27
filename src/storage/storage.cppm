@@ -21,7 +21,7 @@ import txn_manager;
 import buffer_manager;
 import wal_manager;
 import background_process;
-import interval_trigger_thread;
+import periodic_trigger_thread;
 
 export module storage;
 
@@ -56,7 +56,7 @@ private:
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
-    UniquePtr<IntervalTriggerThread> interval_trigger_thread_{};
+    UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
 };
 
 } // namespace infinity

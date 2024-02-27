@@ -49,7 +49,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 
     TxnTimeStamp visible_ts = scanner->visible_ts();
     auto iter = entry_list_.begin();
-    while (iter != Prev(entry_list_.end())) {
+    while ((*iter)->entry_type_ != EntryType::kDummy) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->commit_ts_ < visible_ts) {
             if (entry->deleted_) {
@@ -63,7 +63,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
         }
         ++iter;
     }
-    while (iter != Prev(entry_list_.end())) {
+    while ((*iter)->entry_type_ != EntryType::kDummy) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->Committed()) {
             scanner->AddEntry(std::move(entry));

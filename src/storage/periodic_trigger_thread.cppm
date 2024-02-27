@@ -14,24 +14,24 @@
 
 module;
 
-export module interval_trigger_thread;
+export module periodic_trigger_thread;
 
 import stl;
-import interval_trigger;
+import periodic_trigger;
 
 namespace infinity {
 
-export class IntervalTriggerThread {
+export class PeriodicTriggerThread {
 public:
-    IntervalTriggerThread() : running_(true) {}
+    PeriodicTriggerThread() : running_(true) {}
 
-    ~IntervalTriggerThread() {
+    ~PeriodicTriggerThread() {
         if (running_.load()) {
             Stop();
         }
     }
 
-    int AddTrigger(UniquePtr<IntervalTrigger> trigger) {
+    int AddTrigger(UniquePtr<PeriodicTrigger> trigger) {
         int id = triggers_.size();
         triggers_.push_back(std::move(trigger));
         return id;
@@ -52,7 +52,7 @@ public:
     void Reset(int id) { triggers_[id]->Reset(); }
 
 private:
-    Vector<UniquePtr<IntervalTrigger>> triggers_;
+    Vector<UniquePtr<PeriodicTrigger>> triggers_;
 
     Thread thread_{};
     atomic_bool running_{};
