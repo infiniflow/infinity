@@ -43,12 +43,12 @@ class AbsFunctionsTest : public BaseTest {};
 TEST_F(AbsFunctionsTest, abs_func) {
     using namespace infinity;
 
-    UniquePtr<NewCatalog> catalog_ptr = MakeUnique<NewCatalog>(nullptr);
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(nullptr);
 
     RegisterAbsFunction(catalog_ptr);
 
     String op = "abs";
-    SharedPtr<FunctionSet> function_set = NewCatalog::GetFunctionSetByName(catalog_ptr.get(), op);
+    SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
     SharedPtr<ScalarFunctionSet> scalar_function_set = std::static_pointer_cast<ScalarFunctionSet>(function_set);
 

@@ -6567,7 +6567,7 @@ yyreduce:
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp((yyvsp[-1].str_value), "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp((yyvsp[-1].str_value), "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp((yyvsp[-1].str_value), "ivfflat") == 0) {
@@ -6620,7 +6620,7 @@ yyreduce:
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp((yyvsp[-1].str_value), "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp((yyvsp[-1].str_value), "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp((yyvsp[-1].str_value), "ivfflat") == 0) {

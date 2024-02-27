@@ -30,7 +30,7 @@ CastTable::CastTable() {
 
     // From boolean to other type
     matrix_[kBoolean][kBoolean] = 0;
-    matrix_[kBoolean][kVarchar] = 1;
+    matrix_[kBoolean][kVarchar] = 100;
 
     // From tinyint to other type
     matrix_[kTinyInt][kTinyInt] = 0;
@@ -41,7 +41,7 @@ CastTable::CastTable() {
     matrix_[kTinyInt][kDecimal] = 8;
     matrix_[kTinyInt][kFloat] = 9;
     matrix_[kTinyInt][kDouble] = 10;
-    matrix_[kTinyInt][kVarchar] = 12;
+    matrix_[kTinyInt][kVarchar] = 112;
 
     // From smallint to other type
     matrix_[kSmallInt][kSmallInt] = 0;
@@ -51,7 +51,7 @@ CastTable::CastTable() {
     matrix_[kSmallInt][kDecimal] = 7;
     matrix_[kSmallInt][kFloat] = 8;
     matrix_[kSmallInt][kDouble] = 9;
-    matrix_[kSmallInt][kVarchar] = 11;
+    matrix_[kSmallInt][kVarchar] = 111;
 
     // From integer to other type
     matrix_[kInteger][kInteger] = 0;
@@ -60,7 +60,7 @@ CastTable::CastTable() {
     matrix_[kInteger][kDecimal] = 6;
     matrix_[kInteger][kFloat] = 7;
     matrix_[kInteger][kDouble] = 8;
-    matrix_[kInteger][kVarchar] = 10;
+    matrix_[kInteger][kVarchar] = 110;
 
     // From big int to other type
     matrix_[kBigInt][kBigInt] = 0;
@@ -68,76 +68,76 @@ CastTable::CastTable() {
     matrix_[kBigInt][kDecimal] = 5;
     matrix_[kBigInt][kFloat] = 6;
     matrix_[kBigInt][kDouble] = 7;
-    matrix_[kBigInt][kVarchar] = 9;
+    matrix_[kBigInt][kVarchar] = 109;
 
     // From huge int to other type
     matrix_[kHugeInt][kHugeInt] = 0;
     matrix_[kHugeInt][kDecimal] = 4;
     matrix_[kHugeInt][kFloat] = 5;
     matrix_[kHugeInt][kDouble] = 6;
-    matrix_[kHugeInt][kVarchar] = 8;
+    matrix_[kHugeInt][kVarchar] = 108;
 
     // From decimal128 to other type
     matrix_[kDecimal][kDecimal] = 0;
     matrix_[kDecimal][kFloat] = 1;
     matrix_[kDecimal][kDouble] = 2;
-    matrix_[kDecimal][kVarchar] = 4;
+    matrix_[kDecimal][kVarchar] = 104;
 
     // From float to other type
     matrix_[kFloat][kFloat] = 0;
     matrix_[kFloat][kDouble] = 1;
-    matrix_[kFloat][kVarchar] = 3;
+    matrix_[kFloat][kVarchar] = 103;
 
     // From double to other type
     matrix_[kDouble][kDouble] = 0;
-    matrix_[kDouble][kVarchar] = 2;
+    matrix_[kDouble][kVarchar] = 102;
 
     // From date to other type
     matrix_[kDate][kDate] = 0;
     matrix_[kDate][kDateTime] = 1;
     matrix_[kDate][kTimestamp] = 2;
-    matrix_[kDate][kVarchar] = 5;
+    matrix_[kDate][kVarchar] = 105;
 
     // From time to other type
     matrix_[kTime][kTime] = 0;
-    matrix_[kTime][kVarchar] = 2;
+    matrix_[kTime][kVarchar] = 102;
 
     // From datetime to other type
     matrix_[kDateTime][kDateTime] = 0;
     matrix_[kDateTime][kTimestamp] = 1;
     matrix_[kDateTime][kTime] = 2;
     matrix_[kDateTime][kDate] = 2;
-    matrix_[kDateTime][kVarchar] = 3;
+    matrix_[kDateTime][kVarchar] = 103;
 
     // From timestamp to other type
     matrix_[kTimestamp][kTimestamp] = 0;
     matrix_[kTimestamp][kDateTime] = 1;
     matrix_[kTimestamp][kTime] = 2;
     matrix_[kTimestamp][kDate] = 2;
-    matrix_[kTimestamp][kVarchar] = 3;
+    matrix_[kTimestamp][kVarchar] = 103;
 
     // From interval to other type
     matrix_[kInterval][kInterval] = 0;
-    matrix_[kInterval][kVarchar] = 1;
+    matrix_[kInterval][kVarchar] = 101;
 
     // From array to other type
     // From tuple to other type
 
     // From point to other type
     matrix_[kPoint][kPoint] = 0;
-    matrix_[kPoint][kVarchar] = 1;
+    matrix_[kPoint][kVarchar] = 101;
 
     // From line to other type
     matrix_[kLine][kLine] = 0;
-    matrix_[kLine][kVarchar] = 1;
+    matrix_[kLine][kVarchar] = 101;
 
     // From line segment to other type
     matrix_[kLineSeg][kLineSeg] = 0;
-    matrix_[kLineSeg][kVarchar] = 1;
+    matrix_[kLineSeg][kVarchar] = 101;
 
     // From box to other type
     matrix_[kBox][kBox] = 0;
-    matrix_[kBox][kVarchar] = 1;
+    matrix_[kBox][kVarchar] = 101;
 
     // From path to other type
 //    matrix_[kPath][kPath] = 0;
@@ -149,7 +149,7 @@ CastTable::CastTable() {
 
     // From circle to other type
     matrix_[kCircle][kCircle] = 0;
-    matrix_[kCircle][kVarchar] = 1;
+    matrix_[kCircle][kVarchar] = 101;
 
     // From bitmap to other type
 //    matrix_[kBitmap][kBitmap] = 0;
@@ -157,24 +157,24 @@ CastTable::CastTable() {
 
     // From uuid to other type
     matrix_[kUuid][kUuid] = 0;
-    matrix_[kUuid][kVarchar] = 1;
+    matrix_[kUuid][kVarchar] = 101;
 
     // From cast blob to other type
 //    matrix_[kBlob][kBlob] = 0;
 
     // From embedding to other type
     matrix_[kEmbedding][kEmbedding] = 0;
-    matrix_[kEmbedding][kVarchar] = 1;
+    matrix_[kEmbedding][kVarchar] = 101;
 
     // From row_id to other type
     matrix_[kRowID][kRowID] = 0;
-    matrix_[kRowID][kVarchar] = 1;
+    matrix_[kRowID][kVarchar] = 101;
 
     // From embedding to other type
     matrix_[kMixed][kMixed] = 0;
     matrix_[kMixed][kBigInt] = 1;
     matrix_[kMixed][kFloat] = 2;
-    matrix_[kMixed][kVarchar] = 4;
+    matrix_[kMixed][kVarchar] = 104;
 
     // From null to other type
     matrix_[kNull][kNull] = 0;

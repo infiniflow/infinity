@@ -19,7 +19,7 @@ export module table_index_entry;
 import stl;
 
 import txn_store;
-import irs_index_entry;
+import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 import base_entry;
@@ -27,6 +27,9 @@ import index_def;
 import block_index;
 import third_party;
 import status;
+
+import cleanup_scanner;
+import meta_entry_interface;
 
 namespace infinity {
 
@@ -36,11 +39,13 @@ class BufferManager;
 struct TableEntry;
 class BaseTableRef;
 
-export struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry : public BaseEntry, public EntryInterface {
 
     friend struct TableEntry;
 
 public:
+    TableIndexEntry();
+
     TableIndexEntry(const SharedPtr<IndexDef> &index_def,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
@@ -78,9 +83,10 @@ public:
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexDef *index_def() const { return index_def_.get(); }
     const SharedPtr<IndexDef> &table_index_def() { return index_def_; }
-    SharedPtr<IrsIndexEntry> &irs_index_entry() { return irs_index_entry_; }
+    SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
+    bool IsFulltextIndexHomebrewed() const;
 
     Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
@@ -91,8 +97,8 @@ private:
 
     // For SegmentColumnIndexEntry
     void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);
-    // For IrsIndexEntry
-    void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
+    // For FulltextIndexEntry
+    void CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry);
 
 private:
     std::shared_mutex rw_locker_{};
@@ -102,7 +108,12 @@ private:
 
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
-    SharedPtr<IrsIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
+
+public:
+    void Cleanup() && override;
+
+    void PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

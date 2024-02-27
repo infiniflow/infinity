@@ -20,8 +20,8 @@ export module substring;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterSubstringFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterSubstringFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

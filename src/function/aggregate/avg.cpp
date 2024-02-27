@@ -249,7 +249,7 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
 };
 
-void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "AVG";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -315,7 +315,7 @@ void RegisterAvgFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(avg_function);
     }
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

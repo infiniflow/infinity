@@ -1,6 +1,22 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <vector>
+
+module column_index_reader;
 
 import stl;
 import memory_pool;
@@ -15,7 +31,6 @@ import inmem_index_segment_reader;
 import indexer;
 import column_indexer;
 import dict_reader;
-module column_index_reader;
 
 namespace infinity {
 ColumnIndexReader::ColumnIndexReader(u64 column_id, Indexer *indexer) : column_id_(column_id), indexer_(indexer) {}
@@ -39,11 +54,7 @@ void ColumnIndexReader::Open(const InvertedIndexConfig &index_config) {
 }
 
 SharedPtr<DiskIndexSegmentReader> ColumnIndexReader::CreateDiskSegmentReader(const Segment &segment) {
-    Path path = Path(root_dir_) / std::to_string(segment.GetSegmentId());
-    String dict_file = path.string();
-    dict_file.append(DICT_SUFFIX);
-    SharedPtr<DictionaryReader> dict_reader = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
-    return MakeShared<DiskIndexSegmentReader>(root_dir_, segment, index_config_, dict_reader);
+    return MakeShared<DiskIndexSegmentReader>(column_id_, segment, index_config_);
 }
 
 SharedPtr<InMemIndexSegmentReader> ColumnIndexReader::CreateInMemSegmentReader(Segment &segment) {
@@ -60,6 +71,8 @@ PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *sessi
             seg_postings->push_back(seg_posting);
         }
     }
+    if (seg_postings->empty())
+        return nullptr;
     PostingIterator *iter =
         new ((session_pool)->Allocate(sizeof(PostingIterator))) PostingIterator(index_config_.GetPostingFormatOption(), session_pool);
     u32 state_pool_size = 0; // TODO

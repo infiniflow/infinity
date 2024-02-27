@@ -24,7 +24,7 @@ namespace infinity {
 enum class IndexType {
     kIVFFlat,
     kHnsw,
-    kIRSFullText,
+    kFullText,
     kSecondary,
     kInvalid,
 };
@@ -47,7 +47,7 @@ public:
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{"default"};
+    std::string schema_name_{};
     std::string table_name_{};
     std::string index_name_{};
 

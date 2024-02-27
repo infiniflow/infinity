@@ -4,7 +4,7 @@
 </div>
 
 <p align="center">
-    <b>The AI-native database built for LLM applications, providing incredibly fast vector and full-text search</b>
+    <b>The AI-native database built for LLM applications, providing incredibly fast full-text and vector search</b>
 </p>
 
 <h4 align="center">

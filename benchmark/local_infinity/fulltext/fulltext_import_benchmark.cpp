@@ -79,7 +79,7 @@ int main() {
     create_db_options.conflict_type_ = ConflictType::kIgnore;
     infinity->CreateDatabase(db_name, std::move(create_db_options));
 
-    std::shared_ptr<Database> data_base = infinity->GetDatabase(db_name);
+    auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
     CreateTableOptions create_tb_options;
     create_tb_options.conflict_type_ = ConflictType::kIgnore;
     data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
@@ -87,7 +87,7 @@ int main() {
     BaseProfiler profiler;
 
     profiler.Begin();
-    std::shared_ptr<Table> table = data_base->GetTable(table_name);
+    auto [ table, status2 ] = data_base->GetTable(table_name);
     ImportOptions import_options;
     import_options.copy_file_type_ = CopyFileType::kJSONL;
     table->Import(import_from, std::move(import_options));
@@ -97,7 +97,7 @@ int main() {
     auto index_info_list = new std::vector<IndexInfo *>();
     {
         auto index_info = new IndexInfo();
-        index_info->index_type_ = IndexType::kIRSFullText;
+        index_info->index_type_ = IndexType::kFullText;
         index_info->column_name_ = "text";
 
         {

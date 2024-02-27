@@ -14,7 +14,7 @@ This method connect to the Infinity server and return a infinity object.
 
 ## Parameters
 
-- `REMOTE_HOST = NetworkAddress("127.0.0.1", 9080)`
+- `REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)`
 
 ## Returns
 
@@ -273,13 +273,13 @@ db_obj.create_table(
 db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
                              [index.IndexInfo("body",
-							                                index.IndexType.IRSFullText,
+							                                index.IndexType.FullText,
 	                                            [index.InitParameter("ANALYZER", "segmentation")]),
                               index.IndexInfo("doctitle",
-                                              index.IndexType.IRSFullText,
+                                              index.IndexType.FullText,
                                               []),
                               index.IndexInfo("docdate",
-                                              index.IndexType.IRSFullText,
+                                              index.IndexType.FullText,
                                               []),
                               ], None)
 ```
@@ -291,10 +291,10 @@ This method uses `indexInfo` to create an index.
 - `IndexInfo`
     - `column_name` : `str` Name of the column. Required.
     - `index_type` : `Enum`. The index type. Includes: 
-        - `IVFFlat` 
+        - `IVFFlat`
         - `HnswLVQ`
-        - ``Hnsw` 
-        - `IRSFullText`
+        - `Hnsw`
+        - `FullText`
     - `index_param_list` : list[InitParameter]
         - `param_name` : `str`
         - `param_value` : `str`
@@ -532,7 +532,7 @@ VEC supports list or np.ndarray.
 
 - `vector_column_name` : `str`
 - `embedding_data` : VEC
-- `embedding_data_type` : `str``
+- `embedding_data_type` : `str`
   - `float`
   - `int`
 

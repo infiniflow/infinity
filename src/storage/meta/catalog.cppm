@@ -15,21 +15,21 @@
 module;
 
 export module catalog;
-//export import :db_meta;
-//export import :db_entry;
-//export import :table_meta;
-//export import :table_entry;
-//export import :view_meta;
-//export import :view_entry;
-//export import :segment_entry;
-//export import :block_entry;
-//export import :block_column_entry;
-//export import :table_index_meta;
-//export import :table_index_entry;
-//export import :column_index_entry;
-//export import :segment_column_index_entry;
-//export import :irs_index_entry;
-//export import :base_entry;
+// export import :db_meta;
+// export import :db_entry;
+// export import :table_meta;
+// export import :table_entry;
+// export import :view_meta;
+// export import :view_entry;
+// export import :segment_entry;
+// export import :block_entry;
+// export import :block_column_entry;
+// export import :table_index_meta;
+// export import :table_index_entry;
+// export import :column_index_entry;
+// export import :segment_column_index_entry;
+// export import :fulltext_index_entry;
+// export import :base_entry;
 
 import stl;
 import table_def;
@@ -52,6 +52,11 @@ import table_entry;
 import table_index_entry;
 import segment_entry;
 import db_meta;
+import meta_map;
+import base_entry;
+
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -109,9 +114,9 @@ public:
 
 class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
-export struct NewCatalog {
+export struct Catalog {
 public:
-    explicit NewCatalog(SharedPtr<String> dir, bool create_default_db = false);
+    explicit Catalog(SharedPtr<String> dir, bool create_default_db = false);
 
 public:
     // Database related functions
@@ -121,7 +126,11 @@ public:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<DBEntry *, Status> DropDatabase(const String &db_name,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts,
+                                          TxnManager *txn_mgr,
+                                          ConflictType conflict_type = ConflictType::kError);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -199,18 +208,13 @@ public:
 
 public:
     // Function related methods
-    static SharedPtr<FunctionSet> GetFunctionSetByName(NewCatalog *catalog, String function_name);
+    static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);
 
-    static void AddFunctionSet(NewCatalog *catalog, const SharedPtr<FunctionSet> &function_set);
+    static void AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
-    // Table Function related methods
-    static SharedPtr<TableFunction> GetTableFunctionByName(NewCatalog *catalog, String function_name);
+    static void AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
-    static void AddTableFunction(NewCatalog *catalog, const SharedPtr<TableFunction> &table_function);
-
-    static void AddSpecialFunction(NewCatalog *catalog, const SharedPtr<SpecialFunction> &special_function);
-
-    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(NewCatalog *catalog, String function_name);
+    static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name);
 
 public:
     // Serialization and Deserialization
@@ -220,15 +224,15 @@ public:
 
     bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void MergeFrom(NewCatalog &other);
+    void MergeFrom(Catalog &other);
 
-    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<NewCatalog> &catalog);
+    static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
-    static UniquePtr<NewCatalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 
-    static UniquePtr<NewCatalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr);
 
-    static void LoadFromEntry(NewCatalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
+    static void LoadFromEntry(Catalog *catalog, const String &catalog_path, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -241,19 +245,27 @@ public:
 
 public:
     SharedPtr<String> current_dir_{nullptr};
-    HashMap<String, UniquePtr<DBMeta>> databases_{};
+
+    MetaMap<DBMeta> db_meta_map_{};
+
     TransactionID next_txn_id_{};
     u64 catalog_version_{}; // TODO seems useless
-    std::shared_mutex rw_locker_{};
 
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
-    HashMap<String, SharedPtr<TableFunction>> table_functions_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
 
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
+
+private: // TODO: remove this
+    std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
+
+    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+
+public:
+    void PickCleanup(CleanupScanner *scanner);
 };
 
 } // namespace infinity

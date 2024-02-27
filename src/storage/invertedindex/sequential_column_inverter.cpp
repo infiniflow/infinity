@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <arpa/inet.h>
@@ -29,10 +43,10 @@ SequentialColumnInverter::~SequentialColumnInverter() {}
 
 bool SequentialColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void SequentialColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
+void SequentialColumnInverter::InvertColumn(const ColumnVector &column_vector, RowID start_row_id) {
     docid_t start_doc_id = RowID2DocID(start_row_id);
-    for (SizeT i = 0; i < column_vector->Size(); ++i) {
-        String data = column_vector->ToString(i);
+    for (SizeT i = 0; i < column_vector.Size(); ++i) {
+        String data = column_vector.ToString(i);
         InvertColumn(start_doc_id + i, data);
     }
 }
@@ -115,11 +129,7 @@ void SequentialColumnInverter::Commit() {
                                                                                        &positions_[0],
                                                                                        positions_.size(),
                                                                                        16);
-    if (memory_indexer_->IsRealTime()) {
-        DoRTInsert();
-    } else {
-        DoInsert();
-    }
+    DoInsert();
     memory_indexer_->TryDump();
 }
 
@@ -135,31 +145,6 @@ void SequentialColumnInverter::DoInsert() {
                 last_term_num = i.term_num_;
                 term = GetTermFromNum(last_term_num);
                 posting = memory_indexer_->GetOrAddPosting(String(term.data()));
-            }
-            last_doc_id = i.doc_id_;
-            if (last_doc_id != 0) {
-                posting->EndDocument(last_doc_id, 0);
-            }
-        }
-        if (i.term_pos_ != last_term_pos) {
-            last_term_pos = i.term_pos_;
-            posting->AddPosition(last_term_pos);
-        }
-    }
-}
-
-void SequentialColumnInverter::DoRTInsert() {
-    u32 last_term_num = 0;
-    u32 last_term_pos = 0;
-    u32 last_doc_id = 0;
-    StringRef term;
-    MemoryIndexer::RTPostingPtr posting = nullptr;
-    for (auto &i : positions_) {
-        if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
-            if (last_term_num != i.term_num_) {
-                last_term_num = i.term_num_;
-                term = GetTermFromNum(last_term_num);
-                posting = memory_indexer_->GetOrAddRTPosting(String(term.data()));
             }
             last_doc_id = i.doc_id_;
             if (last_doc_id != 0) {

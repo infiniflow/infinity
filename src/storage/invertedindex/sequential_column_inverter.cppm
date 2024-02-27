@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 export module sequential_column_inverter;
@@ -25,7 +39,7 @@ public:
     SequentialColumnInverter &operator=(const SequentialColumnInverter &&) = delete;
     virtual ~SequentialColumnInverter();
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) override;
+    void InvertColumn(const ColumnVector &column_vector, RowID start_row_id) override;
 
     void InvertColumn(u32 doc_id, const String &val) override;
 
@@ -81,8 +95,6 @@ private:
     void SortTerms();
 
     void DoInsert();
-
-    void DoRTInsert();
 
     MemoryIndexer *memory_indexer_{nullptr};
     Analyzer *analyzer_{nullptr};

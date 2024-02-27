@@ -195,6 +195,7 @@ struct Field {
 enum CopyFileType {
 CSV,
 JSON,
+JSONL,
 FVECS,
 }
 
@@ -226,19 +227,19 @@ struct ImportOption {
 }
 
 struct UploadResponse {
-1:  bool success,
+1:  i64 error_code,
 2:  string error_msg,
 3:  bool can_skip,
 }
 
-struct CommonResponse {
-1:  bool success,
-2:  string error_msg,
-3:  i64 session_id,
-}
-
 struct CommonRequest {
 1:  i64 session_id,
+}
+
+struct CommonResponse {
+1:  i64 error_code,
+2:  string error_msg,
+3:  i64 session_id,
 }
 
 struct ListDatabaseRequest {
@@ -246,7 +247,7 @@ struct ListDatabaseRequest {
 }
 
 struct ListDatabaseResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: list<string> db_names = [],
 }
@@ -257,7 +258,7 @@ struct ListTableRequest {
 }
 
 struct ListTableResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: list<string> table_names = [],
 }
@@ -268,7 +269,7 @@ struct DescribeDatabaseRequest {
 }
 
 struct DescribeDatabaseResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: i64 num_segments,
 4: i64 num_rows,
@@ -282,7 +283,7 @@ struct DescribeTableRequest {
 }
 
 struct DescribeTableResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: i64 num_segments,
 4: i64 num_rows,
@@ -299,7 +300,7 @@ enum IndexType {
 IVFFlat,
 HnswLVQ,
 Hnsw,
-IRSFullText,
+FullText,
 }
 
 struct IndexInfo {
@@ -410,7 +411,7 @@ struct ExplainRequest {
 }
 
 struct ExplainResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: list<ColumnDef> column_defs = [],
 4: list<ColumnField> column_fields = [];
@@ -431,7 +432,7 @@ struct SelectRequest {
 }
 
 struct SelectResponse {
-1: bool success,
+1: i64 error_code,
 2: string error_msg,
 3: list<ColumnDef> column_defs = [],
 4: list<ColumnField> column_fields = [];

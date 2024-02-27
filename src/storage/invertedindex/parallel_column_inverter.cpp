@@ -1,9 +1,24 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <string.h>
 #include <vector>
 
 module parallel_column_inverter;
+
 import stl;
 import analyzer;
 import memory_pool;
@@ -20,12 +35,11 @@ namespace infinity {
 TermPostings::TermPostings(MemoryIndexer *memory_indexer) : memory_indexer_(memory_indexer), terms_{0, ValueRefHash{}, TermEq{postings_}} {}
 
 void TermPostings::GetSorted(Vector<const TermPosting *> &term_postings) {
-    term_postings.resize(term_postings.size());
-
-    for (auto *p = term_postings.data(); const auto &posting : postings_) {
-        *p++ = &posting;
+    SizeT num = postings_.size();
+    term_postings.resize(num);
+    for (SizeT i = 0; i < num; i++) {
+        term_postings[i] = &postings_[i];
     }
-
     std::sort(term_postings.begin(), term_postings.end(), [](const auto lhs, const auto rhs) { return StringViewCompare(lhs->term_, rhs->term_); });
 }
 
@@ -71,7 +85,7 @@ void ParallelColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     }
 }
 
-void ParallelColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {}
+void ParallelColumnInverter::InvertColumn(const ColumnVector &column_vector, RowID start_row_id) {}
 
 ParallelColumnInverters::ParallelColumnInverters(MemoryIndexer *memory_indexer, u32 size) : memory_indexer_(memory_indexer), size_(size) {
     inverters_.resize(size_);

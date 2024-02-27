@@ -96,6 +96,8 @@ export {
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
 
+    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 1;
+
     constexpr std::string_view SYSTEM_DB_NAME = "system";
     constexpr std::string_view DEFAULT_DB_NAME = "default";
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";

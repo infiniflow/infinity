@@ -114,7 +114,6 @@ import logical_command;
 import logical_match;
 import logical_fusion;
 
-
 import value;
 import value_expression;
 import explain_physical_plan;
@@ -895,7 +894,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<Logica
                                            logical_command->GetOutputTypes(),
                                            logical_operator->load_metas());
     if (command_info->type() == CommandType::kCompactTable) {
-        ret->table_ref_ = logical_command->table_ref_;
+        ret->table_entry_ = logical_command->table_entry_;
     }
     return ret;
 }
@@ -943,6 +942,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
                                                        nullptr,
                                                        std::move(input_physical_operator),
                                                        logical_operator->load_metas());
+            break;
+        }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
             break;
         }
     }

@@ -44,7 +44,7 @@ struct CountStarState {
     inline static SizeT Size(const DataType &) { return sizeof(i64); }
 };
 
-void RegisterCountStarFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterCountStarFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "COUNT_STAR";
 
     SharedPtr<AggregateFunctionSet> function_set_ptr = MakeShared<AggregateFunctionSet>(func_name);
@@ -55,7 +55,7 @@ void RegisterCountStarFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
         function_set_ptr->AddFunction(count_function);
     }
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

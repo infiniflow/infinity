@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import numpy as np
 from abc import ABC
 from typing import Optional, Union, List, Any
 
@@ -19,6 +20,7 @@ from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import INSERT_DATA, VEC
+from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
@@ -35,7 +37,7 @@ class RemoteTable(Table, ABC):
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
     def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
-        check_valid_name(index_name)
+        check_valid_name(index_name, "Index")
         index_name = index_name.strip()
 
         index_info_list_to_use: list[ttypes.IndexInfo] = []
@@ -54,19 +56,19 @@ class RemoteTable(Table, ABC):
                                       index_info_list=index_info_list_to_use,
                                       option=options)
 
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def drop_index(self, index_name: str):
-        check_valid_name(index_name)
+        check_valid_name(index_name, "Index")
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -91,7 +93,7 @@ class RemoteTable(Table, ABC):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                               i64_value=value)
 
-                elif isinstance(value, float):
+                elif isinstance(value, float) or isinstance(value, np.float32):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                               f64_value=value)
                 elif isinstance(value, list):
@@ -104,7 +106,8 @@ class RemoteTable(Table, ABC):
                 else:
                     raise Exception("Invalid constant expression")
 
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                expr_type = ttypes.ParsedExprType(
+                    constant_expr=constant_expression)
                 paser_expr = ttypes.ParsedExpr(type=expr_type)
 
                 parse_exprs.append(paser_expr)
@@ -114,10 +117,10 @@ class RemoteTable(Table, ABC):
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                 fields=fields)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def import_data(self, file_path: str, options=None):
 
@@ -131,6 +134,8 @@ class RemoteTable(Table, ABC):
             options.delimiter = ","
         elif file_name.endswith('.json'):
             options.copy_file_type = ttypes.CopyFileType.JSON
+        elif file_name.endswith('.jsonl'):
+            options.copy_file_type = ttypes.CopyFileType.JSONL
         elif file_name.endswith('.fvecs'):
             options.copy_file_type = ttypes.CopyFileType.FVECS
 
@@ -154,8 +159,8 @@ class RemoteTable(Table, ABC):
                     case None:
                         raise Exception("upload failed")
                     case _:
-                        if not res.success:
-                            raise Exception(f"upload failed: {res.error_msg}")
+                        if res.error_code != ErrorCode.OK:
+                            raise Exception(f"ERROR:{res.error_code} upload failed: {res.error_msg}")
                         if res.error_msg:
                             raise Exception(f"upload failed: {res.error_msg}")
                         if res.can_skip:
@@ -165,10 +170,10 @@ class RemoteTable(Table, ABC):
                                      table_name=self._table_name,
                                      file_name=file_name,
                                      import_options=options)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -176,11 +181,12 @@ class RemoteTable(Table, ABC):
                 where_expr = None
             case _:
                 where_expr = traverse_conditions(condition(cond))
-        res = self._conn.delete(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
-        if res.success:
+        res = self._conn.delete(
+            db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
         # {"c1": 1, "c2": 1.1}
@@ -203,55 +209,55 @@ class RemoteTable(Table, ABC):
                         elif isinstance(value, int):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                                       i64_value=value)
-                        elif isinstance(value, float):
+                        elif isinstance(value, float) or isinstance(value, np.float32):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                                       f64_value=value)
                         else:
                             raise Exception("Invalid constant expression")
 
-                        expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                        expr_type = ttypes.ParsedExprType(
+                            constant_expr=constant_expression)
                         paser_expr = ttypes.ParsedExpr(type=expr_type)
-                        update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
+                        update_expr = ttypes.UpdateExpr(
+                            column_name=column_name, value=paser_expr)
 
                         update_expr_array.append(update_expr)
 
         res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,
                                 update_expr_array=update_expr_array)
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int):
-        self.query_builder.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
-
+        self.query_builder.knn(
+            vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
         return self
 
-    def match(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, topn: int):
-        self.query_builder.match(vector_column_name, embedding_data, embedding_data_type, topn)
+    def match(self, fields: str, matching_text: str, options_text: str = ''):
+        self.query_builder.match(fields, matching_text, options_text)
+        return self
 
+    def fusion(self, method: str, options_text: str = ''):
+        self.query_builder.fusion(method, options_text)
         return self
 
     def output(self, columns: Optional[List[str]]):
         self.query_builder.output(columns)
-
         return self
 
     def filter(self, filter: Optional[str]):
         self.query_builder.filter(filter)
-
         return self
 
     def limit(self, limit: Optional[int]):
         self.query_builder.limit(limit)
-
         return self
 
     def offset(self, offset: Optional[int]):
-
         self.query_builder.offset(offset)
-
         return self
 
     def to_result(self):
@@ -282,10 +288,10 @@ class RemoteTable(Table, ABC):
                                 offset_expr=query.offset)
 
         # process the results
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return build_result(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
 
     def _explain_query(self, query: ExplainQuery) -> Any:
         res = self._conn.explain(db_name=self._db_name,
@@ -297,7 +303,7 @@ class RemoteTable(Table, ABC):
                                  limit_expr=query.limit,
                                  offset_expr=query.offset,
                                  explain_type=query.explain_type.to_ttype())
-        if res.success:
+        if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)

@@ -44,21 +44,21 @@ import table_def;
 import index_def;
 import catalog_delta_entry;
 import bg_task;
-import backgroud_process;
+import background_process;
 import base_table_ref;
 import compact_segments_task;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, NewCatalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
       local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id) {
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
     return txn;
 }
@@ -111,7 +111,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     if (!status.ok()) {
         return status;
     }
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
@@ -179,7 +179,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Status Txn::DropDatabase(const String &db_name, ConflictType) {
+Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -189,8 +189,8 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_);
-    if (!status.ok()) {
+    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
+    if (!status.ok() || dropped_db_entry == nullptr) {
         return status;
     }
 
@@ -532,11 +532,11 @@ void Txn::Rollback() {
 
     for (const auto &base_entry : txn_tables_) {
         auto *table_entry = (TableEntry *)(base_entry);
-        NewCatalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        NewCatalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &db_name : db_names_) {
@@ -556,9 +556,9 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
-    local_catalog_delta_ops_entry_->operations().emplace_back(std::move(operation));
-}
+// called by worker thread when create new entry
+// Add lock because multiple threads may add catalog
+void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) { local_catalog_delta_ops_entry_->AddOperation(std::move(operation)); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {

@@ -84,6 +84,7 @@ export namespace std {
     using std::lower_bound;
 
     using std::condition_variable;
+    using std::condition_variable_any;
     using std::lock_guard;
     using std::memory_order;
     using std::memory_order_acq_rel;
@@ -135,6 +136,7 @@ export namespace std {
         using std::chrono::milliseconds;
         using std::chrono::nanoseconds;
         using std::chrono::seconds;
+        using std::chrono::system_clock;
 
         using std::chrono::operator>;
         using std::chrono::operator>=;
@@ -193,6 +195,7 @@ export namespace std {
 
     using std::is_integral_v;
     using std::is_floating_point_v;
+    using std::common_type_t;
 
     using std::monostate;
     using std::function;

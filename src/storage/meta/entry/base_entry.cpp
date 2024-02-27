@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module base_entry;
 
 import stl;
@@ -49,7 +51,7 @@ void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &l
         }
     }
 
-    while(it2 != list2.end()) {
+    while (it2 != list2.end()) {
         if ((*it2)->entry_type_ != EntryType::kDummy) {
             list1.insert(it1, std::move(*it2));
         }

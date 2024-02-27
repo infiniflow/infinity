@@ -42,7 +42,7 @@ import index_base;
 import index_full_text;
 import index_def;
 import bg_task;
-import backgroud_process;
+import background_process;
 import compact_segments_task;
 import default_values;
 import base_table_ref;
@@ -544,7 +544,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 
             auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
-            u64 segment_id = NewCatalog::GetNextSegmentID(table_entry);
+            u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4, false);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
@@ -706,8 +706,8 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto [table_entry, status] = txn2->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            SegmentID segment_id = NewCatalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, false);
+            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2, true);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -745,8 +745,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn4->BeginTS());
-                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_ref, txn4);
+                auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
@@ -775,11 +774,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment, nullptr);
-                EXPECT_NE(segment->deprecate_ts(), UNCOMMIT_TS);
+                EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_EQ(compact_segment->deprecate_ts(), UNCOMMIT_TS);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
         }
         infinity::InfinityContext::instance().UnInit();
@@ -875,10 +874,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
             EXPECT_NE(table_index_meta, nullptr);
             EXPECT_EQ(table_index_meta->index_name(), "idx1");
-            EXPECT_EQ(table_index_meta->entry_list().size(), 2);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->entry_list().front().get());
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "idx1");
-            auto entry_back = table_index_meta->entry_list().back().get();
+            auto entry_back = table_index_meta->index_entry_list().back().get();
             EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }
@@ -898,7 +897,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
-        BufferManager *buffer_manager = storage->buffer_manager();
+        // BufferManager *buffer_manager = storage->buffer_manager();
 
         // CREATE TABLE test_hnsw (col1 embedding(float,128));
         {
@@ -982,10 +981,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);
             EXPECT_EQ(table_index_meta->index_name(), "hnsw_index");
-            EXPECT_EQ(table_index_meta->entry_list().size(), 2);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->entry_list().front().get());
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "hnsw_index");
-            auto entry_back = table_index_meta->entry_list().back().get();
+            auto entry_back = table_index_meta->index_entry_list().back().get();
             EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }

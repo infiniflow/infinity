@@ -38,7 +38,7 @@ import infinity_exception;
 
 import block_entry;
 import segment_entry;
-// #include "statement/extra/extra_ddl_info.h"
+import compact_segments_task;
 
 module wal_manager;
 
@@ -62,6 +62,7 @@ WalManager::~WalManager() {
 }
 
 void WalManager::Start() {
+    LOG_INFO("WAL manager is starting...");
     bool expected = false;
     bool changed = running_.compare_exchange_strong(expected, true);
     if (!changed)
@@ -83,17 +84,19 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
+    LOG_INFO("WAL manager is started.");
 }
 
 void WalManager::Stop() {
+    LOG_INFO("WAL manager is stopping...");
     bool expected = true;
     bool changed = running_.compare_exchange_strong(expected, false);
     if (!changed) {
-        LOG_INFO("WalManager::Stop already stopped");
+        LOG_INFO("WAL manager was stopped...");
         return;
     }
 
-    LOG_INFO("WalManager::Stop begin to stop txn manager");
+    LOG_TRACE("WalManager::Stop begin to stop txn manager.");
     // Notify txn manager to stop.
     TxnManager *txn_mgr = storage_->txn_manager();
     txn_mgr->Stop();
@@ -109,16 +112,15 @@ void WalManager::Stop() {
     que_.clear();
 
     // Wait for checkpoint thread to stop.
-    LOG_INFO("WalManager::Stop checkpoint thread join");
+    LOG_TRACE("WalManager::Stop checkpoint thread join");
     checkpoint_thread_.join();
 
     // Wait for flush thread to stop
-    LOG_INFO("WalManager::Stop flush thread join");
+    LOG_TRACE("WalManager::Stop flush thread join");
     flush_thread_.join();
 
     ofs_.close();
-
-    LOG_INFO("WalManager is stopped");
+    LOG_INFO("WAL manager is stopped.");
 }
 
 // Session request to persist an entry. Assuming txn_id of the entry has
@@ -244,9 +246,9 @@ void WalManager::Checkpoint() {
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
-        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
-                             current_max_commit_ts,
-                             ckp_commit_ts));
+//        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
+//                              current_max_commit_ts,
+//                              ckp_commit_ts));
         return;
     }
 
@@ -655,7 +657,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    NewCatalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
+    Catalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
     table_index_entry->Commit(commit_ts);
 }
 
@@ -689,7 +691,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
 
-    NewCatalog::AddSegment(table_entry, segment_entry);
+    Catalog::AddSegment(table_entry, segment_entry);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -712,8 +714,8 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
-    NewCatalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
-    NewCatalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -728,6 +730,10 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
 
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
         auto *segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
+        if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
+            UnrecoverableError("Assert: Replay segment should be compactable.");
+        }
+        segment_entry->SetNoDelete();
         segment_entry->SetDeprecated(commit_ts);
     }
 }
@@ -747,8 +753,8 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    NewCatalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
-    NewCatalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
+    Catalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
+    Catalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
 }
 
 } // namespace infinity

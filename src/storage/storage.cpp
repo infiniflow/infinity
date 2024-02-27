@@ -36,9 +36,11 @@ import logger;
 import txn;
 import infinity_exception;
 import status;
-import backgroud_process;
+import background_process;
 import status;
 import bg_task;
+import periodic_trigger_thread;
+import periodic_trigger;
 
 namespace infinity {
 
@@ -87,10 +89,25 @@ void Storage::Init() {
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
     txn_mgr_->CommitTxn(txn);
+
+    {
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+        std::chrono::seconds cleanup_interval = config_ptr_->cleanup_interval();
+        if (cleanup_interval.count() > 0) {
+            periodic_trigger_thread_->AddTrigger(
+                MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
+        } else {
+            LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
+        }
+
+        periodic_trigger_thread_->Start();
+    }
 }
 
 void Storage::UnInit() {
     fmt::print("Shutdown storage ...\n");
+    periodic_trigger_thread_->Stop();
     bg_processor_->Stop();
 
     wal_mgr_->Stop();
@@ -113,7 +130,7 @@ void Storage::AttachCatalog(const Vector<String> &catalog_files) {
     for (const auto &catalog_file : catalog_files) {
         LOG_TRACE(fmt::format("Catalog file: {}", catalog_file.c_str()));
     }
-    new_catalog_ = NewCatalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
+    new_catalog_ = Catalog::LoadFromFiles(catalog_files, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {
@@ -123,7 +140,7 @@ void Storage::InitNewCatalog() {
     if (!fs.Exists(catalog_dir)) {
         fs.CreateDirectory(catalog_dir);
     }
-    new_catalog_ = MakeUnique<NewCatalog>(MakeShared<String>(catalog_dir), true);
+    new_catalog_ = MakeUnique<Catalog>(MakeShared<String>(catalog_dir), true);
 }
 
 } // namespace infinity

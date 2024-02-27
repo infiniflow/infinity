@@ -27,10 +27,10 @@ namespace infinity {
 using PutWalEntryFn = std::function<void(SharedPtr<WalEntry>)>;
 
 class BGTaskProcessor;
-struct NewCatalog;
+struct Catalog;
 export class TxnManager {
 public:
-    explicit TxnManager(NewCatalog *catalog,
+    explicit TxnManager(Catalog *catalog,
                         BufferManager *buffer_mgr,
                         BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
@@ -69,11 +69,13 @@ public:
 
     void RollBackTxn(Txn *txn);
 
+    TxnTimeStamp GetMinUncommitTs();
+
 private:
     TransactionID GetNewTxnID();
 
 private:
-    NewCatalog *catalog_{};
+    Catalog *catalog_{};
     std::shared_mutex rw_locker_{};
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
@@ -84,7 +86,9 @@ private:
     TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
-    TxnTimeStamp start_ts_{};
+    TxnTimeStamp start_ts_{};        // The next txn ts
+    Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
+
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};

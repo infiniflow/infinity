@@ -115,9 +115,10 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexHnsw>(file_name, column_names, metric_type, encode_type, M, ef_construction, ef);
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             String analyzer = ReadBufAdv<String>(ptr);
-            res = MakeShared<IndexFullText>(file_name, column_names, analyzer);
+            u8 is_homebrewed = ReadBufAdv<u8>(ptr);
+            res = MakeShared<IndexFullText>(file_name, column_names, analyzer, bool(is_homebrewed));
             break;
         }
         case IndexType::kSecondary: {
@@ -182,9 +183,15 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             String analyzer = index_def_json["analyzer"];
-            auto ptr = MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer);
+            bool homebrewed = false;
+            String para_val = index_def_json["homebrewed"];
+            std::transform(para_val.begin(), para_val.end(), para_val.begin(), ::tolower);
+            if (!para_val.empty() && para_val != "false" && para_val != "0") {
+                homebrewed = true;
+            }
+            auto ptr = MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer, homebrewed);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

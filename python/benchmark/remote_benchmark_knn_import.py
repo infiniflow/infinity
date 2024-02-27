@@ -4,6 +4,7 @@ import os
 import infinity
 from infinity import index
 from infinity.common import REMOTE_HOST
+from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
 
@@ -30,7 +31,7 @@ def import_sift_1m(path):
 
     assert os.path.exists(path)
     res = table_obj.import_data(path, None)
-    assert res.success
+    assert res.error_code == ErrorCode.OK
 
     create_index("sift_benchmark")
 
@@ -48,7 +49,7 @@ def import_gist_1m(path):
 
     assert os.path.exists(path)
     res = table_obj.import_data(path, None)
-    assert res.success
+    assert res.error_code == ErrorCode.OK
 
     create_index("gist_benchmark")
 
@@ -67,7 +68,7 @@ def create_index(table_name):
                                                   index.InitParameter("encode", "lvq")
                                               ])], None)
 
-    assert res.success
+    assert res.error_code == ErrorCode.OK
 
 
 if __name__ == '__main__':

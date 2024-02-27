@@ -44,7 +44,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     auto res = buffer_obj.get();
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("BufferManager::Allocate: file %s already exists.", file_path.c_str()));
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
         LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
     }
@@ -72,6 +72,29 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
     rw_locker_.unlock();
 
     return iter2->second.get();
+}
+
+// return false if buffer_obj is not loaded
+bool BufferManager::Cleanup(const String &file_path) {
+    UniquePtr<BufferObj> buffer_obj = nullptr;
+    {
+        std::unique_lock w_lock(rw_locker_);
+        if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+            buffer_obj = std::move(iter->second);
+            buffer_map_.erase(iter);
+        }
+    }
+    if (buffer_obj.get() == nullptr) {
+        // FIXME: is it right?
+        LocalFileSystem fs;
+        if (!fs.Exists(file_path)) {
+            UnrecoverableError(fmt::format("File {} not found.", file_path));
+        }
+        fs.DeleteFile(file_path);
+        return false;
+    }
+    buffer_obj->Cleanup();
+    return true;
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {

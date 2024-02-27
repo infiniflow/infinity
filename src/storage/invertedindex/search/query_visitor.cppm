@@ -14,34 +14,30 @@
 
 module;
 
-import stl;
-import singleton;
-import boost;
-import connection;
+export module query_visitor;
 
-export module db_server;
+import stl;
+import index_defines;
+import index_config;
+import term_queries;
 
 namespace infinity {
 
-export struct StartupParameter {
-    SharedPtr<String> config_path{};
-};
-
-export class DBServer {
+export class QueryVisitor {
 public:
-    void Run();
+    QueryVisitor() = default;
+    ~QueryVisitor() = default;
 
-    void Shutdown();
+    template <typename NodeType>
+    void Visit(NodeType &node);
+
+    UniquePtr<TermQuery> Build() { return std::move(result_); }
 
 private:
-    void CreateConnection();
+    template <typename NodeType>
+    void BuildMultiQuery(MultiQuery *query, NodeType &n);
 
-    void StartConnection(SharedPtr<Connection> &connection);
-
-    atomic_bool initialized{false};
-    atomic_u64 running_connection_count_{0};
-    boost::asio::io_service io_service_{};
-    UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
+    UniquePtr<TermQuery> result_;
 };
 
-}
+} // namespace infinity

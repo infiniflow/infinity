@@ -17,6 +17,8 @@ from numpy import dtype
 
 import common_values
 import infinity
+import infinity.index as index
+from infinity.errors import ErrorCode
 
 
 class TestInsert:
@@ -54,28 +56,28 @@ class TestInsert:
         assert table_obj is not None
 
         res = table_obj.insert([{"c1": 0, "c2": 0}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.insert([{"c1": 1, "c2": 1}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.insert({"c2": 2, "c1": 2})
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.insert([{"c2": 3, "c1": 3}, {"c1": 4, "c2": 4}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2, 3, 4), 'c2': (0, 1, 2, 3, 4)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
         res = db_obj.drop_table("table_2")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_insert_varchar(self):
         """
@@ -91,11 +93,11 @@ class TestInsert:
         assert table_obj
 
         res = table_obj.insert([{"c1": "test_insert_varchar"}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": " test insert varchar "}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": "^789$ test insert varchar"}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
@@ -116,7 +118,7 @@ class TestInsert:
         assert table_obj
         for i in range(100):
             res = table_obj.insert([{"c1": "test_insert_big_varchar" * 1000}])
-            assert res.success
+            assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -137,19 +139,19 @@ class TestInsert:
             "c1": "vector,3,int"}, None)
         assert table_obj
         res = table_obj.insert([{"c1": [1, 2, 3]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [4, 5, 6]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [7, 8, 9]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-7, -8, -9]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
         res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
             "c1": [7, 8, 9]}, {"c1": [-7, -8, -9]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9],
                                                                 [1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
@@ -160,13 +162,13 @@ class TestInsert:
         table_obj = db_obj.get_table("test_insert_embedding_2")
         assert table_obj
         res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [4.4, 5.5, 6.6]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [7.7, 8.8, 9.9]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-7.7, -8.8, -9.9]}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -187,13 +189,13 @@ class TestInsert:
             "c1": "vector,65535,int"}, None)
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [4] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [7] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_insert_big_embedding_float(self):
         """
@@ -208,15 +210,15 @@ class TestInsert:
             "c1": "vector,65535,float"}, None)
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [1.1] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
-        assert res.success
+        assert res.error_code == ErrorCode.OK
         res = db_obj.drop_table("test_insert_big_embedding_float")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_insert_exceed_block_size(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -232,18 +234,264 @@ class TestInsert:
             table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
+    @pytest.mark.skip(reason="May cause service shutdown.")
+    @pytest.mark.parametrize("types", common_values.types_array)
+    @pytest.mark.parametrize("types_example", common_values.types_example_array)
+    def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition")
+        table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition",
+                                        {"c1": "int", "c2": types}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": types_example}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # insert large varchar which exceeds the limit to table
     # insert embedding data which type info isn't match with table definition
     # insert data into non-existent table, dropped table
+    def test_insert_data_into_non_existent_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_into_non_existent_table")
+
+        # create and drop table
+        table_obj = db_obj.create_table("test_insert_data_into_non_existent_table",
+                                        {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_insert_data_into_non_existent_table")
+
+        # insert
+        values = [{"c1": 1, "c2": 1}]
+        # check whether throw exception TABLE_NOT_EXIST
+        with pytest.raises(Exception, match="ERROR:3022*"):
+            table_obj.insert(values)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # insert empty into table
+    @pytest.mark.parametrize("types", common_values.types_array)
+    def test_insert_empty_into_table(self, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_empty_into_table")
+        table_obj = db_obj.create_table("test_insert_empty_into_table",
+                                        {"c1": "int", "c2": types}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            values = [{}]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # insert data into index created table
+    def test_insert_data_into_index_created_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_data_into_index_created_table")
+        table_obj = db_obj.create_table("test_insert_data_into_index_created_table",
+                                        {"c1": "vector,1024,float"}, None)
+
+        # create index
+        table_obj.create_index("my_index_1",
+                               [index.IndexInfo("c1",
+                                                index.IndexType.Hnsw,
+                                                [
+                                                    index.InitParameter("M", "16"),
+                                                    index.InitParameter("ef_construction", "50"),
+                                                    index.InitParameter("ef", "50"),
+                                                    index.InitParameter("metric", "l2")
+                                                ])], None)
+
+        table_obj.create_index("my_index_2",
+                               [index.IndexInfo("c1",
+                                                index.IndexType.IVFFlat,
+                                                [index.InitParameter("centroids_count", "128"),
+                                                 index.InitParameter("metric", "l2")])], None)
+
+        # insert
+        values = [{"c1": [1.1 for _ in range(1024)]}]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_pl()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     # insert table with 10000 columns.
+    def test_insert_table_with_10000_columns(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_table_with_10000_columns")
+        table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        for i in range(100):
+            values = [{"c1": 1, "c2": 2} for _ in range(100)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # insert table with columns isn't matched (more and less)
+    @pytest.mark.parametrize("values", [[{"c1": 1}], [{"c1": 1, "c2": 1, "c3": 1}]])
+    def test_insert_with_not_matched_columns(self, values):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_not_matched_columns")
+        table_obj = db_obj.create_table("test_insert_with_not_matched_columns",
+                                        {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # insert table with column value exceeding invalid value range
+    @pytest.mark.parametrize("values", [[{"c1": pow(2, 63) - 1, "c2": pow(2, 63) - 1}]])
+    def test_insert_with_exceeding_invalid_value_range(self, values):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_exceeding_invalid_value_range")
+        table_obj = db_obj.create_table("test_insert_with_exceeding_invalid_value_range",
+                                        {"c1": "int", "c2": "int32"}, None)
+
+        # insert
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_pl()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     # batch insert, within limit
-    # batch insert with 10000 columns
+    @pytest.mark.parametrize("batch", [10, 1024, 2048])
+    def test_batch_insert_within_limit(self, batch):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_batch_insert_within_limit")
+        table_obj = db_obj.create_table("test_batch_insert_within_limit", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(batch)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # batch insert, batch size limit? 8192?
+    def test_batch_insert(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_batch_insert")
+        table_obj = db_obj.create_table("test_batch_insert", {"c1": "int", "c2": "int"}, None)
+
+        # insert
+        values = [{"c1": 1, "c2": 2} for _ in range(8192)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # batch insert, with invalid data type inside.
+    @pytest.mark.skip(reason="An error example.")
+    @pytest.mark.parametrize("batch", [10, 1024])
+    @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
+    def test_insert_with_invalid_data_type(self, batch, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_data_type")
+        table_obj = db_obj.create_table("test_insert_with_invalid_data_type",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+
+        # insert
+        for i in range(5):
+            values = [{"c1": 1, "c2": types} for _ in range(batch)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # batch insert, with invalid column count
+    @pytest.mark.parametrize("batch", [10, 1024])
+    def test_insert_with_invalid_column_count(self, batch):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_with_invalid_column_count")
+        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {"c1": "int"}, None)
+
+        # insert
+        with pytest.raises(Exception, match=".*input value count mismatch*"):
+            for i in range(5):
+                values = [{"c1": 1, "c2": 1} for _ in range(batch)]
+                table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize('column_types', ["varchar"])
+    @pytest.mark.parametrize('column_types_example', [[1, 2, 3], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
+    def test_various_insert_types(self, column_types, column_types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_various_insert_types")
+        db_obj.create_table("test_various_insert_types", {"c1": column_types}, None)
+
+        table_obj = db_obj.get_table("test_various_insert_types")
+
+        values = [{"c1": column_types_example} for _ in range(5)]
+        table_obj.insert(values)
+
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK

@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -52,13 +66,13 @@ public:
     void SetSegments(Vector<Segment> &segments) { segments_ = segments; }
 
 private:
-    String index_name_;
-    u64 memory_quota_;
+    String index_name_{""};
+    u64 memory_quota_{200 * 1024 * 1024};
     u32 indexing_threads_{1};
     PostingFormatOption posting_format_option_;
-    optionflag_t flag_;
-    bool is_short_list_vbyte_compress_;
-    String analyzer_;
+    optionflag_t flag_{OPTION_FLAG_ALL};
+    bool is_short_list_vbyte_compress_{false};
+    String analyzer_{"standard"};
     HashMap<u64, String> analyzers_;
     Vector<Segment> segments_;
     segmentid_t last_segment_id_{INVALID_SEGMENTID};

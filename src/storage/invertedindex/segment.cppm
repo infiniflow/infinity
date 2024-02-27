@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -58,6 +72,7 @@ public:
     void SetBaseDocId(docid_t base_doc) { segment_meta_.base_doc_id_ = base_doc; }
     void IncDocCount(u64 doc_count) { segment_meta_.doc_count_ += doc_count; }
     void SetDocCount(u64 doc_count) { segment_meta_.doc_count_ = doc_count; }
+    docid_t GetNextDocId() { return segment_meta_.base_doc_id_ + segment_meta_.doc_count_; };
     void SetSegmentMeta(const SegmentMeta &segment_meta) { segment_meta_ = segment_meta; }
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }
     void SetTimestamp(i64 timestamp) { segment_meta_.timestamp_ = timestamp; }

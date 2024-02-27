@@ -79,6 +79,9 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             }
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+        }
     }
 }
 
@@ -232,7 +235,8 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kProjection: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() == nullptr) {
-                current_fragment_ptr->SetFragmentType(FragmentType::kParallelStream);
+                // Project will be only operator
+                current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
                 current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
 
             } else {

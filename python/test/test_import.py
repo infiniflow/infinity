@@ -13,9 +13,12 @@
 # limitations under the License.
 
 import os
-
+import pytest
 import common_values
 import infinity
+from infinity.errors import ErrorCode
+
+TEST_DATA_DIR = "/test/data/"
 
 
 class TestImport:
@@ -48,16 +51,97 @@ class TestImport:
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # search
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("test_import")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # import different file format data
-    # import empty file
+    @pytest.mark.skip(reason="Python sdk not support.")
+    @pytest.mark.parametrize("file_format", ["csv", "json", "fvecs"])
+    def test_import_different_file_format_data(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+
+        db_obj.drop_table("test_import_different_file_format_data")
+        table_obj = db_obj.create_table("test_import_different_file_format_data",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+
+        if file_format == "fvecs":
+            db_obj.drop_table("test_import_different_file_format_data_fvecs")
+            table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
+                                            {"c1": "vector,128,float"}, None)
+            table_obj.import_data(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+            res = table_obj.output(["*"]).to_df()
+            print(res)
+
+        print(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+        table_obj.import_data(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format, None)
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    # import empty FVECS file
+    @pytest.mark.parametrize("file_format", ["fvecs", "fvecs", "fvecs"])
+    def test_import_empty_file_fvecs(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_fvecs")
+        table_obj = db_obj.create_table("test_import_empty_file_fvecs",
+                                        {"c1": "vector,128,float"}, None)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    # import empty CSV file
+    @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
+    def test_import_empty_file_csv(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_csv")
+        table_obj = db_obj.create_table("test_import_empty_file_csv",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    # import empty JSONL file
+    @pytest.mark.parametrize("file_format", ["jsonl", "jsonl", "jsonl"])
+    def test_import_empty_file_jsonl(self, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_empty_file_jsonl")
+        table_obj = db_obj.create_table("test_import_empty_file_jsonl",
+                                        {"c1": "int", "c2": "vector,3,int"}, None)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # import format unrecognized data
     # import csv with different delimiter
     # import csv with delimiter more than one charactor

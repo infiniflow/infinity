@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 #include <filesystem>
@@ -42,13 +56,14 @@ ColumnIndexer::~ColumnIndexer() {}
 
 void ColumnIndexer::Insert(RowID row_id, String &data) { active_memory_indexer_->Insert(row_id, data); }
 
-void ColumnIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
+void ColumnIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
 
 void ColumnIndexer::PreCommit() { active_memory_indexer_->PreCommit(); }
 
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 
 void ColumnIndexer::Dump() {
+    active_memory_indexer_->DisableCommit();
     Path path = Path(index_name_) / std::to_string(current_segment_id_);
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -70,7 +85,6 @@ void ColumnIndexer::Dump() {
             const MemoryIndexer::PostingPtr posting_writer = it.getData();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta);
-            /// TODO dict writer
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.getKey();
             builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);

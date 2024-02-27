@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 export module memory_indexer;
@@ -17,7 +31,6 @@ import analyzer;
 import sequential_column_inverter;
 import parallel_column_inverter;
 import task_executor;
-import memory_posting;
 import third_party;
 import internal_types;
 import commit_task;
@@ -32,11 +45,8 @@ class ColumnIndexer;
 export class MemoryIndexer {
 public:
     using TermKey = String;
-    // using PostingPtr = MemoryPosting<false> *;
     using PostingPtr = SharedPtr<PostingWriter>;
-    using RTPostingPtr = SharedPtr<MemoryPosting<true>>;
     using PostingTable = Btree<TermKey, PostingPtr>;
-    using RTPostingTable = Btree<TermKey, RTPostingPtr>;
 
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -64,7 +74,7 @@ public:
     // realtime insert
     void Insert(RowID row_id, String &data);
 
-    void Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id);
+    void Insert(const ColumnVector &column_vector, RowID start_row_id);
 
     void PreCommit();
 
@@ -80,15 +90,13 @@ public:
 
     PostingTable *GetPostingTable() { return posting_store_.get(); }
 
-    RTPostingTable *GetRTPostingTable() { return rt_posting_store_.get(); }
-
     PostingPtr GetOrAddPosting(const TermKey &term);
-
-    RTPostingPtr GetOrAddRTPosting(const TermKey &term);
 
     void ReclaimMemory();
 
     void Reset();
+
+    void DisableCommit() { disable_commit_ = true; }
 
 private:
     void SetAnalyzer();
@@ -110,7 +118,6 @@ private:
     SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
     GenerationHandler generation_handler_;
     UniquePtr<PostingTable> posting_store_;
-    UniquePtr<RTPostingTable> rt_posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
     Vector<UniquePtr<SequentialColumnInverter>> free_inverters_;
@@ -127,5 +134,9 @@ private:
     u32 max_inverters_;
     UniquePtr<SequencedTaskExecutor> invert_executor_;
     UniquePtr<SequencedTaskExecutor> commit_executor_;
+
+    bool disable_commit_{false};
+    std::condition_variable cv_;
+    std::mutex mutex_;
 };
 } // namespace infinity

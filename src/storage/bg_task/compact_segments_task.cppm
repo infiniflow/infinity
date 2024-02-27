@@ -62,19 +62,18 @@ struct ToDeleteInfo {
     const SegmentID segment_id_;
 
     const Vector<SegmentOffset> delete_offsets_;
-
-    const SharedPtr<Txn> delete_txn_;
 };
 
 export struct CompactSegmentsTaskState {
     // default copy construct of table ref
-    CompactSegmentsTaskState(BaseTableRef *table_ref) : new_table_ref_(MakeUnique<BaseTableRef>(*table_ref)) {}
+    CompactSegmentsTaskState() {}
 
     RowIDRemapper remapper_;
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+    Vector<SegmentEntry *> old_segments_;
 
-    UniquePtr<BaseTableRef> new_table_ref_;
+    UniquePtr<BaseTableRef> new_table_ref_ = nullptr;
 };
 
 export enum class CompactSegmentsTaskType : i8 {
@@ -84,13 +83,15 @@ export enum class CompactSegmentsTaskType : i8 {
 
 export class CompactSegmentsTask final : public BGTask {
 public:
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> segments, Txn *txn);
+    static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
 
-    static SharedPtr<CompactSegmentsTask> MakeTaskWithWholeTable(SharedPtr<BaseTableRef> &table_ref, Txn *txn);
+    static SharedPtr<CompactSegmentsTask> MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn);
 
-    explicit CompactSegmentsTask(SharedPtr<BaseTableRef> table_ref, Txn *txn, CompactSegmentsTaskType type);
+    explicit CompactSegmentsTask(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn, CompactSegmentsTaskType type);
 
 public:
+    ~CompactSegmentsTask() override = default;
+
     String ToString() const override { return "Compact segments task"; }
 
     void BeginTxn() { txn_->Begin(); }
@@ -101,10 +102,11 @@ public:
 
     // Called by `SegmentEntry::DeleteData` which is called by wal thread in
     // So to_deletes_ is thread-safe.
-    void AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets, SharedPtr<Txn> delete_txn);
+    // TODO: remove lock
+    void AddToDelete(SegmentID segment_id, Vector<SegmentOffset> &&delete_offsets);
 
+    // these functions are called by unit test. Do not use them directly.
 public:
-    // these two are called by unit test. Do not use them directly.
     CompactSegmentsTaskState CompactSegments();
 
     void CreateNewIndex(BaseTableRef *table_ref);
@@ -113,18 +115,15 @@ public:
     void SaveSegmentsData(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
 
     // Apply the delete op commit in process of compacting
-    void ApplyDeletes(const RowIDRemapper &remapper);
+    void ApplyDeletes(const RowIDRemapper &remapper, const Vector<SegmentEntry *> &old_segments);
 
 private:
-    Vector<SegmentEntry *> PickSegmentsToCompact();
-
     SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
-
-    bool ApplyToDelete(const RowIDRemapper &remapper);
 
 private:
     CompactSegmentsTaskType task_type_;
-    const SharedPtr<BaseTableRef> table_ref_; // hold table ref here because task may be background task
+    TableEntry *table_entry_;
+    Vector<SegmentEntry *> segments_;
 
     Txn *const txn_;
 

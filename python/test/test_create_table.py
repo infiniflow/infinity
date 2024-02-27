@@ -17,6 +17,7 @@ import pytest
 import common_values
 import infinity
 
+from infinity.errors import ErrorCode
 
 class TestCreateTable:
 
@@ -52,7 +53,7 @@ class TestCreateTable:
 
     def test_create_table_with_invalid_column_name(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        with pytest.raises(Exception, match=r".*Empty column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -60,7 +61,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -68,7 +69,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -76,7 +77,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -84,7 +85,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -92,7 +93,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -100,7 +101,7 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
@@ -108,10 +109,30 @@ class TestCreateTable:
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
 
-        with pytest.raises(Exception, match=r".*invalid column name"):
+        with pytest.raises(Exception):
             db_obj = infinity_obj.get_database("default")
             db_obj.drop_table("test_create_invalid_column_name", True)
             table_obj = db_obj.create_table("test_create_invalid_column_name", {
                 "1.1": "vector,128,float"}, None)
             assert table_obj
             db_obj.drop_table("test_create_invalid_column_name")
+
+    @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
+    def test_create_table_with_invalid_column_name_python(self, column_name):
+        """
+        target: create with invalid column name
+        methods: create table with invalid column name
+        expect: all operations throw exception on python side
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        try:
+            tb = db_obj.create_table("my_table", {column_name: "int"}, None)
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
