@@ -36,43 +36,47 @@ import fst;
 
 namespace infinity {
 
-ColumnIndexer::ColumnIndexer(Indexer *indexer,
-                             u64 column_id,
+ColumnIndexer::ColumnIndexer(u64 column_id,
+                             const String directory,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
-                             SharedPtr<RecyclePool> buffer_pool) {
-    active_memory_indexer_ = MakeUnique<MemoryIndexer>(indexer, this, column_id, index_config, byte_slice_pool, buffer_pool);
-    index_name_ = indexer->GetDirectory();
-    Path path = Path(index_name_) / std::to_string(column_id);
-    index_name_ = path.string();
+                             SharedPtr<RecyclePool> buffer_pool,
+                             ThreadPool &thread_pool)
+    : thread_pool_(thread_pool) {
+    active_memory_indexer_ = MakeUnique<MemoryIndexer>(column_id, index_config, byte_slice_pool, buffer_pool, thread_pool);
+    standby_memory_indexer_ = MakeUnique<MemoryIndexer>(column_id, index_config, byte_slice_pool, buffer_pool, thread_pool);
+    directory_ = directory;
     std::error_code ec;
-    bool path_exists = std::filesystem::exists(path);
+    bool path_exists = std::filesystem::exists(directory);
     if (!path_exists) {
-        std::filesystem::create_directories(path, ec);
+        std::filesystem::create_directories(directory, ec);
     }
 }
 
 ColumnIndexer::~ColumnIndexer() {}
 
-void ColumnIndexer::Insert(RowID row_id, String &data) { active_memory_indexer_->Insert(row_id, data); }
-
-void ColumnIndexer::Insert(const ColumnVector &column_vector, RowID start_row_id) { active_memory_indexer_->Insert(column_vector, start_row_id); }
-
-void ColumnIndexer::PreCommit() { active_memory_indexer_->PreCommit(); }
+void ColumnIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin) {
+    active_memory_indexer_->Insert(column_vector, row_offset, row_count, row_id_begin);
+}
 
 void ColumnIndexer::Commit() { active_memory_indexer_->Commit(); }
 
 void ColumnIndexer::Dump() {
-    active_memory_indexer_->DisableCommit();
-    Path path = Path(index_name_) / std::to_string(current_segment_id_);
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        std::swap(active_memory_indexer_, standby_memory_indexer_);
+    }
+    standby_memory_indexer_->WaitInflightTasks();
+
+    Path path = Path(directory_) / std::to_string(current_segment_id_);
     String index_prefix = path.string();
     LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX;
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX;
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
-    MemoryIndexer::PostingTable *posting_table = active_memory_indexer_->GetPostingTable();
-    TermMetaDumper term_meta_dumpler(active_memory_indexer_->index_config_.GetPostingFormatOption());
+    MemoryIndexer::PostingTable *posting_table = standby_memory_indexer_->GetPostingTable();
+    TermMetaDumper term_meta_dumpler(standby_memory_indexer_->index_config_.GetPostingFormatOption());
 
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
@@ -95,7 +99,7 @@ void ColumnIndexer::Dump() {
         fs.AppendFile(dict_file, fst_file);
         fs.DeleteFile(fst_file);
     }
-    active_memory_indexer_->Reset();
+    standby_memory_indexer_->Reset();
 }
 
 } // namespace infinity

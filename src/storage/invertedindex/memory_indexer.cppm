@@ -28,19 +28,16 @@ import data_block;
 
 import column_vector;
 import analyzer;
-import sequential_column_inverter;
-import parallel_column_inverter;
-import task_executor;
+import column_inverter;
 import third_party;
 import internal_types;
-import commit_task;
+import ring;
 
 namespace vespalib::alloc {
 class MemoryPoolAllocator;
 }
 
 namespace infinity {
-class Indexer;
 class ColumnIndexer;
 export class MemoryIndexer {
 public:
@@ -50,37 +47,31 @@ public:
 
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
-        // bool operator()(const TermKey &lhs, const TermKey &rhs) const;
     };
 
     enum IndexMode {
-        REAL_TIME,
         NEAR_REAL_TIME,
         OFFLINE,
     };
 
-    MemoryIndexer(Indexer *indexer,
-                  ColumnIndexer *column_indexer,
-                  u64 column_id,
+    MemoryIndexer(u64 column_id,
                   const InvertedIndexConfig &index_config,
                   SharedPtr<MemoryPool> byte_slice_pool,
-                  SharedPtr<RecyclePool> buffer_pool);
+                  SharedPtr<RecyclePool> buffer_pool,
+                  ThreadPool &thread_pool);
 
     ~MemoryIndexer();
 
-    void SetIndexMode(IndexMode index_mode);
-
-    bool IsRealTime() { return index_mode_ == REAL_TIME; }
-    // realtime insert
-    void Insert(RowID row_id, String &data);
-
-    void Insert(const ColumnVector &column_vector, RowID start_row_id);
-
-    void PreCommit();
+    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
 
     void Commit();
 
-    void TryDump();
+    void WaitInflightTasks() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
+    }
+
+    void SetIndexMode(IndexMode index_mode);
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
@@ -96,20 +87,12 @@ public:
 
     void Reset();
 
-    void DisableCommit() { disable_commit_ = true; }
-
 private:
     void SetAnalyzer();
-
-    void SwitchActiveInverter();
-
-    void SwitchActiveParallelInverters();
 
 private:
     friend class ColumnIndexer;
 
-    Indexer *indexer_{nullptr};
-    ColumnIndexer *column_indexer_{nullptr};
     IndexMode index_mode_{NEAR_REAL_TIME};
     u64 column_id_;
     InvertedIndexConfig index_config_;
@@ -120,22 +103,13 @@ private:
     UniquePtr<PostingTable> posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
-    Vector<UniquePtr<SequentialColumnInverter>> free_inverters_;
-    Deque<UniquePtr<SequentialColumnInverter>> inflight_inverters_;
-    UniquePtr<SequentialColumnInverter> inverter_;
 
-    UniquePtr<ParallelColumnInverters> parallel_inverter_;
-    Vector<UniquePtr<ParallelColumnInverters>> free_parallel_inverters_;
-    Deque<UniquePtr<ParallelColumnInverters>> inflight_parallel_inverters_;
+    ThreadPool &thread_pool_;
+    Ring<SharedPtr<ColumnInverter>> ring_inverted_;
+    Ring<SharedPtr<ColumnInverter>> ring_sorted_;
+    u64 seq_inserted_{0};
+    u64 inflight_tasks_{0};
 
-    UniquePtr<CommitTask> inflight_commit_task_;
-
-    u32 num_inverters_;
-    u32 max_inverters_;
-    UniquePtr<SequencedTaskExecutor> invert_executor_;
-    UniquePtr<SequencedTaskExecutor> commit_executor_;
-
-    bool disable_commit_{false};
     std::condition_variable cv_;
     std::mutex mutex_;
 };
