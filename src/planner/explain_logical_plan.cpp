@@ -1655,6 +1655,9 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
+        }
     }
 
     if (import_node->left_node().get() != nullptr or import_node->right_node().get() != nullptr) {
@@ -1721,6 +1724,9 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
             SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: FVECS", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
+        }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
         }
     }
 

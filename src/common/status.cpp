@@ -307,6 +307,18 @@ Status Status::FTSIndexNotExist(const String &table_name) {
 
 Status Status::UnknownFTSFault() { return Status(ErrorCode::kUnknownFTSFault, MakeUnique<String>(fmt::format("Unknown full text index fault."))); }
 
+Status Status::InvalidConstraintType() { return Status(ErrorCode::kInvalidConstraintType, MakeUnique<String>("Invalid constraint type.")); }
+
+Status Status::InvalidKnnDistanceType() { return Status(ErrorCode::kInvalidKnnDistanceType, MakeUnique<String>("Invalid knn distance type.")); }
+
+Status Status::InvalidEmbeddingDataType() { return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>("Invalid embedding data type.")); }
+
+Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstantType, MakeUnique<String>("Invalid constant type.")); }
+
+Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsedExprType, MakeUnique<String>("Invalid parsed expression type.")); }
+
+Status Status::InvalidIndexType() { return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("Invalid index type.")); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

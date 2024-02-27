@@ -18,6 +18,7 @@ export module status;
 
 import stl;
 
+// If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
 
 export enum class ErrorCode : long {
@@ -92,6 +93,12 @@ export enum class ErrorCode : long {
     kParseMatchExprFailed = 3052,
     kFTSIndexNotExist = 3053,
     kUnknownFTSFault = 3054,
+    kInvalidConstraintType = 3055,
+    kInvalidKnnDistanceType = 3056,
+    kInvalidEmbeddingDataType = 3057,
+    kInvalidConstantType = 3058,
+    kInvalidParsedExprType = 3059,
+    kInvalidIndexType = 3060,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -194,13 +201,19 @@ public:
     static Status ExceedTableNameLength(u64 table_name_length);
     static Status ExceedColumnNameLength(u64 column_name_length);
     static Status ExceedIndexNameLength(u64 index_name_length);
-    static Status NoColumnDefined(const String& table_name);
-    static Status NotSupportedTypeConversion(const String& from_type, const String& to_type);
+    static Status NoColumnDefined(const String &table_name);
+    static Status NotSupportedTypeConversion(const String &from_type, const String &to_type);
     static Status EmptySelectFields();
     static Status InvalidDataType();
-    static Status ParseMatchExprFailed(const String& fields, const String& matching_text);
-    static Status FTSIndexNotExist(const String& table_name);
+    static Status ParseMatchExprFailed(const String &fields, const String &matching_text);
+    static Status FTSIndexNotExist(const String &table_name);
     static Status UnknownFTSFault();
+    static Status InvalidConstraintType();
+    static Status InvalidKnnDistanceType();
+    static Status InvalidEmbeddingDataType();
+    static Status InvalidConstantType();
+    static Status InvalidParsedExprType();
+    static Status InvalidIndexType();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
