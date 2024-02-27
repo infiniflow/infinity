@@ -25,7 +25,8 @@ import posting_writer;
 import memory_indexer;
 
 namespace infinity {
-InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
+InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
+    : posting_table_(memory_indexer->GetPostingTable()), base_doc_id_(memory_indexer->GetBaseDocId()) {}
 
 PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
     MemoryIndexer::PostingTable::Iterator iter = posting_table_->Find(term);
@@ -35,15 +36,12 @@ PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) con
         return nullptr;
 }
 
-bool InMemIndexSegmentReader::GetSegmentPosting(const String &term,
-                                                docid_t base_doc_id,
-                                                SegmentPosting &seg_posting,
-                                                MemoryPool *session_pool) const {
+bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const {
     PostingWriter *posting_writer = GetPostingWriter(term);
     if (posting_writer == nullptr) {
         return false;
     }
-    seg_posting.Init(base_doc_id, posting_writer);
+    seg_posting.Init(base_doc_id_, posting_writer);
     return true;
 }
 

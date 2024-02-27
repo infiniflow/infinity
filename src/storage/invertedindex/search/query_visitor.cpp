@@ -21,7 +21,6 @@ module query_visitor;
 
 import stl;
 import index_defines;
-import index_config;
 import term_queries;
 
 namespace infinity {

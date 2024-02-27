@@ -66,6 +66,7 @@ import match_expr;
 import segment_iter;
 import table_entry;
 import segment_entry;
+import index_defines;
 
 namespace infinity {
 

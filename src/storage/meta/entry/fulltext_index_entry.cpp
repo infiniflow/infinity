@@ -25,7 +25,6 @@ import index_base;
 import index_full_text;
 import logger;
 import catalog_delta_entry;
-import index_config;
 
 namespace infinity {
 
@@ -43,37 +42,27 @@ SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewFulltextIndexEntry(TableInd
                                                                         TxnTimeStamp begin_ts) {
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
-    if (homebrewed) {
-        fulltext_index_entry->indexer_ = MakeUnique<Indexer>();
-        InvertedIndexConfig index_config;
-        fulltext_index_entry->indexer_->Open(index_config, *index_dir);
-    } else {
+    if (!homebrewed) {
         fulltext_index_entry->irs_index_ =
             MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
     }
 
-    {
-        if (txn != nullptr) {
-            auto operation = MakeUnique<AddFulltextIndexEntryOp>(fulltext_index_entry);
-            txn->AddCatalogDeltaOperation(std::move(operation));
-        }
+    if (txn != nullptr) {
+        auto operation = MakeUnique<AddFulltextIndexEntryOp>(fulltext_index_entry);
+        txn->AddCatalogDeltaOperation(std::move(operation));
     }
     return fulltext_index_entry;
 }
 
-SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                                         SharedPtr<String> index_dir,
-                                                                         TransactionID txn_id,
-                                                                         TxnTimeStamp begin_ts,
-                                                                         TxnTimeStamp commit_ts,
-                                                                         bool is_delete) {
+SharedPtr<FulltextIndexEntry> FulltextIndexEntry::NewReplayFulltextIndexEntry(TableIndexEntry *table_index_entry,
+                                                                              SharedPtr<String> index_dir,
+                                                                              TransactionID txn_id,
+                                                                              TxnTimeStamp begin_ts,
+                                                                              TxnTimeStamp commit_ts,
+                                                                              bool is_delete) {
     auto fulltext_index_entry = MakeShared<FulltextIndexEntry>(table_index_entry, index_dir, txn_id, begin_ts);
     bool homebrewed = table_index_entry->IsFulltextIndexHomebrewed();
-    if (homebrewed) {
-        fulltext_index_entry->indexer_ = MakeUnique<Indexer>();
-        InvertedIndexConfig index_config;
-        fulltext_index_entry->indexer_->Open(index_config, *index_dir);
-    } else {
+    if (!homebrewed) {
         fulltext_index_entry->irs_index_ =
             MakeUnique<IRSDataStore>(*(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()), *(index_dir));
     }

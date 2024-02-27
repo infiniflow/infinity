@@ -17,7 +17,6 @@
 
 import stl;
 import index_defines;
-import index_config;
 
 namespace infinity {
 QueryTreeBuilder::QueryTreeBuilder() {}

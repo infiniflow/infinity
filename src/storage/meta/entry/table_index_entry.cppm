@@ -19,6 +19,7 @@ export module table_index_entry;
 import stl;
 
 import txn_store;
+import segment_index_entry;
 import fulltext_index_entry;
 import segment_index_entry;
 import base_entry;
@@ -32,6 +33,7 @@ import cleanup_scanner;
 import meta_entry_interface;
 import index_file_worker;
 import column_def;
+import memory_pool;
 
 namespace infinity {
 
@@ -90,6 +92,8 @@ public:
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
     const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
+
+    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &segment_index_map() { return segment_index_map_; }
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     SharedPtr<String> index_dir() { return index_dir_; }
@@ -104,6 +108,10 @@ public:
     static String IndexFileName(u32 segment_id) { return fmt::format("seg{}.idx", segment_id); }
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
+
+    MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
+    RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
+    ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
@@ -122,8 +130,13 @@ private:
     SharedPtr<String> index_dir_{};
 
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
-
+    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> segment_index_map_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
+
+    // For fulltext index
+    MemoryPool byte_slice_pool_{};
+    RecyclePool buffer_pool_{};
+    ThreadPool thread_pool_{};
 
 public:
     void Cleanup() override;

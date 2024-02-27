@@ -20,9 +20,7 @@ import stl;
 import doc_iterator;
 import term_queries;
 import column_index_reader;
-import indexer;
 import match_data;
-import index_config;
 
 namespace infinity {
 
@@ -33,14 +31,13 @@ export struct QueryContext {
 
 export class QueryBuilder {
 public:
-    QueryBuilder(Indexer *indexer);
+    QueryBuilder();
 
     ~QueryBuilder();
 
     UniquePtr<DocIterator> CreateSearch(QueryContext &context);
 
 private:
-    Indexer *indexer_{nullptr};
     Vector<u64> column_ids_;
     IndexReader index_reader_;
     UniquePtr<Scorer> scorer_;
