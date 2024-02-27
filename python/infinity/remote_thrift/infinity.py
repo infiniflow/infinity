@@ -39,14 +39,14 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def list_databases(self):
         res = self._client.list_databases()
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def describe_database(self, db_name: str):
         check_valid_name(db_name, "DB")
@@ -54,7 +54,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def drop_database(self, db_name: str, options=None):
         check_valid_name(db_name, "DB")
@@ -62,7 +62,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def get_database(self, db_name: str):
         check_valid_name(db_name, "DB")
@@ -70,7 +70,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return RemoteDatabase(self._client, db_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def disconnect(self):
         res = self._client.disconnect()
@@ -78,7 +78,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             self._is_connected = False
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     @property
     def client(self):
@@ -89,4 +89,4 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")

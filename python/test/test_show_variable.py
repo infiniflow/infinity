@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import common_values
+from python.test.common import common_values
 import infinity
 from infinity.infinity import ShowVariable
 

@@ -14,7 +14,7 @@
 
 import threading
 import infinity
-import common_values
+from python.test.common import common_values
 import pytest
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
