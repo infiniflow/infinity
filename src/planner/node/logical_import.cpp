@@ -60,6 +60,10 @@ String LogicalImport::ToString(i64 &space) const {
             ss << "(FVECS) ";
             break;
         }
+        case CopyFileType::kInvalid: {
+            ss << "(Invalid) ";
+            break;
+        }
     }
 
     ss << "to " << *table_entry_->GetDBName() << '.' << *table_entry_->GetTableName();

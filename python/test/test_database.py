@@ -480,7 +480,7 @@ class TestDatabase:
 
     # one thread get db, another thread drop this db
     @trace_expected_exceptions
-    def test_get_drop_db_with_two_thread(self):
+    def test_get_drop_db_with_two_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_obj.create_database("test_get_drop_db_with_two_thread")

@@ -701,16 +701,14 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
     return result;
 }
 
-bool TableEntry::PickCleanup(CleanupScanner *scanner) {
-    if (Cleanupable(scanner->visible_ts())) {
-        return true;
-    }
-    index_meta_map_.PickCleanup(scanner);
-    {
+void TableEntry::PickCleanup(CleanupScanner *scanner) {
+    // index_meta_map_.PickCleanup(scanner); FIXME(sys): implement it
+    { // FIXME(sys)
         std::unique_lock lock(this->rw_locker());
+        TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
             SharedPtr<SegmentEntry> &segment = iter->second;
-            if (segment->Cleanupable(scanner->visible_ts())) {
+            if (segment->CheckDeprecate(visible_ts)) {
                 scanner->AddEntry(std::move(segment));
                 iter = segment_map_.erase(iter);
             } else {
@@ -718,7 +716,6 @@ bool TableEntry::PickCleanup(CleanupScanner *scanner) {
             }
         }
     }
-    return false;
 }
 
 void TableEntry::Cleanup() && {
@@ -728,7 +725,8 @@ void TableEntry::Cleanup() && {
     std::move(index_meta_map_).Cleanup();
 
     LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*table_entry_dir_);
+    // FIXME(sys): delete all index cache in buffer_manager.
+    // fs.DeleteDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

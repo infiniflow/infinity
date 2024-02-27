@@ -42,7 +42,7 @@ public:
 
     virtual void Cleanup() && = 0;
 
-    virtual bool PickCleanup(CleanupScanner *scanner) = 0;
+    virtual void PickCleanup(CleanupScanner *scanner) = 0;
 };
 
 export template <typename Entry>

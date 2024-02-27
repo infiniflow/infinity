@@ -92,7 +92,7 @@ public:
 
     void RollbackCompact();
 
-    void FlushNewData();
+    void FlushNewData(TxnTimeStamp flush_ts);
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
@@ -101,6 +101,8 @@ public:
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts) const;
 
     bool CheckVisible(TxnTimeStamp check_ts) const;
+
+    bool CheckDeprecate(TxnTimeStamp check_ts) const;
 
     // Check if the segment has any delete before check_ts
     bool CheckAnyDelete(TxnTimeStamp check_ts) const;
@@ -191,7 +193,7 @@ private:
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
     TxnTimeStamp max_row_ts_{UNCOMMIT_TS};
     TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
-    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS}; // FIXME: need persist to disk
+    TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // FIXME: need persist to disk
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
 
@@ -204,7 +206,7 @@ private:
 public:
     void Cleanup() && override;
 
-    bool PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

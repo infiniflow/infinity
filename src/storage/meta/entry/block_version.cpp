@@ -106,7 +106,9 @@ void BlockVersion::SaveToFile(const String &version_path) {
 void BlockVersion::Cleanup(const String &version_path) {
     LocalFileSystem fs;
 
-    fs.DeleteFile(version_path);
+    if (fs.Exists(version_path)) {
+        fs.DeleteFile(version_path);
+    }
 }
 
 } // namespace infinity

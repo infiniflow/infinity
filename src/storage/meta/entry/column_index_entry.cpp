@@ -147,9 +147,9 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
-void ColumnIndexEntry::Cleanup() {
+void ColumnIndexEntry::Cleanup() && {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
-        segment_column_index_entry->Cleanup();
+        std::move(*segment_column_index_entry).Cleanup();
     }
 }
 

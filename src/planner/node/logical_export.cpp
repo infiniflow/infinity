@@ -59,6 +59,10 @@ String LogicalExport::ToString(i64 &space) const {
             ss << "(JSONL) ";
             break;
         }
+        case CopyFileType::kInvalid: {
+            ss << "(Invalid) ";
+            break;
+        }
     }
     ss << "to " << schema_name_ << '.' << table_name_;
 

@@ -27,6 +27,8 @@ std::string ConstrainTypeToString(ConstraintType type) {
             return "Nullable";
         case ConstraintType::kNotNull:
             return "Not nullable";
+        case ConstraintType::kInvalid:
+            return "Invalid";
     }
     ParserError("Unexpected error.");
 }
