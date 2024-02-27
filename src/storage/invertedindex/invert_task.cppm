@@ -17,43 +17,20 @@ module;
 export module invert_task;
 
 import stl;
-import task_executor;
-import column_inverter;
 import column_vector;
-
 import internal_types;
 
 namespace infinity {
 
-export class InvertTask : public TaskExecutor::Task {
+export struct BatchInvertTask {
 public:
-    explicit InvertTask(ColumnInverter *inverter, const String &value, u32 row_id);
+    BatchInvertTask(u64 task_seq, const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin)
+        : task_seq_(task_seq), column_vector_(column_vector), row_offset_(row_offset), row_count_(row_count), row_id_begin_(row_id_begin) {}
 
-    ~InvertTask() = default;
-
-    void Run() override;
-
-private:
-    ColumnInverter *inverter_{nullptr};
-
-    const String &value_;
-
-    u32 row_id_;
-};
-
-export class BatchInvertTask : public TaskExecutor::Task {
-public:
-    BatchInvertTask(ColumnInverter *inverter, const ColumnVector &column_vector, RowID start_row_id);
-
-    ~BatchInvertTask() = default;
-
-    void Run() override;
-
-private:
-    ColumnInverter *inverter_{nullptr};
-
-    ColumnVector column_vector_;
-
-    RowID start_row_id_;
+    u64 task_seq_;
+    const ColumnVector &column_vector_;
+    u32 row_offset_;
+    u32 row_count_;
+    RowID row_id_begin_;
 };
 } // namespace infinity
