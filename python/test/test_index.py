@@ -181,7 +181,8 @@ class TestIndex:
         db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
 
         # create created index
-        res = table_obj.create_index("my_index",
+        with pytest.raises(Exception, match="ERROR:3022*"):
+            table_obj.create_index("my_index",
                                      [index.IndexInfo("c1",
                                                       index.IndexType.IVFFlat,
                                                       [index.InitParameter("centroids_count", "128"),

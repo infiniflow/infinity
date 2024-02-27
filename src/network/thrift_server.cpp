@@ -463,7 +463,7 @@ public:
             ProcessStatus(response, Status::EmptySelectFields());
             return;
         }
-        
+
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(request.select_list.size());
 
