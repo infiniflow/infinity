@@ -14,30 +14,25 @@
 
 module;
 
-import stl;
+#include <thread>
+#include <vector>
 
-export module interval_checker;
+module periodic_trigger_thread;
+
+import stl;
 
 namespace infinity {
 
-export class IntervalChecker {
-public:
-    explicit IntervalChecker(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
-
-    bool Check() {
-        const auto now = std::chrono::system_clock::now();
-        if (now - last_check_ < interval_) {
-            return false;
+void PeriodicTriggerThread::Run() {
+    while (running_.load()) {
+        for (auto &trigger : triggers_) {
+            if (trigger->Check()) {
+                trigger->Trigger();
+            }
         }
-        last_check_ = now;
-        return true;
+        // sleep for 1s
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-
-    void Reset() { last_check_ = std::chrono::system_clock::now(); }
-
-private:
-    const std::chrono::milliseconds interval_;
-    std::chrono::system_clock::time_point last_check_;
-};
+}
 
 } // namespace infinity

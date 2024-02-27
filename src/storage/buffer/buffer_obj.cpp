@@ -164,7 +164,7 @@ void BufferObj::CloseFile() {
 }
 
 void BufferObj::Cleanup() {
-    if (status_ != BufferStatus::kFreed) {
+    if (status_ != BufferStatus::kFreed && status_ != BufferStatus::kUnloaded) {
         UnrecoverableError("Assert: buffer object status isn't freed.");
     }
     file_worker_->CleanupFile();

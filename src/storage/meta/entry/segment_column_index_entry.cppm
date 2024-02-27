@@ -72,7 +72,7 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup();
+    void Cleanup() &&;
 
 public:
     // Getter

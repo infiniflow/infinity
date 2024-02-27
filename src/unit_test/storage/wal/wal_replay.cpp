@@ -42,7 +42,7 @@ import index_base;
 import index_full_text;
 import index_def;
 import bg_task;
-import backgroud_process;
+import background_process;
 import compact_segments_task;
 import default_values;
 import base_table_ref;

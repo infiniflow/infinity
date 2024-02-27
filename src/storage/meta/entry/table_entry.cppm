@@ -211,7 +211,7 @@ public: // TODO: remote it?
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
 
 public:
-    bool PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() && override;
 };

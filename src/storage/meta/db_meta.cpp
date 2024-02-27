@@ -273,6 +273,10 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp
 
 void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry) {
     std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker());
+    if (db_meta->db_entry_list().empty()) {
+        auto dummy_entry = MakeShared<DBEntry>();
+        db_meta->db_entry_list().emplace_front(std::move(dummy_entry));
+    }
     db_meta->db_entry_list().emplace_front(std::move(db_entry));
 }
 
@@ -428,8 +432,8 @@ void DBMeta::Cleanup() && {
     std::move(db_entry_list_).Cleanup();
 
     String db_meta_dir = fmt::format("{}/{}", *data_dir_, *db_name_);
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(db_meta_dir);
+    // LocalFileSystem fs;
+    // fs.DeleteEmptyDirectory(db_meta_dir);
 }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }

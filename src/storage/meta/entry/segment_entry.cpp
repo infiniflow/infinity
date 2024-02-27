@@ -180,6 +180,11 @@ bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
     return min_row_ts_ <= check_ts && check_ts <= deprecate_ts_;
 }
 
+bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    return check_ts >= deprecate_ts_;
+}
+
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     return first_delete_ts_ < check_ts;
@@ -400,7 +405,10 @@ void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_chec
     }
 }
 
-void SegmentEntry::FlushNewData() {
+void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
+    if (this->min_row_ts_ == UNCOMMIT_TS) {
+        this->min_row_ts_ = flush_ts;
+    }
     for (const auto &block_entry : this->block_entries_) {
         block_entry->FlushData(block_entry->row_count());
     }
@@ -477,6 +485,6 @@ void SegmentEntry::Cleanup() && {
     fs.DeleteEmptyDirectory(*segment_dir_);
 }
 
-bool SegmentEntry::PickCleanup(CleanupScanner *scanner) { return this->Cleanupable(scanner->visible_ts()); }
+void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 
 } // namespace infinity
