@@ -500,7 +500,8 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
-    segment_entry->FlushNewData();
+    TxnTimeStamp flush_ts = txn_store->txn_->BeginTS();
+    segment_entry->FlushNewData(flush_ts);
     const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
 
     const String &db_name = *txn_store->table_entry_->GetDBName();

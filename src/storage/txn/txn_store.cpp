@@ -32,7 +32,7 @@ import table_entry;
 import catalog;
 import internal_types;
 import data_type;
-import backgroud_process;
+import background_process;
 import bg_task;
 import compact_segments_task;
 

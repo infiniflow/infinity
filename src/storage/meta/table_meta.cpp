@@ -224,6 +224,10 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
 
     std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
     if (this->table_entry_list().empty()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            LOG_TRACE(fmt::format("Ignore drop a not existed table entry {}", table_name));
+            return {nullptr, Status::OK()};
+        }
         UniquePtr<String> err_msg = MakeUnique<String>("Empty table entry list.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
@@ -231,6 +235,10 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
 
     BaseEntry *header_base_entry = this->table_entry_list().front().get();
     if (header_base_entry->entry_type_ == EntryType::kDummy) {
+        if (conflict_type == ConflictType::kIgnore) {
+            LOG_TRACE(fmt::format("Ignore drop a not existed table entry {}", table_name));
+            return {nullptr, Status::OK()};
+        }
         UniquePtr<String> err_msg = MakeUnique<String>("No valid table entry.");
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
@@ -478,8 +486,8 @@ void TableMeta::Cleanup() && {
     std::move(table_entry_list_).Cleanup();
 
     String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(table_meta_dir);
+    // LocalFileSystem fs;
+    // fs.DeleteEmptyDirectory(table_meta_dir);
 }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
