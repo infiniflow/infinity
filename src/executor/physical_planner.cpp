@@ -944,6 +944,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
                                                        logical_operator->load_metas());
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+            break;
+        }
     }
 
     return explain_node;
