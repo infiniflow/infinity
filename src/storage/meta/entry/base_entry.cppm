@@ -38,11 +38,16 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
+// export enum class EntryStatus : i8 {
+//     kInit,
+//     kFlushed,
+//     kCleanedup,
+// };
+
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
-            deleted_ = true;
         }
     }
 
@@ -59,13 +64,20 @@ public:
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
+    bool Deleted() const { return deleted_; }
+
 public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    bool deleted_{false};
+    bool deleted_ = false;
 
-    EntryType entry_type_{EntryType::kDummy};
+    const EntryType entry_type_{EntryType::kDummy};
+
+    // private:
+    //     std::mutex mtx_;
+
+    //     EntryStatus status_{EntryStatus::kInit};
 };
 
 // Merge two reverse-ordered list inplace.

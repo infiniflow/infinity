@@ -35,12 +35,13 @@ import cleanup_scanner;
 namespace infinity {
 
 class TxnManager;
+class AddDBEntryOp;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
-    explicit DBEntry();
+    using EntryOp = AddDBEntryOp;
 
     explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -75,14 +76,15 @@ private:
                                             const Vector<SharedPtr<ColumnDef>> &columns,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
-                                            TxnManager *txn_mgr);
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type);
 
     Tuple<TableEntry *, Status>
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr);
+    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 

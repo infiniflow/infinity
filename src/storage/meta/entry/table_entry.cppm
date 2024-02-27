@@ -47,9 +47,13 @@ class FulltextIndexEntry;
 class TableMeta;
 class Txn;
 struct Catalog;
+class AddTableEntryOp;
 
 export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
+
+public:
+    using EntryOp = AddTableEntryOp;
 
 public:
     explicit TableEntry();
@@ -95,7 +99,7 @@ private:
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr);
+    void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 

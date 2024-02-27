@@ -64,14 +64,9 @@ private:
     Tuple<DBEntry *, Status>
     DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
 
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
+    void DeleteNewEntry(TransactionID txn_id);
 
     Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    // Used in initialization phase
-    static void AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry);
 
 private:
     SharedPtr<String> db_name_{};

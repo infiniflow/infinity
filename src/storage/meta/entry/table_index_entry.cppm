@@ -38,10 +38,13 @@ class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
 class BaseTableRef;
+class AddTableIndexEntryOp;
 
 export struct TableIndexEntry : public BaseEntry, public EntryInterface {
-
     friend struct TableEntry;
+
+public:
+    using EntryOp = AddTableIndexEntryOp;
 
 public:
     TableIndexEntry();

@@ -70,16 +70,15 @@ private:
                                                const Vector<SharedPtr<ColumnDef>> &columns,
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr);
+                                               TxnManager *txn_mgr,
+                                               ConflictType conflict_type);
 
     Tuple<TableEntry *, Status>
     DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type);
 
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
-
     Tuple<TableEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    void DeleteNewEntry(TransactionID txn_id);
 
 private:
     SharedPtr<String> db_entry_dir_{};

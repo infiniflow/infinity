@@ -194,7 +194,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
 }
 
-void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr) {
+void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     this->rw_locker().lock_shared();
 
     TableIndexMeta *table_index_meta{nullptr};
@@ -204,7 +204,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     this->rw_locker().unlock_shared();
 
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
-    table_index_meta->DeleteNewEntry(txn_id, txn_mgr);
+    table_index_meta->DeleteNewEntry(txn_id);
 }
 
 void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,

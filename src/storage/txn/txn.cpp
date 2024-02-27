@@ -532,15 +532,15 @@ void Txn::Rollback() {
 
     for (const auto &base_entry : txn_tables_) {
         auto *table_entry = (TableEntry *)(base_entry);
-        Catalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveTableEntry(table_entry, txn_id_);
     }
 
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);
     }
 
     for (const auto &db_name : db_names_) {
-        catalog_->RemoveDBEntry(db_name, this->txn_id_, txn_mgr_);
+        catalog_->RemoveDBEntry(db_name, this->txn_id_);
     }
 
     // Rollback the prepared data

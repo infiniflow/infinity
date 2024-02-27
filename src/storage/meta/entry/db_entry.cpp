@@ -33,10 +33,9 @@ import status;
 import catalog_delta_entry;
 import column_def;
 import local_file_system;
+import extra_ddl_info;
 
 namespace infinity {
-
-DBEntry::DBEntry() : BaseEntry(EntryType::kDummy) {}
 
 DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
@@ -75,7 +74,8 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  const Vector<SharedPtr<ColumnDef>> &columns,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr) {
+                                                 TxnManager *txn_mgr,
+                                                 ConflictType conflict_type) {
     const String &table_name = *table_collection_name;
 
     // Check if there is table_meta with the table_name
@@ -112,7 +112,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
         LOG_TRACE(fmt::format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
     }
 
-    auto table_entry = table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
+    auto table_entry = table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 
     return table_entry;
 }
@@ -162,7 +162,7 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_coll
     return table_meta->GetEntry(txn_id, begin_ts);
 }
 
-void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr) {
+void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionID txn_id) {
     this->rw_locker().lock_shared();
 
     TableMeta *table_meta{nullptr};
@@ -172,7 +172,7 @@ void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionI
     this->rw_locker().unlock_shared();
 
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_collection_name));
-    table_meta->DeleteNewEntry(txn_id, txn_mgr);
+    table_meta->DeleteNewEntry(txn_id);
 }
 
 Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -261,7 +261,6 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     EntryType entry_type = db_entry_json["entry_type"];
     res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
-    res->entry_type_ = entry_type;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
