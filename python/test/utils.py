@@ -2,10 +2,6 @@ import functools
 import traceback
 
 import numpy as np
-import pytest
-import infinity
-
-import common_values
 
 
 # catch the expected exception

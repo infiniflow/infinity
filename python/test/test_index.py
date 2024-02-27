@@ -13,10 +13,11 @@
 # limitations under the License.
 import pytest
 
-import common_values
+from python.test.common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+
 
 class TestIndex:
 

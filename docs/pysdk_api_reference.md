@@ -451,7 +451,7 @@ This method searches for rows that satisfy the search condition and updates them
 Gets a query_builder by self.
 
 ```python
-query_builder=table_obj.query_builder()
+query_builder=table_obj.query_builder
 ```
 
 ## Details

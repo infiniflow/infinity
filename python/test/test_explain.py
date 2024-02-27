@@ -15,7 +15,7 @@
 import polars as pl
 import pytest
 
-import common_values
+from python.test.common import common_values
 import infinity
 from infinity.table import ExplainType
 
