@@ -16,7 +16,7 @@ import os
 import pandas as pd
 from numpy import dtype
 
-import common_values
+from python.test.common import common_values
 import infinity
 import infinity.index as index
 

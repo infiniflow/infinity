@@ -15,10 +15,11 @@ import os
 
 import pytest
 
-import common_values
+from python.test.common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+
 
 TEST_DATA_DIR = "/test/data/"
 

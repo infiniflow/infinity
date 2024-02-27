@@ -135,7 +135,7 @@ class RemoteDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def drop_table(self, table_name, if_exists=True):
         check_valid_name(table_name, "Table")
@@ -146,7 +146,7 @@ class RemoteDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def describe_table(self, table_name):
         check_valid_name(table_name, "Table")
@@ -155,7 +155,7 @@ class RemoteDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def get_table(self, table_name):
         check_valid_name(table_name, "Table")
@@ -164,11 +164,11 @@ class RemoteDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def show_tables(self):
         res = self._conn.show_tables(self._db_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, ", res.error_msg)
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
