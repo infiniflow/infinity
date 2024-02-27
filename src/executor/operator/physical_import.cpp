@@ -87,6 +87,9 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportFVECS(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
+        }
     }
     import_op_state->SetComplete();
     Txn *txn = query_context->GetTxn();
@@ -121,7 +124,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
-    
+
     if (nbytes != sizeof(dimension)) {
         RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
     }
