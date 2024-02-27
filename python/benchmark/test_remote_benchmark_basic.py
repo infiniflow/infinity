@@ -22,7 +22,7 @@ import pandas as pd
 
 import infinity
 from infinity import NetworkAddress
-from infinity./errors import ErrorCode
+from infinity.errors import ErrorCode
 
 
 def trace_unhandled_exceptions(func):
