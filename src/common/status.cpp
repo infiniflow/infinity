@@ -319,6 +319,12 @@ Status Status::InvalidParsedExprType() { return Status(ErrorCode::kInvalidParsed
 
 Status Status::InvalidIndexType() { return Status(ErrorCode::kInvalidIndexType, MakeUnique<String>("Invalid index type.")); }
 
+Status Status::InvalidIndexParam(const String &param_name) {
+    return Status(ErrorCode::kInvalidIndexParam, MakeUnique<String>(fmt::format("Invalid index parameter type: {}", param_name)));
+}
+
+Status Status::LackIndexParam() { return Status(ErrorCode::kLackIndexParam, MakeUnique<String>("Lack index parameter")); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
