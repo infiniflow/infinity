@@ -234,7 +234,6 @@ class TestInsert:
             table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
-    @pytest.mark.skip(reason="May cause service shutdown.")
     @pytest.mark.parametrize("types", common_values.types_array)
     @pytest.mark.parametrize("types_example", common_values.types_example_array)
     def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
@@ -432,9 +431,8 @@ class TestInsert:
         assert res.error_code == ErrorCode.OK
 
     # batch insert, with invalid data type inside.
-    @pytest.mark.skip(reason="An error example.")
     @pytest.mark.parametrize("batch", [10, 1024])
-    @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
+    @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
     def test_insert_with_invalid_data_type(self, batch, types):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -445,8 +443,12 @@ class TestInsert:
 
         # insert
         for i in range(5):
-            values = [{"c1": 1, "c2": types} for _ in range(batch)]
-            table_obj.insert(values)
+            values = [{"c1": 1, "c2": types[0]} for _ in range(batch)]
+            if not types[1]:
+                with pytest.raises(Exception, match=".*ERROR:3032*"):
+                    table_obj.insert(values)
+            else:
+                table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
