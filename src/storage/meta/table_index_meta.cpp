@@ -58,17 +58,30 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
         txn = txn_mgr->GetTxn(txn_id);
     }
     auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
-    return index_entry_list_.AddEntry(table_index_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    auto [index_entry_ptr, status] = index_entry_list_.AddEntry(table_index_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDuplicateDatabaseName) {
+        return {index_entry_ptr, Status::DuplicateIndex(*this->index_name_)};
+    }
+    return {index_entry_ptr, status};
 }
 
 Tuple<TableIndexEntry *, Status>
 TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
-    return index_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    drop_entry->deleted_ = true;
+    auto [index_entry_ptr, status] = index_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {index_entry_ptr, Status::IndexNotExist(*this->index_name_)};
+    }
+    return {index_entry_ptr, status};
 }
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return index_entry_list_.GetEntry(txn_id, begin_ts);
+    auto [index_entry_ptr, status] = index_entry_list_.GetEntry(txn_id, begin_ts);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {index_entry_ptr, Status::IndexNotExist(*this->index_name_)};
+    }
+    return {index_entry_ptr, status};
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { index_entry_list_.DeleteEntry(txn_id); }

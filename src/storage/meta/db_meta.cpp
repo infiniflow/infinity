@@ -41,15 +41,30 @@ UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &data_dir, const Sha
 // TODO: Use Txn* txn as parma instead of TransactionID txn_id and TxnManager *txn_mgr
 Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-    return db_entry_list_.AddEntry(db_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    auto [db_entry_ptr, status] = db_entry_list_.AddEntry(db_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDuplicateDatabaseName) {
+        return {db_entry_ptr, Status::DuplicateDatabase(*this->db_name_)};
+    }
+    return {db_entry_ptr, status};
 }
 
 Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-    return db_entry_list_.DropEntry(db_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    db_entry->deleted_ = true;
+    auto [db_entry_ptr, status] = db_entry_list_.DropEntry(db_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {db_entry_ptr, Status::DBNotExist(*this->db_name_)};
+    }
+    return {db_entry_ptr, status};
 }
 
-Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntry(txn_id, begin_ts); }
+Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry_ptr, status] = db_entry_list_.GetEntry(txn_id, begin_ts);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {db_entry_ptr, Status::DBNotExist(*this->db_name_)};
+    }
+    return {db_entry_ptr, status};
+}
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { db_entry_list_.DeleteEntry(txn_id); }
 

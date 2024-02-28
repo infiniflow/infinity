@@ -442,8 +442,10 @@ void AddTableIndexEntryOp::SaveSate() {
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
-    this->index_dir_ = *this->table_index_entry_->index_dir();
-    this->index_base_ = this->table_index_entry_->table_index_def();
+    if (!this->is_delete_) {
+        this->index_dir_ = *this->table_index_entry_->index_dir();
+        this->index_base_ = this->table_index_entry_->table_index_def();
+    }
     is_saved_sate_ = true;
 }
 
@@ -729,7 +731,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_
 
 // called by bg_task
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
-    // FIXME: should make timestamp increase ? 
+    // FIXME: should make timestamp increase ?
     std::lock_guard<std::mutex> lock(mtx_);
 
     auto &global_operations = this->operations();

@@ -62,7 +62,11 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                       ConflictType conflict_type) {
     SharedPtr<TableEntry> table_entry =
         TableEntry::NewTableEntry(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
-    return table_entry_list_.AddEntry(table_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    auto [table_entry_ptr, status] = table_entry_list_.AddEntry(table_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDuplicateDatabaseName) {
+        return {table_entry_ptr, Status::DuplicateTable(*table_collection_name_ptr)};
+    }
+    return {table_entry_ptr, status};
 }
 
 Tuple<TableEntry *, Status>
@@ -70,22 +74,21 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
     Vector<SharedPtr<ColumnDef>> dummy_columns;
     SharedPtr<TableEntry> drop_entry =
         TableEntry::NewTableEntry(this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
-    return table_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    drop_entry->deleted_ = true;
+    auto [table_entry_ptr, status] = table_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {table_entry_ptr, Status::TableNotExist(table_name)};
+    }
+    return {table_entry_ptr, status};
 }
 
-/**
- * @brief Get the table entry object
- *        LIST: [👇(a new entry).... table_entry2 , table_entry1 , dummy_entry]
- *        Get the first valid table entry from the front.
- *        The table entry is valid if:
- *          1. committed and commit_ts < begin_ts.
- *          2. not dummy entry.
- * @param table_meta
- * @param txn_id
- * @param begin_ts
- * @return Status
- */
-Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return table_entry_list_.GetEntry(txn_id, begin_ts); }
+Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry_ptr, status] = table_entry_list_.GetEntry(txn_id, begin_ts);
+    if (status.code() == ErrorCode::kDBNotExist) {
+        return {table_entry_ptr, Status::TableNotExist(*this->table_name_)};
+    }
+    return {table_entry_ptr, status};
+}
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { table_entry_list_.DeleteEntry(txn_id); }
 

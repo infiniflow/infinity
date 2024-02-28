@@ -603,7 +603,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
 }
 void WalManager::WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
     auto [db_entry, status] = storage_->catalog()->CreateDatabase(cmd.db_name_, txn_id, commit_ts, storage_->txn_manager(), ConflictType::kIgnore);
-    if (!status.ok()) {
+    if (db_entry == nullptr) {
         UnrecoverableError("Wal Replay: Create database failed");
     }
     db_entry->Commit(commit_ts);
@@ -613,7 +613,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
     auto [table_entry, table_status] =
         storage_->catalog()->CreateTable(cmd.db_name_, txn_id, commit_ts, cmd.table_def_, ConflictType::kIgnore, storage_->txn_manager());
 
-    if (!table_status.ok()) {
+    if (table_entry == nullptr) {
         UnrecoverableError("Wal Replay: Create table failed" + *table_status.msg_);
     }
     table_entry->Commit(commit_ts);
@@ -650,6 +650,9 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
                                                                                         nullptr,
                                                                                         true, /*is_replay*/
                                                                                         cmd.table_index_dir_);
+    if (table_index_entry == nullptr) {
+        UnrecoverableError("Wal Replay: Create table index failed" + *index_def_entry_status.msg_);
+    }
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 

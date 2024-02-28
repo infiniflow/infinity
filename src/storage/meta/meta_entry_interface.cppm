@@ -46,6 +46,6 @@ public:
 };
 
 export template <typename Entry>
-concept EntryConcept = std::derived_from<Entry, EntryInterface>;
+concept EntryConcept = requires { typename Entry::EntryOp; } and std::derived_from<Entry, EntryInterface>;
 
 } // namespace infinity

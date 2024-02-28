@@ -197,7 +197,12 @@ void CompactSegmentsTask::CreateNewIndex(BaseTableRef *new_table_ref) {
             // Table index entry isn't found
             RecoverableError(status);
         }
-        txn_->CreateIndexPrepare(table_index_entry, new_table_ref, false, false);
+        table_index_entry->CreateIndexPrepare(table_entry,
+                                              new_table_ref->block_index_.get(),
+                                              txn_,
+                                              false,  // prepare
+                                              false,  // isreplay
+                                              false); // check_ts
     }
 }
 

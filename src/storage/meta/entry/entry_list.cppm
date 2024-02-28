@@ -118,6 +118,7 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
             }
         }
     }
+    return find_res;
 }
 
 template <EntryConcept Entry>
@@ -127,9 +128,11 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
     switch (find_res) {
         case FindResult::kNotFound: {
             entry_list_.push_front(entry);
-            auto op = MakeUnique<typename Entry::EntryOp>(entry);
-            Txn *txn = txn_mgr->GetTxn(txn_id);
-            txn->AddCatalogDeltaOperation(std::move(op));
+            if (txn_mgr != nullptr) {
+                auto op = MakeUnique<typename Entry::EntryOp>(entry);
+                Txn *txn = txn_mgr->GetTxn(txn_id);
+                txn->AddCatalogDeltaOperation(std::move(op));
+            }
             return {entry.get(), Status::OK()};
         }
         case FindResult::kFound: {
@@ -174,14 +177,14 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Not exisited entry.");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status::DBNotExist("todo")};
+                    return {nullptr, Status::DBNotExist("")};
                 }
             }
         }
         case FindResult::kFound: {
             entry_list_.push_front(drop_entry);
-            auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
             if (txn_mgr != nullptr) {
+                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }
@@ -229,7 +232,7 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
     }
     switch (find_res) {
         case FindResult::kNotFound: {
-            return {nullptr, Status::DBNotExist("todo")};
+            return {nullptr, Status::DBNotExist("")};
         }
         case FindResult::kFound: {
             return {entry_ptr, Status::OK()};
