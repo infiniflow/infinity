@@ -94,8 +94,8 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
 
     const auto *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
     auto centroids_count = index_ivfflat->centroids_count_;
-    if (centroids_count == 0) {
-        centroids_count = default_centroid_num_;
+    if (default_centroid_num_ < centroids_count) {
+        centroids_count = 1;
     }
     switch (GetType()) {
         case kElemFloat: {
