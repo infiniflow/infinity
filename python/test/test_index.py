@@ -260,7 +260,6 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # insert data, then create index
-    @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat
     ])
@@ -285,7 +284,6 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat, index.IndexType.FullText
     ])
@@ -299,7 +297,7 @@ class TestIndex:
             "c1": "int",
             "c2": "vector,3,float"}, None)
 
-        table_obj.import_data("../../" + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c2",
                                                       index_type,
