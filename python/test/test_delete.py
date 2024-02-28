@@ -399,3 +399,23 @@ class TestDelete:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="TODO")
+    def test_filter_expression(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_filter_expression")
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete()
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
