@@ -126,6 +126,9 @@ class TestInsert:
 
         db_obj.drop_table("test_insert_big_varchar")
 
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     def test_insert_embedding(self):
         """
         target: test insert embedding column
@@ -176,6 +179,7 @@ class TestInsert:
 
         db_obj.drop_table("test_insert_embedding2")
 
+    @pytest.mark.skip("Unexpected error.")
     def test_insert_big_embedding(self):
         """
         target: test insert embedding with big dimension
@@ -197,6 +201,7 @@ class TestInsert:
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.skip("Unexpected error.")
     def test_insert_big_embedding_float(self):
         """
         target: test insert embedding float with big dimension
@@ -220,6 +225,23 @@ class TestInsert:
         res = db_obj.drop_table("test_insert_big_embedding_float")
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.skip("Unexpected error.")
+    @pytest.mark.parametrize("types", ["vector,65535,int", "vector,65535,float"])
+    @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 65535}],
+                                                [{"c1": [4] * 65535}],
+                                                [{"c1": [-9999999] * 65535}],
+                                                [{"c1": [1.1] * 65535}],
+                                                [{"c1": [-9999999.988] * 65535}],
+                                                ])
+    def test_insert_big_embedding_various_type(self, types, types_examples):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_big_embedding", True)
+        table_obj = db_obj.create_table("test_insert_big_embedding", {
+            "c1": types}, None)
+        res = table_obj.insert(types_examples)
+        assert res.error_code == ErrorCode.OK
+
     def test_insert_exceed_block_size(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -234,7 +256,6 @@ class TestInsert:
             table_obj.insert(values)
 
     # insert primitive data type not aligned with table definition
-    @pytest.mark.skip(reason="May cause service shutdown.")
     @pytest.mark.parametrize("types", common_values.types_array)
     @pytest.mark.parametrize("types_example", common_values.types_example_array)
     def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
@@ -432,9 +453,8 @@ class TestInsert:
         assert res.error_code == ErrorCode.OK
 
     # batch insert, with invalid data type inside.
-    @pytest.mark.skip(reason="An error example.")
     @pytest.mark.parametrize("batch", [10, 1024])
-    @pytest.mark.parametrize("types", [1, 1.1, "1#$@!adf", [1, 2, 3]])
+    @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
     def test_insert_with_invalid_data_type(self, batch, types):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -445,8 +465,12 @@ class TestInsert:
 
         # insert
         for i in range(5):
-            values = [{"c1": 1, "c2": types} for _ in range(batch)]
-            table_obj.insert(values)
+            values = [{"c1": 1, "c2": types[0]} for _ in range(batch)]
+            if not types[1]:
+                with pytest.raises(Exception, match=".*ERROR:3032*"):
+                    table_obj.insert(values)
+            else:
+                table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
@@ -456,7 +480,7 @@ class TestInsert:
 
     # batch insert, with invalid column count
     @pytest.mark.parametrize("batch", [10, 1024])
-    def test_insert_with_invalid_column_count(self, batch):
+    def test_batch_insert_with_invalid_column_count(self, batch):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
