@@ -353,7 +353,7 @@ public:
         // auto start2 = std::chrono::steady_clock::now();
 
         // select list
-        if (request.__isset.select_list == false) {
+        if (request.__isset.select_list == false or request.select_list.empty()) {
             ProcessStatus(response, Status::EmptySelectFields());
             return;
         }

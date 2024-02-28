@@ -46,7 +46,7 @@ Txn *TxnManager::CreateTxn() {
         UnrecoverableError("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
-    u64 new_txn_id = GetNewTxnID();
+    TransactionID new_txn_id = GetNewTxnID();
     UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
@@ -62,10 +62,7 @@ Txn *TxnManager::GetTxn(TransactionID txn_id) {
 }
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) {
-    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    Txn *txn_ptr = txn_map_[txn_id].get();
-    TxnState res = txn_ptr->GetTxnState();
-    return res;
+    return GetTxn(txn_id)->GetTxnState();
 }
 
 u64 TxnManager::GetNewTxnID() {
