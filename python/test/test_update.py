@@ -327,7 +327,7 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
-    @pytest.mark.skip(reason="Cost too much time.")
+    @pytest.mark.skip(reason="Taking too much time.")
     def test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
