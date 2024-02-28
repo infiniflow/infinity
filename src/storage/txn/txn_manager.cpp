@@ -159,6 +159,7 @@ void TxnManager::RollBackTxn(Txn *txn) {
 }
 
 TxnTimeStamp TxnManager::GetMinUncommitTs() {
+    std::shared_lock r_locker(rw_locker_);
     while (!ts_queue_.empty()) {
         TxnTimeStamp front_ts = ts_queue_.front();
         if (txn_map_.find(front_ts) != txn_map_.end()) {
