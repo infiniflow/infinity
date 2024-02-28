@@ -427,6 +427,8 @@ void SegmentColumnIndexEntry::Cleanup() && {
     }
 }
 
+void SegmentColumnIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+
 void SegmentColumnIndexEntry::SaveIndexFile() {
     String &index_name = *this->column_index_entry_->col_index_dir();
     u64 segment_id = this->segment_id_;

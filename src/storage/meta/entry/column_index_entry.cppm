@@ -34,6 +34,7 @@ class BufferManager;
 struct TableEntry;
 class Txn;
 class BlockIndex;
+class CleanupScanner;
 
 export struct ColumnIndexEntry : public BaseEntry {
     friend struct TableEntry;
@@ -70,6 +71,8 @@ public:
                                                    TableIndexEntry *table_index_entry,
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
+
+    void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
 
     void Cleanup() &&;
 

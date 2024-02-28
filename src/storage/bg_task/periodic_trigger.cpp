@@ -24,6 +24,7 @@ import cleanup_task;
 import catalog;
 import txn_manager;
 import third_party;
+import txn;
 
 namespace infinity {
 
@@ -38,7 +39,8 @@ void CleanupPeriodicTrigger::Trigger() {
     }
     last_visible_ts_ = visible_ts;
     LOG_INFO(fmt::format("Cleanup visible timestamp: {}", visible_ts));
-    bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts));
+    Txn *txn = txn_mgr_->CreateTxn();
+    bg_processor_->Submit(MakeShared<CleanupTask>(catalog_, visible_ts, txn));
 }
 
 } // namespace infinity

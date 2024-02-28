@@ -20,13 +20,15 @@ import stl;
 import bg_task;
 import cleanup_scanner;
 import catalog;
+import txn;
 
 namespace infinity {
 
 export class CleanupTask final : public BGTask {
 public:
     // Try clean up is async task?
-    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts) : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts) {}
+    CleanupTask(Catalog *catalog, TxnTimeStamp visible_ts, Txn *txn)
+        : BGTask(BGTaskType::kCleanup, true), catalog_(catalog), visible_ts_(visible_ts), txn_(txn) {}
 
 public:
     ~CleanupTask() override = default;
@@ -40,10 +42,16 @@ public:
         std::move(scanner).Cleanup();
     }
 
+    void BeginTxn() { txn_->Begin(); }
+
+    // FIXME: ill structure
+    void CommitTxn() { txn_->txn_mgr()->CommitTxn(txn_); }
+
 private:
     Catalog *const catalog_;
 
     const TxnTimeStamp visible_ts_;
+    Txn *const txn_;
 };
 
 } // namespace infinity

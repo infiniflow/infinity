@@ -282,4 +282,10 @@ void TableIndexEntry::Cleanup() && {
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
+void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    for (auto &[column_id, column_index_entry] : column_index_map_) {
+        column_index_entry->PickCleanupBySegments(sorted_segment_ids, scanner);
+    }
+}
+
 } // namespace infinity

@@ -307,7 +307,7 @@ Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, De
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
 }
 

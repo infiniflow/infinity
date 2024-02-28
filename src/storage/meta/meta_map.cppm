@@ -26,6 +26,12 @@ namespace infinity {
 export template <MetaConcept Meta>
 class MetaMap {
 public:
+    using Map = HashMap<String, UniquePtr<Meta>>;
+    using Iterator = typename Map::iterator;
+
+public:
+    void IterateMut(std::function<void(Iterator)> func);
+
     void PickCleanup(CleanupScanner *scanner);
 
     void Cleanup() &&;
@@ -33,8 +39,16 @@ public:
 public:                                     // TODO: make both private
     mutable std::shared_mutex rw_locker_{}; // FIX
 
-    HashMap<String, UniquePtr<Meta>> meta_map_;
+    Map meta_map_;
 };
+
+template <MetaConcept Meta>
+void MetaMap<Meta>::IterateMut(std::function<void(Iterator)> func) {
+    std::unique_lock lock(rw_locker_);
+    for (auto iter = meta_map_.begin(); iter != meta_map_.end(); ++iter) {
+        func(iter);
+    }
+}
 
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {

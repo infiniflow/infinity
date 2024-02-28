@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <ctime>
 #include <string>
 
@@ -150,6 +151,18 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
 void ColumnIndexEntry::Cleanup() && {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
         std::move(*segment_column_index_entry).Cleanup();
+    }
+}
+
+void ColumnIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
+        auto &[segment_id, segment_column_index_entry] = *iter;
+        if (std::binary_search(sorted_segment_ids.begin(), sorted_segment_ids.end(), segment_id)) {
+            scanner->AddEntry(std::move(segment_column_index_entry));
+            iter = index_by_segment_.erase(iter);
+        } else {
+            ++iter;
+        }
     }
 }
 

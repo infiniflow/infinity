@@ -117,7 +117,7 @@ private:
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
+    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_state);
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 

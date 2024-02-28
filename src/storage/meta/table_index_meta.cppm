@@ -93,5 +93,7 @@ public:
     void Cleanup() && override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
+
+    void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
 };
 } // namespace infinity

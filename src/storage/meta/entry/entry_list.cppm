@@ -42,6 +42,9 @@ class EntryList {
     };
 
 public:
+    using Iterator = typename List<SharedPtr<Entry>>::iterator;
+
+public:
     Tuple<Entry *, Status>
     AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type);
 
@@ -57,6 +60,8 @@ public:
     void Cleanup() &&;
 
     void MergeWith(EntryList<Entry> &other);
+
+    void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
 
 private:
     FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -346,6 +351,16 @@ void EntryList<Entry>::MergeWith(EntryList<Entry> &other) {
     }
 
     other_list.clear();
+}
+
+template <EntryConcept Entry>
+void EntryList<Entry>::Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts) {
+    std::shared_lock lock(rw_locker_);
+    for (auto &entry : entry_list_) {
+        if (entry->commit_ts_ < visible_ts && !entry->Deleted()) {
+            func(entry.get());
+        }
+    }
 }
 
 } // namespace infinity

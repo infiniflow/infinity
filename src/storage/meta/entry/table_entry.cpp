@@ -336,11 +336,11 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
     return Status::OK();
 }
 
-Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     if (compact_store.segment_data_.empty()) {
         return Status::OK();
     }
-    for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+    for (auto &[new_segment, old_segments] : compact_store.segment_data_) {
         auto status = CommitSegment(commit_ts, new_segment);
         if (!status.ok()) {
             // TODO: rollback
@@ -710,13 +710,15 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
-    // index_meta_map_.PickCleanup(scanner); FIXME(sys): implement it
-    { // FIXME(sys)
+    index_meta_map_.PickCleanup(scanner);
+    Vector<SegmentID> cleanup_segment_ids;
+    {
         std::unique_lock lock(this->rw_locker());
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
             SharedPtr<SegmentEntry> &segment = iter->second;
             if (segment->CheckDeprecate(visible_ts)) {
+                cleanup_segment_ids.push_back(iter->first);
                 scanner->AddEntry(std::move(segment));
                 iter = segment_map_.erase(iter);
             } else {
@@ -724,6 +726,7 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
             }
         }
     }
+    std::sort(cleanup_segment_ids.begin(), cleanup_segment_ids.end());
 }
 
 void TableEntry::Cleanup() && {

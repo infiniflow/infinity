@@ -69,9 +69,12 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
         txn_mgr->CommitTxn(txn);
     }
     {
+        auto *txn = txn_mgr->CreateTxn();
         TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, txn);
+        cleanup_task->BeginTxn();
         cleanup_task->Execute();
+        cleanup_task->CommitTxn();
     }
     {
         auto *txn = txn_mgr->CreateTxn();
@@ -126,9 +129,12 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         {
+            auto *txn = txn_mgr->CreateTxn();
             TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
-            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, txn);
+            cleanup_task->BeginTxn();
             cleanup_task->Execute();
+            cleanup_task->CommitTxn();
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -181,9 +187,12 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
     }
 
     {
+        auto *txn = txn_mgr->CreateTxn();
         TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, txn);
+        cleanup_task->BeginTxn();
         cleanup_task->Execute();
+        cleanup_task->CommitTxn();
     }
     {
         auto *txn = txn_mgr->CreateTxn();
@@ -258,9 +267,12 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         {
+            auto *txn = txn_mgr->CreateTxn();
             TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
-            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, txn);
+            cleanup_task->BeginTxn();
             cleanup_task->Execute();
+            cleanup_task->CommitTxn();
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -366,9 +378,12 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     }
 
     {
+        auto *txn = txn_mgr->CreateTxn();
         TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts, txn);
+        cleanup_task->BeginTxn();
         cleanup_task->Execute();
+        cleanup_task->CommitTxn();
     }
 
     infinity::InfinityContext::instance().UnInit();
