@@ -42,7 +42,7 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
         }
     }
     if (metric_type == MetricType::kInvalid) {
-        UnrecoverableError("Lack index parameter metric_type");
+        RecoverableError(Status::LackIndexParam());
     }
     return MakeShared<IndexIVFFlat>(std::move(file_name), std::move(column_names), centroids_count, metric_type);
 }
