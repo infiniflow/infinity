@@ -36,6 +36,8 @@ class EntryList {
     enum class FindResult : u8 {
         kFound,
         kNotFound,
+        kUncommitted,
+        kUncommittedDelete,
         kConflict,
     };
 
@@ -92,9 +94,9 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
                 case TxnState::kStarted: {
                     if (entry->txn_id_ == txn_id) {
                         if (entry->Deleted()) {
-                            find_res = FindResult::kNotFound;
+                            find_res = FindResult::kUncommittedDelete;
                         } else {
-                            find_res = FindResult::kFound;
+                            find_res = FindResult::kUncommitted;
                         }
                     } else {
                         find_res = FindResult::kConflict;
@@ -126,6 +128,7 @@ Tuple<Entry *, Status>
 EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
+        case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
             entry_list_.push_front(entry);
             if (txn_mgr != nullptr) {
@@ -135,6 +138,7 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
             }
             return {entry.get(), Status::OK()};
         }
+        case FindResult::kUncommitted:
         case FindResult::kFound: {
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
@@ -168,6 +172,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
                                                    ConflictType conflict_type) {
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
+        case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
@@ -180,6 +185,16 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
                     return {nullptr, Status::DBNotExist("")};
                 }
             }
+        }
+        case FindResult::kUncommitted: {
+            Entry *drop_entry_ptr = entry_list_.front().get();
+            entry_list_.pop_front();
+            if (txn_mgr != nullptr) {
+                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
+                Txn *txn = txn_mgr->GetTxn(txn_id);
+                txn->AddCatalogDeltaOperation(std::move(op));
+            }
+            return {drop_entry_ptr, Status::OK()};
         }
         case FindResult::kFound: {
             entry_list_.push_front(drop_entry);

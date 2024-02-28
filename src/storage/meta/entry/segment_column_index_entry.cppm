@@ -99,7 +99,7 @@ private:
 
 private:
     const ColumnIndexEntry *column_index_entry_{};
-    SegmentID segment_id_{};
+    const SegmentID segment_id_{};
 
     Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 

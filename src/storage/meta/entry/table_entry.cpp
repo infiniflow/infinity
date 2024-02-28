@@ -341,12 +341,22 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, c
         return Status::OK();
     }
     for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-        std::unique_lock lock(this->rw_locker());
-        for (const auto &old_segment : old_segments) {
-            old_segment->SetDeprecated(commit_ts);
+        auto status = CommitSegment(commit_ts, new_segment);
+        if (!status.ok()) {
+            // TODO: rollback
+            return status;
         }
-        ImportSegment(commit_ts, new_segment, true); // call the function with lock holding
     }
+    {
+        std::unique_lock lock(this->rw_locker());
+        for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+            this->segment_map_.emplace(new_segment->segment_id_, new_segment);
+            for (const auto &old_segment : old_segments) {
+                old_segment->SetDeprecated(commit_ts);
+            }
+        }
+    }
+
     if (compaction_alg_.get() == nullptr) {
         return Status::OK();
     }
@@ -407,13 +417,18 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
     return Status::OK();
 }
 
-Status TableEntry::CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
-    ImportSegment(commit_ts, segment, call_with_lock);
+Status TableEntry::CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
+    auto status = CommitSegment(commit_ts, segment);
+    if (!status.ok()) {
+        return status;
+    }
+    std::unique_lock lock(this->rw_locker());
+    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     row_count_ += segment->row_count();
     return Status::OK();
 }
 
-Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock) {
+Status TableEntry::CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> &segment) {
     if (this->deleted_) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Table {} is deleted.", *this->GetTableName()));
         return Status(ErrorCode::kTableNotExist, std::move(err_msg));
@@ -429,11 +444,6 @@ Status TableEntry::ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
         block_entry->block_version_->created_.emplace_back(commit_ts, block_entry->row_count());
     }
 
-    std::unique_lock<std::shared_mutex> rw_locker;
-    if (!call_with_lock) {
-        rw_locker = std::unique_lock(this->rw_locker());
-    }
-    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
 }
 
