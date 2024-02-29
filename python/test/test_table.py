@@ -13,6 +13,7 @@
 # limitations under the License.
 import concurrent.futures
 import pytest
+import polars as pl
 
 from python.test.common import common_values
 import infinity
@@ -94,6 +95,18 @@ class TestTable:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    def test_show_tables(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+
+        db = infinity_obj.get_database("default")
+
+        with pl.Config(fmt_str_lengths=1000):
+            res = db.show_tables()
+            print(res)
+            # check the polars dataframe
+            assert res.columns == ["database", "table", "type", "column_count", "row_count", "segment_count",
+                                   "block_count", "segment_capacity"]
 
     def test_create_varchar_table(self):
         """

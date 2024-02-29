@@ -519,3 +519,11 @@ class TestInsert:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="TODO")
+    def test_insert_and_shutdown_output(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_and_shutdown_output")
+        db_obj.create_table("test_insert_and_shutdown_output", {"c1": "int"}, None)

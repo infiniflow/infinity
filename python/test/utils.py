@@ -1,4 +1,6 @@
 import functools
+import os
+import subprocess
 import traceback
 
 import numpy as np
@@ -24,3 +26,10 @@ def read_fvecs_file(filename):
     ivecs = file_int32.reshape(-1, d + 1)[:, 1:].copy()
     fvecs = ivecs.view('float32')
     return fvecs
+
+
+def start_infinity_service_in_subporcess():
+    # shell = "./build/src/infinity"
+    # p = subprocess.Popen(shell, stdout=subprocess.PIPE, shell=True)
+    # p.wait()
+    pass
