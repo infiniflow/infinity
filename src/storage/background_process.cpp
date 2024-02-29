@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module backgroud_process;
+module background_process;
 
 import stl;
 import bg_task;

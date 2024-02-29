@@ -87,6 +87,9 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportFVECS(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
+        }
     }
     import_op_state->SetComplete();
     Txn *txn = query_context->GetTxn();
@@ -121,7 +124,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         import_op_state->result_msg_ = std::move(result_msg);
         return;
     }
-    
+
     if (nbytes != sizeof(dimension)) {
         RecoverableError(Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes)));
     }
@@ -497,7 +500,8 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
-    segment_entry->FlushNewData();
+    TxnTimeStamp flush_ts = txn_store->txn_->BeginTS();
+    segment_entry->FlushNewData(flush_ts);
     const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
 
     const String &db_name = *txn_store->table_entry_->GetDBName();

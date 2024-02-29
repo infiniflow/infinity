@@ -196,9 +196,9 @@ export namespace std {
     using std::is_floating_point_v;
     using std::common_type_t;
 
-    using std::monostate;
     using std::function;
-
+    using std::monostate;
+    using std::thread;
 } // namespace std
 
 namespace infinity {

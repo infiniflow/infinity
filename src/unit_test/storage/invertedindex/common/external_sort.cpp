@@ -16,6 +16,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <string.h>
 
 import stl;
 import third_party;
@@ -35,6 +36,17 @@ Vector<char> RandStr(T key) {
         str.push_back('a' + rand() % 26);
 
     *(T *)str.data() = key;
+    return str;
+}
+
+Vector<char> RandStr() {
+    u32 len = rand() % 100;
+
+    Vector<char> str;
+    str.reserve(len);
+    for (u32 i = 0; i < len; ++i)
+        str.push_back('a' + rand() % 26);
+
     return str;
 }
 
@@ -58,7 +70,6 @@ protected:
         while (run_num < 100 || SIZE % run_num != 0)
             run_num = rand() % 300;
 
-        // run_num = 800;
         for (u32 i = 0; i < run_num; ++i) {
             u64 pos = ftell(f);
             fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);
@@ -69,8 +80,6 @@ protected:
                 fwrite(&len, sizeof(LenType), 1, f);
                 fwrite(str.data(), len, 1, f);
                 s += len + sizeof(LenType);
-
-                // cout<<"\rAdd data: "<<(double)(i*SIZE/run_num+j)/SIZE*100.<<"%"<<std::Flush;
             }
             u64 next_run_pos = ftell(f);
             fseek(f, pos, SEEK_SET);
@@ -103,9 +112,70 @@ protected:
         }
         std::filesystem::remove("./tt");
     }
+
+    void CheckTermTuple(const u64 SIZE, u32 bs = 100000000) {
+        std::filesystem::remove("./tt");
+
+        Vector<char> str;
+        FILE *f = fopen("./tt", "w+");
+        fwrite(&SIZE, sizeof(u64), 1, f);
+
+        u32 run_num = rand() % 300;
+        while (run_num < 100 || SIZE % run_num != 0)
+            run_num = rand() % 300;
+
+        char buffer[200];
+        for (u32 i = 0; i < run_num; ++i) {
+            u64 pos = ftell(f);
+            fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);
+            u32 s = 0;
+            for (u32 j = 0; j < SIZE / run_num; ++j) {
+                str = RandStr();
+                u32 doc_id = 34567; // i * SIZE / run_num + j;
+                u32 term_pos = i;
+                memcpy(buffer, str.data(), str.size());
+                buffer[str.size()] = '\0';
+                memcpy(buffer + str.size() + 1, &doc_id, sizeof(u32));
+                memcpy(buffer + str.size() + 1 + sizeof(u32), &term_pos, sizeof(u32));
+                u16 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
+                fwrite(&len, sizeof(u16), 1, f);
+                fwrite(buffer, len, 1, f);
+                s += len + sizeof(u16);
+            }
+            u64 next_run_pos = ftell(f);
+            fseek(f, pos, SEEK_SET);
+            fwrite(&s, sizeof(u32), 1, f);
+            s = SIZE / run_num;
+            fwrite(&s, sizeof(u32), 1, f);
+            fwrite(&next_run_pos, sizeof(u64), 1, f);
+            fseek(f, 0, SEEK_END);
+        }
+        fclose(f);
+
+        SortMerger<TermTuple, u16> merger("./tt", run_num, bs, 2);
+        merger.Run();
+
+        f = fopen("./tt", "r");
+        u64 count = 0;
+        u32 doc_id = 34567;
+        fread(&count, sizeof(u64), 1, f);
+        EXPECT_EQ(count, SIZE);
+        for (u32 i = 0; i < count; ++i) {
+            u16 len = 0;
+            fread(&len, sizeof(u16), 1, f);
+            char *buf = new char[len];
+            fread(buf, len, 1, f);
+            TermTuple tuple(buf, len);
+            EXPECT_EQ(tuple.doc_id_, doc_id);
+            delete[] buf;
+        }
+        std::filesystem::remove("./tt");
+    }
 };
 
 TEST_F(ExternalSortTest, test1) {
     CheckMerger<u32, u8>(1000, 100000);
     CheckMerger<u32, u8>(10000, 1000000);
 }
+
+TEST_F(ExternalSortTest, test2) { CheckTermTuple(10000, 1000000); }

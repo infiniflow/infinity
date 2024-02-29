@@ -79,6 +79,9 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             }
             break;
         }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
+        }
     }
 }
 

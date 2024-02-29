@@ -59,8 +59,6 @@ public:
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
-    bool Cleanupable(TxnTimeStamp visible_ts) const;
-
 public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};

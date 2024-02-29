@@ -29,7 +29,7 @@ import default_values;
 import txn_manager;
 import txn;
 import status;
-import backgroud_process;
+import background_process;
 import bg_task;
 
 class BGProcessTest : public BaseTest {
