@@ -11,13 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import common_values
 import infinity
-from infinity.infinity import ShowVariable
+from infinity.errors import ErrorCode
+
+from python.infinity.infinity import ShowVariable
+from python.test.common import common_values
 
 
-class TestShowVariable:
+class TestInfinity:
+
+    def test_get_database(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        database_res = infinity_obj.get_database('default')
+        print(database_res)
+        # assert database_res.error_code == ErrorCode.OK
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_list_database(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        database_res = infinity_obj.list_databases()
+        assert database_res.db_names[0] == 'default'
 
     def test_show_variable(self):
         # QUERY_COUNT = "query_count"
@@ -77,3 +92,5 @@ class TestShowVariable:
 
         res = infinity_obj.show_variable(ShowVariable.TIME_ZONE)
         print(res)
+
+

@@ -14,7 +14,7 @@
 
 import os
 import pytest
-import common_values
+from python.test.common import common_values
 import infinity
 from infinity.errors import ErrorCode
 

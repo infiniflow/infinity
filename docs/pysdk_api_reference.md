@@ -446,36 +446,28 @@ This method searches for rows that satisfy the search condition and updates them
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.query_builder
 
-Gets a query_builder by self.
-
-```python
-query_builder=table_obj.query_builder()
-```
-
-## Details
-
-This method retrieves a query_builder by self table.
-
-## Returns
-
-- success:
-    - A `query_builder` object.
-- failure: `Exception`
-
----
-
-# query_builder.output
+# table_obj.output
 
 Specifies the columns to display in the search output. 
 
 ```python
-query_builder.output(["num", "body"])
+table_obj.output(["num", "body"])
 # To display all columns
-query_builder.output(["*"])
+table_obj.output(["*"])
 # To display row ID
-query_builder.output(["_row_id"])
+table_obj.output(["_row_id"])
+```
+Convert output to different display types.
+```python
+# Returns a data result
+table_obj.output(["*"]).to_result()
+# Returns a pandas result
+table_obj.output(["*"]).to_df()
+# Returns a polars result
+table_obj.output(["*"]).to_pl()
+# Returns a pyarrow result
+table_obj.output(["*"]).to_arrow()
 ```
 
 ## Details
@@ -493,12 +485,12 @@ This method specifies the columns to display in the search output. You must inpu
 
 - self : `InfinityThriftQueryBuilder`
 
-# query_builder.filter
+# table_obj.filter
 
 Builds a filtering condition expression.
 
 ```python
-query_builder.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
+table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ```
 
 ## Details
@@ -515,13 +507,13 @@ This method builds a filtering expression.
 
 - self : `InfinityThriftQueryBuilder`
 
-# query_builder.knn
+# table_obj.knn
 
 Builds a KNN search expression.
 
 ```python
-query_builder.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
-query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
+table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
+table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
 ## Details
@@ -548,12 +540,12 @@ VEC supports list or np.ndarray.
 
 - self : `InfinityThriftQueryBuilder`
 
-# query_builder.match
+# table_obj.match
 
 Builds a full-text search expression.
 
 ```python
-query_builder.match('body', 'harmful', 'topn=2')
+table_obj.match('body', 'harmful', 'topn=2')
 ```
 
 ## Details
@@ -570,12 +562,12 @@ This method builds a full-text search expression.
 
 - self : `InfinityThriftQueryBuilder`
 
-# query_builder.fusion
+# table_obj.fusion
 
 Builds a fusion expression.
 
 ```python
-query_builder.fusion('rrf')
+table_obj.fusion('rrf')
 ```
 
 ## Details
@@ -592,12 +584,12 @@ query_builder.fusion('rrf')
 
 - self : `InfinityThriftQueryBuilder`
 
-# query_builder.to_result
+# table_obj.output.to_result
 
 Returns a data result.
 
 ```python
-table_obj.query_builder().output(["*"]).to_result()
+table_obj.output(["*"]).to_result()
 ```
 
 ## Details
@@ -610,12 +602,12 @@ This method returns a data result of Python's built-in type.
 
 - `tuple[dict[str, list[Any]], dict[str, Any]]`
 
-# query_builder.to_df
+# table_obj.output.to_df
 
 Returns a pandas result.
 
 ```python
-table_obj.query_builder().output(["*"]).to_df()
+table_obj.output(["*"]).to_df()
 ```
 
 ## Details
@@ -626,12 +618,12 @@ This method returns a data result in pandas `DataFrame`.
 
 - `pandas.DataFrame`
 
-# query_builder.to_pl
+# table_obj.output.to_pl
 
 Returns a polars result.
 
 ```python
-table_obj.query_builder().output(["*"]).to_pl()
+table_obj.output(["*"]).to_pl()
 ```
 
 ## Details
@@ -642,12 +634,12 @@ This method returns a data result in polars `DataFrame`
 
 - `polars.DataFrame`
 
-# query_builder.to_arrow
+# table_obj.output.to_arrow
 
 Returns a pyarrow result.
 
 ```python
-table_obj.query_builder().output(["*"]).to_arrow()
+table_obj.output(["*"]).to_arrow()
 ```
 
 ## Details
