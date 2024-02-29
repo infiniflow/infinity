@@ -21,6 +21,7 @@ import doc_iterator;
 import term_queries;
 import column_index_reader;
 import indexer;
+import match_data;
 import index_config;
 
 namespace infinity {
@@ -42,5 +43,6 @@ private:
     Indexer *indexer_{nullptr};
     Vector<u64> column_ids_;
     IndexReader index_reader_;
+    UniquePtr<MatchDataManager> match_data_manager_;
 };
 } // namespace infinity

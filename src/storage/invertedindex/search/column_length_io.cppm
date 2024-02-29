@@ -14,20 +14,19 @@
 
 module;
 
-module term_doc_iterator;
+export module column_length_io;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import bitmap;
 import index_defines;
-import term_meta;
-import doc_iterator;
+
 namespace infinity {
-TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id) : column_id_(column_id), iter_(iter) {}
+export class ColumnLengthWriter {};
 
-TermDocIterator::~TermDocIterator() {}
+export class ColumnLengthReader {
+public:
+    ColumnLengthReader() = default;
+    ~ColumnLengthReader() = default;
 
-void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
-
+    u32 GetColumnLength(u64 column_id, docid_t doc_id);
+};
 } // namespace infinity

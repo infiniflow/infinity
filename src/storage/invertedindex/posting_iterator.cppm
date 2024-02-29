@@ -10,6 +10,7 @@ import in_doc_pos_state;
 import multi_posting_decoder;
 import segment_posting;
 import index_defines;
+import match_data;
 export module posting_iterator;
 
 namespace infinity {
@@ -29,6 +30,17 @@ public:
 
     void SeekPosition(pos_t pos, pos_t &result);
 
+    tf_t GetCurrentTF() { return state_.GetTermFreq(); }
+
+    docpayload_t GetCurrentDocPayload() {
+        if (posting_option_.HasDocPayload()) {
+            DecodeTFBuffer();
+            DecodeDocPayloadBuffer();
+            return doc_payload_buffer_[GetDocOffsetInBuffer()];
+        }
+        return 0;
+    }
+
     ttf_t GetCurrentTTF() {
         if (posting_option_.HasTfList()) {
             DecodeTFBuffer();
@@ -41,6 +53,17 @@ public:
     }
 
     bool HasPosition() const { return posting_option_.HasPositionList(); }
+
+    void GetTermMatchData(TermColumnMatchData &match_data) {
+        DecodeTFBuffer();
+        DecodeDocPayloadBuffer();
+        if (posting_option_.HasTfList()) {
+            match_data.tf_ = tf_buffer_[GetDocOffsetInBuffer()];
+        }
+        if (posting_option_.HasDocPayload()) {
+            match_data.doc_payload_ = doc_payload_buffer_[GetDocOffsetInBuffer()];
+        }
+    }
 
 private:
     u32 GetCurrentSeekedDocCount() const { return posting_decoder_->InnerGetSeekedDocCount() + (GetDocOffsetInBuffer() + 1); }
