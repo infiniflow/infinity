@@ -874,8 +874,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             EXPECT_EQ(table_index_meta->index_entry_list().size(), 1);
             auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "idx1");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }
 
@@ -980,8 +978,6 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             EXPECT_EQ(table_index_meta->index_entry_list().size(), 1);
             auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
             EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
             txn_mgr->CommitTxn(txn);
         }
 

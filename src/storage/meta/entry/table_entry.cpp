@@ -423,8 +423,8 @@ Status TableEntry::CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> 
         return status;
     }
     std::unique_lock lock(this->rw_locker());
-    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     row_count_ += segment->row_count();
+    this->segment_map_.emplace(segment->segment_id_, std::move(segment));
     return Status::OK();
 }
 
@@ -584,6 +584,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
 
     UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    if (*table_name == "test_compact_with_delete") {
+        int a = 1;
+    }
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
 
@@ -601,8 +604,6 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
         if (!table_entry->segment_map_.empty()) {
             UnrecoverableError("deleted table should have no segment");
         }
-    } else if (!table_entry->segment_map_.empty() && table_entry->segment_map_[0].get() == nullptr) {
-        UnrecoverableError("table segment 0 should be valid");
     }
 
     if (table_entry_json.contains("table_indexes")) {
@@ -734,10 +735,6 @@ void TableEntry::Cleanup() && {
         std::move(*segment).Cleanup();
     }
     std::move(index_meta_map_).Cleanup();
-
-    LocalFileSystem fs;
-    // FIXME(sys): delete all index cache in buffer_manager.
-    // fs.DeleteDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

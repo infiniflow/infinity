@@ -78,9 +78,7 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kCleanup: {
                 auto task = static_cast<CleanupTask *>(bg_task.get());
-                task->BeginTxn();
                 task->Execute();
-                task->CommitTxn();
                 break;
             }
             case BGTaskType::kInvalid: {

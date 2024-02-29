@@ -317,7 +317,7 @@ void EntryList<Entry>::Cleanup() && {
     if (entry_list_.empty()) {
         return;
     }
-    for (auto iter = entry_list_.begin(); iter != Prev(entry_list_.end()); ++iter) {
+    for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
         std::move(*entry).Cleanup();
     }
