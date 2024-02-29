@@ -27,6 +27,7 @@ import index_base;
 import block_index;
 import third_party;
 import status;
+import random;
 
 import cleanup_scanner;
 import meta_entry_interface;
@@ -47,8 +48,6 @@ public:
     using EntryOp = AddTableIndexEntryOp;
 
 public:
-    TableIndexEntry();
-
     TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
@@ -96,7 +95,9 @@ public:
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
 private:
-    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
+    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
+        return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));
+    }
 
     // For SegmentColumnIndexEntry
     void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);

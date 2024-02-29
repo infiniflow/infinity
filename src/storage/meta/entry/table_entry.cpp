@@ -49,9 +49,8 @@ import local_file_system;
 
 namespace infinity {
 
-TableEntry::TableEntry() : BaseEntry(EntryType::kDummy) {}
-
-TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
+TableEntry::TableEntry(bool is_delete,
+                       const SharedPtr<String> &db_entry_dir,
                        SharedPtr<String> table_collection_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
@@ -59,8 +58,9 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTable), table_meta_(table_meta),
-      table_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *db_entry_dir, *table_collection_name, txn_id))),
+      table_entry_dir_(is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_collection_name)),
       table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
+    this->deleted_ = is_delete;
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
@@ -75,7 +75,8 @@ TableEntry::TableEntry(const SharedPtr<String> &db_entry_dir,
     compaction_alg_->Enable(segments);
 }
 
-SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entry_dir,
+SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
+                                                const SharedPtr<String> &db_entry_dir,
                                                 SharedPtr<String> table_collection_name,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
                                                 TableEntryType table_entry_type,
@@ -83,7 +84,8 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(const SharedPtr<String> &db_entr
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
 
-    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    auto table_entry =
+        MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     return table_entry;
 }
 
@@ -97,8 +99,7 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
                                                       TxnTimeStamp commit_ts,
                                                       bool is_delete,
                                                       SizeT row_count) {
-    auto table_entry = MakeShared<TableEntry>(db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
-    table_entry->deleted_ = is_delete;
+    auto table_entry = MakeShared<TableEntry>(is_delete, db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -583,10 +584,8 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
-    if (*table_name == "test_compact_with_delete") {
-        int a = 1;
-    }
+    UniquePtr<TableEntry> table_entry =
+        MakeUnique<TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
 
@@ -728,6 +727,7 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         }
     }
     std::sort(cleanup_segment_ids.begin(), cleanup_segment_ids.end());
+    index_meta_map_.Iterate([&](auto *meta) { meta->PickCleanupBySegments(cleanup_segment_ids, scanner); });
 }
 
 void TableEntry::Cleanup() && {
@@ -735,6 +735,9 @@ void TableEntry::Cleanup() && {
         std::move(*segment).Cleanup();
     }
     std::move(index_meta_map_).Cleanup();
+
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*table_entry_dir_);
 }
 
 } // namespace infinity

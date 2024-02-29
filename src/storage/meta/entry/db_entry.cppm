@@ -28,7 +28,7 @@ import status;
 import extra_ddl_info;
 import column_def;
 import meta_map;
-
+import random;
 import meta_entry_interface;
 import cleanup_scanner;
 
@@ -43,10 +43,14 @@ export class DBEntry final : public BaseEntry, public EntryInterface {
 public:
     using EntryOp = AddDBEntryOp;
 
-    explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    explicit DBEntry(bool is_delete,
+                     const SharedPtr<String> &data_dir,
+                     const SharedPtr<String> &db_name,
+                     TransactionID txn_id,
+                     TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry>
-    NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    NewDBEntry(bool is_delete, const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> NewReplayDBEntry(const SharedPtr<String> &data_dir,
                                                const SharedPtr<String> &db_name,
@@ -89,6 +93,10 @@ private:
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+
+    static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
+        return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
+    }
 
 private:
     const SharedPtr<String> db_entry_dir_{};

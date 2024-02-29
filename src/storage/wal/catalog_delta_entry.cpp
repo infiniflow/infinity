@@ -368,7 +368,9 @@ void AddDBEntryOp::SaveSate() {
     this->is_delete_ = this->db_entry_->deleted_;
     this->begin_ts_ = this->db_entry_->begin_ts_;
     this->db_name_ = this->db_entry_->db_name();
-    this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
+    if (!this->is_delete_) {
+        this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
+    }
     is_saved_sate_ = true;
 }
 
@@ -377,9 +379,11 @@ void AddTableEntryOp::SaveSate() {
     this->begin_ts_ = this->table_entry_->begin_ts_;
     this->db_name_ = *this->table_entry_->GetDBName();
     this->table_name_ = *this->table_entry_->GetTableName();
-    this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
-    this->column_defs_ = this->table_entry_->column_defs();
-    this->row_count_ = this->table_entry_->row_count();
+    if (!this->is_delete_) {
+        this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
+        this->column_defs_ = this->table_entry_->column_defs();
+        this->row_count_ = this->table_entry_->row_count();
+    }
     is_saved_sate_ = true;
 }
 

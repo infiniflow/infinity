@@ -152,6 +152,8 @@ void ColumnIndexEntry::Cleanup() && {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
         std::move(*segment_column_index_entry).Cleanup();
     }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*col_index_dir_);
 }
 
 void ColumnIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {

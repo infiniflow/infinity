@@ -61,7 +61,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                       TxnManager *txn_mgr,
                                                       ConflictType conflict_type) {
     SharedPtr<TableEntry> table_entry =
-        TableEntry::NewTableEntry(this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
+        TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
     auto [table_entry_ptr, status] = table_entry_list_.AddEntry(table_entry, txn_id, begin_ts, txn_mgr, conflict_type);
     if (status.code() == ErrorCode::kDuplicateDatabaseName) {
         return {table_entry_ptr, Status::DuplicateTable(*table_collection_name_ptr)};
@@ -73,8 +73,7 @@ Tuple<TableEntry *, Status>
 TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type) {
     Vector<SharedPtr<ColumnDef>> dummy_columns;
     SharedPtr<TableEntry> drop_entry =
-        TableEntry::NewTableEntry(this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
-    drop_entry->deleted_ = true;
+        TableEntry::NewTableEntry(true, this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
     auto [table_entry_ptr, status] = table_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
     if (status.code() == ErrorCode::kDBNotExist) {
         return {table_entry_ptr, Status::TableNotExist(table_name)};
@@ -150,9 +149,6 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     }
     res->table_entry_list().sort(
         [](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
-    auto dummy_entry = MakeUnique<TableEntry>();
-    dummy_entry->deleted_ = true;
-    res->table_entry_list().emplace_back(std::move(dummy_entry));
 
     return res;
 }
@@ -169,8 +165,8 @@ void TableMeta::Cleanup() && {
     std::move(table_entry_list_).Cleanup();
 
     String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
-    // LocalFileSystem fs;
-    // fs.DeleteEmptyDirectory(table_meta_dir);
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(table_meta_dir);
 }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }

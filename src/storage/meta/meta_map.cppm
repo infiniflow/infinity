@@ -30,7 +30,7 @@ public:
     using Iterator = typename Map::iterator;
 
 public:
-    void IterateMut(std::function<void(Iterator)> func);
+    void Iterate(std::function<void(Meta *)> func);
 
     void PickCleanup(CleanupScanner *scanner);
 
@@ -43,10 +43,10 @@ public:                                     // TODO: make both private
 };
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::IterateMut(std::function<void(Iterator)> func) {
+void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
     std::unique_lock lock(rw_locker_);
-    for (auto iter = meta_map_.begin(); iter != meta_map_.end(); ++iter) {
-        func(iter);
+    for (auto &[name, meta] : meta_map_) {
+        func(meta.get());
     }
 }
 
@@ -60,9 +60,8 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         bool all_delete = meta->PickCleanup(scanner);
         lock.lock();
         if (all_delete) {
-            // scanner->AddMeta(std::move(meta));
-            // iter = meta_map_.erase(iter);
-            ++iter;
+            scanner->AddMeta(std::move(meta));
+            iter = meta_map_.erase(iter);
         } else {
             ++iter;
         }

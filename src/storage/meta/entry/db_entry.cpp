@@ -37,11 +37,11 @@ import extra_ddl_info;
 
 namespace infinity {
 
-DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
+DBEntry::DBEntry(bool is_delete, const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
-      db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase), db_entry_dir_(is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)), db_name_(db_name) {
+    this->deleted_ = is_delete;
     //    atomic_u64 txn_id_{0};
     //    TxnTimeStamp begin_ts_{0};
     //    atomic_u64 commit_ts_{UNCOMMIT_TS};
@@ -50,10 +50,12 @@ DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_
     txn_id_.store(txn_id);
 }
 
-SharedPtr<DBEntry>
-DBEntry::NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-
-    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+SharedPtr<DBEntry> DBEntry::NewDBEntry(bool is_delete,
+                                       const SharedPtr<String> &data_dir,
+                                       const SharedPtr<String> &db_name,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts) {
+    auto db_entry = MakeShared<DBEntry>(is_delete, data_dir, db_name, txn_id, begin_ts);
     return db_entry;
 }
 
@@ -63,9 +65,8 @@ SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(const SharedPtr<String> &data_dir,
                                              TxnTimeStamp begin_ts,
                                              TxnTimeStamp commit_ts,
                                              bool is_delete) {
-    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+    auto db_entry = MakeShared<DBEntry>(is_delete, data_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
-    db_entry->deleted_ = is_delete;
     return db_entry;
 }
 
@@ -254,10 +255,10 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, Buf
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
     TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
-    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_entry_dir, db_name, txn_id, begin_ts);
+    bool deleted = db_entry_json["deleted"];
+    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(deleted, db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
-    bool deleted = db_entry_json["deleted"];
     EntryType entry_type = db_entry_json["entry_type"];
     res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
@@ -301,8 +302,8 @@ void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup
 void DBEntry::Cleanup() && {
     std::move(table_meta_map_).Cleanup();
 
-    // LocalFileSystem fs;
-    // fs.DeleteDirectory(*db_entry_dir_);
+    LocalFileSystem fs;
+    fs.DeleteDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

@@ -38,6 +38,7 @@ import meta_map;
 
 import meta_entry_interface;
 import cleanup_scanner;
+import random;
 
 namespace infinity {
 
@@ -56,9 +57,8 @@ public:
     using EntryOp = AddTableEntryOp;
 
 public:
-    explicit TableEntry();
-
-    explicit TableEntry(const SharedPtr<String> &db_entry_dir,
+    explicit TableEntry(bool is_delete,
+                        const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
@@ -66,7 +66,8 @@ public:
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableEntry> NewTableEntry(const SharedPtr<String> &db_entry_dir,
+    static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
+                                               const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
                                                TableEntryType table_entry_type,
@@ -127,6 +128,10 @@ private:
     Status CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> &segment);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
+
+    static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name) {
+        return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
+    }
 
 public:
     // Getter
