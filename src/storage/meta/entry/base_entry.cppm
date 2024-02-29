@@ -80,7 +80,4 @@ public:
     //     EntryStatus status_{EntryStatus::kInit};
 };
 
-// Merge two reverse-ordered list inplace.
-export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
-
 } // namespace infinity

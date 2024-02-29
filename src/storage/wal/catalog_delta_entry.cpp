@@ -49,7 +49,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, db_entry_dir);
+            operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), table_name, db_entry_dir);
             break;
         }
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
@@ -84,7 +84,15 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             }
 
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
-            operation = MakeUnique<AddTableEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, table_entry_dir, columns, row_count);
+            operation = MakeUnique<AddTableEntryOp>(begin_ts,
+                                                    is_delete,
+                                                    txn_id,
+                                                    commit_ts,
+                                                    std::move(db_name),
+                                                    table_name,
+                                                    table_entry_dir,
+                                                    columns,
+                                                    row_count);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
@@ -102,8 +110,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                       is_delete,
                                                       txn_id,
                                                       commit_ts,
-                                                      db_name,
-                                                      table_name,
+                                                      std::move(db_name),
+                                                      std::move(table_name),
                                                       segment_id,
                                                       segment_dir,
                                                       column_count,
@@ -130,8 +138,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                     is_delete,
                                                     txn_id,
                                                     commit_ts,
-                                                    db_name,
-                                                    table_name,
+                                                    std::move(db_name),
+                                                    std::move(table_name),
                                                     segment_id,
                                                     block_id,
                                                     block_dir,
@@ -150,15 +158,23 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             BlockID block_id = ReadBufAdv<BlockID>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
             i32 next_outline_idx = ReadBufAdv<i32>(ptr);
-            operation = MakeUnique<
-                AddColumnEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, segment_id, block_id, column_id, next_outline_idx);
+            operation = MakeUnique<AddColumnEntryOp>(begin_ts,
+                                                     is_delete,
+                                                     txn_id,
+                                                     commit_ts,
+                                                     std::move(db_name),
+                                                     std::move(table_name),
+                                                     segment_id,
+                                                     block_id,
+                                                     column_id,
+                                                     next_outline_idx);
             break;
         }
         case CatalogDeltaOpType::ADD_INDEX_META: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name);
+            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), index_name);
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
@@ -234,7 +250,7 @@ void AddDBMetaOp::WriteAdv(char *&buf) const {
 
 void AddTableMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->db_entry_dir_);
 }
@@ -247,7 +263,7 @@ void AddDBEntryOp::WriteAdv(char *&buf) const {
 
 void AddTableEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_entry_dir_);
 
@@ -268,8 +284,8 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->segment_dir_);
 
@@ -283,8 +299,8 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
 
 void AddBlockEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->block_id_);
     WriteBufAdv(buf, this->block_dir_);
@@ -298,8 +314,8 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
 
 void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->block_id_);
     WriteBufAdv(buf, this->column_id_);
@@ -308,8 +324,8 @@ void AddColumnEntryOp::WriteAdv(char *&buf) const {
 
 void AddIndexMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->index_name_);
 }
 
@@ -351,20 +367,19 @@ void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_ts_);
 }
 
-void AddDBMetaOp::SaveSate() {
+void AddDBMetaOp::SaveState() {
     this->db_name_ = *this->db_meta_->db_name();
     this->data_dir_ = *this->db_meta_->data_dir();
     is_saved_sate_ = true;
 }
 
-void AddTableMetaOp::SaveSate() {
-    this->db_name_ = *this->table_meta_->db_name_ptr();
+void AddTableMetaOp::SaveState() {
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
     is_saved_sate_ = true;
 }
 
-void AddDBEntryOp::SaveSate() {
+void AddDBEntryOp::SaveState() {
     this->is_delete_ = this->db_entry_->deleted_;
     this->begin_ts_ = this->db_entry_->begin_ts_;
     this->db_name_ = this->db_entry_->db_name();
@@ -374,10 +389,9 @@ void AddDBEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddTableEntryOp::SaveSate() {
+void AddTableEntryOp::SaveState() {
     this->is_delete_ = this->table_entry_->deleted_;
     this->begin_ts_ = this->table_entry_->begin_ts_;
-    this->db_name_ = *this->table_entry_->GetDBName();
     this->table_name_ = *this->table_entry_->GetTableName();
     if (!this->is_delete_) {
         this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
@@ -387,11 +401,9 @@ void AddTableEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddSegmentEntryOp::SaveSate() {
+void AddSegmentEntryOp::SaveState() {
     this->is_delete_ = segment_entry_->deleted_;
     this->begin_ts_ = segment_entry_->begin_ts_;
-    this->db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
     this->segment_id_ = this->segment_entry_->segment_id();
     this->segment_dir_ = *this->segment_entry_->segment_dir();
     this->min_row_ts_ = this->segment_entry_->min_row_ts();
@@ -403,12 +415,9 @@ void AddSegmentEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddBlockEntryOp::SaveSate() {
+void AddBlockEntryOp::SaveState() {
     this->is_delete_ = block_entry_->deleted_;
     this->begin_ts_ = block_entry_->begin_ts_;
-    this->db_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->block_entry_->GetSegmentEntry()->GetTableEntry()->GetTableName();
-    this->segment_id_ = this->block_entry_->GetSegmentEntry()->segment_id();
     this->block_id_ = this->block_entry_->block_id();
     this->block_dir_ = this->block_entry_->DirPath();
     this->row_count_ = this->block_entry_->row_count();
@@ -420,27 +429,21 @@ void AddBlockEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddColumnEntryOp::SaveSate() {
+void AddColumnEntryOp::SaveState() {
     this->is_delete_ = column_entry_->deleted_;
     this->begin_ts_ = column_entry_->begin_ts_;
-    this->db_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->column_entry_->GetBlockEntry()->GetSegmentEntry()->GetTableEntry()->GetTableName();
-    this->segment_id_ = this->column_entry_->GetBlockEntry()->GetSegmentEntry()->segment_id();
-    this->block_id_ = this->column_entry_->GetBlockEntry()->block_id();
     this->column_id_ = this->column_entry_->column_id();
     this->next_outline_idx_ = this->column_entry_->OutlineBufferCount();
     is_saved_sate_ = true;
 }
 
 /// Related to index
-void AddIndexMetaOp::SaveSate() {
-    this->db_name_ = *this->index_meta_->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->index_meta_->GetTableEntry()->GetTableName();
+void AddIndexMetaOp::SaveState() {
     this->index_name_ = this->index_meta_->index_name();
     is_saved_sate_ = true;
 }
 
-void AddTableIndexEntryOp::SaveSate() {
+void AddTableIndexEntryOp::SaveState() {
     this->is_delete_ = table_index_entry_->deleted_;
     this->begin_ts_ = table_index_entry_->begin_ts_;
     this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
@@ -453,7 +456,7 @@ void AddTableIndexEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddFulltextIndexEntryOp::SaveSate() {
+void AddFulltextIndexEntryOp::SaveState() {
     this->is_delete_ = fulltext_index_entry_->deleted_;
     this->begin_ts_ = fulltext_index_entry_->begin_ts_;
     this->db_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -463,7 +466,7 @@ void AddFulltextIndexEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddColumnIndexEntryOp::SaveSate() {
+void AddColumnIndexEntryOp::SaveState() {
     this->is_delete_ = column_index_entry_->deleted_;
     this->begin_ts_ = column_index_entry_->begin_ts_;
     this->db_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -475,7 +478,7 @@ void AddColumnIndexEntryOp::SaveSate() {
     is_saved_sate_ = true;
 }
 
-void AddSegmentColumnIndexEntryOp::SaveSate() {
+void AddSegmentColumnIndexEntryOp::SaveState() {
     this->is_delete_ = segment_column_index_entry_->deleted_;
     this->begin_ts_ = segment_column_index_entry_->begin_ts_;
     this->db_name_ = *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
@@ -492,14 +495,14 @@ void AddSegmentColumnIndexEntryOp::SaveSate() {
 const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
 
 const String AddTableMetaOp::ToString() const {
-    return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", db_name_, table_name_, db_entry_dir_);
+    return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", *db_name_, table_name_, db_entry_dir_);
 }
 
 const String AddDBEntryOp::ToString() const { return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", db_name_, db_entry_dir_); }
 
 const String AddTableEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}", db_name_, table_name_, table_entry_dir_);
+    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}", *db_name_, table_name_, table_entry_dir_);
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
@@ -510,8 +513,8 @@ const String AddTableEntryOp::ToString() const {
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
     sstream << fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
-                           db_name_,
-                           table_name_,
+                           *db_name_,
+                           *table_name_,
                            segment_id_,
                            segment_dir_);
 
@@ -530,8 +533,8 @@ const String AddBlockEntryOp::ToString() const {
     sstream << fmt::format(
         "AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} block_dir: {} row_count: {} row_capacity: {} min_row_ts: {} "
         "max_row_ts: {}",
-        db_name_,
-        table_name_,
+        *db_name_,
+        *table_name_,
         segment_id_,
         block_id_,
         block_dir_,
@@ -547,8 +550,8 @@ const String AddBlockEntryOp::ToString() const {
 
 const String AddColumnEntryOp::ToString() const {
     return fmt::format("AddColumnEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} column_id: {} next_outline_idx: {}",
-                       db_name_,
-                       table_name_,
+                       *db_name_,
+                       *table_name_,
                        segment_id_,
                        block_id_,
                        column_id_,
@@ -556,7 +559,7 @@ const String AddColumnEntryOp::ToString() const {
 }
 
 const String AddIndexMetaOp::ToString() const {
-    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", db_name_, table_name_, index_name_);
+    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, index_name_);
 }
 
 const String AddTableIndexEntryOp::ToString() const {
@@ -702,7 +705,7 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
-        operation->SaveSate();
+        operation->SaveState();
         operation->txn_id_ = txn_id;
         operation->commit_ts_ = commit_ts;
     }

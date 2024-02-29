@@ -68,7 +68,7 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         // } else {
         //     ++iter;
         // }
-        ++iter; // FIXME(sys): delete meta from hashmap
+        ++iter; // FIXME(sys): remove empty meta need crab latch in entry list operation
     }
 }
 

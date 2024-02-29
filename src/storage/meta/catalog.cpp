@@ -865,7 +865,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                add_table_entry_op->SaveSate();
+                add_table_entry_op->SaveState();
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
