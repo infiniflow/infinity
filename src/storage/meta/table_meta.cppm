@@ -60,7 +60,6 @@ public:
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const;
-    [[nodiscard]] const String &db_name() const;
     [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 

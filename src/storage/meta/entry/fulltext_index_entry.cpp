@@ -108,6 +108,10 @@ FulltextIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, Tabl
     return fulltext_index_entry;
 }
 
+void FulltextIndexEntry::Cleanup() && {
+    // FIXME: remove the index
+}
+
 SharedPtr<String> FulltextIndexEntry::DetermineIndexDir(const String &, const String &) {
     UnrecoverableError("Not implemented");
     return nullptr;

@@ -358,7 +358,7 @@ void AddDBMetaOp::SaveSate() {
 }
 
 void AddTableMetaOp::SaveSate() {
-    this->db_name_ = this->table_meta_->db_name();
+    this->db_name_ = *this->table_meta_->db_name_ptr();
     this->table_name_ = this->table_meta_->table_name();
     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
     is_saved_sate_ = true;

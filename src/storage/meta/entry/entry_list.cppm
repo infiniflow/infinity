@@ -76,7 +76,6 @@ template <EntryConcept Entry>
 EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     FindResult find_res = FindResult::kNotFound;
     bool continue_loop = true;
-    std::unique_lock lock(rw_locker_);
     while (!entry_list_.empty() && continue_loop) {
         continue_loop = false;
         Entry *entry = entry_list_.front().get();
@@ -131,6 +130,7 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
 template <EntryConcept Entry>
 Tuple<Entry *, Status>
 EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+    std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
@@ -175,6 +175,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
                                                    TxnTimeStamp begin_ts,
                                                    TxnManager *txn_mgr,
                                                    ConflictType conflict_type) {
+    std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
@@ -316,6 +317,9 @@ void EntryList<Entry>::Cleanup() && {
     }
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
+        if (entry->deleted_) {
+            continue;
+        }
         std::move(*entry).Cleanup();
     }
 }

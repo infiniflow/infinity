@@ -230,12 +230,14 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     Vector<TableMeta *> table_metas;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["db_entry_dir"] = *this->db_entry_dir_;
         json_res["db_name"] = *this->db_name_;
         json_res["txn_id"] = this->txn_id_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["deleted"] = this->deleted_;
+        if (!this->deleted_) {
+            json_res["db_entry_dir"] = *this->db_entry_dir_;
+        }
         json_res["entry_type"] = this->entry_type_;
         table_metas.reserve(this->table_meta_map().size());
         for (auto &table_meta_pair : this->table_meta_map()) {
@@ -302,8 +304,9 @@ void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup
 void DBEntry::Cleanup() && {
     std::move(table_meta_map_).Cleanup();
 
+    LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
     LocalFileSystem fs;
-    fs.DeleteDirectory(*db_entry_dir_);
+    fs.DeleteEmptyDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

@@ -20,6 +20,8 @@ import stl;
 import local_file_system;
 import cleanup_scanner;
 import meta_entry_interface;
+import third_party;
+import logger;
 
 namespace infinity {
 
@@ -59,12 +61,14 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         lock.unlock();
         bool all_delete = meta->PickCleanup(scanner);
         lock.lock();
-        if (all_delete) {
-            scanner->AddMeta(std::move(meta));
-            iter = meta_map_.erase(iter);
-        } else {
-            ++iter;
-        }
+        // if (all_delete) {
+        //     LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
+        //     scanner->AddMeta(std::move(meta));
+        //     iter = meta_map_.erase(iter);
+        // } else {
+        //     ++iter;
+        // }
+        ++iter; // FIXME(sys): delete meta from hashmap
     }
 }
 

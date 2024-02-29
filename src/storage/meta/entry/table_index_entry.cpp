@@ -31,6 +31,7 @@ import base_table_ref;
 import iresearch_datastore;
 import create_index_info;
 import base_entry;
+import logger;
 
 namespace infinity {
 
@@ -264,9 +265,11 @@ void TableIndexEntry::Cleanup() && {
     for (auto &[column_id, column_index_entry] : column_index_map_) {
         std::move(*column_index_entry).Cleanup();
     }
-    // FIXME: to cleanup fulltext_index_entry_
+    std::move(*fulltext_index_entry_).Cleanup();
+
+    LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
     LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(*index_dir_);
+    fs.DeleteDirectory(*index_dir_); // FIXME(sys): delete full text index by whole directory tmply
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}

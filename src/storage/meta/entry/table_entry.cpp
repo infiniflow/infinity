@@ -499,7 +499,6 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     Vector<String> table_index_name_candidates;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["table_entry_dir"] = *this->table_entry_dir_;
         json_res["table_name"] = *this->GetTableName();
         json_res["table_entry_type"] = this->table_entry_type_;
         json_res["row_count"] = this->row_count_.load();
@@ -507,17 +506,20 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["txn_id"] = this->txn_id_.load();
         json_res["deleted"] = this->deleted_;
-        for (const auto &column_def : this->columns_) {
-            nlohmann::json column_def_json;
-            column_def_json["column_type"] = column_def->type()->Serialize();
-            column_def_json["column_id"] = column_def->id();
-            column_def_json["column_name"] = column_def->name();
+        if (!this->deleted_) {
+            json_res["table_entry_dir"] = *this->table_entry_dir_;
+            for (const auto &column_def : this->columns_) {
+                nlohmann::json column_def_json;
+                column_def_json["column_type"] = column_def->type()->Serialize();
+                column_def_json["column_id"] = column_def->id();
+                column_def_json["column_name"] = column_def->name();
 
-            for (const auto &column_constraint : column_def->constraints_) {
-                column_def_json["constraints"].emplace_back(column_constraint);
+                for (const auto &column_constraint : column_def->constraints_) {
+                    column_def_json["constraints"].emplace_back(column_constraint);
+                }
+
+                json_res["column_definition"].emplace_back(column_def_json);
             }
-
-            json_res["column_definition"].emplace_back(column_def_json);
         }
         u32 next_segment_id = this->next_segment_id_;
         json_res["next_segment_id"] = next_segment_id;
@@ -553,16 +555,16 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
 }
 
 UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr) {
-    SharedPtr<String> table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_entry_json["table_name"]);
     TableEntryType table_entry_type = table_entry_json["table_entry_type"];
-    u64 row_count = table_entry_json["row_count"];
 
     bool deleted = table_entry_json["deleted"];
 
     Vector<SharedPtr<ColumnDef>> columns;
-
-    if (table_entry_json.contains("column_definition")) {
+    u64 row_count = 0;
+    SharedPtr<String> table_entry_dir;
+    if (!deleted) {
+        table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
@@ -579,6 +581,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints);
             columns.emplace_back(column_def);
         }
+        row_count = table_entry_json["row_count"];
     }
 
     TransactionID txn_id = table_entry_json["txn_id"];
@@ -736,6 +739,7 @@ void TableEntry::Cleanup() && {
     }
     std::move(index_meta_map_).Cleanup();
 
+    LOG_INFO(fmt::format("Cleanup dir: {}", *table_entry_dir_));
     LocalFileSystem fs;
     fs.DeleteEmptyDirectory(*table_entry_dir_);
 }

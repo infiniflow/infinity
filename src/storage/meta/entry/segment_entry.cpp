@@ -472,7 +472,7 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
 
 void SegmentEntry::Cleanup() && {
     for (auto &block_entry : block_entries_) {
-        block_entry->Cleanup();
+        std::move(*block_entry).Cleanup();
     }
     LocalFileSystem fs;
     fs.DeleteEmptyDirectory(*segment_dir_);

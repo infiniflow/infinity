@@ -93,8 +93,6 @@ void TableMeta::DeleteNewEntry(TransactionID txn_id) { table_entry_list_.DeleteE
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 
-const String &TableMeta::db_name() const { return db_entry_->db_name(); }
-
 SharedPtr<String> TableMeta::ToString() {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
@@ -161,13 +159,7 @@ void TableMeta::MergeFrom(TableMeta &other) {
     this->table_entry_list_.MergeWith(other.table_entry_list_);
 }
 
-void TableMeta::Cleanup() && {
-    std::move(table_entry_list_).Cleanup();
-
-    String table_meta_dir = fmt::format("{}/{}", *db_entry_dir_, *table_name_);
-    LocalFileSystem fs;
-    fs.DeleteEmptyDirectory(table_meta_dir);
-}
+void TableMeta::Cleanup() && { std::move(table_entry_list_).Cleanup(); }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 

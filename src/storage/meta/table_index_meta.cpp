@@ -144,12 +144,7 @@ void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
     this->index_entry_list_.MergeWith(other.index_entry_list_);
 }
 
-void TableIndexMeta::Cleanup() && {
-    std::move(index_entry_list_).Cleanup();
-
-    // LocalFileSystem fs;
-    // FIXME(sys) remove table index meta dir
-}
+void TableIndexMeta::Cleanup() && { std::move(index_entry_list_).Cleanup(); }
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }
 
