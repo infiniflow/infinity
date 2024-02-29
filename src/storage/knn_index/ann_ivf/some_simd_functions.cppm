@@ -86,7 +86,7 @@ export f32 L2Distance_simd(const f32 *vector1, const f32 *vector2, u32 dimension
 #elif defined(__SSE__) 
 
 export f32 L2Distance_simd(const f32 *vector1, const f32 *vector2, u32 dimension) {
-    F32L2SSEResidual(vector1, vector2, dimension);
+    return F32L2SSEResidual(vector1, vector2, dimension);
 }
 
 #endif
@@ -123,7 +123,7 @@ export f32 IPDistance_simd(const f32 *vector1, const f32 *vector2, u32 dimension
 #elif defined(__SSE__) 
 
 export f32 IPDistance_simd(const f32 *vector1, const f32 *vector2, u32 dimension) {
-    F32IPSSEResidual(vector1, vector2, dimension);
+    return F32IPSSEResidual(vector1, vector2, dimension);
 }
 
 #endif

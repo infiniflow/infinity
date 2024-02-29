@@ -251,7 +251,6 @@ export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
         pv2 += 4;
         diff = _mm_sub_ps(v1, v2);
         sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
-        
         v1 = _mm_loadu_ps(pv1);
         pv1 += 4;
         v2 = _mm_loadu_ps(pv2);

@@ -11,7 +11,7 @@ add_subdirectory(parser)
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
-add_definitions(-msse4.2 -mfma)
+add_definitions(-march=native)
 
 file(GLOB_RECURSE
         main_cpp
@@ -198,7 +198,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/vespalib")
 
-target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
 
 add_executable(infinity
         ${main_cpp}
