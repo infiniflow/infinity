@@ -28,9 +28,9 @@ def read_fvecs_file(filename):
     return fvecs
 
 
-# def start_infinity_service_in_subporcess():
-#     # os.system("rm -fr /tmp/infinity")
-#     shell = "/home/fann/infinity/build/src/infinity"
-#     with open("./tmp.txt", "w") as f:
-#         infinity = subprocess.Popen(shell, stdout=f)
-#     return infinity
+def start_infinity_service_in_subporcess():
+    # os.system("rm -fr /tmp/infinity")
+    shell = "/home/fann/infinity/build/src/infinity"
+    with open("./tmp.txt", "w") as f:
+        infinity = subprocess.Popen(shell, stdout=f)
+    return infinity
