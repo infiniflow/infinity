@@ -118,6 +118,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
     }
+    LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
     auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta), txn_id, begin_ts, txn_mgr);

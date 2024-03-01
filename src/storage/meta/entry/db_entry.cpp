@@ -79,9 +79,9 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  ConflictType conflict_type) {
     const String &table_name = *table_collection_name;
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this); };
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
     auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta), txn_id, begin_ts, txn_mgr);
 
-    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
     return table_meta->CreateNewEntry(std::move(r_lock), table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 

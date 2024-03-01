@@ -72,9 +72,8 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
         // Physical wal log
         return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
     };
-    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
-
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
     return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
