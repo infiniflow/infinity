@@ -36,12 +36,16 @@ namespace infinity {
 
 class DBEntry;
 class TxnManager;
+class AddTableMetaOp;
 
 export struct TableMeta : public MetaInterface, public BaseMeta {
     using EntryT = TableEntry;
 
     friend class DBEntry;
     friend struct Catalog;
+
+public:
+    using MetaOp = AddTableMetaOp;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)

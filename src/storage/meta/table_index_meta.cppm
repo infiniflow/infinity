@@ -33,11 +33,14 @@ class TxnManager;
 class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
+class AddIndexMetaOp;
 
 export class TableIndexMeta : public MetaInterface, public BaseMeta {
     friend struct TableEntry;
 
 public:
+    using MetaOp = AddIndexMetaOp;
+
     using EntryT = TableIndexEntry;
 
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);

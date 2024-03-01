@@ -22,16 +22,19 @@ import cleanup_scanner;
 import meta_entry_interface;
 import third_party;
 import logger;
+import txn_manager;
 
 namespace infinity {
 
 export template <MetaConcept Meta>
 class MetaMap {
 public:
-    using Map = HashMap<String, UniquePtr<Meta>>;
-    using Iterator = typename Map::iterator;
+    using Map = HashMap<String, SharedPtr<Meta>>;
 
 public:
+    Tuple<Meta *, std::shared_lock<std::shared_mutex>>
+    GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+
     void Iterate(std::function<void(Meta *)> func);
 
     void PickCleanup(CleanupScanner *scanner);
@@ -45,6 +48,40 @@ public:                                     // TODO: make both private
 };
 
 template <MetaConcept Meta>
+Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name,
+                                                                          std::function<UniquePtr<Meta>()> &&init_func,
+                                                                          TransactionID txn_id,
+                                                                          TxnTimeStamp begin_ts,
+                                                                          TxnManager *txn_mgr) {
+    std::shared_lock r_lock(rw_locker_);
+    auto iter = meta_map_.find(name);
+    if (iter == meta_map_.end()) {
+        r_lock.unlock();
+        {
+            UniquePtr<Meta> new_meta = init_func();
+            std::unique_lock w_lock(rw_locker_);
+            if (auto iter1 = meta_map_.find(name); iter1 != meta_map_.end()) {
+                LOG_TRACE("Add new entry in new meta_map");
+                iter = iter1;
+            } else {
+                LOG_TRACE("Add new entry in existed meta_map");
+                // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
+                // In replay phase, not need to recording the catalog delta operation.
+                if (txn_mgr != nullptr) {
+                    auto operation = MakeUnique<typename Meta::MetaOp>(new_meta.get(), begin_ts);
+                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
+                }
+                iter = meta_map_.emplace(name, std::move(new_meta)).first;
+            }
+        }
+        r_lock.lock();
+    } else {
+        LOG_TRACE("Add new entry in existed meta_map");
+    }
+    return {iter->second.get(), std::move(r_lock)};
+}
+
+template <MetaConcept Meta>
 void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
     std::unique_lock lock(rw_locker_);
     for (auto &[name, meta] : meta_map_) {
@@ -54,21 +91,23 @@ void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
 
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
-    std::unique_lock lock(rw_locker_);
+    Map copy_meta_map;
+    {
+        std::unique_lock lock(rw_locker_);
+        copy_meta_map = meta_map_;
+    }
 
-    for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-        UniquePtr<Meta> &meta = iter->second;
-        lock.unlock();
+    for (auto iter = copy_meta_map.begin(); iter != copy_meta_map.end();) {
+        SharedPtr<Meta> &meta = iter->second;
         bool all_delete = meta->PickCleanup(scanner);
-        lock.lock();
         // if (all_delete) {
         //     LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
         //     scanner->AddMeta(std::move(meta));
-        //     iter = meta_map_.erase(iter);
+        //     iter = copy_meta_map.erase(iter);
         // } else {
         //     ++iter;
         // }
-        ++iter; // FIXME(sys): remove empty meta need crab latch in entry list operation
+        ++iter;
     }
 }
 

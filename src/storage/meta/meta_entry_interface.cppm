@@ -34,7 +34,7 @@ public:
 };
 
 export template <typename Meta>
-concept MetaConcept = std::derived_from<Meta, MetaInterface>;
+concept MetaConcept = requires { typename Meta::MetaOp; } and std::derived_from<Meta, MetaInterface>;
 
 export class EntryInterface {
 public:

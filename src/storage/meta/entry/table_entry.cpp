@@ -118,39 +118,10 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
     }
+    auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
-    TableIndexMeta *table_index_meta{nullptr};
-
-    // TODO: lock granularity can be narrowed.
-    this->rw_locker().lock_shared();
-    if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
-        table_index_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
-
-    if (table_index_meta == nullptr) {
-
-        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_);
-
-        {
-            if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddIndexMetaOp>(new_table_index_meta.get(), begin_ts);
-                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-            }
-        }
-
-        table_index_meta = new_table_index_meta.get();
-
-        this->rw_locker().lock();
-
-        if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
-            table_index_meta = iter->second.get();
-        } else {
-
-            this->index_meta_map()[*index_base->index_name_] = std::move(new_table_index_meta);
-        }
-        this->rw_locker().unlock();
-    }
+    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta), txn_id, begin_ts, txn_mgr);
+    r_lock.unlock(); // TODO(sys)
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     return table_index_meta->CreateTableIndexEntry(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);

@@ -78,44 +78,12 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  TxnManager *txn_mgr,
                                                  ConflictType conflict_type) {
     const String &table_name = *table_collection_name;
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this); };
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta), txn_id, begin_ts, txn_mgr);
+    r_lock.unlock(); // TODO(sys)
 
-    // Check if there is table_meta with the table_name
-    TableMeta *table_meta{nullptr};
-    this->rw_locker().lock_shared();
-    auto table_iter = this->table_meta_map().find(table_name);
-    if (table_iter != this->table_meta_map().end()) {
-        table_meta = table_iter->second.get();
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *this->db_entry_dir_));
-
-    } else {
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Create new table/collection: {}", table_name));
-        UniquePtr<TableMeta> new_table_meta = TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this);
-        table_meta = new_table_meta.get();
-
-        if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddTableMetaOp>(table_meta, begin_ts);
-            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-        }
-
-        this->rw_locker().lock();
-        auto table_iter2 = this->table_meta_map().find(table_name);
-        if (table_iter2 != this->table_meta_map().end()) {
-            table_meta = table_iter2->second.get();
-        } else {
-            this->table_meta_map()[table_name] = std::move(new_table_meta);
-        }
-        this->rw_locker().unlock();
-
-        LOG_TRACE(fmt::format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
-    }
-
-    auto table_entry = table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
-
-    return table_entry;
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
+    return table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_name,

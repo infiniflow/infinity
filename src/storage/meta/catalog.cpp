@@ -64,44 +64,16 @@ Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)) {}
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-
-    // Check if there is db_meta with the db_name
-    DBMeta *db_meta{nullptr};
-
-    this->rw_locker().lock_shared();
-    auto db_iter = this->db_meta_map().find(db_name);
-    if (db_iter != this->db_meta_map().end()) {
-        // Find the db
-        db_meta = db_iter->second.get();
-        this->rw_locker().unlock_shared();
-    } else {
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Create new database: {}", db_name));
+    auto init_db_meta = [&]() {
         // Not find the db and create new db meta
         Path catalog_path(*this->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
         // Physical wal log
-        UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
-
-        // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
-        // In replay phase, not need to recording the catalog delta operation.
-        if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddDBMetaOp>(new_db_meta.get(), begin_ts);
-            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-        }
-
-        db_meta = new_db_meta.get();
-        this->rw_locker().lock();
-        auto db_iter2 = this->db_meta_map().find(db_name);
-        if (db_iter2 == this->db_meta_map().end()) {
-            this->db_meta_map()[db_name] = std::move(new_db_meta);
-        } else {
-            db_meta = db_iter2->second.get();
-        }
-        this->rw_locker().unlock();
-    }
+        return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
+    };
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
+    r_lock.unlock(); // TODO(sys)
 
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
     return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
