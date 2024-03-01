@@ -22,6 +22,7 @@ import posting_iterator;
 import index_defines;
 import segment;
 import index_config;
+import match_data;
 namespace infinity {
 export class DocIterator {
 public:
@@ -46,6 +47,8 @@ public:
     virtual void DoSeek(docid_t doc_id) = 0;
 
     virtual u32 GetDF() const = 0;
+
+    virtual bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) { return false; }
 
 protected:
     docid_t doc_id_;

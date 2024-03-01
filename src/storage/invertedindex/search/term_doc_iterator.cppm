@@ -25,10 +25,11 @@ import term_meta;
 import segment;
 import index_config;
 import doc_iterator;
+import match_data;
 namespace infinity {
 export class TermDocIterator : public DocIterator {
 public:
-    TermDocIterator(PostingIterator *iter);
+    TermDocIterator(PostingIterator *iter, u64 column_id);
 
     virtual ~TermDocIterator();
 
@@ -38,7 +39,17 @@ public:
 
     u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }
 
+    bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) override {
+        if (doc_id == doc_id_) {
+            match_data.doc_id_ = doc_id_;
+            iter_->GetTermMatchData(match_data);
+            return true;
+        }
+        return false;
+    }
+
 private:
+    u64 column_id_;
     PostingIterator *iter_ = nullptr;
 };
 } // namespace infinity
