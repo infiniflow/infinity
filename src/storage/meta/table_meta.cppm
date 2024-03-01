@@ -37,7 +37,7 @@ namespace infinity {
 class DBEntry;
 class TxnManager;
 
-export struct TableMeta : public MetaInterface {
+export struct TableMeta : public MetaInterface, public BaseMeta {
     using EntryT = TableEntry;
 
     friend class DBEntry;
@@ -95,7 +95,7 @@ private:
     List<SharedPtr<TableEntry>> &table_entry_list() { return table_entry_list_.entry_list_; }
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 };

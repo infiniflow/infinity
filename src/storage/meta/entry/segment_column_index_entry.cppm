@@ -73,7 +73,7 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    virtual void Cleanup() && override;
+    virtual void Cleanup() override;
 
     virtual void PickCleanup(CleanupScanner *scanner) override;
 

@@ -221,7 +221,7 @@ public: // TODO: remote it?
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() && override;
+    void Cleanup() override;
 };
 
 } // namespace infinity

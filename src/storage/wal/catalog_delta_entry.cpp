@@ -174,7 +174,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), index_name);
+            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), std::move(index_name));
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
@@ -183,8 +183,15 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            operation =
-                MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_base);
+            operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
+                                                         is_delete,
+                                                         txn_id,
+                                                         commit_ts,
+                                                         std::move(db_name),
+                                                         std::move(table_name),
+                                                         std::move(index_name),
+                                                         index_dir,
+                                                         index_base);
             break;
         }
         case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
@@ -192,7 +199,14 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddFulltextIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir);
+            operation = MakeUnique<AddFulltextIndexEntryOp>(begin_ts,
+                                                            is_delete,
+                                                            txn_id,
+                                                            commit_ts,
+                                                            std::move(db_name),
+                                                            std::move(table_name),
+                                                            std::move(index_name),
+                                                            index_dir);
             break;
         }
         case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
@@ -203,8 +217,16 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
 
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            operation = MakeUnique<
-                AddColumnIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, col_index_dir, column_id, index_base);
+            operation = MakeUnique<AddColumnIndexEntryOp>(begin_ts,
+                                                          is_delete,
+                                                          txn_id,
+                                                          commit_ts,
+                                                          std::move(db_name),
+                                                          std::move(table_name),
+                                                          std::move(index_name),
+                                                          col_index_dir,
+                                                          column_id,
+                                                          index_base);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
@@ -219,9 +241,9 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                                  is_delete,
                                                                  txn_id,
                                                                  commit_ts,
-                                                                 db_name,
-                                                                 table_name,
-                                                                 index_name,
+                                                                 std::move(db_name),
+                                                                 std::move(table_name),
+                                                                 std::move(index_name),
                                                                  column_id,
                                                                  segment_id,
                                                                  min_ts,
@@ -326,31 +348,31 @@ void AddIndexMetaOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, *this->index_name_);
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
     index_base_->WriteAdv(buf);
 }
 
 void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
 }
 
 void AddColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->col_index_dir_);
     WriteBufAdv(buf, this->column_id_);
     index_base_->WriteAdv(buf);
@@ -358,9 +380,9 @@ void AddColumnIndexEntryOp::WriteAdv(char *&buf) const {
 
 void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->column_id_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->min_ts_);
@@ -438,17 +460,11 @@ void AddColumnEntryOp::SaveState() {
 }
 
 /// Related to index
-void AddIndexMetaOp::SaveState() {
-    this->index_name_ = this->index_meta_->index_name();
-    is_saved_sate_ = true;
-}
+void AddIndexMetaOp::SaveState() { is_saved_sate_ = true; }
 
 void AddTableIndexEntryOp::SaveState() {
     this->is_delete_ = table_index_entry_->deleted_;
     this->begin_ts_ = table_index_entry_->begin_ts_;
-    this->db_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
     if (!this->is_delete_) {
         this->index_dir_ = *this->table_index_entry_->index_dir();
         this->index_base_ = this->table_index_entry_->table_index_def();
@@ -459,9 +475,6 @@ void AddTableIndexEntryOp::SaveState() {
 void AddFulltextIndexEntryOp::SaveState() {
     this->is_delete_ = fulltext_index_entry_->deleted_;
     this->begin_ts_ = fulltext_index_entry_->begin_ts_;
-    this->db_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->fulltext_index_entry_->table_index_entry()->table_index_meta()->index_name();
     this->index_dir_ = this->fulltext_index_entry_->index_dir();
     is_saved_sate_ = true;
 }
@@ -469,9 +482,6 @@ void AddFulltextIndexEntryOp::SaveState() {
 void AddColumnIndexEntryOp::SaveState() {
     this->is_delete_ = column_index_entry_->deleted_;
     this->begin_ts_ = column_index_entry_->begin_ts_;
-    this->db_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->column_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->column_index_entry_->table_index_entry()->table_index_meta()->index_name();
     this->col_index_dir_ = *this->column_index_entry_->col_index_dir();
     this->column_id_ = this->column_index_entry_->column_id();
     this->index_base_ = this->column_index_entry_->index_base();
@@ -481,11 +491,6 @@ void AddColumnIndexEntryOp::SaveState() {
 void AddSegmentColumnIndexEntryOp::SaveState() {
     this->is_delete_ = segment_column_index_entry_->deleted_;
     this->begin_ts_ = segment_column_index_entry_->begin_ts_;
-    this->db_name_ = *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ =
-        *this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->segment_column_index_entry_->column_index_entry()->table_index_entry()->table_index_meta()->index_name();
-    this->column_id_ = this->segment_column_index_entry_->column_index_entry()->column_id();
     this->segment_id_ = this->segment_column_index_entry_->segment_id();
     this->min_ts_ = this->segment_column_index_entry_->min_ts();
     this->max_ts_ = this->segment_column_index_entry_->max_ts();
@@ -559,31 +564,31 @@ const String AddColumnEntryOp::ToString() const {
 }
 
 const String AddIndexMetaOp::ToString() const {
-    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, index_name_);
+    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
 }
 
 const String AddTableIndexEntryOp::ToString() const {
     return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
-                       db_name_,
-                       table_name_,
-                       index_name_,
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
                        index_dir_,
                        index_base_->ToString());
 }
 
 const String AddFulltextIndexEntryOp::ToString() const {
     return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}",
-                       db_name_,
-                       table_name_,
-                       index_name_,
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
                        index_dir_);
 }
 
 const String AddColumnIndexEntryOp::ToString() const {
     return fmt::format("AddColumnIndexEntryOp db_name: {} table_name: {} index_name: {} col_index_dir: {} column_id: {} index_base: {}",
-                       db_name_,
-                       table_name_,
-                       index_name_,
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
                        col_index_dir_,
                        column_id_,
                        index_base_->ToString());
@@ -591,9 +596,9 @@ const String AddColumnIndexEntryOp::ToString() const {
 
 const String AddSegmentColumnIndexEntryOp::ToString() const {
     return fmt::format("AddSegmentColumnIndexEntryOp db_name: {} table_name: {} index_name: {} column_id: {} segment_id: {} min_ts: {} max_ts: {}",
-                       db_name_,
-                       table_name_,
-                       index_name_,
+                       *db_name_,
+                       *table_name_,
+                       *index_name_,
                        column_id_,
                        segment_id_,
                        min_ts_,

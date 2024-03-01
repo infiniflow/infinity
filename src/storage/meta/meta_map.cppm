@@ -36,7 +36,7 @@ public:
 
     void PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup() &&;
+    void Cleanup();
 
 public:                                     // TODO: make both private
     mutable std::shared_mutex rw_locker_{}; // FIX
@@ -73,9 +73,10 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
 }
 
 template <MetaConcept Meta>
-void MetaMap<Meta>::Cleanup() && {
+void MetaMap<Meta>::Cleanup() {
     for (auto &[name, meta] : meta_map_) {
-        std::move(*meta).Cleanup();
+        meta->SetCleanuped();
+        meta->Cleanup();
     }
 }
 

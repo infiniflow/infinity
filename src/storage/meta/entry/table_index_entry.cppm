@@ -116,7 +116,7 @@ private:
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

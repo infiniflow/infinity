@@ -148,9 +148,10 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
-void ColumnIndexEntry::Cleanup() && {
+void ColumnIndexEntry::Cleanup() {
+    SetCleanuped();
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
-        std::move(*segment_column_index_entry).Cleanup();
+        segment_column_index_entry->Cleanup();
     }
     LocalFileSystem fs;
     fs.DeleteEmptyDirectory(*col_index_dir_);

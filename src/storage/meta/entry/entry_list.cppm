@@ -57,7 +57,7 @@ public:
 
     bool PickCleanup(CleanupScanner *scanner);
 
-    void Cleanup() &&;
+    void Cleanup();
 
     void MergeWith(EntryList<Entry> &other);
 
@@ -145,6 +145,7 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
         }
         case FindResult::kUncommitted:
         case FindResult::kFound: {
+            entry->Cleanup();
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore Add an existed entry."));
@@ -158,6 +159,7 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
             }
         }
         case FindResult::kConflict: {
+            entry->Cleanup();
             UniquePtr<String> err_msg = MakeUnique<String>(
                 fmt::format("Write-write conflict: There is a committing/committed entry which is later than current transaction."));
             LOG_ERROR(*err_msg);
@@ -311,16 +313,14 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
 }
 
 template <EntryConcept Entry>
-void EntryList<Entry>::Cleanup() && {
-    if (entry_list_.empty()) {
-        return;
-    }
+void EntryList<Entry>::Cleanup() {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->deleted_) {
             continue;
         }
-        std::move(*entry).Cleanup();
+        entry->SetCleanuped();
+        entry->Cleanup();
     }
 }
 

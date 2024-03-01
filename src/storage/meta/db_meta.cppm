@@ -35,7 +35,7 @@ namespace infinity {
 
 struct Catalog;
 
-export struct DBMeta : public MetaInterface {
+export struct DBMeta : public MetaInterface, public BaseMeta {
     using EntryT = DBEntry;
 
     friend struct Catalog;
@@ -73,7 +73,7 @@ private:
     SharedPtr<String> data_dir_{};
 
 public:
-    void Cleanup() && override;
+    void Cleanup()  override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

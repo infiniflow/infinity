@@ -53,7 +53,7 @@ public:
     static SharedPtr<FulltextIndexEntry>
     Deserialize(const nlohmann::json &index_def_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr);
 
-    void Cleanup() &&;
+    void Cleanup();
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);

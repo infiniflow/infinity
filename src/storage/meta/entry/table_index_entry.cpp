@@ -261,11 +261,11 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
     return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
 }
 
-void TableIndexEntry::Cleanup() && {
+void TableIndexEntry::Cleanup() {
     for (auto &[column_id, column_index_entry] : column_index_map_) {
-        std::move(*column_index_entry).Cleanup();
+        column_index_entry->Cleanup();
     }
-    std::move(*fulltext_index_entry_).Cleanup();
+    fulltext_index_entry_->Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
     LocalFileSystem fs;

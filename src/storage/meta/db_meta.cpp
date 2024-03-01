@@ -121,7 +121,7 @@ void DBMeta::MergeFrom(DBMeta &other) {
     this->db_entry_list_.MergeWith(db_entry_list_);
 }
 
-void DBMeta::Cleanup() && { std::move(db_entry_list_).Cleanup(); }
+void DBMeta::Cleanup() { db_entry_list_.Cleanup(); }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
 

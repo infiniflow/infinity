@@ -74,7 +74,7 @@ public:
 
     void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
 
-    void Cleanup() &&;
+    void Cleanup();
 
 public:
     // Getter

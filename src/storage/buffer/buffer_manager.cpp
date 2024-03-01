@@ -45,7 +45,7 @@ BufferObj *BufferManager::Allocate(UniquePtr<FileWorker> file_worker) {
     std::unique_lock w_locker(rw_locker_);
     if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
         iter->second->Cleanup();
-        buffer_map_.erase(iter); // FIXME(sys): should not find it
+        buffer_map_.erase(iter);
     }
     buffer_map_.emplace(file_path, std::move(buffer_obj));
     return res;

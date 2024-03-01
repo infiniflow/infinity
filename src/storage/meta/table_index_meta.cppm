@@ -34,7 +34,7 @@ class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
 
-export class TableIndexMeta : public MetaInterface {
+export class TableIndexMeta : public MetaInterface, public BaseMeta {
     friend struct TableEntry;
 
 public:
@@ -73,7 +73,7 @@ private:
     void MergeFrom(TableIndexMeta &other);
 
 public:
-    String index_name() const { return *index_name_; }
+    const SharedPtr<String> &index_name() const { return index_name_; }
 
 private:
     SharedPtr<String> index_name_{};
@@ -90,7 +90,7 @@ public:
     List<SharedPtr<TableIndexEntry>> &index_entry_list() { return index_entry_list_.entry_list_; }
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
 

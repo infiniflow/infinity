@@ -159,7 +159,7 @@ void TableMeta::MergeFrom(TableMeta &other) {
     this->table_entry_list_.MergeWith(other.table_entry_list_);
 }
 
-void TableMeta::Cleanup() && { std::move(table_entry_list_).Cleanup(); }
+void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
 

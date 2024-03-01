@@ -301,8 +301,8 @@ void DBEntry::MergeFrom(BaseEntry &other) {
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
-void DBEntry::Cleanup() && {
-    std::move(table_meta_map_).Cleanup();
+void DBEntry::Cleanup() {
+    table_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
     LocalFileSystem fs;

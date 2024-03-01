@@ -108,7 +108,7 @@ FulltextIndexEntry::Deserialize(const nlohmann::json &index_def_entry_json, Tabl
     return fulltext_index_entry;
 }
 
-void FulltextIndexEntry::Cleanup() && {
+void FulltextIndexEntry::Cleanup() {
     // FIXME: remove the index
 }
 

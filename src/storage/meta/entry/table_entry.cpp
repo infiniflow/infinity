@@ -733,11 +733,11 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
     index_meta_map_.Iterate([&](auto *meta) { meta->PickCleanupBySegments(cleanup_segment_ids, scanner); });
 }
 
-void TableEntry::Cleanup() && {
+void TableEntry::Cleanup() {
     for (auto &[segment_id, segment] : segment_map_) {
-        std::move(*segment).Cleanup();
+        segment->Cleanup();
     }
-    std::move(index_meta_map_).Cleanup();
+    index_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *table_entry_dir_));
     LocalFileSystem fs;
