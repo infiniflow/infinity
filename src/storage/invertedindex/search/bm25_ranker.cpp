@@ -14,20 +14,22 @@
 
 module;
 
-module term_doc_iterator;
+#include <cmath>
+
+module bm25_ranker;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import bitmap;
-import index_defines;
-import term_meta;
-import doc_iterator;
+
 namespace infinity {
-TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id) : column_id_(column_id), iter_(iter) {}
 
-TermDocIterator::~TermDocIterator() {}
+constexpr float k1 = 1.2F;
+constexpr float b = 0.75F;
 
-void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
+BM25Ranker::BM25Ranker(u64 total_df) : total_df_(std::max(total_df, 1UL)) {}
 
+void BM25Ranker::AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len) {
+    float smooth_idf = std::log(1.0F + (total_df_ - df + 0.5F) / (df + 0.5F));
+    float smooth_tf = (k1 + 1.0F) * tf / (tf + k1 * (1.0F - b + b * column_len / avg_column_len));
+    score_ += smooth_idf * smooth_tf;
+}
 } // namespace infinity
