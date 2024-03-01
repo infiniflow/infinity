@@ -68,7 +68,7 @@ import subquery_reference;
 import join_reference;
 import cross_product_reference;
 import data_type;
-
+import logical_type;
 import base_entry;
 import view_entry;
 
@@ -184,7 +184,9 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
+            RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
+        }
         bound_select_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
 
