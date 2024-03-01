@@ -14,6 +14,9 @@
 
 module;
 
+#include <type_traits>
+#include <vector>
+
 export module meta_map;
 
 import stl;
@@ -23,8 +26,15 @@ import meta_entry_interface;
 import third_party;
 import logger;
 import txn_manager;
+import extra_ddl_info;
+import status;
+import infinity_exception;
 
 namespace infinity {
+
+class TableMeta;
+class DBMeta;
+class TableIndexMeta;
 
 export template <MetaConcept Meta>
 class MetaMap {
@@ -34,6 +44,8 @@ public:
 public:
     Tuple<Meta *, std::shared_lock<std::shared_mutex>>
     GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+
+    Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> GetExistMeta(const String &name, ConflictType conflict_type);
 
     void Iterate(std::function<void(Meta *)> func);
 
@@ -82,6 +94,29 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
 }
 
 template <MetaConcept Meta>
+Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExistMeta(const String &name, ConflictType conflict_type) {
+    std::shared_lock r_lock(rw_locker_);
+    if (auto iter = meta_map_.find(name); iter != meta_map_.end()) {
+        return {iter->second.get(), Status::OK(), std::move(r_lock)};
+    }
+    if (conflict_type == ConflictType::kIgnore) {
+        LOG_TRACE(fmt::format("Ignore drop a non-exist meta: {}", name));
+        return {nullptr, Status::OK(), std::move(r_lock)};
+    }
+    auto err_msg = MakeUnique<String>(fmt::format("Attempt to drop non-exist entry {}", name));
+    LOG_ERROR(*err_msg);
+    if constexpr (std::is_same_v<Meta, TableMeta>) {
+        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg)), std::move(r_lock)};
+    } else if constexpr (std::is_same_v<Meta, DBMeta>) {
+        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg)), std::move(r_lock)};
+    } else if constexpr (std::is_same_v<Meta, TableIndexMeta>) {
+        return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg)), std::move(r_lock)};
+    } else {
+        UnrecoverableError("Unimplemented");
+    }
+}
+
+template <MetaConcept Meta>
 void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
     std::unique_lock lock(rw_locker_);
     for (auto &[name, meta] : meta_map_) {
@@ -93,22 +128,24 @@ template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
     Map copy_meta_map;
     {
-        std::unique_lock lock(rw_locker_);
+        std::unique_lock w_lock(rw_locker_);
         copy_meta_map = meta_map_;
     }
 
-    for (auto iter = copy_meta_map.begin(); iter != copy_meta_map.end();) {
-        SharedPtr<Meta> &meta = iter->second;
-        bool all_delete = meta->PickCleanup(scanner);
-        // if (all_delete) {
-        //     LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
-        //     scanner->AddMeta(std::move(meta));
-        //     iter = copy_meta_map.erase(iter);
-        // } else {
-        //     ++iter;
-        // }
-        ++iter;
+    for (auto [name, meta] : copy_meta_map) {
+        meta->PickCleanup(scanner);
     }
+    // {
+    //     std::unique_lock w_lock(rw_locker_);
+    //     for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+    //         if (iter->second->Empty()) {
+    //             LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
+    //             iter = meta_map_.erase(iter);
+    //         } else {
+    //             ++iter;
+    //         }
+    //     }
+    // }
 }
 
 template <MetaConcept Meta>

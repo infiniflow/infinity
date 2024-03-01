@@ -81,6 +81,8 @@ public:
 
     bool PickCleanup(CleanupScanner *scanner) override;
 
+    bool Empty() override { return db_entry_list_.Empty(); }
+
 private:
     EntryList<DBEntry> db_entry_list_{};
 

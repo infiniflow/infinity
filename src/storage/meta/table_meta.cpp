@@ -60,34 +60,29 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
                                                       TxnTimeStamp begin_ts,
                                                       TxnManager *txn_mgr,
                                                       ConflictType conflict_type) {
-    SharedPtr<TableEntry> table_entry =
-        TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
-    auto [table_entry_ptr, status] = table_entry_list_.AddEntry(table_entry, txn_id, begin_ts, txn_mgr, conflict_type);
-    if (status.code() == ErrorCode::kDuplicateDatabaseName) {
-        return {table_entry_ptr, Status::DuplicateTable(*table_collection_name_ptr)};
-    }
-    return {table_entry_ptr, status};
+    auto init_table_entry = [&]() {
+        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
+    };
+    return table_entry_list_.AddEntry(std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status>
 TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type) {
-    Vector<SharedPtr<ColumnDef>> dummy_columns;
-    SharedPtr<TableEntry> drop_entry =
-        TableEntry::NewTableEntry(true, this->db_entry_dir_, this->table_name_, dummy_columns, TableEntryType::kTableEntry, this, txn_id, begin_ts);
-    auto [table_entry_ptr, status] = table_entry_list_.DropEntry(drop_entry, txn_id, begin_ts, txn_mgr, conflict_type);
-    if (status.code() == ErrorCode::kDBNotExist) {
-        return {table_entry_ptr, Status::TableNotExist(table_name)};
-    }
-    return {table_entry_ptr, status};
+    auto init_drop_entry = [&]() {
+        Vector<SharedPtr<ColumnDef>> dummy_columns;
+        return TableEntry::NewTableEntry(true,
+                                         this->db_entry_dir_,
+                                         this->table_name_,
+                                         dummy_columns,
+                                         TableEntryType::kTableEntry,
+                                         this,
+                                         txn_id,
+                                         begin_ts);
+    };
+    return table_entry_list_.DropEntry(std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [table_entry_ptr, status] = table_entry_list_.GetEntry(txn_id, begin_ts);
-    if (status.code() == ErrorCode::kDBNotExist) {
-        return {table_entry_ptr, Status::TableNotExist(*this->table_name_)};
-    }
-    return {table_entry_ptr, status};
-}
+Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return table_entry_list_.GetEntry(txn_id, begin_ts); }
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { table_entry_list_.DeleteEntry(txn_id); }
 

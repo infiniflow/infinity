@@ -129,31 +129,11 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
 
 Tuple<TableIndexEntry *, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableIndexMeta *index_meta{nullptr};
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        index_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, conflict_type);
+    r_lock.unlock(); // TODO(sys)
     if (index_meta == nullptr) {
-        switch (conflict_type) {
-
-            case ConflictType::kIgnore: {
-                return {nullptr, Status::OK()};
-            }
-            case ConflictType::kError: {
-                String error_message = fmt::format("Attempt to drop not existed index entry {}", index_name);
-                LOG_TRACE(error_message);
-                return {nullptr, Status(ErrorCode::kIndexNotExist, error_message.c_str())};
-            }
-            default: {
-                UnrecoverableError("Invalid conflict type.");
-            }
-        }
-        UnrecoverableError("Should not reach here.");
+        return {nullptr, status};
     }
-    LOG_TRACE(fmt::format("Drop index entry {}", index_name));
     return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
 }
 

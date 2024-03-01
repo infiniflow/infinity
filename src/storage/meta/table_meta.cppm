@@ -102,6 +102,8 @@ public:
     void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
+
+    bool Empty() override { return table_entry_list_.Empty(); }
 };
 
 } // namespace infinity

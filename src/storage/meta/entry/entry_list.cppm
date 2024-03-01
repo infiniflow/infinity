@@ -14,6 +14,8 @@
 
 module;
 
+#include <type_traits>
+
 export module entry_list;
 
 import stl;
@@ -31,6 +33,10 @@ import txn_state;
 
 namespace infinity {
 
+class DBEntry;
+class TableEntry;
+class TableIndexEntry;
+
 export template <EntryConcept Entry>
 class EntryList {
     enum class FindResult : u8 {
@@ -45,11 +51,17 @@ public:
     using Iterator = typename List<SharedPtr<Entry>>::iterator;
 
 public:
-    Tuple<Entry *, Status>
-    AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type);
+    Tuple<Entry *, Status> AddEntry(std::function<SharedPtr<Entry>()> &&init_func,
+                                    TransactionID txn_id,
+                                    TxnTimeStamp begin_ts,
+                                    TxnManager *txn_mgr,
+                                    ConflictType conflict_type);
 
-    Tuple<Entry *, Status>
-    DropEntry(SharedPtr<Entry> drop_entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type);
+    Tuple<Entry *, Status> DropEntry(std::function<SharedPtr<Entry>()> &&init_func,
+                                     TransactionID txn_id,
+                                     TxnTimeStamp begin_ts,
+                                     TxnManager *txn_mgr,
+                                     ConflictType conflict_type);
 
     Tuple<Entry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -62,6 +74,11 @@ public:
     void MergeWith(EntryList<Entry> &other);
 
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
+
+    bool Empty() {
+        std::shared_lock r_lock(rw_locker_);
+        return entry_list_.empty();
+    }
 
 private:
     FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -128,13 +145,17 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status>
-EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
+Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::function<SharedPtr<Entry>()> &&init_func,
+                                                  TransactionID txn_id,
+                                                  TxnTimeStamp begin_ts,
+                                                  TxnManager *txn_mgr,
+                                                  ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
+            SharedPtr<Entry> entry = init_func();
             entry_list_.push_front(entry);
             if (txn_mgr != nullptr) {
                 auto op = MakeUnique<typename Entry::EntryOp>(entry);
@@ -145,7 +166,6 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
         }
         case FindResult::kUncommitted:
         case FindResult::kFound: {
-            entry->Cleanup();
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore Add an existed entry."));
@@ -154,12 +174,19 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
                 default: {
                     UniquePtr<String> err_msg = MakeUnique<String>("Duplicated entry");
                     LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
+                    if constexpr (std::is_same_v<Entry, DBEntry>) {
+                        return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
+                    } else if constexpr (std::is_same_v<Entry, TableEntry>) {
+                        return {nullptr, Status(ErrorCode::kDuplicateTableName, std::move(err_msg))};
+                    } else if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                        return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
+                    } else {
+                        UnrecoverableError("Unimplemented");
+                    }
                 }
             }
         }
         case FindResult::kConflict: {
-            entry->Cleanup();
             UniquePtr<String> err_msg = MakeUnique<String>(
                 fmt::format("Write-write conflict: There is a committing/committed entry which is later than current transaction."));
             LOG_ERROR(*err_msg);
@@ -172,7 +199,7 @@ EntryList<Entry>::AddEntry(SharedPtr<Entry> entry, TransactionID txn_id, TxnTime
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
+Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::function<SharedPtr<Entry>()> &&init_func,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnManager *txn_mgr,
@@ -188,13 +215,22 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
                     return {nullptr, Status::OK()};
                 }
                 default: {
-                    UniquePtr<String> err_msg = MakeUnique<String>("Not exisited entry.");
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status::DBNotExist("")};
+                    auto err_msg = MakeUnique<String>("Not existed entry.");
+                    // LOG_ERROR(*err_msg);
+                    if constexpr (std::is_same_v<Entry, DBEntry>) {
+                        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+                    } else if constexpr (std::is_same_v<Entry, TableEntry>) {
+                        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+                    } else if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                        return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+                    } else {
+                        UnrecoverableError("Unimplemented");
+                    }
                 }
             }
         }
         case FindResult::kUncommitted: {
+            SharedPtr<Entry> drop_entry = init_func();
             Entry *drop_entry_ptr = entry_list_.front().get();
             entry_list_.pop_front();
             if (txn_mgr != nullptr) {
@@ -205,6 +241,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
             return {drop_entry_ptr, Status::OK()};
         }
         case FindResult::kFound: {
+            SharedPtr<Entry> drop_entry = init_func();
             entry_list_.push_front(drop_entry);
             if (txn_mgr != nullptr) {
                 auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
@@ -214,7 +251,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(SharedPtr<Entry> drop_entry,
             return {drop_entry.get(), Status::OK()};
         }
         case FindResult::kConflict: {
-            UniquePtr<String> err_msg = MakeUnique<String>(
+            auto err_msg = MakeUnique<String>(
                 fmt::format("Write-write conflict: There is a committing/committed entry which is later than current transaction."));
             LOG_ERROR(*err_msg);
             return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
@@ -255,7 +292,17 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
     }
     switch (find_res) {
         case FindResult::kNotFound: {
-            return {nullptr, Status::DBNotExist("")};
+            auto err_msg = MakeUnique<String>("Not existed entry.");
+            // LOG_ERROR(*err_msg);
+            if constexpr (std::is_same_v<Entry, DBEntry>) {
+                return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+            } else if constexpr (std::is_same_v<Entry, TableEntry>) {
+                return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+            } else if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+            } else {
+                UnrecoverableError("Unimplemented");
+            }
         }
         case FindResult::kFound: {
             return {entry_ptr, Status::OK()};

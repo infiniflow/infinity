@@ -91,25 +91,11 @@ Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_na
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_collection_name, conflict_type);
+    r_lock.unlock(); // TODO(sys)
     if (table_meta == nullptr) {
-        if (conflict_type == ConflictType::kIgnore) {
-            LOG_TRACE(fmt::format("Ignore drop a not existed table/collection entry {}", table_collection_name));
-            return {nullptr, Status::OK()};
-        }
-
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
-
-    LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
     return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
