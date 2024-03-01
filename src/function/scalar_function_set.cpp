@@ -15,14 +15,17 @@
 module;
 
 #include <sstream>
+
+module scalar_function_set;
+
 import stl;
 import base_expression;
 import scalar_function;
 
 import infinity_exception;
 import cast_table;
-
-module scalar_function_set;
+import logger;
+import status;
 
 namespace infinity {
 
@@ -54,12 +57,14 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
     if (candidates_index.empty()) {
         // No matched function
         std::stringstream ss;
-        ss << "Can't find matched function for " << FunctionSet::ToString(name_, input_arguments) << std::endl;
+        String function_str = FunctionSet::ToString(name_, input_arguments);
+        ss << "Can't find matched function for " << function_str << std::endl;
         ss << "Candidate functions: " << std::endl;
         for (auto &function : functions_) {
             ss << function.ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        LOG_ERROR(ss.str());
+        RecoverableError(Status::FunctionNotFound(function_str));
     }
 
     if (candidates_index.size() > 1) {

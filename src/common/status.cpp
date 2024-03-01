@@ -325,10 +325,15 @@ Status Status::InvalidIndexParam(const String &param_name) {
 
 Status Status::LackIndexParam() { return Status(ErrorCode::kLackIndexParam, MakeUnique<String>("Lack index parameter")); }
 
+Status Status::InvalidFilterExpression(const String &expr_str) {
+    return Status(ErrorCode::kInvalidFilterExpression, MakeUnique<String>(fmt::format("Invalid expression in where clause: {} expression", expr_str)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
 }
+
 Status Status::TxnConflict(u64 txn_id, const String &conflict_reason) {
     return Status(ErrorCode::kTxnConflict,
                   MakeUnique<String>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
