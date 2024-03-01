@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
+from common import common_type as ct
 from common import common_values
 import infinity
 import infinity.index as index
@@ -380,7 +381,7 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="TODO")
+    # @pytest.mark.skip(reason="TODO")
     def test_read_after_shutdown(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
@@ -536,7 +537,8 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.skip(reason="TODO")
+    # @pytest.mark.tag(ct.CaseLabel.L0)
+    @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
 
         os.system("rm -fr /tmp/infinity")
