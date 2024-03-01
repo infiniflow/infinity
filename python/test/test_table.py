@@ -15,7 +15,7 @@ import concurrent.futures
 import pytest
 import polars as pl
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -432,6 +432,7 @@ class TestTable:
             print(e)
 
     # create/drop/describe/get 1000 tables with 10000 columns with various column types.
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
     def test_various_tables_with_various_columns(self):
         # connect
@@ -624,6 +625,7 @@ class TestTable:
         assert res.error_code == ErrorCode.OK
 
     # create/drop/list/get 1M table to reach the limit
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_1M_table(self):
         """

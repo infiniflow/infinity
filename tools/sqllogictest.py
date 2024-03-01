@@ -6,6 +6,7 @@ import threading
 import time
 from shutil import copyfile
 import subprocess
+import signal
 
 from generate_big import generate as generate1
 from generate_fvecs import generate as generate2
@@ -35,7 +36,7 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def python_sdk_test(python_test_dir: str):
+def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # os.system(f"cd {python_test_dir}/test")
     # check if infinity_sdk is installed
@@ -46,7 +47,7 @@ def python_sdk_test(python_test_dir: str):
     # run test
     print("start pysdk test...")
     process = subprocess.Popen(
-        ["python", "-m", "pytest", f"{python_test_dir}/test"],
+        ["python", "-m", "pytest", '-m', pytest_mark, f'{python_test_dir}/test'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
@@ -151,6 +152,13 @@ if __name__ == "__main__":
         dest="data",
     )
     parser.add_argument(
+        "-m",
+        "--pytest_mark",
+        type=str,
+        default='not complex and not slow',
+        dest="pytest_mark",
+    )
+    parser.add_argument(
         "-c",
         "--copy",
         type=str,
@@ -189,7 +197,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            python_sdk_test(python_test_dir)
+            python_sdk_test(python_test_dir, args.pytest_mark)
             test_process(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)

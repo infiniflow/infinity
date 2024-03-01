@@ -13,6 +13,8 @@
 # limitations under the License.
 import os
 import signal
+import time
+
 
 import pandas as pd
 import pytest
@@ -537,6 +539,8 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.complex
+    # @pytest.mark.skip(reason="complex")
     # @pytest.mark.tag(ct.CaseLabel.L0)
     @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
@@ -563,6 +567,8 @@ class TestInsert:
 
         # shutdown service
         os.kill(infinity_service_1.pid, signal.SIGINT)
+
+        time.sleep(1)
 
         # restart
         infinity_service_2 = start_infinity_service_in_subporcess()

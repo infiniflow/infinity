@@ -2,8 +2,10 @@ import pytest
 from infinity.errors import ErrorCode
 
 from common import common_values
-from python import infinity
-from python.infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
+import infinity
+from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
+
 
 
 class TestConvert:
