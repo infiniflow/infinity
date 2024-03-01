@@ -35,26 +35,34 @@ export struct MatchData {
 };
 
 class TermDocIterator;
-export class MatchDataManager {
+export class Scorer {
 public:
-    MatchDataManager();
+    Scorer(u64 num_of_docs);
 
-    ~MatchDataManager() = default;
+    ~Scorer() = default;
+
+    void InitRanker(const Map<u64, double> &weight_map);
 
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
-    void FetchMatchData(docid_t doc_id);
+    float Score(docid_t doc_id);
 
 private:
     u32 GetOrSetColumnIndex(u64 column_id);
+
+    double GetAvgColumnLength(u64 column_id);
 
     struct Hash {
         inline u64 operator()(const u64 &val) const { return val; }
     };
 
+    u64 total_df_;
     u32 column_counter_{0};
     FlatHashMap<u64, u32, Hash> column_index_map_;
+    Vector<u64> column_ids_;
     Vector<Vector<TermDocIterator *>> iterators_;
+    Vector<double> column_weights_;
+    Vector<double> avg_column_length_;
     UniquePtr<ColumnLengthReader> column_length_reader_;
     MatchData match_data_;
 };

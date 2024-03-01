@@ -57,6 +57,9 @@ public:
     void GetTermMatchData(TermColumnMatchData &match_data) {
         DecodeTFBuffer();
         DecodeDocPayloadBuffer();
+        if (need_move_to_current_doc_) {
+            MoveToCurrentDoc();
+        }
         if (posting_option_.HasTfList()) {
             match_data.tf_ = tf_buffer_[GetDocOffsetInBuffer()];
         }

@@ -21,7 +21,15 @@ import stl;
 namespace infinity {
 export class BM25Ranker {
 public:
-    BM25Ranker();
-    ~BM25Ranker();
+    BM25Ranker(u64 total_df);
+    ~BM25Ranker() = default;
+
+    void AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len);
+
+    float GetScore() { return score_; }
+
+private:
+    float score_{0};
+    i64 total_df_{0};
 };
 } // namespace infinity

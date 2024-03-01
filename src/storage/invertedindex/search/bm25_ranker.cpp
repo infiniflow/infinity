@@ -14,35 +14,22 @@
 
 module;
 
-export module query_builder;
+#include <cmath>
+
+module bm25_ranker;
 
 import stl;
-import doc_iterator;
-import term_queries;
-import column_index_reader;
-import indexer;
-import match_data;
-import index_config;
 
 namespace infinity {
 
-class QueryNode;
-export struct QueryContext {
-    UniquePtr<QueryNode> query_tree_;
-};
+constexpr float k1 = 1.2F;
+constexpr float b = 0.75F;
 
-export class QueryBuilder {
-public:
-    QueryBuilder(Indexer *indexer);
+BM25Ranker::BM25Ranker(u64 total_df) : total_df_(std::max(total_df, 1UL)) {}
 
-    ~QueryBuilder();
-
-    UniquePtr<DocIterator> CreateSearch(QueryContext &context);
-
-private:
-    Indexer *indexer_{nullptr};
-    Vector<u64> column_ids_;
-    IndexReader index_reader_;
-    UniquePtr<Scorer> scorer_;
-};
+void BM25Ranker::AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len) {
+    float smooth_idf = std::log(1.0F + (total_df_ - df + 0.5F) / (df + 0.5F));
+    float smooth_tf = (k1 + 1.0F) * tf / (tf + k1 * (1.0F - b + b * column_len / avg_column_len));
+    score_ += smooth_idf * smooth_tf;
+}
 } // namespace infinity

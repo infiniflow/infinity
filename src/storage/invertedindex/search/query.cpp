@@ -35,13 +35,13 @@ UniquePtr<TermQuery> TermQuery::Optimize(UniquePtr<TermQuery> query) {
     return UniquePtr<TermQuery>(root);
 }
 
-UniquePtr<DocIterator> TermQuery::CreateSearch(IndexReader &index_reader, MatchDataManager *match_data_manager) {
+UniquePtr<DocIterator> TermQuery::CreateSearch(IndexReader &index_reader, Scorer *scorer) {
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_.column_id_);
     PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
     if (posting_iterator == nullptr)
         return nullptr;
     UniquePtr<TermDocIterator> search = MakeUnique<TermDocIterator>(posting_iterator, column_.column_id_);
-    match_data_manager->AddDocIterator(search.get(), column_.column_id_);
+    scorer->AddDocIterator(search.get(), column_.column_id_);
     return std::move(search);
 }
 
@@ -77,11 +77,11 @@ void MultiQuery::Optimize(TermQuery *&self) {
     OptimizeSelf();
 }
 
-UniquePtr<DocIterator> MultiQuery::CreateSearch(IndexReader &index_reader, MatchDataManager *match_data_manager) {
+UniquePtr<DocIterator> MultiQuery::CreateSearch(IndexReader &index_reader, Scorer *scorer) {
     Vector<UniquePtr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (u32 i = 0; i < children_.size(); ++i) {
-        auto iter = children_[i]->CreateSearch(index_reader, match_data_manager);
+        auto iter = children_[i]->CreateSearch(index_reader, scorer);
         if (iter)
             sub_doc_iters.push_back(std::move(iter));
     }
