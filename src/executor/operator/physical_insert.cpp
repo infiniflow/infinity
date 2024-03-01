@@ -43,6 +43,9 @@ void PhysicalInsert::Init() {}
 
 bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     SizeT row_count = value_list_.size();
+    if (row_count == 0) {
+        RecoverableError(Status::UnexpectedError(fmt::format("Insert values count is zero.")));
+    }
     SizeT column_count = value_list_[0].size();
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
