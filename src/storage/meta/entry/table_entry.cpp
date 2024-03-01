@@ -610,7 +610,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
-        UnrecoverableError(fmt::format("No column name: {}", column_name));
+        RecoverableError(Status::SyntaxError(fmt::format("No column name: {}", column_name)));
     }
     return it->second;
 }
