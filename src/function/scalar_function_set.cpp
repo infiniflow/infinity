@@ -26,6 +26,7 @@ import infinity_exception;
 import cast_table;
 import logger;
 import status;
+import third_party;
 
 namespace infinity {
 
@@ -69,13 +70,14 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
 
     if (candidates_index.size() > 1) {
         // multiple functions matched
+        String function = FunctionSet::ToString(name_, input_arguments);
         std::stringstream ss;
-        ss << "Multiple matched functions of " << FunctionSet::ToString(name_, input_arguments) << std::endl;
-        ss << "Matched candidate functions: " << std::endl;
         for (auto index : candidates_index) {
             ss << functions_[index].ToString() << std::endl;
         }
-        UnrecoverableError(ss.str());
+        String candicates = ss.str();
+        LOG_ERROR(fmt::format("Multiple matched functions of {} Matched candidate functions: \n {}", function, candicates));
+        RecoverableError(Status::MultipleFunctionMatched(function, candicates));
     }
 
     return functions_[candidates_index[0]];
