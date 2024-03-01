@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions

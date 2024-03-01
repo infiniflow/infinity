@@ -1,7 +1,7 @@
 import pytest
 from infinity.errors import ErrorCode
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 
 

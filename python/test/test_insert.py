@@ -13,6 +13,7 @@
 # limitations under the License.
 import os
 import signal
+import time
 
 import pandas as pd
 import pytest
@@ -371,7 +372,7 @@ class TestInsert:
         table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
 
         # insert
-        for i in range(10):
+        for i in range(100):
             values = [{"c1": 1, "c2": 2} for _ in range(100)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
@@ -537,8 +538,8 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.tag(ct.CaseLabel.L0)
-    @pytest.mark.skip(reason="TODO")
+    @pytest.mark.complex
+    # @pytest.mark.skip(reason="complex")
     def test_insert_and_shutdown_output(self):
 
         os.system("rm -fr /tmp/infinity")
@@ -563,6 +564,8 @@ class TestInsert:
 
         # shutdown service
         os.kill(infinity_service_1.pid, signal.SIGINT)
+
+        time.sleep(1)
 
         # restart
         infinity_service_2 = start_infinity_service_in_subporcess()

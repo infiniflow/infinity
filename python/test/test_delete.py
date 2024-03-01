@@ -16,7 +16,7 @@ import time
 import pandas as pd
 import pytest
 from numpy import dtype
-from python.test.common import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -289,6 +289,7 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # delete inserted long before and select to check
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much time.")
     def test_delete_inserted_long_before_data(self):
         # connect
