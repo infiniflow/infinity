@@ -27,6 +27,6 @@ public:
     ColumnLengthReader() = default;
     ~ColumnLengthReader() = default;
 
-    u32 GetColumnLength(u64 column_id, docid_t doc_id);
+    u32 GetColumnLength(u64 column_id, docid_t doc_id) { return 0; }
 };
 } // namespace infinity
