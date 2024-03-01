@@ -643,7 +643,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     }
 
     auto [table_index_entry, index_def_entry_status] = storage_->catalog()->CreateIndex(table_entry,
-                                                                                        cmd.index_def_,
+                                                                                        cmd.index_base_,
                                                                                         ConflictType::kError,
                                                                                         txn_id,
                                                                                         commit_ts,

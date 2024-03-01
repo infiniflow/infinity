@@ -23,7 +23,6 @@ import query_context;
 import operator_state;
 import load_meta;
 
-import index_def;
 import create_index_data;
 import base_table_ref;
 import status;

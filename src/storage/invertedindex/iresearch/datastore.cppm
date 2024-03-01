@@ -23,7 +23,7 @@ import data_block;
 import operator_state;
 import column_vector;
 import query_context;
-import index_def;
+import index_base;
 import table_entry;
 import segment_entry;
 import buffer_manager;
@@ -132,7 +132,7 @@ public:
 
     void StopSchedule();
 
-    void BatchInsert(TableEntry *table_entry, const IndexDef *index_def, const SegmentEntry *segment_entry, BufferManager *buffer_mgr);
+    void BatchInsert(TableEntry *table_entry, const IndexBase *index_base, const SegmentEntry *segment_entry, BufferManager *buffer_mgr);
 
     void Reset();
 

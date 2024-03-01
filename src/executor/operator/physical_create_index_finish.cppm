@@ -23,7 +23,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-import index_def;
+import index_base;
 import internal_types;
 import data_type;
 
@@ -34,7 +34,7 @@ public:
                               UniquePtr<PhysicalOperator> left,
                               SharedPtr<String> db_name,
                               SharedPtr<String> table_name,
-                              SharedPtr<IndexDef> index_def,
+                              SharedPtr<IndexBase> index_base,
                               SharedPtr<Vector<String>> output_names,
                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                               SharedPtr<Vector<LoadMeta>> load_metas);
@@ -53,7 +53,7 @@ public:
 public:
     const SharedPtr<String> db_name_{};
     const SharedPtr<String> table_name_{};
-    const SharedPtr<IndexDef> index_def_{};
+    const SharedPtr<IndexBase> index_base_{};
 
     const SharedPtr<Vector<String>> output_names_{};
     const SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

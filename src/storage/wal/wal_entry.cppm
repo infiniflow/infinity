@@ -19,7 +19,7 @@ module;
 export module wal_entry;
 
 import table_def;
-import index_def;
+import index_base;
 import data_block;
 import stl;
 
@@ -129,9 +129,9 @@ export struct WalCmdCreateTable : public WalCmd {
 };
 
 export struct WalCmdCreateIndex : public WalCmd {
-    WalCmdCreateIndex(String db_name, String table_name, String table_index_dir, SharedPtr<IndexDef> index_def)
+    WalCmdCreateIndex(String db_name, String table_name, String table_index_dir, SharedPtr<IndexBase> index_base)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), table_index_dir_(std::move(table_index_dir)),
-          index_def_(std::move(index_def)) {}
+          index_base_(std::move(index_base)) {}
 
     WalCommandType GetType() override { return WalCommandType::CREATE_INDEX; }
 
@@ -144,7 +144,7 @@ export struct WalCmdCreateIndex : public WalCmd {
     String db_name_{};
     String table_name_{};
     String table_index_dir_{};
-    SharedPtr<IndexDef> index_def_{};
+    SharedPtr<IndexBase> index_base_{};
 };
 
 export struct WalCmdDropTable : public WalCmd {

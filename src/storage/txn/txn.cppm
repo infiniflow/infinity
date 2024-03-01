@@ -19,7 +19,7 @@ import stl;
 
 import table_detail;
 import table_def;
-import index_def;
+import index_base;
 import data_block;
 import meta_state;
 import data_access_state;
@@ -112,14 +112,14 @@ public:
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
-    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
     // write wal
-    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &indef);
+    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 

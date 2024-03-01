@@ -54,7 +54,7 @@ import buffer_manager;
 import default_values;
 import data_block;
 import txn;
-import index_def;
+import index_base;
 
 import buffer_handle;
 import local_file_system;
@@ -287,7 +287,7 @@ void IRSDataStore::StopSchedule() {
     maintenance_state_->cancel_.store(true, std::memory_order::release);
 }
 
-void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_def, const SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
+void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexBase *index_base, const SegmentEntry *segment_entry, BufferManager *buffer_mgr) {
 
     constexpr static Array<IRSTypeInfo::type_id, 1> TEXT_FEATURES{IRSType<Norm>::id()};
     constexpr static Array<IRSTypeInfo::type_id, 1> NUMERIC_FEATURES{IRSType<GranularityPrefix>::id()};
@@ -296,25 +296,23 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
     static Features numeric_features{NUMERIC_FEATURES.data(), NUMERIC_FEATURES.size()};
     bool schedule = false;
     auto segment_id = segment_entry->segment_id();
-    Vector<UniquePtr<IRSAnalyzer>> analyzers;
-    for (const auto &ibase : index_def->index_array_) {
-        auto index_base = reinterpret_cast<IndexFullText *>(ibase.get());
-        if (index_base->analyzer_ == JIEBA) {
-            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
-            if (!stream.get()) {
-                UnrecoverableError("Dict path of Jieba analyzer is not valid");
-            }
-            analyzers.push_back(std::move(stream));
-        } else if (index_base->analyzer_ == SEGMENT) {
-            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(std::move(stream));
-        } else if (index_base->analyzer_.empty()) {
-            // TODO use segmentation analyzer if analyzer is not set
-            UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
-            analyzers.push_back(std::move(stream));
-        } else {
-            UnrecoverableError("Non existing analyzer");
+    UniquePtr<IRSAnalyzer> analyzer;
+    auto index_fulltext = const_cast<IndexFullText *>(static_cast<const IndexFullText *>(index_base));
+    if (index_fulltext->analyzer_ == JIEBA) {
+        UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(JIEBA);
+        if (!stream.get()) {
+            UnrecoverableError("Dict path of Jieba analyzer is not valid");
         }
+        analyzer = std::move(stream);
+    } else if (index_fulltext->analyzer_ == SEGMENT) {
+        UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
+        analyzer = std::move(stream);
+    } else if (index_fulltext->analyzer_.empty()) {
+        // TODO use segmentation analyzer if analyzer is not set
+        UniquePtr<IRSAnalyzer> stream = AnalyzerPool::instance().Get(SEGMENT);
+        analyzer = std::move(stream);
+    } else {
+        UnrecoverableError("Non existing analyzer");
     }
 
     auto block_entry_iter = BlockEntryIter(segment_entry);
@@ -323,101 +321,98 @@ void IRSDataStore::BatchInsert(TableEntry *table_entry, const IndexDef *index_de
         for (SizeT i = 0; i < block_entry->row_count(); ++i) {
             auto doc = ctx.Insert(RowID2DocID(segment_id, block_entry->block_id(), i));
 
-            for (SizeT col = 0; col < index_def->index_array_.size(); ++col) {
-                auto index_base = reinterpret_cast<IndexFullText *>(index_def->index_array_[col].get());
-                u64 column_id = table_entry->GetColumnIdByName(index_base->column_name());
-                auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                BufferHandle buffer_handle = block_column_entry->buffer()->Load();
-                switch (block_column_entry->column_type()->type()) {
-                    case kTinyInt: {
-                        auto block_data_ptr = reinterpret_cast<const TinyIntT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        TinyIntT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kSmallInt: {
-                        auto block_data_ptr = reinterpret_cast<const SmallIntT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        SmallIntT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kInteger: {
-                        auto block_data_ptr = reinterpret_cast<const IntegerT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        IntegerT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kBigInt: {
-                        auto block_data_ptr = reinterpret_cast<const BigIntT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        BigIntT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kHugeInt: {
-                        auto block_data_ptr = reinterpret_cast<const HugeIntT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        HugeIntT v = block_data_ptr[i];
-                        field->value_ = v.lower; // Lose precision
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kFloat: {
-                        auto block_data_ptr = reinterpret_cast<const FloatT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<f32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        FloatT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kDouble: {
-                        auto block_data_ptr = reinterpret_cast<const DoubleT *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<f64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        DoubleT v = block_data_ptr[i];
-                        field->value_ = v;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    }
-                    case kDate: {
-                        auto block_data_ptr = reinterpret_cast<const DateType *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        DateType v = block_data_ptr[i];
-                        field->value_ = v.value;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kTime: {
-                        auto block_data_ptr = reinterpret_cast<const TimeType *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        TimeType v = block_data_ptr[i];
-                        field->value_ = v.value;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kDateTime: {
-                        auto block_data_ptr = reinterpret_cast<const DateTimeType *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        DateTimeType v = block_data_ptr[i];
-                        field->value_ = ((i64)v.date << 32) + v.time;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kTimestamp: {
-                        auto block_data_ptr = reinterpret_cast<const TimestampType *>(buffer_handle.GetData());
-                        auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
-                        TimestampType v = block_data_ptr[i];
-                        field->value_ = ((i64)v.date << 32) + v.time;
-                        doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
-                    } break;
-                    case kVarchar: {
-                        auto field = MakeUnique<TextField>(index_base->column_name().c_str(),
-                                                           irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
-                                                           text_features,
-                                                           analyzers[col].get());
-                        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
-                        field->f_ = column_vector.GetValue(i).GetVarchar();
-                        doc.Insert<irs::Action::INDEX, TextField>(field.get());
-                    } break;
-                    default:
-                        break;
+            u64 column_id = table_entry->GetColumnIdByName(index_base->column_name());
+            auto block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            BufferHandle buffer_handle = block_column_entry->buffer()->Load();
+            switch (block_column_entry->column_type()->type()) {
+                case kTinyInt: {
+                    auto block_data_ptr = reinterpret_cast<const TinyIntT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TinyIntT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kSmallInt: {
+                    auto block_data_ptr = reinterpret_cast<const SmallIntT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    SmallIntT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kInteger: {
+                    auto block_data_ptr = reinterpret_cast<const IntegerT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    IntegerT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kBigInt: {
+                    auto block_data_ptr = reinterpret_cast<const BigIntT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    BigIntT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kHugeInt: {
+                    auto block_data_ptr = reinterpret_cast<const HugeIntT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    HugeIntT v = block_data_ptr[i];
+                    field->value_ = v.lower; // Lose precision
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kFloat: {
+                    auto block_data_ptr = reinterpret_cast<const FloatT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<f32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    FloatT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kDouble: {
+                    auto block_data_ptr = reinterpret_cast<const DoubleT *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<f64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DoubleT v = block_data_ptr[i];
+                    field->value_ = v;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
                 }
+                case kDate: {
+                    auto block_data_ptr = reinterpret_cast<const DateType *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DateType v = block_data_ptr[i];
+                    field->value_ = v.value;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kTime: {
+                    auto block_data_ptr = reinterpret_cast<const TimeType *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i32>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TimeType v = block_data_ptr[i];
+                    field->value_ = v.value;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kDateTime: {
+                    auto block_data_ptr = reinterpret_cast<const DateTimeType *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    DateTimeType v = block_data_ptr[i];
+                    field->value_ = ((i64)v.date << 32) + v.time;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kTimestamp: {
+                    auto block_data_ptr = reinterpret_cast<const TimestampType *>(buffer_handle.GetData());
+                    auto field = MakeUnique<NumericField<i64>>(index_base->column_name().c_str(), irs::IndexFeatures::NONE, numeric_features);
+                    TimestampType v = block_data_ptr[i];
+                    field->value_ = ((i64)v.date << 32) + v.time;
+                    doc.Insert<irs::Action::INDEX | irs::Action::STORE>(field.get());
+                } break;
+                case kVarchar: {
+                    auto field = MakeUnique<TextField>(index_base->column_name().c_str(),
+                                                       irs::IndexFeatures::FREQ | irs::IndexFeatures::POS,
+                                                       text_features,
+                                                       analyzer.get());
+                    ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                    field->f_ = column_vector.GetValue(i).GetVarchar();
+                    doc.Insert<irs::Action::INDEX, TextField>(field.get());
+                } break;
+                default:
+                    break;
             }
         }
         if (!schedule) {
