@@ -264,7 +264,7 @@ public:
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
 
-    HashMap<String, SharedPtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
 public:
     void PickCleanup(CleanupScanner *scanner);

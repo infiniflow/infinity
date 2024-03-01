@@ -77,11 +77,6 @@ public:
 
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
 
-    bool Empty() {
-        std::shared_lock r_lock(rw_locker_);
-        return entry_list_.empty();
-    }
-
 private:
     FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 

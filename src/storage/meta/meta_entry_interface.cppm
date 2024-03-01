@@ -31,8 +31,6 @@ public:
     virtual bool PickCleanup(CleanupScanner *scanner) = 0;
 
     virtual void Cleanup() = 0;
-
-    virtual bool Empty() = 0;
 };
 
 export template <typename Meta>

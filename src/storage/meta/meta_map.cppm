@@ -39,7 +39,7 @@ class TableIndexMeta;
 export template <MetaConcept Meta>
 class MetaMap {
 public:
-    using Map = HashMap<String, SharedPtr<Meta>>;
+    using Map = HashMap<String, UniquePtr<Meta>>;
 
 public:
     Tuple<Meta *, std::shared_lock<std::shared_mutex>>
@@ -126,25 +126,14 @@ void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
 
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
-    Map copy_meta_map;
-    {
-        std::unique_lock w_lock(rw_locker_);
-        copy_meta_map = meta_map_;
-    }
-
-    bool may_delete = false;
-    for (auto [name, meta] : copy_meta_map) {
-        may_delete |= meta->PickCleanup(scanner);
-    }
-    if (may_delete) {
-        std::unique_lock w_lock(rw_locker_);
-        for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-            if (iter->second->Empty()) {
-                LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
-                iter = meta_map_.erase(iter);
-            } else {
-                ++iter;
-            }
+    std::unique_lock w_lock(rw_locker_);
+    for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+        bool all_delete = iter->second->PickCleanup(scanner);
+        if (all_delete) {
+            LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
+            iter = meta_map_.erase(iter);
+        } else {
+            ++iter;
         }
     }
 }

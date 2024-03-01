@@ -216,7 +216,7 @@ private: // TODO: remote it
     std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
 
 public: // TODO: remote it?
-    HashMap<String, SharedPtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;
