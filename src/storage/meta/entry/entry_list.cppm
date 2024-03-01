@@ -51,13 +51,15 @@ public:
     using Iterator = typename List<SharedPtr<Entry>>::iterator;
 
 public:
-    Tuple<Entry *, Status> AddEntry(std::function<SharedPtr<Entry>()> &&init_func,
+    Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                    std::function<SharedPtr<Entry>()> &&init_func,
                                     TransactionID txn_id,
                                     TxnTimeStamp begin_ts,
                                     TxnManager *txn_mgr,
                                     ConflictType conflict_type);
 
-    Tuple<Entry *, Status> DropEntry(std::function<SharedPtr<Entry>()> &&init_func,
+    Tuple<Entry *, Status> DropEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                     std::function<SharedPtr<Entry>()> &&init_func,
                                      TransactionID txn_id,
                                      TxnTimeStamp begin_ts,
                                      TxnManager *txn_mgr,
@@ -145,12 +147,14 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::function<SharedPtr<Entry>()> &&init_func,
+Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_mutex> parent_r_lock,
+                                                  std::function<SharedPtr<Entry>()> &&init_func,
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
                                                   TxnManager *txn_mgr,
                                                   ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
+    parent_r_lock.unlock();
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
@@ -199,12 +203,14 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::function<SharedPtr<Entry>
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::function<SharedPtr<Entry>()> &&init_func,
+Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_mutex> parent_r_lock,
+                                                   std::function<SharedPtr<Entry>()> &&init_func,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
                                                    TxnManager *txn_mgr,
                                                    ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
+    parent_r_lock.unlock();
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:

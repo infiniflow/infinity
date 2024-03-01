@@ -80,10 +80,9 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
     const String &table_name = *table_collection_name;
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this); };
     auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta), txn_id, begin_ts, txn_mgr);
-    r_lock.unlock(); // TODO(sys)
 
     LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
-    return table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
+    return table_meta->CreateNewEntry(std::move(r_lock), table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_name,
@@ -92,41 +91,24 @@ Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_na
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr) {
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_collection_name, conflict_type);
-    r_lock.unlock(); // TODO(sys)
     if (table_meta == nullptr) {
         return {nullptr, status};
     }
-    return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
+    return table_meta->DropNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
-Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_collection_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
-    //    LOG_TRACE("Get a table entry {}", table_name);
+Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    LOG_TRACE(fmt::format("Get a table entry {}", table_name));
+    auto [table_meta, status, _] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys): conflict_type
     if (table_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No valid table meta.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
     return table_meta->GetEntry(txn_id, begin_ts);
 }
 
-void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionID txn_id) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
-    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_collection_name));
+void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
+    auto [table_meta, _1, _2] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys)
+    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_name));
     table_meta->DeleteNewEntry(txn_id);
 }
 

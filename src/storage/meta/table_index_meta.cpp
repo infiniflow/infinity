@@ -46,7 +46,8 @@ UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_en
     return table_index_meta;
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexBase> &index_base,
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                                       const SharedPtr<IndexBase> &index_base,
                                                                        ConflictType conflict_type,
                                                                        TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts,
@@ -60,17 +61,20 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
         }
         return TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
     };
-    return index_entry_list_.AddEntry(std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+    return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableIndexEntry *, Status>
-TableIndexMeta::DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                                     ConflictType conflict_type,
+                                                                     TransactionID txn_id,
+                                                                     TxnTimeStamp begin_ts,
+                                                                     TxnManager *txn_mgr) {
     auto init_drop_entry = [&]() {
         auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
         drop_entry->deleted_ = true;
         return drop_entry;
     };
-    return index_entry_list_.DropEntry(std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+    return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {

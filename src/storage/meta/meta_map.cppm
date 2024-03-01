@@ -132,20 +132,21 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         copy_meta_map = meta_map_;
     }
 
+    bool may_delete = false;
     for (auto [name, meta] : copy_meta_map) {
-        meta->PickCleanup(scanner);
+        may_delete |= meta->PickCleanup(scanner);
     }
-    // {
-    //     std::unique_lock w_lock(rw_locker_);
-    //     for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-    //         if (iter->second->Empty()) {
-    //             LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
-    //             iter = meta_map_.erase(iter);
-    //         } else {
-    //             ++iter;
-    //         }
-    //     }
-    // }
+    if (may_delete) {
+        std::unique_lock w_lock(rw_locker_);
+        for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+            if (iter->second->Empty()) {
+                LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
+                iter = meta_map_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
 }
 
 template <MetaConcept Meta>

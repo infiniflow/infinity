@@ -73,10 +73,9 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
         return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
     };
     auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
-    r_lock.unlock(); // TODO(sys)
 
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
-    return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 // do not only use this method to drop database
@@ -86,39 +85,22 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
 Tuple<DBEntry *, Status>
 Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, conflict_type);
-    r_lock.unlock(); // TODO(sys)
     if (db_meta == nullptr) {
         return {nullptr, status};
     }
-    return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    return db_meta->DropNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-
-    DBMeta *db_meta{nullptr};
-    this->rw_locker().lock_shared();
-    auto iter = this->db_meta_map().find(db_name);
-    if (iter != this->db_meta_map().end()) {
-        db_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [db_meta, status, _] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys): add conflict_type
     if (db_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
     return db_meta->GetEntry(txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id) {
-    this->rw_locker().lock_shared();
-
-    DBMeta *db_meta{nullptr};
-    if (this->db_meta_map().find(db_name) != this->db_meta_map().end()) {
-        db_meta = this->db_meta_map()[db_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
+    auto [db_meta, _1, _2] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys)
     LOG_TRACE(fmt::format("Remove a database entry {}", db_name));
     db_meta->DeleteNewEntry(txn_id);
 }

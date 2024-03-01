@@ -51,7 +51,8 @@ public:
     // Getter
     inline TableEntry *GetTableEntry() const { return table_entry_; }
 
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexBase> &index_base,
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                           const SharedPtr<IndexBase> &index_base,
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
                                                            TxnTimeStamp begin_ts,
@@ -59,8 +60,11 @@ public:
                                                            bool is_replay,
                                                            String replay_table_index_dir);
 
-    Tuple<TableIndexEntry *, Status>
-    DropTableIndexEntry(ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                         ConflictType conflict_type,
+                                                         TransactionID txn_id,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 

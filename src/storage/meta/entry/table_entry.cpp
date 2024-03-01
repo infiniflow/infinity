@@ -121,42 +121,33 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
     auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta), txn_id, begin_ts, txn_mgr);
-    r_lock.unlock(); // TODO(sys)
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
-    return table_index_meta->CreateTableIndexEntry(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    return table_index_meta
+        ->CreateTableIndexEntry(std::move(r_lock), index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
 Tuple<TableIndexEntry *, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, conflict_type);
-    r_lock.unlock(); // TODO(sys)
     if (index_meta == nullptr) {
         return {nullptr, status};
     }
-    return index_meta->DropTableIndexEntry(conflict_type, txn_id, begin_ts, txn_mgr);
+    return index_meta->DropTableIndexEntry(std::move(r_lock), conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        return iter->second->GetEntry(txn_id, begin_ts);
+    auto [index_meta, status, _] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys): conflict_type
+    if (index_meta == nullptr) {
+        return {nullptr, status};
     }
-    UniquePtr<String> err_msg = MakeUnique<String>("Cannot find index def");
-    LOG_ERROR(*err_msg);
-    return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
+    return index_meta->GetEntry(txn_id, begin_ts);
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
-    this->rw_locker().lock_shared();
-
-    TableIndexMeta *table_index_meta{nullptr};
-    if (auto iter = this->index_meta_map().find(index_name); iter != this->index_meta_map().end()) {
-        table_index_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
-
+    auto [index_meta, _1, _2] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys)
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
-    table_index_meta->DeleteNewEntry(txn_id);
+    return index_meta->DeleteNewEntry(txn_id);
 }
 
 void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,

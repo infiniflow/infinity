@@ -24,7 +24,6 @@ import cleanup_task;
 import catalog;
 import txn_manager;
 import third_party;
-import txn;
 
 namespace infinity {
 

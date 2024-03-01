@@ -68,7 +68,8 @@ public:
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
 private:
-    Tuple<TableEntry *, Status> CreateNewEntry(TableEntryType table_entry_type,
+    Tuple<TableEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                               TableEntryType table_entry_type,
                                                const SharedPtr<String> &table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
                                                TransactionID txn_id,
@@ -76,8 +77,12 @@ private:
                                                TxnManager *txn_mgr,
                                                ConflictType conflict_type);
 
-    Tuple<TableEntry *, Status>
-    DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type);
+    Tuple<TableEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                             TransactionID txn_id,
+                                             TxnTimeStamp begin_ts,
+                                             TxnManager *txn_mgr,
+                                             const String &table_name,
+                                             ConflictType conflict_type);
 
     Tuple<TableEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 

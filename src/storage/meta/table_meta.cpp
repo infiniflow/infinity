@@ -53,7 +53,8 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
  * @param txn_mgr
  * @return Status
  */
-Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry_type,
+Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                      TableEntryType table_entry_type,
                                                       const SharedPtr<String> &table_collection_name_ptr,
                                                       const Vector<SharedPtr<ColumnDef>> &columns,
                                                       TransactionID txn_id,
@@ -63,11 +64,15 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(TableEntryType table_entry
     auto init_table_entry = [&]() {
         return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
     };
-    return table_entry_list_.AddEntry(std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+    return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status>
-TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, const String &table_name, ConflictType conflict_type) {
+Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+                                                    TransactionID txn_id,
+                                                    TxnTimeStamp begin_ts,
+                                                    TxnManager *txn_mgr,
+                                                    const String &table_name,
+                                                    ConflictType conflict_type) {
     auto init_drop_entry = [&]() {
         Vector<SharedPtr<ColumnDef>> dummy_columns;
         return TableEntry::NewTableEntry(true,
@@ -79,7 +84,7 @@ TableMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager 
                                          txn_id,
                                          begin_ts);
     };
-    return table_entry_list_.DropEntry(std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+    return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return table_entry_list_.GetEntry(txn_id, begin_ts); }
