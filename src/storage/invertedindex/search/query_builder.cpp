@@ -38,7 +38,8 @@ QueryBuilder::QueryBuilder(Indexer *indexer) : indexer_(indexer) {
         index_reader_.column_index_readers_[column_ids[i]] = std::move(column_index_reader);
     }
     index_reader_.session_pool_ = MakeShared<MemoryPool>();
-    scorer_ = MakeUnique<Scorer>();
+    // TODO get num of docs
+    scorer_ = MakeUnique<Scorer>(0);
 }
 
 QueryBuilder::~QueryBuilder() {}
