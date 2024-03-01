@@ -17,7 +17,7 @@ module;
 export module index_ivfflat;
 
 import stl;
-import index_def;
+import index_base;
 
 import index_base;
 import third_party;
@@ -28,10 +28,12 @@ import statement_common;
 namespace infinity {
 export class IndexIVFFlat final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase>
+    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexIVFFlat(String file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
-        : IndexBase(file_name, IndexType::kIVFFlat, std::move(column_names)), centroids_count_(centroids_count), metric_type_(metric_type) {}
+    IndexIVFFlat(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, SizeT centroids_count, MetricType metric_type)
+        : IndexBase(IndexType::kIVFFlat, index_name, file_name, std::move(column_names)), centroids_count_(centroids_count),
+          metric_type_(metric_type) {}
 
     ~IndexIVFFlat() final = default;
 

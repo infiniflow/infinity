@@ -41,7 +41,7 @@ import cleanup_scanner;
 
 namespace infinity {
 
-class IndexDef;
+class IndexBase;
 struct TableIndexEntry;
 class FulltextIndexEntry;
 class TableMeta;
@@ -82,7 +82,7 @@ public:
                                                      SizeT row_count);
 
 private:
-    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
+    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,

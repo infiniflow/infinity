@@ -33,7 +33,6 @@ class Txn;
 struct TableEntry;
 class FaissIndexPtr;
 class BufferManager;
-class IndexDef;
 struct SegmentEntry;
 
 export class SegmentColumnIndexEntry : public BaseEntry {
