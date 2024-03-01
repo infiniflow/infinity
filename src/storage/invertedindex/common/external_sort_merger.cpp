@@ -386,7 +386,7 @@ void SortMerger<KeyType, LenType>::Run() {
     IASSERT(out_f);
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
-    Thread *out_thread[OUT_BUF_NUM_];
+    Vector<Thread *> out_thread(OUT_BUF_NUM_);
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i)
         out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
 

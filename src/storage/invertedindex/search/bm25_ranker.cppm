@@ -14,20 +14,22 @@
 
 module;
 
-module term_doc_iterator;
+export module bm25_ranker;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import bitmap;
-import index_defines;
-import term_meta;
-import doc_iterator;
+
 namespace infinity {
-TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id) : column_id_(column_id), iter_(iter) {}
+export class BM25Ranker {
+public:
+    BM25Ranker(u64 total_df);
+    ~BM25Ranker() = default;
 
-TermDocIterator::~TermDocIterator() {}
+    void AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len);
 
-void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
+    float GetScore() { return score_; }
 
+private:
+    float score_{0};
+    i64 total_df_{0};
+};
 } // namespace infinity

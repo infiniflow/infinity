@@ -18,6 +18,7 @@ export module term_queries;
 
 import stl;
 import doc_iterator;
+import match_data;
 import column_index_reader;
 
 namespace infinity {
@@ -51,7 +52,7 @@ public:
 
     virtual bool IsOr() const { return false; }
 
-    virtual UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader);
+    virtual UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader, Scorer *scorer);
 
 protected:
     virtual void NotifyChange() {
@@ -89,7 +90,7 @@ public:
 
     void Optimize(TermQuery *&self) override;
 
-    UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader) override;
+    UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader, Scorer *scorer) override;
 
     virtual UniquePtr<DocIterator> CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) = 0;
 

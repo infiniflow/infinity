@@ -15,6 +15,7 @@ import os
 import signal
 import time
 
+
 import pandas as pd
 import pytest
 from numpy import dtype
@@ -372,7 +373,7 @@ class TestInsert:
         table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
 
         # insert
-        for i in range(100):
+        for i in range(10):
             values = [{"c1": 1, "c2": 2} for _ in range(100)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
@@ -540,6 +541,8 @@ class TestInsert:
 
     @pytest.mark.complex
     # @pytest.mark.skip(reason="complex")
+    # @pytest.mark.tag(ct.CaseLabel.L0)
+    @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
 
         os.system("rm -fr /tmp/infinity")

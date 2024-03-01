@@ -25,6 +25,7 @@ import term_queries;
 import column_index_reader;
 import query_visitor;
 import indexer;
+import match_data;
 import index_config;
 
 namespace infinity {
@@ -37,6 +38,8 @@ QueryBuilder::QueryBuilder(Indexer *indexer) : indexer_(indexer) {
         index_reader_.column_index_readers_[column_ids[i]] = std::move(column_index_reader);
     }
     index_reader_.session_pool_ = MakeShared<MemoryPool>();
+    // TODO get num of docs
+    scorer_ = MakeUnique<Scorer>(0);
 }
 
 QueryBuilder::~QueryBuilder() {}
@@ -46,6 +49,6 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
     context.query_tree_->Accept(visitor);
     UniquePtr<TermQuery> root = visitor.Build();
     root = TermQuery::Optimize(std::move(root));
-    return root->CreateSearch(index_reader_);
+    return root->CreateSearch(index_reader_, scorer_.get());
 }
 } // namespace infinity
