@@ -158,7 +158,7 @@ public:
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    virtual void MergeFrom(BaseEntry &other) override;
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 

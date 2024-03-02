@@ -61,7 +61,7 @@ public:
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other); // TODO: fix warning
+    virtual void MergeFrom(BaseEntry &other) override;
 
     [[nodiscard]] const String &db_name() const { return *db_name_; }
 
