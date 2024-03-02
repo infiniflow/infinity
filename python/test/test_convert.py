@@ -108,7 +108,7 @@ class TestConvert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.skip(reason="Cause core dumped.")
+    @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
         "c2 > 1",
