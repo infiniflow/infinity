@@ -20,7 +20,7 @@ module table_index_meta;
 
 import stl;
 
-import index_def;
+import index_base;
 import txn_manager;
 import default_values;
 import txn_state;
@@ -46,14 +46,14 @@ UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_en
     return table_index_meta;
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                                        ConflictType conflict_type,
                                                                        TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts,
                                                                        TxnManager *txn_mgr,
                                                                        bool is_replay,
                                                                        String replay_table_index_dir) {
-    auto [table_index_entry, status] = CreateTableIndexEntryInternal(index_def, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    auto [table_index_entry, status] = CreateTableIndexEntryInternal(index_base, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
     switch (conflict_type) {
         case ConflictType::kError: {
             return {table_index_entry, status};
@@ -72,7 +72,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(const Sha
     }
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def,
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(const SharedPtr<IndexBase> &index_base,
                                                                                TransactionID txn_id,
                                                                                TxnTimeStamp begin_ts,
                                                                                TxnManager *txn_mgr,
@@ -95,7 +95,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         this->index_entry_list().emplace_back(std::move(dummy_entry));
 
         // Create a new table index entry
-        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+        auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
         table_index_entry_ptr = table_index_entry.get();
         this->index_entry_list().emplace_front(std::move(table_index_entry));
         LOG_TRACE("New table index entry is added.");
@@ -104,7 +104,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
         // Already have a db_entry, check if the db_entry is valid here.
         BaseEntry *header_base_entry = this->index_entry_list().front().get();
         if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+            auto table_index_entry = TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
             table_index_entry_ptr = table_index_entry.get();
             this->index_entry_list().emplace_front(std::move(table_index_entry));
             LOG_TRACE("New table index entry is added.");
@@ -117,7 +117,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                 if (header_entry->deleted_) {
                     // No conflict
                     auto table_index_entry =
-                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                        TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->index_entry_list().emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");
@@ -147,7 +147,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
                         if (header_entry->deleted_) {
                             // No conflict
                             auto table_index_entry =
-                                TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                                TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                             table_index_entry_ptr = table_index_entry.get();
                             this->index_entry_list().emplace_front(std::move(table_index_entry));
                             LOG_TRACE("New table index entry is added.");
@@ -178,7 +178,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntryInternal(c
 
                     // Append new one
                     auto table_index_entry =
-                        TableIndexEntry::NewTableIndexEntry(index_def, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                        TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
                     table_index_entry_ptr = table_index_entry.get();
                     this->index_entry_list().emplace_front(std::move(table_index_entry));
                     LOG_TRACE("New table index entry is added.");

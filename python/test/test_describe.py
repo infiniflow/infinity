@@ -13,7 +13,7 @@
 # limitations under the License.
 import polars as pl
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 
 

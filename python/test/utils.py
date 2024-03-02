@@ -1,6 +1,7 @@
 import functools
 import os
 import subprocess
+import time
 import traceback
 
 import numpy as np
@@ -29,8 +30,8 @@ def read_fvecs_file(filename):
 
 
 def start_infinity_service_in_subporcess():
-    # os.system("rm -fr /tmp/infinity")
     shell = "/home/fann/infinity/build/src/infinity"
     with open("./tmp.txt", "w") as f:
         infinity = subprocess.Popen(shell, stdout=f)
+    time.sleep(1)
     return infinity

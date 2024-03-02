@@ -61,7 +61,6 @@ import explain_ast;
 
 import local_file_system;
 
-import index_def;
 import status;
 import default_values;
 import index_base;
@@ -520,15 +519,6 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     return Status::OK();
 }
 
-// struct IndexInfo {
-//     ~IndexInfo();
-//     IndexType method_type_{};
-//     std::string column_name_{};
-//     std::vector<InitParameter *> *index_param_list_{nullptr};
-//
-//     static std::string IndexTypeToString(IndexType index_type);
-// };
-
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
 
@@ -542,14 +532,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     //    }
 
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
-    SharedPtr<IndexDef> index_def_ptr = MakeShared<IndexDef>(index_name);
-
-    Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
-    index_def_ptr->index_array_.reserve(index_info_list.size());
-    if (index_info_list.empty()) {
-        RecoverableError(Status::SyntaxError("No index info."));
-    }
-
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
@@ -561,45 +543,51 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         }
     }
 
-    for (IndexInfo *index_info : index_info_list) {
-        SharedPtr<IndexBase> base_index_ptr{nullptr};
-        switch (index_info->index_type_) {
-            case IndexType::kFullText: {
-                base_index_ptr = IndexFullText::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                     {index_info->column_name_},
-                                                     *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kHnsw: {
-                // The following check might affect performance
-                IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexHnsw::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+    if (create_index_info->index_info_list_->size() != 1) {
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));
+    }
+    IndexInfo *index_info = create_index_info->index_info_list_->at(0);
+    SharedPtr<IndexBase> base_index_ptr{nullptr};
+    switch (index_info->index_type_) {
+        case IndexType::kFullText: {
+            base_index_ptr = IndexFullText::Make(index_name,
+                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                  {index_info->column_name_},
                                                  *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kIVFFlat: {
-                IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexIVFFlat::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                    {index_info->column_name_},
-                                                    *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kSecondary: {
-                IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexSecondary::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
-                break;
-            }
-            case IndexType::kInvalid: {
-                UnrecoverableError("Invalid index type.");
-                break;
-            }
+            break;
         }
-        index_def_ptr->index_array_.emplace_back(base_index_ptr);
+        case IndexType::kHnsw: {
+            // The following check might affect performance
+            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexHnsw::Make(index_name,
+                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                             {index_info->column_name_},
+                                             *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kIVFFlat: {
+            IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexIVFFlat::Make(index_name,
+                                                fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                                {index_info->column_name_},
+                                                *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kSecondary: {
+            IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr =
+                IndexSecondary::Make(index_name, fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
+            break;
+        }
+        case IndexType::kInvalid: {
+            UnrecoverableError("Invalid index type.");
+            break;
+        }
     }
 
     auto logical_create_index_operator =
-        MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, index_def_ptr, create_index_info->conflict_type_);
+        MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, base_index_ptr, create_index_info->conflict_type_);
 
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");

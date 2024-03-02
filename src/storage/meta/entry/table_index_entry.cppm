@@ -23,7 +23,7 @@ import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 import base_entry;
-import index_def;
+import index_base;
 import block_index;
 import third_party;
 import status;
@@ -46,7 +46,7 @@ export struct TableIndexEntry : public BaseEntry, public EntryInterface {
 public:
     TableIndexEntry();
 
-    TableIndexEntry(const SharedPtr<IndexDef> &index_def,
+    TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
                     TransactionID txn_id,
@@ -55,7 +55,7 @@ public:
 
     TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+    static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          TableIndexMeta *table_index_meta,
                                                          Txn *txn,
                                                          TransactionID txn_id,
@@ -66,7 +66,7 @@ public:
     static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
-                                                               const SharedPtr<IndexDef> &index_def,
+                                                               const SharedPtr<IndexBase> &index_base,
                                                                const SharedPtr<String> &index_dir,
                                                                TransactionID txn_id,
                                                                TxnTimeStamp begin_ts,
@@ -81,8 +81,8 @@ public:
 public:
     // Getter
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
-    inline const IndexDef *index_def() const { return index_def_.get(); }
-    const SharedPtr<IndexDef> &table_index_def() { return index_def_; }
+    inline const IndexBase *index_base() const { return index_base_.get(); }
+    const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
@@ -103,9 +103,10 @@ private:
 private:
     std::shared_mutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
-    const SharedPtr<IndexDef> index_def_{};
+    const SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
 
+    // TODO yzc: replace column_index_map_ and fulltext_index_entry_ with segment_index_map_
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};

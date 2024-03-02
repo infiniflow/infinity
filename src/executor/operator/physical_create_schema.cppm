@@ -22,7 +22,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import index_def;
+import index_base;
 import load_meta;
 import infinity_exception;
 import internal_types;

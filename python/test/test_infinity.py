@@ -14,8 +14,8 @@
 import infinity
 from infinity.errors import ErrorCode
 
-from python.infinity.infinity import ShowVariable
-from python.test.common import common_values
+from infinity.infinity import ShowVariable
+from common import common_values
 
 
 class TestInfinity:

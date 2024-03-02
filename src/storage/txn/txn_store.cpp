@@ -93,7 +93,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Import(const SharedPtr<SegmentEn
 
 Tuple<UniquePtr<String>, Status>
 TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
-    const String &index_name = *table_index_entry->index_def()->index_name_;
+    const String &index_name = *table_index_entry->index_base()->index_name_;
     if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
         column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
     } else {

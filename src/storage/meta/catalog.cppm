@@ -43,7 +43,7 @@ import profiler;
 import status;
 import default_values;
 import table_detail;
-import index_def;
+import index_base;
 import txn_store;
 import data_access_state;
 import extra_ddl_info;
@@ -162,7 +162,7 @@ public:
 
     // Index Related methods
     Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
-                                                 const SharedPtr<IndexDef> &index_def,
+                                                 const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,

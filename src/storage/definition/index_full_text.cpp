@@ -31,7 +31,10 @@ namespace infinity {
 
 void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
 
-SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
+                                         const String &file_name,
+                                         Vector<String> column_names,
+                                         const Vector<InitParameter *> &index_param_list) {
     String analyzer{};
     bool homebrewed = false;
     SizeT param_count = index_param_list.size();
@@ -49,7 +52,7 @@ SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column
             }
         }
     }
-    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer, homebrewed);
+    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer, homebrewed);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {

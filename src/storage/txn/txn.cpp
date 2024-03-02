@@ -41,7 +41,7 @@ import table_entry_type;
 import database_detail;
 import status;
 import table_def;
-import index_def;
+import index_base;
 import catalog_delta_entry;
 import bg_task;
 import background_process;
@@ -300,7 +300,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type) {
+Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -308,11 +308,11 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
         return {nullptr, index_status};
     }
-    txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
+    txn_indexes_.emplace(*index_base->index_name_, table_index_entry);
     return {table_index_entry, index_status};
 }
 
@@ -322,8 +322,8 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();
-        auto index_def = table_index_entry->table_index_def();
-        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_def));
+        auto index_base = table_index_entry->table_index_def();
+        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
     }
     return Status::OK();
 }
@@ -344,13 +344,13 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
 }
 
-Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def) {
-    String key = *index_def->index_name_;
+Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
+    String key = *index_base->index_name_;
     auto it = txn_indexes_.find(key);
     if (it != txn_indexes_.end()) {
         // Key found, it -> second is the value
         TableIndexEntry *found_entry = it->second;
-        this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *found_entry->index_dir(), index_def));
+        this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *found_entry->index_dir(), index_base));
         LOG_TRACE(fmt::format("The key {} exists in the map", key));
     } else {
         // Key not found

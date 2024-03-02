@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
