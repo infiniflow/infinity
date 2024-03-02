@@ -99,7 +99,7 @@ struct MinState<IntegerT, IntegerT> {
 public:
     IntegerT value_;
 
-    void Initialize() { this->value_ = std::numeric_limits<i32>::max();; }
+    void Initialize() { this->value_ = std::numeric_limits<i32>::max(); }
 
     void Update(const IntegerT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -115,7 +115,7 @@ struct MinState<BigIntT, BigIntT> {
 public:
     BigIntT value_;
 
-    void Initialize() { this->value_ = std::numeric_limits<i64>::max();; }
+    void Initialize() { this->value_ = std::numeric_limits<i64>::max(); }
 
     void Update(const BigIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
@@ -132,8 +132,8 @@ public:
     HugeIntT value_;
 
     void Initialize() {
-        this->value_.lower = std::numeric_limits<i64>::max();;
-        this->value_.upper = std::numeric_limits<i64>::max();;
+        this->value_.lower = std::numeric_limits<i64>::max();
+        this->value_.upper = std::numeric_limits<i64>::max();
     }
 
     void Update(const HugeIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
