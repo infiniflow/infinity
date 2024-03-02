@@ -11,22 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import polars as pl
 
-import common_values
-import infinity
+import pytest
 
 
-class TestShowTables:
+def disable_items_with_mark(items, mark, reason):
+    skipper = pytest.mark.skip(reason=reason)
+    for item in items:
+        if mark in item.keywords:
+            item.add_marker(skipper)
 
-    def test_show_tables(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        db = infinity_obj.get_database("default")
-
-        with pl.Config(fmt_str_lengths=1000):
-            res = db.show_tables()
-            print(res)
-            # check the polars dataframe
-            assert res.columns == ["database", "table", "type", "column_count", "row_count", "segment_count",
-                                   "block_count", "segment_capacity"]
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run integration tests (requires S3 buckets to be setup with access)",
+    )

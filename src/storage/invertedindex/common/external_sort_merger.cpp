@@ -172,10 +172,8 @@ void SortMerger<KeyType, LenType>::Init(DirectIO &io_stream) {
         micro_run_pos_[i] = KeyAddr(micro_buf_[i], -1, i).LEN() + sizeof(LenType);
         num_micro_run_[i] = 0;
 
-        // if size_run_[i]>PRE_BUF_SIZE_, it needs to the end of a run and turn to the next run
         io_stream.Seek(next_run_pos);
     }
-    // LOG_INFO << "Run number: " << group_size_;
 
     // initialize predict heap and records number of every microrun
     for (u32 i = 0; i < group_size_; ++i) {
@@ -388,7 +386,7 @@ void SortMerger<KeyType, LenType>::Run() {
     IASSERT(out_f);
     IASSERT(fwrite(&count_, sizeof(u64), 1, out_f) == 1);
 
-    Thread *out_thread[OUT_BUF_NUM_];
+    Vector<Thread *> out_thread(OUT_BUF_NUM_);
     for (u32 i = 0; i < OUT_BUF_NUM_; ++i)
         out_thread[i] = new Thread(std::bind(&self_t::Output, this, out_f, i));
 
@@ -409,5 +407,5 @@ void SortMerger<KeyType, LenType>::Run() {
 }
 
 template class SortMerger<u32, u8>;
-
+template class SortMerger<TermTuple, u16>;
 } // namespace infinity

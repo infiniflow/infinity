@@ -22,7 +22,7 @@ import crc;
 import serialize;
 import data_block;
 import table_def;
-import index_def;
+import index_base;
 import infinity_exception;
 import internal_types;
 import stl;
@@ -166,10 +166,9 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            //  TODO: index_def
+            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation =
-                MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_def);
+                MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_base);
             break;
         }
         case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
@@ -320,7 +319,7 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    index_def_->WriteAdv(buf);
+    index_base_->WriteAdv(buf);
 }
 
 void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
@@ -444,7 +443,7 @@ void AddTableIndexEntryOp::SaveSate() {
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
     this->index_dir_ = *this->table_index_entry_->index_dir();
-    this->index_def_ = this->table_index_entry_->table_index_def();
+    this->index_base_ = this->table_index_entry_->table_index_def();
     is_saved_sate_ = true;
 }
 
@@ -555,12 +554,12 @@ const String AddIndexMetaOp::ToString() const {
 }
 
 const String AddTableIndexEntryOp::ToString() const {
-    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_def: {}",
+    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
                        db_name_,
                        table_name_,
                        index_name_,
                        index_dir_,
-                       index_def_->ToString());
+                       index_base_->ToString());
 }
 
 const String AddFulltextIndexEntryOp::ToString() const {

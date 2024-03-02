@@ -15,10 +15,11 @@ import os
 
 import pytest
 
-import common_values
+from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+
 
 TEST_DATA_DIR = "/test/data/"
 
@@ -58,10 +59,14 @@ class TestIndex:
                                      [index.IndexInfo("c1",
                                                       index.IndexType.Hnsw,
                                                       [
-                                                          index.InitParameter("M", "16"),
-                                                          index.InitParameter("ef_construction", "50"),
-                                                          index.InitParameter("ef", "50"),
-                                                          index.InitParameter("metric", "l2")
+                                                          index.InitParameter(
+                                                              "M", "16"),
+                                                          index.InitParameter(
+                                                              "ef_construction", "50"),
+                                                          index.InitParameter(
+                                                              "ef", "50"),
+                                                          index.InitParameter(
+                                                              "metric", "l2")
                                                       ])], None)
 
         assert res.error_code == ErrorCode.OK
@@ -70,7 +75,7 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     def test_create_index_fulltext(self):
-        # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(ANALYZER=segmentation) (doctitle, docdate) USING FULLTEXT;
+        # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(ANALYZER=segmentation);
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_index_fulltext", if_exists=True)
@@ -83,12 +88,6 @@ class TestIndex:
                                      [index.IndexInfo("body",
                                                       index.IndexType.FullText,
                                                       [index.InitParameter("ANALYZER", "segmentation")]),
-                                      index.IndexInfo("doctitle",
-                                                      index.IndexType.FullText,
-                                                      []),
-                                      index.IndexInfo("docdate",
-                                                      index.IndexType.FullText,
-                                                      []),
                                       ], None)
 
         assert res.error_code == ErrorCode.OK
@@ -144,27 +143,34 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # create / drop index with invalid options
-    @pytest.mark.skip(reason="Expected error.")
-    @pytest.mark.parametrize("cl_name", [1, 2.2, (1, 2), "c1", [1, 2, 3]])
+    @pytest.mark.parametrize("cl_name", [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
     @pytest.mark.parametrize("index_type", [
-        1, 2.2, [1, 2], "$#%dfva", (1, 2), {"1": 2},
-        index.IndexType.Hnsw, index.IndexType.IVFFlat, index.IndexType.FullText
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
+            1, 2), False), ({"1": 2}, False),
+        (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
+                                        True), (index.IndexType.FullText, True)
     ])
     @pytest.mark.parametrize("params", [
-        1, 2.2, [1, 2], "$#%dfva", (1, 2), {"1": 2},
-        [index.InitParameter("centroids_count", "128"),
-         index.InitParameter("metric", "l2")]
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
+            1, 2), False), ({"1": 2}, False),
+        ([index.InitParameter("centroids_count", "128"),
+         index.InitParameter("metric", "l2")], True)
     ])
     def test_create_drop_index_invalid_options(self, cl_name, index_type, params):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+        db_obj.drop_table(
+            "test_create_drop_index_invalid_options", if_exists=True)
         table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
             "c1": "vector,3,float"}, None)
 
-        index_info = [cl_name, index_type, params]
-        table_obj.create_index("my_index", index_info, None)
+        index_info = [index.IndexInfo(cl_name[0], index_type[0], params[0])]
+        if not cl_name[1] or not index_type[1] or not params[1]:
+            with pytest.raises(Exception):
+                table_obj.create_index("my_index", index_info, None)
+        else:
+            table_obj.create_index("my_index", index_info, None)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -175,18 +181,20 @@ class TestIndex:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+        db_obj.drop_table(
+            "test_create_drop_index_invalid_options", if_exists=True)
         table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
             "c1": "vector,3,float"}, None)
-        db_obj.drop_table("test_create_drop_index_invalid_options", if_exists=True)
+        db_obj.drop_table(
+            "test_create_drop_index_invalid_options", if_exists=True)
 
         # create created index
         with pytest.raises(Exception, match="ERROR:3022*"):
             table_obj.create_index("my_index",
-                                     [index.IndexInfo("c1",
-                                                      index.IndexType.IVFFlat,
-                                                      [index.InitParameter("centroids_count", "128"),
-                                                       index.InitParameter("metric", "l2")])], None)
+                                   [index.IndexInfo("c1",
+                                                    index.IndexType.IVFFlat,
+                                                    [index.InitParameter("centroids_count", "128"),
+                                                     index.InitParameter("metric", "l2")])], None)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -234,32 +242,40 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # create index on different type of column and show index
-    @pytest.mark.skip(reason="Cause service shutdown.")
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.Hnsw, index.IndexType.IVFFlat, index.IndexType.FullText
+        (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
+                                        True), (index.IndexType.FullText, True)
     ])
     def test_create_index_on_different_type_of_column(self, types, index_type):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_create_index_on_different_type_of_column", if_exists=True)
+        db_obj.drop_table(
+            "test_create_index_on_different_type_of_column", if_exists=True)
         table_obj = db_obj.create_table("test_create_index_on_different_type_of_column", {
             "c1": types}, None)
         # create created index
-        res = table_obj.create_index("my_index",
-                                     [index.IndexInfo("c1",
-                                                      index_type,
-                                                      [index.InitParameter("centroids_count", "128"),
-                                                       index.InitParameter("metric", "l2")])], None)
-        assert res.error_code == ErrorCode.OK
+        if not index_type[1]:
+            with pytest.raises(Exception, match="ERROR:3061*"):
+                table_obj.create_index("my_index",
+                                       [index.IndexInfo("c1",
+                                                        index_type[0],
+                                                        [index.InitParameter("centroids_count", "128"),
+                                                         index.InitParameter("metric", "l2")])], None)
+        else:
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index_type[0],
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "l2")])], None)
+            assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     # insert data, then create index
-    @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat
     ])
@@ -284,7 +300,6 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat, index.IndexType.FullText
     ])
@@ -298,7 +313,8 @@ class TestIndex:
             "c1": "int",
             "c2": "vector,3,float"}, None)
 
-        table_obj.import_data("../../" + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
+                              file_format + "/pysdk_test." + file_format)
         res = table_obj.create_index("my_index",
                                      [index.IndexInfo("c2",
                                                       index_type,

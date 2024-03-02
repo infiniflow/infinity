@@ -213,6 +213,12 @@ public:
         }
 
         Status constant_status;
+
+        if(request.fields.empty()) {
+            ProcessStatus(response, Status::InsertWithoutValues());
+            return;
+        }
+
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
         for (auto &value : request.fields) {
@@ -353,7 +359,7 @@ public:
         // auto start2 = std::chrono::steady_clock::now();
 
         // select list
-        if (request.__isset.select_list == false) {
+        if (request.__isset.select_list == false or request.select_list.empty()) {
             ProcessStatus(response, Status::EmptySelectFields());
             return;
         }

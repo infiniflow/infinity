@@ -17,7 +17,6 @@ module;
 export module catalog_delta_entry;
 
 import table_def;
-import index_def;
 import data_block;
 import stl;
 
@@ -587,10 +586,10 @@ public:
                                   String table_name,
                                   String index_name,
                                   String index_dir,
-                                  SharedPtr<IndexDef> index_def)
+                                  SharedPtr<IndexBase> index_base)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)), index_def_(std::move(index_def)) {
-    }
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)),
+          index_base_(std::move(index_base)) {}
     explicit AddTableIndexEntryOp(SharedPtr<TableIndexEntry> table_index_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY; }
@@ -601,7 +600,7 @@ public:
         total_size += sizeof(i32) + this->table_name_.size();
         total_size += sizeof(i32) + this->index_name_.size();
         total_size += sizeof(i32) + this->index_dir_.size();
-        total_size += this->index_def_->GetSizeInBytes();
+        total_size += this->index_base_->GetSizeInBytes();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -619,14 +618,14 @@ public:
     const String &table_name() const { return table_name_; }
     const String &index_name() const { return index_name_; }
     const String &index_dir() const { return index_dir_; }
-    SharedPtr<IndexDef> index_def() const { return index_def_; }
+    SharedPtr<IndexBase> index_base() const { return index_base_; }
 
 private:
     String db_name_{};
     String table_name_{};
     String index_name_{};
     String index_dir_{};
-    SharedPtr<IndexDef> index_def_{};
+    SharedPtr<IndexBase> index_base_{};
 };
 
 /// class AddFulltextIndexEntryOp

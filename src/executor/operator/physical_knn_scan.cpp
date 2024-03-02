@@ -42,7 +42,6 @@ import index_base;
 import buffer_manager;
 import merge_knn;
 import knn_result_handler;
-import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;

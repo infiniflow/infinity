@@ -25,7 +25,6 @@ import table_entry_type;
 import third_party;
 import txn;
 import buffer_manager;
-import index_def;
 import block_index;
 import data_access_state;
 import internal_types;
@@ -107,14 +106,14 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
     return table_entry;
 }
 
-Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDef> &index_def,
+Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr,
                                                          bool is_replay,
                                                          String replay_table_index_dir) {
-    if (index_def->index_name_->empty()) {
+    if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
     }
@@ -123,14 +122,14 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
     // TODO: lock granularity can be narrowed.
     this->rw_locker().lock_shared();
-    if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
+    if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
         table_index_meta = iter->second.get();
     }
     this->rw_locker().unlock_shared();
 
     if (table_index_meta == nullptr) {
 
-        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_def->index_name_);
+        UniquePtr<TableIndexMeta> new_table_index_meta = TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_);
 
         {
             if (txn_mgr != nullptr) {
@@ -143,17 +142,17 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexDe
 
         this->rw_locker().lock();
 
-        if (auto iter = this->index_meta_map().find(*index_def->index_name_); iter != this->index_meta_map().end()) {
+        if (auto iter = this->index_meta_map().find(*index_base->index_name_); iter != this->index_meta_map().end()) {
             table_index_meta = iter->second.get();
         } else {
 
-            this->index_meta_map()[*index_def->index_name_] = std::move(new_table_index_meta);
+            this->index_meta_map()[*index_base->index_name_] = std::move(new_table_index_meta);
         }
         this->rw_locker().unlock();
     }
 
-    LOG_TRACE(fmt::format("Creating new index: {}", *index_def->index_name_));
-    return table_index_meta->CreateTableIndexEntry(index_def, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
+    return table_index_meta->CreateTableIndexEntry(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
 Tuple<TableIndexEntry *, Status>
@@ -217,13 +216,12 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
         auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
         if (status.ok()) {
             fulltext_index_entry = table_index_entry->fulltext_index_entry();
-            for (const SharedPtr<IndexBase> &index_base : table_index_entry->index_def()->index_array_) {
-                if (index_base->index_type_ != IndexType::kFullText)
-                    continue;
-                IndexFullText *index_full_text = static_cast<IndexFullText *>(index_base.get());
-                for (auto &column_name : index_full_text->column_names_) {
-                    column2analyzer[column_name] = index_full_text->analyzer_;
-                }
+            const IndexBase *index_base = table_index_entry->index_base();
+            if (index_base->index_type_ != IndexType::kFullText)
+                continue;
+            auto index_full_text = static_cast<const IndexFullText *>(index_base);
+            for (auto &column_name : index_full_text->column_names_) {
+                column2analyzer[column_name] = index_full_text->analyzer_;
             }
             if (!column2analyzer.empty()) {
                 // iresearch requires there is exactly one full index per table.

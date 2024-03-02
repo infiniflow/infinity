@@ -14,7 +14,7 @@
 
 import threading
 import infinity
-import common_values
+from common import common_values
 import pytest
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -166,6 +166,7 @@ class TestDatabase:
 
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_drop_show_1M_databases(self):
 
@@ -511,21 +512,24 @@ class TestDatabase:
         assert res.error_code == ErrorCode.OK
 
     # create same db in different thread to test conflict and show dbs
-    @trace_expected_exceptions
+    # @trace_expected_exceptions
     def test_create_same_db_in_different_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                   args=(1,))
-        thread2 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                   args=(2,))
+        with pytest.raises(Exception, match="ERROR:3016*"):
+            thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                       args=(1,))
+            thread2 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                       args=(2,))
+            thread1.start()
+            thread2.start()
 
-        thread1.start()
-        thread2.start()
+            thread1.join()
+            thread2.join()
 
-        thread1.join()
-        thread2.join()
+        # drop
+        infinity_obj.drop_database("test_create_same_db_in_different_threads")
 
         # disconnect
         res = infinity_obj.disconnect()

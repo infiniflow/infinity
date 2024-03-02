@@ -37,7 +37,7 @@ import file_system;
 import table_def;
 import table_entry_type;
 import table_detail;
-import index_def;
+import index_base;
 import txn_store;
 import data_access_state;
 import catalog_delta_entry;
@@ -260,15 +260,15 @@ Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, 
 }
 
 Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
-                                                         const SharedPtr<IndexDef> &index_def,
-                                                         ConflictType conflict_type,
-                                                         TransactionID txn_id,
-                                                         TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr,
-                                                         bool is_replay,
-                                                         String replay_table_index_dir) {
+                                                      const SharedPtr<IndexBase> &index_base,
+                                                      ConflictType conflict_type,
+                                                      TransactionID txn_id,
+                                                      TxnTimeStamp begin_ts,
+                                                      TxnManager *txn_mgr,
+                                                      bool is_replay,
+                                                      String replay_table_index_dir) {
 
-    return table_entry->CreateIndex(index_def, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    return table_entry->CreateIndex(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
 Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
@@ -644,7 +644,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto table_name = add_table_index_entry_op->table_name();
                 auto index_name = add_table_index_entry_op->index_name();
                 auto index_dir = add_table_index_entry_op->index_dir();
-                auto index_def = add_table_index_entry_op->index_def();
+                auto index_base = add_table_index_entry_op->index_base();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
                 auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -658,7 +658,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 }
                 auto index_meta = table_entry->index_meta_map().at(index_name).get();
                 auto table_index_entry = TableIndexEntry::NewReplayTableIndexEntry(index_meta,
-                                                                                   index_def,
+                                                                                   index_base,
                                                                                    MakeUnique<String>(index_dir),
                                                                                    txn_id,
                                                                                    begin_ts,

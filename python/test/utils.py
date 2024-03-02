@@ -1,11 +1,10 @@
 import functools
+import os
+import subprocess
+import time
 import traceback
 
 import numpy as np
-import pytest
-import infinity
-
-import common_values
 
 
 # catch the expected exception
@@ -28,3 +27,11 @@ def read_fvecs_file(filename):
     ivecs = file_int32.reshape(-1, d + 1)[:, 1:].copy()
     fvecs = ivecs.view('float32')
     return fvecs
+
+
+def start_infinity_service_in_subporcess():
+    shell = "/home/fann/infinity/build/src/infinity"
+    with open("./tmp.txt", "w") as f:
+        infinity = subprocess.Popen(shell, stdout=f)
+    time.sleep(1)
+    return infinity

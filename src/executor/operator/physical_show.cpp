@@ -36,7 +36,6 @@ import value;
 import table_def;
 import data_table;
 import third_party;
-import index_def;
 import index_ivfflat;
 import index_base;
 import index_hnsw;

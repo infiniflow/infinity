@@ -18,6 +18,7 @@ import infinity.index as index
 from infinity.common import REMOTE_HOST
 import pandas as pds
 
+
 def main():
     infinity_obj = infinity.connect(REMOTE_HOST)
     db = infinity_obj.get_database("default")
@@ -43,7 +44,7 @@ def test():
         db.drop_table("my_table", if_exists=True)
         # Create a table named "my_table"
         table = db.create_table("my_table", {
-                                "num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
+            "num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
         table.insert(
             [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
         table.insert(
@@ -93,6 +94,7 @@ def test():
     # print(json_data)
     # print("------tabular - querybuilder-------")
     # print(qb_result)
+
 
 if __name__ == '__main__':
     # main()

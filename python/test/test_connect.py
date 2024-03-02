@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import pytest
-import common_values
+from common import common_values
 import infinity
 from infinity.common import NetworkAddress
 

@@ -16,7 +16,7 @@ import time
 import pandas as pd
 import pytest
 from numpy import dtype
-import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -121,14 +121,11 @@ class TestDelete:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        tb = db_obj.drop_table("test_delete_non_existent_table", if_exists=True)
-        assert tb
+        table_obj = db_obj.drop_table("test_delete_non_existent_table", if_exists=True)
+        assert table_obj
 
-        tb = db_obj.create_table("test_delete_non_existent_table", {"c1": "int"}, None)
-        assert tb
-
-        table_obj = db_obj.get_table("test_delete_empty_table")
-        table_obj.delete()
+        with pytest.raises(Exception, match="ERROR:3022*"):
+            db_obj.get_table("test_delete_non_existent_table").delete()
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -292,6 +289,7 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # delete inserted long before and select to check
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much time.")
     def test_delete_inserted_long_before_data(self):
         # connect
@@ -357,3 +355,68 @@ class TestDelete:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    def test_delete_one_block_without_expression(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_one_segment_without_expression")
+        table_obj = db_obj.create_table("test_delete_one_segment_without_expression", {"c1": "int"}, None)
+
+        # insert
+        values = [{"c1": 1} for _ in range(8192)]
+        table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete()
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_delete_one_segment_without_expression(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_delete_one_segment_without_expression")
+        table_obj = db_obj.create_table("test_delete_one_segment_without_expression", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete()
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="TODO")
+    def test_filter_expression(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_filter_expression")
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int"}, None)
+
+        # insert
+        for i in range(1024):
+            values = [{"c1": i} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.delete()
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)

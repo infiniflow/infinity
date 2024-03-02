@@ -325,8 +325,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     SharedPtr<String> schema_name = logical_create_index->base_table_ref()->schema_name();
     SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_name();
     const auto &index_def_ptr = logical_create_index->index_definition();
-    if (false || index_def_ptr->index_array_.size() != 1 || index_def_ptr->index_array_[0]->index_type_ != IndexType::kHnsw) {
-        // TODO: invalidate multiple index in one statement.
+    if (index_def_ptr->index_type_ != IndexType::kHnsw) {
         // TODO: support other index types build in parallel.
         return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
                                                       logical_create_index->base_table_ref(),

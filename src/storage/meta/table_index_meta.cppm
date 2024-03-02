@@ -20,7 +20,7 @@ import table_index_entry;
 import base_entry;
 import stl;
 import third_party;
-import index_def;
+import index_base;
 import status;
 import extra_ddl_info;
 import entry_list;
@@ -53,7 +53,7 @@ public:
     Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
                                                            TxnTimeStamp begin_ts,
@@ -74,7 +74,7 @@ private:
 
     void MergeFrom(TableIndexMeta &other);
 
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntryInternal(const SharedPtr<IndexDef> &index_def,
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntryInternal(const SharedPtr<IndexBase> &index_base,
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnManager *txn_mgr,
