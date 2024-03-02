@@ -36,7 +36,7 @@ namespace infinity {
 
 class TxnManager;
 
-export class DBEntry : public BaseEntry, public EntryInterface {
+export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
@@ -61,7 +61,7 @@ public:
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other) override;
+    void MergeFrom(BaseEntry &other) final;
 
     [[nodiscard]] const String &db_name() const { return *db_name_; }
 
