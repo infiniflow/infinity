@@ -36,7 +36,7 @@ void ScalarFunctionSet::AddFunction(const ScalarFunction &func) { functions_.emp
 
 ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
 
-    i64 lowest_cost = std::numeric_limits<i64>::max();;
+    i64 lowest_cost = std::numeric_limits<i64>::max();
     SizeT function_count = functions_.size();
     Vector<i64> candidates_index;
 
