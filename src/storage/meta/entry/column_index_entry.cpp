@@ -255,8 +255,7 @@ Status ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry,
     auto *txn_store = txn->GetTxnTableStore(table_entry);
 
     for (const auto *segment_entry : block_index->segments_) {
-        // use actual_row_count to exclude the deleted rows
-        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), segment_entry->actual_row_count(), column_def);
+        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), column_def);
         SegmentID segment_id = segment_entry->segment_id();
         SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
             SegmentColumnIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
@@ -280,11 +279,11 @@ Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32,
     return Status::OK();
 }
 
-UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, SizeT seg_actual_row_count, const ColumnDef *column_def) {
+UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def) {
     switch (index_base_->index_type_) {
         case IndexType::kIVFFlat: {
             // FIXME: actually the seg_actual_row_count is a bad feature, we should remove it in the future
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_actual_row_count);
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_row_count);
         }
         case IndexType::kHnsw: {
             SizeT max_element = seg_row_count;
