@@ -275,9 +275,8 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             // 1. build secondary index by merge sort
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            // fetch the actual_row_count from segment_entry
-            auto secondary_index_builder =
-                GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), segment_entry->actual_row_count(), part_capacity);
+            // fetch the row_count from segment_entry
+            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), part_capacity);
             secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_id, begin_ts, check_ts);
             secondary_index_builder->StartOutput();
             // 2. output into SecondaryIndexDataPart

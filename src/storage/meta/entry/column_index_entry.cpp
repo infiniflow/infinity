@@ -210,32 +210,19 @@ Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateInde
         case IndexType::kSecondary: {
             auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
             auto const row_count = create_secondary_param->row_count_;
-            auto const actual_row_count = create_secondary_param->actual_row_count_;
             auto const part_capacity = create_secondary_param->part_capacity_;
             // now we can only use row_count to calculate the part_num
             // because the actual_row_count will reduce when we delete rows
-            // which will cause the index file worker count to be inconsistent when we read the index file
+            // consider the timestamp, actual_row_count may be less than, equal to or greater than rows we can actually read
             u32 part_num = (row_count + part_capacity - 1) / part_capacity;
             vector_file_worker.resize(part_num + 1);
             // cannot use invalid file_worker
-            vector_file_worker[0] = MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(),
-                                                                         file_name,
-                                                                         index_base,
-                                                                         column_def,
-                                                                         0,
-                                                                         row_count,
-                                                                         actual_row_count,
-                                                                         part_capacity);
+            vector_file_worker[0] =
+                MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), file_name, index_base, column_def, 0, row_count, part_capacity);
             for (u32 i = 1; i <= part_num; ++i) {
                 auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
-                vector_file_worker[i] = MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(),
-                                                                             part_file_name,
-                                                                             index_base,
-                                                                             column_def,
-                                                                             i,
-                                                                             row_count,
-                                                                             actual_row_count,
-                                                                             part_capacity);
+                vector_file_worker[i] =
+                    MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), part_file_name, index_base, column_def, i, row_count, part_capacity);
             }
             break;
         }
@@ -308,7 +295,7 @@ UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_
         }
         case IndexType::kSecondary: {
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base_.get(), column_def, seg_row_count, seg_actual_row_count, part_capacity);
+            return MakeUnique<CreateSecondaryIndexParam>(index_base_.get(), column_def, seg_row_count, part_capacity);
         }
         default: {
             UniquePtr<String> err_msg =
