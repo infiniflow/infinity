@@ -48,7 +48,7 @@ class TableMeta;
 class Txn;
 struct Catalog;
 
-export struct TableEntry : public BaseEntry, public EntryInterface {
+export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
@@ -158,7 +158,7 @@ public:
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    void MergeFrom(BaseEntry &other) final;
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
