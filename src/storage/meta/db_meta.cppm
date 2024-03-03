@@ -36,7 +36,7 @@ namespace infinity {
 struct Catalog;
 class AddDBMetaOp;
 
-export struct DBMeta : public MetaInterface, public BaseMeta {
+export struct DBMeta : public MetaInterface {
     using EntryT = DBEntry;
 
     friend struct Catalog;
@@ -62,13 +62,13 @@ public:
     SharedPtr<String> data_dir() const { return data_dir_; }
 
 private:
-    Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<DBEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                           TransactionID txn_id,
                                           TxnTimeStamp begin_ts,
                                           TxnManager *txn_mgr,
@@ -78,6 +78,8 @@ private:
 
     Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
@@ -86,6 +88,8 @@ public:
     void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
+
+    bool Empty() override { return db_entry_list_.Empty(); }
 
 private:
     EntryList<DBEntry> db_entry_list_{};

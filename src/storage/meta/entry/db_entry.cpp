@@ -40,8 +40,7 @@ namespace infinity {
 DBEntry::DBEntry(bool is_delete, const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase), db_entry_dir_(is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)), db_name_(db_name) {
-    this->deleted_ = is_delete;
+    : BaseEntry(EntryType::kDatabase, is_delete), db_entry_dir_(is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)), db_name_(db_name) {
     //    atomic_u64 txn_id_{0};
     //    TxnTimeStamp begin_ts_{0};
     //    atomic_u64 commit_ts_{UNCOMMIT_TS};
@@ -99,7 +98,7 @@ Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_na
 
 Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     LOG_TRACE(fmt::format("Get a table entry {}", table_name));
-    auto [table_meta, status, _] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys): conflict_type
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys): conflict_type
     if (table_meta == nullptr) {
         return {nullptr, status};
     }
@@ -107,8 +106,8 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
 }
 
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
-    auto [table_meta, _1, _2] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys)
-    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_name));
+    auto [table_meta, _1, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError); // FIXME(sys)
+    LOG_TRACE(fmt::format("Remove a db entry: {}", table_name));
     table_meta->DeleteNewEntry(txn_id);
 }
 

@@ -305,7 +305,6 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 }
 
 void BlockEntry::Cleanup() {
-    SetCleanuped();
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
     }

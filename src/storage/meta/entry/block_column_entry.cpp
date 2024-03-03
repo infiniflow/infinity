@@ -173,7 +173,6 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
 }
 
 void BlockColumnEntry::Cleanup() {
-    SetCleanuped();
     if (buffer_ != nullptr) {
         buffer_->Cleanup();
     }

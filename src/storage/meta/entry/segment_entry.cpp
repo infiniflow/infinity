@@ -471,7 +471,6 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
 }
 
 void SegmentEntry::Cleanup() {
-    SetCleanuped();
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
     }

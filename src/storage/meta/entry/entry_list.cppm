@@ -48,17 +48,14 @@ class EntryList {
     };
 
 public:
-    using Iterator = typename List<SharedPtr<Entry>>::iterator;
-
-public:
-    Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                     std::function<SharedPtr<Entry>()> &&init_func,
                                     TransactionID txn_id,
                                     TxnTimeStamp begin_ts,
                                     TxnManager *txn_mgr,
                                     ConflictType conflict_type);
 
-    Tuple<Entry *, Status> DropEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<Entry *, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                      std::function<SharedPtr<Entry>()> &&init_func,
                                      TransactionID txn_id,
                                      TxnTimeStamp begin_ts,
@@ -66,6 +63,8 @@ public:
                                      ConflictType conflict_type);
 
     Tuple<Entry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<Entry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void DeleteEntry(TransactionID txn_id);
 
@@ -76,6 +75,11 @@ public:
     void MergeWith(EntryList<Entry> &other);
 
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
+
+    bool Empty() {
+        std::shared_lock lock(rw_locker_);
+        return entry_list_.empty();
+    }
 
 private:
     FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -90,9 +94,9 @@ template <EntryConcept Entry>
 EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     FindResult find_res = FindResult::kNotFound;
     bool continue_loop = true;
-    while (!entry_list_.empty() && continue_loop) {
+    for (auto iter = entry_list_.begin(); iter != entry_list_.end() && continue_loop; ++iter) {
         continue_loop = false;
-        Entry *entry = entry_list_.front().get();
+        Entry *entry = iter->get();
         if (entry->Committed()) {
             if (begin_ts > entry->commit_ts_) {
                 if (entry->Deleted()) {
@@ -128,7 +132,6 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
                 }
                 case TxnState::kRollbacking:
                 case TxnState::kRollbacked: {
-                    entry_list_.pop_front();
                     continue_loop = true;
                     break;
                 }
@@ -142,7 +145,7 @@ EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, T
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_mutex> parent_r_lock,
+Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_mutex> &&parent_r_lock,
                                                   std::function<SharedPtr<Entry>()> &&init_func,
                                                   TransactionID txn_id,
                                                   TxnTimeStamp begin_ts,
@@ -198,7 +201,7 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_mutex> parent_r_lock,
+Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_mutex> &&parent_r_lock,
                                                    std::function<SharedPtr<Entry>()> &&init_func,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts,
@@ -315,6 +318,30 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
 }
 
 template <EntryConcept Entry>
+Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    if (!entry_list_.empty()) {
+        auto *entry = entry_list_.front().get();
+
+        TransactionID entry_txn_id = entry->txn_id_.load();
+        // committed
+        if (begin_ts > entry->commit_ts_) {
+            if (entry->deleted_) {
+                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
+                LOG_ERROR(*err_msg);
+                return {nullptr, Status::InvalidEntry()};
+            } else {
+                return {entry, Status::OK()};
+            }
+        } else if (txn_id == entry_txn_id) {
+            return {entry, Status::OK()};
+        }
+    }
+    UniquePtr<String> err_msg = MakeUnique<String>("No entry found.");
+    LOG_ERROR(*err_msg);
+    return {nullptr, Status::NotFoundEntry()};
+}
+
+template <EntryConcept Entry>
 void EntryList<Entry>::DeleteEntry(TransactionID txn_id) {
     std::unique_lock lock(rw_locker_);
     if (entry_list_.empty()) {
@@ -367,7 +394,6 @@ void EntryList<Entry>::Cleanup() {
         if (entry->deleted_) {
             continue;
         }
-        entry->SetCleanuped();
         entry->Cleanup();
     }
 }

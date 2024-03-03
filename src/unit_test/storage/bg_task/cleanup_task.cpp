@@ -34,7 +34,7 @@ import status;
 import compilation_config;
 import cleanup_task;
 import compact_segments_task;
-import index_def;
+import index_base;
 import index_base;
 import third_party;
 import base_table_ref;
@@ -461,16 +461,14 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
 
-        auto index_def = MakeShared<IndexDef>(index_name);
-        SharedPtr<IndexBase> base_index_ptr = IndexSecondary::Make(fmt::format("{}_{}", *table_name, *index_name), {*column_name});
-        index_def->index_array_.emplace_back(base_index_ptr);
+        SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
 
         auto [table_entry, status1] = txn->GetTableEntry(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
         TxnTimeStamp begin_ts = txn->BeginTS();
         auto table_ref = BaseTableRef::FakeTableRef(table_entry, begin_ts);
-        auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_def, ConflictType::kError);
+        auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
 
         auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);

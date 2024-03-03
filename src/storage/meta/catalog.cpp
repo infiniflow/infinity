@@ -91,7 +91,7 @@ Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp 
 }
 
 Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [db_meta, status, _] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys): add conflict_type
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys): add conflict_type
     if (db_meta == nullptr) {
         return {nullptr, status};
     }
@@ -99,7 +99,7 @@ Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, Transaction
 }
 
 void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id) {
-    auto [db_meta, _1, _2] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys)
+    auto [db_meta, _, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys)
     LOG_TRACE(fmt::format("Remove a database entry {}", db_name));
     db_meta->DeleteNewEntry(txn_id);
 }
@@ -415,7 +415,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto table_name = add_table_meta_op->table_name();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
@@ -433,7 +433,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto row_count = add_table_entry_op->row_count();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
@@ -465,12 +465,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
@@ -505,12 +505,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
@@ -536,12 +536,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto column_id = add_column_entry_op->column_id();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
@@ -559,12 +559,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto index_name = add_index_meta_op->index_name();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
@@ -581,12 +581,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto index_base = add_table_index_entry_op->index_base();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
@@ -609,17 +609,17 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto index_dir = add_fulltext_index_entry_op->index_dir();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
                 auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
@@ -642,17 +642,17 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto column_index_dir = add_column_index_entry_op->col_index_dir();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
                 auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
@@ -680,17 +680,17 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
                 LOG_TRACE(fmt::format("at db {}", db_name));
-                auto [db_entry, db_status] = db_meta->GetEntry(txn_id, begin_ts);
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntry(txn_id, begin_ts);
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
                 auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntry(txn_id, begin_ts);
+                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }

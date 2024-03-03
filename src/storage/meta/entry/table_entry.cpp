@@ -57,10 +57,9 @@ TableEntry::TableEntry(bool is_delete,
                        TableMeta *table_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable), table_meta_(table_meta),
+    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta),
       table_entry_dir_(is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_collection_name)),
       table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
-    this->deleted_ = is_delete;
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
@@ -138,7 +137,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [index_meta, status, _] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys): conflict_type
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys): conflict_type
     if (index_meta == nullptr) {
         return {nullptr, status};
     }
@@ -146,7 +145,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
-    auto [index_meta, _1, _2] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys)
+    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys)
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
     return index_meta->DeleteNewEntry(txn_id);
 }

@@ -39,7 +39,7 @@ UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &data_dir, const Sha
 }
 
 // TODO: Use Txn* txn as parma instead of TransactionID txn_id and TxnManager *txn_mgr
-Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr,
@@ -48,7 +48,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mut
     return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                               TransactionID txn_id,
                                               TxnTimeStamp begin_ts,
                                               TxnManager *txn_mgr,
@@ -58,6 +58,10 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex
 }
 
 Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntry(txn_id, begin_ts); }
+
+Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    return db_entry_list_.GetEntryReplay(txn_id, begin_ts);
+}
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { db_entry_list_.DeleteEntry(txn_id); }
 

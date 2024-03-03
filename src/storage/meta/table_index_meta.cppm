@@ -35,7 +35,7 @@ struct TableEntry;
 struct SegmentEntry;
 class AddIndexMetaOp;
 
-export class TableIndexMeta : public MetaInterface, public BaseMeta {
+export class TableIndexMeta : public MetaInterface {
     friend struct TableEntry;
 
 public:
@@ -51,7 +51,7 @@ public:
     // Getter
     inline TableEntry *GetTableEntry() const { return table_entry_; }
 
-    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                            const SharedPtr<IndexBase> &index_base,
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
@@ -60,13 +60,15 @@ public:
                                                            bool is_replay,
                                                            String replay_table_index_dir);
 
-    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void DeleteNewEntry(TransactionID txn_id);
 
@@ -102,5 +104,7 @@ public:
     bool PickCleanup(CleanupScanner *scanner) override;
 
     void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
+
+    bool Empty() override { return index_entry_list_.Empty(); }
 };
 } // namespace infinity

@@ -46,7 +46,7 @@ UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_en
     return table_index_meta;
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                        const SharedPtr<IndexBase> &index_base,
                                                                        ConflictType conflict_type,
                                                                        TransactionID txn_id,
@@ -64,7 +64,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
     return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                      ConflictType conflict_type,
                                                                      TransactionID txn_id,
                                                                      TxnTimeStamp begin_ts,
@@ -79,6 +79,10 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
     return index_entry_list_.GetEntry(txn_id, begin_ts);
+}
+
+Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    return index_entry_list_.GetEntryReplay(txn_id, begin_ts);
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { index_entry_list_.DeleteEntry(txn_id); }

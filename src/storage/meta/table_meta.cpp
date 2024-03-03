@@ -53,7 +53,7 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
  * @param txn_mgr
  * @return Status
  */
-Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                       TableEntryType table_entry_type,
                                                       const SharedPtr<String> &table_collection_name_ptr,
                                                       const Vector<SharedPtr<ColumnDef>> &columns,
@@ -67,7 +67,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shar
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> r_lock,
+Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                     TransactionID txn_id,
                                                     TxnTimeStamp begin_ts,
                                                     TxnManager *txn_mgr,
@@ -88,6 +88,10 @@ Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared
 }
 
 Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return table_entry_list_.GetEntry(txn_id, begin_ts); }
+
+Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    return table_entry_list_.GetEntryReplay(txn_id, begin_ts);
+}
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { table_entry_list_.DeleteEntry(txn_id); }
 

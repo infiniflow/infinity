@@ -169,7 +169,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [db_entry, status] = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
-    if (db_entry == nullptr) {
+    if (db_entry == nullptr) { // nullptr means some exception happened
         return status;
     }
 
@@ -303,7 +303,7 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
-    if (table_index_entry == nullptr) {
+    if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
     txn_indexes_.emplace(*index_base->index_name_, table_index_entry);

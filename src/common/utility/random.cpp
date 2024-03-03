@@ -30,8 +30,7 @@ namespace {
 String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 }
 
-String RandomString(SizeT len, u32 seed) {
-    srand(seed);
+String RandomString(SizeT len) {
     // LOG_WARN(fmt::format("Set seed: {}", seed));
     String ret(len, '\0');
     for (SizeT i = 0; i < len; i++) {
@@ -44,11 +43,15 @@ String RandomString(SizeT len, u32 seed) {
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
     LocalFileSystem fs;
     SharedPtr<String> result;
-    int cnt = 0;
+    // int cnt = 0;
+    static bool initialized = false;
     do {
-        u32 seed = std::rand();
-        result = MakeShared<String>(fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN, seed), name));
-        ++cnt;
+        if (!initialized) {
+            initialized = true;
+            srand(std::time(nullptr));
+        }
+        result = MakeShared<String>(fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name));
+        // ++cnt;
     } while (!fs.CreateDirectoryNoExp(*result));
     // LOG_WARN(fmt::format("Generate path time: {}", cnt));
     return result;

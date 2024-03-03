@@ -126,14 +126,26 @@ void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
 
 template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
-    std::unique_lock w_lock(rw_locker_);
-    for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
-        bool all_delete = iter->second->PickCleanup(scanner);
-        if (all_delete) {
-            LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
-            iter = meta_map_.erase(iter);
-        } else {
-            ++iter;
+    Vector<Meta *> metas;
+    {
+        std::unique_lock w_lock(rw_locker_);
+        for (auto &[name, meta] : meta_map_) {
+            metas.push_back(meta.get());
+        }
+    }
+    bool may_empty = false;
+    for (auto *meta : metas) {
+        may_empty |= meta->PickCleanup(scanner);
+    }
+    if (may_empty) {
+        std::unique_lock w_lock(rw_locker_);
+        for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
+            if (iter->second->Empty()) {
+                LOG_INFO(fmt::format("PickCleanup: all_delete: {}", iter->first));
+                iter = meta_map_.erase(iter);
+            } else {
+                ++iter;
+            }
         }
     }
 }
@@ -141,7 +153,6 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
 template <MetaConcept Meta>
 void MetaMap<Meta>::Cleanup() {
     for (auto &[name, meta] : meta_map_) {
-        meta->SetCleanuped();
         meta->Cleanup();
     }
 }

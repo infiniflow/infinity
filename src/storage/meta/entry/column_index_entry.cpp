@@ -149,7 +149,6 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
 }
 
 void ColumnIndexEntry::Cleanup() {
-    SetCleanuped();
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
         segment_column_index_entry->Cleanup();
     }
@@ -167,16 +166,6 @@ void ColumnIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_seg
             ++iter;
         }
     }
-}
-
-SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
-    LocalFileSystem fs;
-    SharedPtr<String> index_dir;
-    do {
-        u32 seed = time(nullptr);
-        index_dir = MakeShared<String>(parent_dir + "/" + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_index_" + index_name);
-    } while (!fs.CreateDirectoryNoExp(*index_dir));
-    return index_dir;
 }
 
 Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {

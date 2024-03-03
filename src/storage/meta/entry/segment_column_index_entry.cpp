@@ -419,7 +419,6 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
 }
 
 void SegmentColumnIndexEntry::Cleanup() {
-    SetCleanuped();
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");

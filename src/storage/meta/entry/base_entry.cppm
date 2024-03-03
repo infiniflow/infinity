@@ -38,13 +38,8 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
-export enum class EntryStatus : i8 {
-    kInit,
-    kCleanedup,
-};
-
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
+    explicit BaseEntry(EntryType entry_type, bool is_delete = false) : entry_type_(entry_type), deleted_(is_delete) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
         }
@@ -69,51 +64,9 @@ public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    bool deleted_ = false;
+    bool deleted_;
 
     const EntryType entry_type_{EntryType::kDummy};
-
-public:
-    bool IfNotCleanedup(std::function<void()> &&func) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (status_ == EntryStatus::kCleanedup) {
-            return false;
-        }
-        func();
-        return true;
-    }
-
-    void SetCleanuped() {
-        std::lock_guard<std::mutex> lock(mtx_);
-        status_ = EntryStatus::kCleanedup;
-    }
-
-private:
-    std::mutex mtx_;
-
-    EntryStatus status_{EntryStatus::kInit};
-};
-
-export struct BaseMeta {
-public:
-    bool IfNotCleanedup(std::function<void()> &&func) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (status_ == EntryStatus::kCleanedup) {
-            return false;
-        }
-        func();
-        return true;
-    }
-
-    void SetCleanuped() {
-        std::lock_guard<std::mutex> lock(mtx_);
-        status_ = EntryStatus::kCleanedup;
-    }
-
-private:
-    std::mutex mtx_;
-
-    EntryStatus status_{EntryStatus::kInit};
 };
 
 } // namespace infinity
