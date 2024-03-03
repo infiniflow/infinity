@@ -251,20 +251,26 @@ public:
             auto [neighbors, neighbor_n] = vertex.GetNeighbors();
             assert(neighbor_n <= int(Mmax0));
             for (int i = 0; i < neighbor_n; ++i) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
                 VertexType neighbor_idx = neighbors[i];
                 assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
                 assert(neighbor_idx != vertex_i);
+#pragma clang diagnostic pop
             }
             for (int layer_i = 1; layer_i <= cur_max_layer; ++layer_i) {
                 auto [neighbors, neighbor_n] = GetLevelX(vertex, layer_i).GetNeighbors();
                 assert(neighbor_n <= int(Mmax));
                 for (int i = 0; i < neighbor_n; ++i) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
                     VertexType neighbor_idx = neighbors[i];
                     assert(neighbor_idx < cur_vertex_n && neighbor_idx >= 0);
                     assert(neighbor_idx != vertex_i);
 
                     int n_layer = GetLevel0(neighbor_idx).GetLayers().second;
                     assert(n_layer >= layer_i);
+#pragma clang diagnostic pop
                 }
             }
         }

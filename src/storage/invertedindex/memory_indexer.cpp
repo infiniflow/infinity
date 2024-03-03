@@ -14,6 +14,12 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-W#pragma-messages"
+
 #include <ctpl_stl.h>
 #include <storage/invertedindex/common/vespa_alloc.h>
 #include <vespalib/btree/btree.hpp>
@@ -28,6 +34,8 @@ module;
 #include <vespalib/btree/btreetraits.h>
 #include <vespalib/btree/noaggregated.h>
 #include <vespalib/datastore/buffer_type.hpp>
+
+#pragma clang diagnostic pop
 
 #include <string.h>
 
