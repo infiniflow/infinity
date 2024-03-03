@@ -17,15 +17,17 @@ module;
 #include <string>
 #include <vector>
 
+module index_full_text;
+
 import stl;
 import index_base;
 import third_party;
-
+import status;
 import serialize;
 import infinity_exception;
 import statement_common;
-
-module index_full_text;
+import base_table_ref;
+import logical_type;
 
 namespace infinity {
 
@@ -78,7 +80,7 @@ void IndexFullText::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, is_homebrewed);
 }
 
-SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
+SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t) {
     UnrecoverableError("Not implemented");
     return nullptr;
 }
@@ -86,7 +88,7 @@ SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
 String IndexFullText::ToString() const {
     std::stringstream ss;
     String output_str = IndexBase::ToString();
-    if(!analyzer_.empty()) {
+    if (!analyzer_.empty()) {
         output_str += ", " + analyzer_;
     }
     return output_str;
@@ -102,6 +104,18 @@ nlohmann::json IndexFullText::Serialize() const {
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
     UnrecoverableError("Not implemented");
     return nullptr;
+}
+
+void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+    auto &column_names_vector = *(base_table_ref->column_names_);
+    auto &column_types_vector = *(base_table_ref->column_types_);
+    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    if (column_id == column_names_vector.size()) {
+        RecoverableError(Status::ColumnNotExist(column_name));
+    } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kVarchar) {
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Invalid parameter for Full text index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
+    }
 }
 
 } // namespace infinity
