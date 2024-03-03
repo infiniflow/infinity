@@ -33,10 +33,6 @@ import third_party;
 import internal_types;
 import ring;
 
-namespace vespalib::alloc {
-class MemoryPoolAllocator;
-}
-
 namespace infinity {
 class ColumnIndexer;
 export class MemoryIndexer {
