@@ -101,7 +101,7 @@ void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u3
 void MemoryIndexer::Commit() {
     thread_pool_.push([this](int id) {
         Vector<SharedPtr<ColumnInverter>> inverters;
-        u64 seq_commit = this->ring_inverted_.GetMulti(inverters);
+        u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
         SizeT num = inverters.size();
         for (SizeT i = 1; i < num; i++) {
             inverters[0]->Merge(*inverters[i]);
