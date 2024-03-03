@@ -1,6 +1,21 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 module disk_index_segment_reader;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -11,16 +26,25 @@ import segment;
 import file_reader;
 import dict_reader;
 import term_meta;
+import byte_slice;
 import posting_list_format;
 
 namespace infinity {
 
-DiskIndexSegmentReader::DiskIndexSegmentReader(const String &root_path,
-                                               const Segment &segment,
-                                               const InvertedIndexConfig &index_config,
-                                               const SharedPtr<DictionaryReader> &dict_reader)
-    : path_(root_path), dict_reader_(dict_reader) {
+DiskIndexSegmentReader::DiskIndexSegmentReader(u64 column_id, const Segment &segment, const InvertedIndexConfig &index_config)
+    : column_id_(column_id), segment_(segment) {
     posting_format_option_ = index_config.GetPostingFormatOption();
+
+    String root_dir = index_config.GetIndexName();
+    Path path = Path(root_dir) / std::to_string(column_id_);
+    String path_str = path.string();
+    path_str.append(std::to_string(segment_.GetSegmentId()));
+    String dict_file = path_str;
+    dict_file.append(DICT_SUFFIX);
+    dict_reader_ = MakeShared<DictionaryReader>(dict_file, index_config.GetPostingFormatOption());
+    String posting_file = path_str;
+    posting_file.append(POSTING_SUFFIX);
+    posting_reader_ = MakeShared<FileReader>(fs_, posting_file, 1024);
 }
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {}
@@ -29,10 +53,13 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, docid_t base_
     TermMeta term_meta;
     if (!dict_reader_.get() || !dict_reader_->Lookup(term, term_meta))
         return false;
-    /// TODO
+    posting_reader_->Seek(term_meta.doc_start_);
+    u64 file_length = term_meta.pos_end_ - term_meta.doc_start_;
+    ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
+    posting_reader_->Read((char *)slice->data_, file_length);
+    SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
+    seg_posting.Init(byte_slice_list, base_doc_id, term_meta.doc_freq_, term_meta);
     return true;
 }
-
-docid_t DiskIndexSegmentReader::GetBaseDocId() const { return 0; }
 
 } // namespace infinity

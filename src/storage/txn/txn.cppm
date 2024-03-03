@@ -19,7 +19,7 @@ import stl;
 
 import table_detail;
 import table_def;
-import index_def;
+import index_base;
 import data_block;
 import meta_state;
 import data_access_state;
@@ -47,7 +47,7 @@ struct ScanParam {
 };
 
 class TxnManager;
-struct NewCatalog;
+struct Catalog;
 class BGTaskProcessor;
 struct TableEntry;
 struct DBEntry;
@@ -59,25 +59,26 @@ struct WalCmd;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
+enum class CompactSegmentsTaskType;
 
-export class Txn : public EnableSharedFromThis<Txn> {
+export class Txn {
 public:
     explicit Txn(TxnManager *txn_manager,
                  BufferManager *buffer_manager,
-                 NewCatalog *catalog,
+                 Catalog *catalog,
                  BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id);
 
-    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+    explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
     // Txn OPs
     void Begin();
 
     TxnTimeStamp Commit();
 
-    void CommitBottom();
+    void CommitBottom() noexcept;
 
     void CancelCommitBottom();
 
@@ -111,14 +112,14 @@ public:
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
-    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
     // write wal
-    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &indef);
+    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -137,14 +138,17 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
 
-    Status Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+    Status Compact(const String &db_name,
+                   const String &table_name,
+                   Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                   CompactSegmentsTaskType type);
 
     // Getter
     BufferManager *GetBufferMgr() const;
 
     BufferManager *buffer_manager() const { return buffer_mgr_; }
 
-    NewCatalog *GetCatalog() { return catalog_; }
+    Catalog *GetCatalog() { return catalog_; }
 
     inline TransactionID TxnID() const { return txn_id_; }
 
@@ -173,12 +177,14 @@ public:
 
     void DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
 
+    TxnManager *txn_mgr() const { return txn_mgr_; }
+
 private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
-    NewCatalog *catalog_{};
+    Catalog *catalog_{};
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};

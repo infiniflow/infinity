@@ -134,8 +134,8 @@ int main(int argn, char *argv[]) {
         std::cout << "Test " << i << std::endl;
 
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-        std::shared_ptr<Database> data_base = infinity->GetDatabase(db_name);
-        std::shared_ptr<Table> table = data_base->GetTable(table_name);
+        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
+        auto [ table, status2 ] = data_base->GetTable(table_name);
 
         size_t correct_n = 0;
         size_t total_n = 0;

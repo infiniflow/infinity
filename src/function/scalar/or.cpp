@@ -56,14 +56,14 @@ static void GenerateOrFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) {
     function_set_ptr->AddFunction(or_function);
 }
 
-void RegisterOrFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterOrFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "OR";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateOrFunction(function_set_ptr);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

@@ -36,7 +36,6 @@ import value;
 import table_def;
 import data_table;
 import third_party;
-import index_def;
 import index_ivfflat;
 import index_base;
 import index_hnsw;
@@ -702,7 +701,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     };
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    auto chuck_filling = [&](const StdFunction<u64(const String &)> &file_size_func, const String &path) {
+    auto chuck_filling = [&](const std::function<u64(const String &)> &file_size_func, const String &path) {
         SizeT column_id = 0;
         {
             Value value = Value::MakeVarchar(path);
@@ -1411,7 +1410,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
                                                        index_hnsw->ef_);
                         break;
                     }
-                    case IndexType::kIRSFullText: {
+                    case IndexType::kFullText: {
                         const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
                         other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
                         break;

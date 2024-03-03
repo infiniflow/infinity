@@ -175,7 +175,7 @@ private:
     }
 };
 
-StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
 InvalidPhysicalTopCompareType(const DataType &type_) {
     return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
         UnrecoverableError(fmt::format("OrderBy LogicalType {} not implemented.", type_name));
@@ -245,7 +245,7 @@ struct PhysicalTopCompareSingleValue<compare_order, T> {
 };
 
 template <OrderType compare_order>
-inline StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+inline std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
 GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     switch (auto switch_type = sort_expression->Type().type(); switch_type) {
         case LogicalType::kBoolean: {
@@ -296,7 +296,7 @@ GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
     }
 }
 
-StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
+std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>
 PhysicalTop::GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpression> &sort_expression) {
     switch (compare_order) {
         case OrderType::kAsc: {
@@ -314,7 +314,7 @@ void PhysicalTop::Init() {
     if (sort_expr_count_ != sort_expressions_.size()) {
         UnrecoverableError("order_by_types_.size() != sort_expressions_.size()");
     }
-    Vector<StdFunction<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
+    Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count_);
     for (u32 i = 0; i < sort_expr_count_; ++i) {
         sort_functions.emplace_back(GenerateSortFunction(order_by_types_[i], sort_expressions_[i]));

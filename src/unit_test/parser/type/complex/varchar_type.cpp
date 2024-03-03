@@ -270,7 +270,7 @@ TEST_F(VarcharTypeTest, TestMoveAssignment) {
         v1.InitAsValue(s1);
         VarcharT v2;
         v2 = std::move(v1);
-        EXPECT_EQ(v1.length_, 0);
+        EXPECT_EQ(v1.length_, 0u);
         EXPECT_EQ(v1.ToString(), "");
         EXPECT_EQ(v2.length_, s1.length());
         EXPECT_EQ(v2.ToString(), s1);

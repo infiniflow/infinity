@@ -31,7 +31,7 @@ TEST_F(BitmaskTest, bitmask_a) {
     constexpr size_t bit_count = 8192;
 
     Bitmask bitmask1;
-    EXPECT_EQ(bitmask1.count(), 0);
+    EXPECT_EQ(bitmask1.count(), 0u);
     EXPECT_EQ(bitmask1.GetData(), nullptr);
 
     // test Initialize()

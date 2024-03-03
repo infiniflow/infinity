@@ -18,13 +18,11 @@ ByteSlice *ByteSlice::CreateSlice(SizeT data_size, MemoryPool *pool) {
     ByteSlice *slice = new (mem) ByteSlice;
     slice->data_ = mem + GetHeadSize();
     slice->size_ = data_size;
-    slice->data_size_ = 0;
     slice->offset_ = 0;
     return slice;
 }
 
 void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
-    slice->~ByteSlice();
     u8 *mem = (u8 *)slice;
     if (pool == nullptr) {
         delete[] mem;
@@ -39,13 +37,13 @@ ByteSliceList::ByteSliceList() {
     total_size_ = 0;
 }
 
-ByteSliceList::ByteSliceList(ByteSlice *slice) : head_(nullptr), tail_(nullptr), total_size_(0) {
+ByteSliceList::ByteSliceList(ByteSlice *slice, MemoryPool *pool) : head_(nullptr), tail_(nullptr), total_size_(0), pool_(pool) {
     if (slice != nullptr) {
         Add(slice);
     }
 }
 
-ByteSliceList::~ByteSliceList() { Clear(nullptr); }
+ByteSliceList::~ByteSliceList() { Clear(pool_); }
 
 void ByteSliceList::Add(ByteSlice *slice) {
     if (tail_ == nullptr) {

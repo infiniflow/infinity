@@ -56,13 +56,13 @@ static void GenerateAndFunction(SharedPtr<ScalarFunctionSet> &function_set_ptr) 
     function_set_ptr->AddFunction(and_function);
 }
 
-void RegisterAndFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterAndFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "AND";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateAndFunction(function_set_ptr);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

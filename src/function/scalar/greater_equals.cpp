@@ -93,10 +93,10 @@ static void GenerateGreaterEqualsFunction(SharedPtr<ScalarFunctionSet> &function
     function_set_ptr->AddFunction(greater_equals_function);
 }
 
-void RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = ">=";
 
-    SharedPtr<ScalarFunctionSet> function_set_ptr = std::make_shared<ScalarFunctionSet>(func_name);
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     GenerateGreaterEqualsFunction<TinyIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kTinyInt));
     GenerateGreaterEqualsFunction<SmallIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kSmallInt));
@@ -158,7 +158,7 @@ void RegisterGreaterEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                                 &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterEqualsFunction>);
     function_set_ptr->AddFunction(varchar_greater_equals_mixed);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

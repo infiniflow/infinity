@@ -4,7 +4,7 @@
 </div>
 
 <p align="center">
-    <b>The AI-native database built for LLM applications, providing incredibly fast vector and full-text search</b>
+    <b>The AI-native database built for LLM applications, providing incredibly fast full-text and vector search</b>
 </p>
 
 <h4 align="center">
@@ -61,16 +61,15 @@ docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host inf
 
 #### Deploy Infinity using binary package on Linux x86_64
 
-You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases.
+You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
 
-Fedora/RHEL/OpenSUSE/CentOS
+Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-# not older than centos 7
 sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
 sudo systemctl start infinity
 ```
 
-Ubuntu
+Ubuntu/Debian
 ```bash
 sudo dpkg -i infinity-0.1.0-dev-x86_64.deb
 sudo systemctl start infinity
@@ -81,8 +80,10 @@ See [Build from Source](docs/build_from_source.md).
 
 ### Install Infinity's Python client
 
+`infinity-sdk` requires Python 3.10+.
+
 ```bash
-pip install infinity_sdk 
+pip3 install infinity-sdk
 ```
 
 ### Import necessary modules

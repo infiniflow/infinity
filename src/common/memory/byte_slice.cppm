@@ -13,7 +13,7 @@ export struct ByteSlice {
     ByteSlice() = default;
 
     bool operator==(const ByteSlice &other) const {
-        return next_ == other.next_ && data_ == other.data_ && size_ == other.size_ && data_size_ == other.data_size_ && offset_ == other.offset_;
+        return next_ == other.next_ && data_ == other.data_ && size_ == other.size_ && offset_ == other.offset_;
     }
 
     static constexpr SizeT GetHeadSize() { return sizeof(ByteSlice); }
@@ -27,11 +27,10 @@ export struct ByteSlice {
         return &slice;
     }
 
-    ByteSlice *next_ = nullptr;
-    u8 *data_ = nullptr;
+    u8 *volatile data_ = nullptr;
     SizeT size_ = 0;
-    SizeT data_size_ = 0;
     SizeT offset_ = 0;
+    ByteSlice *next_ = nullptr;
 };
 
 #pragma pack(pop)
@@ -40,7 +39,7 @@ export class ByteSliceList {
 public:
     ByteSliceList();
 
-    ByteSliceList(ByteSlice *slice);
+    ByteSliceList(ByteSlice *slice, MemoryPool *pool = nullptr);
 
     virtual ~ByteSliceList();
 
@@ -63,6 +62,7 @@ private:
     ByteSlice *head_;
     ByteSlice *tail_;
     SizeT total_size_;
+    MemoryPool *pool_{nullptr};
 };
 
 export class ByteSliceListIterator {

@@ -24,7 +24,7 @@ import query_context;
 import operator_state;
 import load_meta;
 import base_table_ref;
-import index_def;
+import index_base;
 import internal_types;
 import extra_ddl_info;
 import data_type;
@@ -34,7 +34,7 @@ export class PhysicalCreateIndexPrepare : public PhysicalOperator {
 public:
     PhysicalCreateIndexPrepare(u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
-                               SharedPtr<IndexDef> index_definition,
+                               SharedPtr<IndexBase> index_definition,
                                ConflictType conflict_type,
                                SharedPtr<Vector<String>> output_names,
                                SharedPtr<Vector<SharedPtr<DataType>>> output_types,
@@ -55,7 +55,7 @@ public:
 public:
     const SharedPtr<BaseTableRef> base_table_ref_{};
 
-    const SharedPtr<IndexDef> index_def_ptr_{};
+    const SharedPtr<IndexBase> index_def_ptr_{};
     const ConflictType conflict_type_{};
 
     const SharedPtr<Vector<String>> output_names_{};

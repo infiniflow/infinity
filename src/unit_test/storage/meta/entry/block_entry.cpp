@@ -25,6 +25,7 @@ import logger;
 import value;
 import default_values;
 import block_entry;
+import block_version;
 
 class BlockVersionTest : public BaseTest {};
 

@@ -55,7 +55,7 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
             }
         }
         if (!row_ids.empty()) {
-            txn->Delete(db_name, *table_name, row_ids);
+            txn->Delete(db_name, *table_name, row_ids); // TODO: segment id in `row_ids` is fixed.
             DeleteOperatorState* delete_operator_state = static_cast<DeleteOperatorState*>(operator_state);
             ++ delete_operator_state->count_;
             delete_operator_state->sum_ += row_ids.size();

@@ -17,7 +17,7 @@ export module table_def;
 
 import stl;
 
-import index_def;
+import index_base;
 import column_def;
 
 
@@ -76,7 +76,7 @@ private:
     SharedPtr<String> table_name_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    Vector<IndexDef> indexes_{};
+    Vector<IndexBase> indexes_{};
 };
 
 } // namespace infinity

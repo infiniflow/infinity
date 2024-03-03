@@ -135,7 +135,7 @@ QueryResult Infinity::ListDatabases() {
     return result;
 }
 
-UniquePtr<Database> Infinity::GetDatabase(const String &db_name) {
+Tuple<UniquePtr<Database>, Status> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -145,11 +145,7 @@ UniquePtr<Database> Infinity::GetDatabase(const String &db_name) {
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<UseCmd>(db_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
-    if (result.status_.ok()) {
-        return MakeUnique<Database>(db_name, session_);
-    } else {
-        return nullptr;
-    }
+    return { result.IsOk() ? MakeUnique<Database>(db_name, session_) : nullptr, result.status_ };
 }
 
 QueryResult Infinity::Query(const String &query_text) {

@@ -8,4 +8,5 @@ target_link_libraries(
     fst
     infinity_core
     benchmark_profiler
+    c++.a
 )

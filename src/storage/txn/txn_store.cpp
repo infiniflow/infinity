@@ -32,6 +32,9 @@ import table_entry;
 import catalog;
 import internal_types;
 import data_type;
+import background_process;
+import bg_task;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -90,7 +93,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Import(const SharedPtr<SegmentEn
 
 Tuple<UniquePtr<String>, Status>
 TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
-    const String &index_name = *table_index_entry->index_def()->index_name_;
+    const String &index_name = *table_index_entry->index_base()->index_name_;
     if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
         column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
     } else {
@@ -117,8 +120,12 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
     return {nullptr, Status::OK()};
 }
 
-Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
-    compact_state_.segment_data_ = std::move(segment_data);
+Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                                                        CompactSegmentsTaskType type) {
+    if (!compact_state_.segment_data_.empty()) {
+        UnrecoverableError("Attempt to compact table store twice");
+    }
+    compact_state_ = TxnCompactStore{std::move(segment_data), type};
     return {nullptr, Status::OK()};
 }
 
@@ -127,11 +134,11 @@ void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 void TxnTableStore::Rollback() {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
-        NewCatalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
+        Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
 
-    NewCatalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
 }
 
@@ -142,19 +149,19 @@ void TxnTableStore::PrepareCommit() {
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
     Txn *txn_ptr = (Txn *)txn_;
-    NewCatalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
+    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
-        const auto &uncommitted = uncommitted_segments_[seg_idx];
+        const SharedPtr<SegmentEntry> &uncommitted = uncommitted_segments_[seg_idx];
         // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
-        NewCatalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
+        Catalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
     // Attention: "compact" needs to be ahead of "delete"
-    NewCatalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
-    NewCatalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
-    NewCatalog::CommitCreateIndex(txn_indexes_store_);
+    Catalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
@@ -163,8 +170,35 @@ void TxnTableStore::PrepareCommit() {
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit() const {
-    NewCatalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
-    NewCatalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
+    Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+}
+
+void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
+    std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
+
+    // FIXME OPT: trigger compaction one time for all segments
+    for (const SharedPtr<SegmentEntry> &new_segment : uncommitted_segments_) {
+        auto ret = table_entry_->AddSegment(new_segment.get(), generate_txn);
+        if (!ret.has_value()) {
+            continue;
+        }
+        auto [to_compacts, txn] = *ret;
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
+        bg_task_processor->Submit(compact_task);
+    }
+    for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
+        auto ret = table_entry_->DeleteInSegment(segment_id, generate_txn);
+        if (!ret.has_value()) {
+            continue;
+        }
+        auto [to_compacts, txn] = *ret;
+        if (to_compacts.empty()) {
+            continue; // delete down layer but not trigger compaction
+        }
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
+        bg_task_processor->Submit(compact_task);
+    }
 }
 
 } // namespace infinity

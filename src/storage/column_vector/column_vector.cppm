@@ -195,8 +195,14 @@ private:
     static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
         auto *src_ptr = (T *)(src.data_ptr_);
         T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
-        for (SizeT idx = 0; idx < count; ++idx) {
-            dst_ptr[idx] = src_ptr[from + idx];
+        if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
+            for (SizeT idx = 0; idx < count; ++idx) {
+                dst_ptr[idx] = src_ptr[from];
+            }
+        } else {
+            for (SizeT idx = 0; idx < count; ++idx) {
+                dst_ptr[idx] = src_ptr[from + idx];
+            }
         }
     }
 

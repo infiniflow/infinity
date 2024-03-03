@@ -15,12 +15,12 @@
 module;
 
 #include <tuple>
+#include <vector>
 
 module logical_planner;
 
 import stl;
 import bind_context;
-
 
 import infinity_exception;
 import query_binder;
@@ -61,7 +61,6 @@ import explain_ast;
 
 import local_file_system;
 
-import index_def;
 import status;
 import default_values;
 import index_base;
@@ -133,7 +132,7 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildSelect(static_cast<const SelectStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kInsert: {
-            return BuildInsert(static_cast<const InsertStatement *>(statement), bind_context_ptr);
+            return BuildInsert(const_cast<InsertStatement *>(static_cast<const InsertStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kUpdate: {
             return BuildUpdate(static_cast<const UpdateStatement *>(statement), bind_context_ptr);
@@ -142,22 +141,22 @@ Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindConte
             return BuildDelete(static_cast<const DeleteStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kCreate: {
-            return BuildCreate(static_cast<const CreateStatement *>(statement), bind_context_ptr);
+            return BuildCreate(const_cast<CreateStatement *>(static_cast<const CreateStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kDrop: {
-            return BuildDrop(static_cast<const DropStatement *>(statement), bind_context_ptr);
+            return BuildDrop(const_cast<DropStatement *>(static_cast<const DropStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kShow: {
-            return BuildShow(static_cast<const ShowStatement *>(statement), bind_context_ptr);
+            return BuildShow(const_cast<ShowStatement *>(static_cast<const ShowStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kFlush: {
             return BuildFlush(static_cast<const FlushStatement *>(statement), bind_context_ptr);
         }
         case StatementType::kOptimize: {
-            return BuildOptimize(static_cast<const OptimizeStatement *>(statement), bind_context_ptr);
+            return BuildOptimize(const_cast<OptimizeStatement *>(static_cast<const OptimizeStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kCopy: {
-            return BuildCopy(static_cast<const CopyStatement *>(statement), bind_context_ptr);
+            return BuildCopy(const_cast<CopyStatement *>(static_cast<const CopyStatement *>(statement)), bind_context_ptr);
         }
         case StatementType::kExplain: {
             return BuildExplain(static_cast<const ExplainStatement *>(statement), bind_context_ptr);
@@ -188,7 +187,8 @@ Status LogicalPlanner::BuildSelect(const SelectStatement *statement, SharedPtr<B
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildInsert(const InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildInsert(InsertStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->schema_name_);
     if (statement->select_ == nullptr) {
         return BuildInsertValue(statement, bind_context_ptr);
     } else {
@@ -244,7 +244,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if (statement->columns_ != nullptr) {
             SizeT statement_column_count = statement->columns_->size();
             if (statement_column_count != value_list.size()) {
-                UnrecoverableError("INSERT: Target column count and input column count mismatch");
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 statement_column_count,
+                                                                 value_list.size())));
             }
 
             //        Value null_value = Value::MakeNullData();
@@ -350,7 +353,8 @@ Status LogicalPlanner::BuildDelete(const DeleteStatement *statement, SharedPtr<B
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCreate(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->create_info_->schema_name_);
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildCreateTable(statement, bind_context_ptr);
@@ -380,6 +384,10 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     // Check if columns is given.
     Vector<SharedPtr<ColumnDef>> columns;
     SizeT column_count = create_table_info->column_defs_.size();
+    if (column_count == 0) {
+        return Status::NoColumnDefined(create_table_info->table_name_);
+    }
+
     columns.reserve(column_count);
     for (SizeT idx = 0; idx < column_count; ++idx) {
 
@@ -514,15 +522,6 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
     return Status::OK();
 }
 
-// struct IndexInfo {
-//     ~IndexInfo();
-//     IndexType method_type_{};
-//     std::string column_name_{};
-//     std::vector<InitParameter *> *index_param_list_{nullptr};
-//
-//     static std::string IndexTypeToString(IndexType index_type);
-// };
-
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
 
@@ -536,14 +535,6 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     //    }
 
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
-    SharedPtr<IndexDef> index_def_ptr = MakeShared<IndexDef>(index_name);
-
-    Vector<IndexInfo *> &index_info_list = *create_index_info->index_info_list_;
-    index_def_ptr->index_array_.reserve(index_info_list.size());
-    if (index_info_list.empty()) {
-        RecoverableError(Status::SyntaxError("No index info."));
-    }
-
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
@@ -555,45 +546,51 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         }
     }
 
-    for (IndexInfo *index_info : index_info_list) {
-        SharedPtr<IndexBase> base_index_ptr{nullptr};
-        switch (index_info->index_type_) {
-            case IndexType::kIRSFullText: {
-                base_index_ptr = IndexFullText::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                     {index_info->column_name_},
-                                                     *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kHnsw: {
-                // The following check might affect performance
-                IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexHnsw::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+    if (create_index_info->index_info_list_->size() != 1) {
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size())));
+    }
+    IndexInfo *index_info = create_index_info->index_info_list_->at(0);
+    SharedPtr<IndexBase> base_index_ptr{nullptr};
+    switch (index_info->index_type_) {
+        case IndexType::kFullText: {
+            base_index_ptr = IndexFullText::Make(index_name,
+                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),
                                                  {index_info->column_name_},
                                                  *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kIVFFlat: {
-                IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexIVFFlat::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                    {index_info->column_name_},
-                                                    *(index_info->index_param_list_));
-                break;
-            }
-            case IndexType::kSecondary: {
-                IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-                base_index_ptr = IndexSecondary::Make(fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
-                break;
-            }
-            case IndexType::kInvalid: {
-                UnrecoverableError("Invalid index type.");
-                break;
-            }
+            break;
         }
-        index_def_ptr->index_array_.emplace_back(base_index_ptr);
+        case IndexType::kHnsw: {
+            // The following check might affect performance
+            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexHnsw::Make(index_name,
+                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                             {index_info->column_name_},
+                                             *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kIVFFlat: {
+            IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexIVFFlat::Make(index_name,
+                                                fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                                {index_info->column_name_},
+                                                *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kSecondary: {
+            IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr =
+                IndexSecondary::Make(index_name, fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
+            break;
+        }
+        case IndexType::kInvalid: {
+            UnrecoverableError("Invalid index type.");
+            break;
+        }
     }
 
     auto logical_create_index_operator =
-        MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, index_def_ptr, create_index_info->conflict_type_);
+        MakeShared<LogicalCreateIndex>(bind_context_ptr->GetNewLogicalNodeId(), base_table_ref, base_index_ptr, create_index_info->conflict_type_);
 
     this->logical_plan_ = logical_create_index_operator;
     this->names_ptr_->emplace_back("OK");
@@ -601,7 +598,8 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildDrop(const DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildDrop(DropStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->drop_info_->schema_name_);
     switch (statement->ddl_type()) {
         case DDLType::kTable: {
             return BuildDropTable(statement, bind_context_ptr);
@@ -739,7 +737,8 @@ Status LogicalPlanner::BuildExecute(const ExecuteStatement *, SharedPtr<BindCont
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildCopy(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->schema_name_);
     if (statement->copy_from_) {
         // Import
         return BuildImport(statement, bind_context_ptr);
@@ -856,12 +855,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCompactTable: {
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
-            UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
 
-            SharedPtr<BaseTableRef> table_ref = query_binder_ptr->GetTableRef(compact_table->schema_name(), compact_table->table_name());
-
+            Txn *txn = query_context_ptr_->GetTxn();
+            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name(), compact_table->table_name());
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
             auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
-            logical_command->table_ref_ = table_ref;
+            logical_command->table_entry_ = table_entry;
 
             this->logical_plan_ = logical_command;
             break;
@@ -873,7 +874,8 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildShow(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->schema_name_);
     switch (statement->show_type_) {
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
@@ -1078,7 +1080,8 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindCo
     return Status::OK();
 }
 
-Status LogicalPlanner::BuildOptimize(const OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    BindSchemaName(statement->schema_name_);
     switch (statement->type()) {
         case OptimizeType::kIRS: {
             SharedPtr<LogicalNode> logical_optimize =
@@ -1117,6 +1120,12 @@ Status LogicalPlanner::BuildExplain(const ExplainStatement *statement, SharedPtr
 
     this->logical_plan_ = explain_node;
     return Status::OK();
+}
+
+void LogicalPlanner::BindSchemaName(String &schema_name) const {
+    if (schema_name.empty()) {
+        schema_name = query_context_ptr_->schema_name();
+    }
 }
 
 } // namespace infinity

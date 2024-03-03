@@ -21,8 +21,8 @@ module index_ivfflat;
 
 import infinity_exception;
 import stl;
-import index_def;
-
+import index_base;
+import status;
 import third_party;
 import serialize;
 import index_base;
@@ -31,7 +31,10 @@ import statement_common;
 
 namespace infinity {
 
-SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexIVFFlat::Make(SharedPtr<String> index_name,
+                                        const String &file_name,
+                                        Vector<String> column_names,
+                                        const Vector<InitParameter *> &index_param_list) {
     SizeT centroids_count = 0;
     MetricType metric_type = MetricType::kInvalid;
     for (auto para : index_param_list) {
@@ -42,9 +45,9 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(String file_name, Vector<String> column_
         }
     }
     if (metric_type == MetricType::kInvalid) {
-        UnrecoverableError("Lack index parameter metric_type");
+        RecoverableError(Status::LackIndexParam());
     }
-    return MakeShared<IndexIVFFlat>(std::move(file_name), std::move(column_names), centroids_count, metric_type);
+    return MakeShared<IndexIVFFlat>(index_name, file_name, std::move(column_names), centroids_count, metric_type);
 }
 
 bool IndexIVFFlat::operator==(const IndexIVFFlat &other) const {
@@ -97,10 +100,10 @@ void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
-        UnrecoverableError(fmt::format("Invalid parameter for IVFFlat index: column name not found: {}.", column_name));
+        RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
-        UnrecoverableError(
-            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString()));
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Invalid parameter for IVFFlat index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
     }
 }
 

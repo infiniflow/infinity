@@ -47,7 +47,7 @@ public:
     tf_t tf_;
     docid_t doc_id_;
     u32 seeked_doc_count_;
-    PositionListDecoder *pos_decoder_;
+    PositionListDecoder *pos_decoder_{nullptr};
     i32 record_offset_;
     i32 offset_in_record_;
     u32 total_position_count_;

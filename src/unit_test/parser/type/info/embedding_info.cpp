@@ -36,12 +36,12 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
     EXPECT_THROW(EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, EMBEDDING_LIMIT + 1), ParserException);
 
     auto embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
-    EXPECT_EQ(embedding_info_ptr->Size(), 32);
+    EXPECT_EQ(embedding_info_ptr->Size(), 32u);
     EXPECT_EQ(embedding_info_ptr->Dimension(), 256);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemBit);
 
     embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, EMBEDDING_LIMIT);
-    EXPECT_EQ(embedding_info_ptr->Size(), EMBEDDING_LIMIT * 8);
+    EXPECT_EQ(embedding_info_ptr->Size(), SizeT(EMBEDDING_LIMIT * 8));
     EXPECT_EQ(embedding_info_ptr->Dimension(), EMBEDDING_LIMIT);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemInt64);
 

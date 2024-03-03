@@ -26,12 +26,12 @@ import stl;
 import infinity_exception;
 import logger;
 import buffer_manager;
-import backgroud_process;
+import background_process;
 import catalog_delta_entry;
 
 namespace infinity {
 
-TxnManager::TxnManager(NewCatalog *catalog,
+TxnManager::TxnManager(Catalog *catalog,
                        BufferManager *buffer_mgr,
                        BGTaskProcessor *bg_task_processor,
                        PutWalEntryFn put_wal_entry_fn,
@@ -46,7 +46,7 @@ Txn *TxnManager::CreateTxn() {
         UnrecoverableError("TxnManager is not running, cannot create txn");
     }
     rw_locker_.lock();
-    u64 new_txn_id = GetNewTxnID();
+    TransactionID new_txn_id = GetNewTxnID();
     UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
@@ -62,10 +62,7 @@ Txn *TxnManager::GetTxn(TransactionID txn_id) {
 }
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) {
-    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
-    Txn *txn_ptr = txn_map_[txn_id].get();
-    TxnState res = txn_ptr->GetTxnState();
-    return res;
+    return GetTxn(txn_id)->GetTxnState();
 }
 
 u64 TxnManager::GetNewTxnID() {
@@ -76,6 +73,7 @@ u64 TxnManager::GetNewTxnID() {
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
     TxnTimeStamp ts = ++start_ts_;
+    ts_queue_.push_back(ts);
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }
@@ -115,7 +113,10 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     return;
 }
 
-void TxnManager::Start() { is_running_.store(true, std::memory_order::relaxed); }
+void TxnManager::Start() {
+    is_running_.store(true, std::memory_order::relaxed);
+    LOG_INFO("TxnManager is started.");
+}
 
 void TxnManager::Stop() {
     bool expected = true;
@@ -125,7 +126,7 @@ void TxnManager::Stop() {
         return;
     }
 
-    LOG_INFO("TxnManager is stopping...");
+    LOG_INFO("Txn manager is stopping...");
     std::lock_guard<std::mutex> guard(mutex_);
     auto it = priority_que_.begin();
     while (it != priority_que_.end()) {
@@ -155,6 +156,18 @@ void TxnManager::RollBackTxn(Txn *txn) {
     rw_locker_.lock();
     txn_map_.erase(txn->TxnID());
     rw_locker_.unlock();
+}
+
+TxnTimeStamp TxnManager::GetMinUncommitTs() {
+    std::shared_lock r_locker(rw_locker_);
+    while (!ts_queue_.empty()) {
+        TxnTimeStamp front_ts = ts_queue_.front();
+        if (txn_map_.find(front_ts) != txn_map_.end()) {
+            return front_ts;
+        }
+        ts_queue_.pop_front();
+    }
+    return start_ts_;
 }
 
 } // namespace infinity

@@ -112,7 +112,7 @@ static void GenerateInEqualsFunction(SharedPtr<ScalarFunctionSet> &function_set_
     function_set_ptr->AddFunction(inequals_function);
 }
 
-void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "<>";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -192,7 +192,7 @@ void RegisterInEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                           &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, InEqualsFunction>);
     function_set_ptr->AddFunction(varchar_inequals_mixed);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

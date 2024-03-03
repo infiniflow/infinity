@@ -13,9 +13,11 @@
 # limitations under the License.
 import concurrent.futures
 import pytest
+import polars as pl
 
-import common_values
+from common import common_values
 import infinity
+from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
 
 
@@ -82,17 +84,145 @@ class TestTable:
         # FIXME: res = db_obj.describe_table("my_table")
 
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
+
+    def test_show_tables(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+
+        db = infinity_obj.get_database("default")
+
+        with pl.Config(fmt_str_lengths=1000):
+            res = db.show_tables()
+            print(res)
+            # check the polars dataframe
+            assert res.columns == ["database", "table", "type", "column_count", "row_count", "segment_count",
+                                   "block_count", "segment_capacity"]
+
+    def test_create_varchar_table(self):
+        """
+        target: test create table with varchar column
+        method: create table with varchar column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_varchar_table", True)
+        table_obj = db_obj.create_table("test_create_varchar_table", {
+            "c1": "varchar, primary key", "c2": "float"}, None)
+        assert table_obj
+
+        db_obj.drop_table("test_create_varchar_table")
+
+    def test_create_embedding_table(self):
+        """
+        target: test create table with embedding column
+        method: create table with embedding column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_embedding_table", True)
+        table_obj = db_obj.create_table("test_create_embedding_table", {
+            "c1": "vector,128,float"}, None)
+        assert table_obj
+
+        db_obj.drop_table("test_create_embedding_table")
+
+    def test_create_table_with_invalid_column_name(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                " ": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "12": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "[]": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "()": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "{}": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "1": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+        with pytest.raises(Exception):
+            db_obj = infinity_obj.get_database("default")
+            db_obj.drop_table("test_create_invalid_column_name", True)
+            table_obj = db_obj.create_table("test_create_invalid_column_name", {
+                "1.1": "vector,128,float"}, None)
+            assert table_obj
+            db_obj.drop_table("test_create_invalid_column_name")
+
+    @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
+    def test_create_table_with_invalid_column_name_python(self, column_name):
+        """
+        target: create with invalid column name
+        methods: create table with invalid column name
+        expect: all operations throw exception on python side
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("my_table")
+
+        try:
+            tb = db_obj.create_table("my_table", {column_name: "int"}, None)
+        except Exception as e:
+            print(e)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     def test_table_with_different_column_name(self):
         """
@@ -206,7 +336,7 @@ class TestTable:
 
         # list table
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # get table
         try:
@@ -216,11 +346,11 @@ class TestTable:
 
         # drop table
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop/describe/get table with 10000 columns with various column types.
     def test_table_with_various_column_types(self):
@@ -256,7 +386,7 @@ class TestTable:
 
         # list table
         res = db_obj.list_tables()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # get table
         try:
@@ -267,11 +397,11 @@ class TestTable:
 
         # drop table
         res = db_obj.drop_table("my_table")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop table with different invalid options
     def test_table_with_different_invalid_options(self):
@@ -294,7 +424,7 @@ class TestTable:
 
         # # disconnect
         # res = infinity_obj.disconnect()
-        # assert res.success
+        # assert res.error_code == ErrorCode.OK
 
         try:
             res = infinity_obj.disconnect()
@@ -302,6 +432,7 @@ class TestTable:
             print(e)
 
     # create/drop/describe/get 1000 tables with 10000 columns with various column types.
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
     def test_various_tables_with_various_columns(self):
         # connect
@@ -334,7 +465,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # after disconnection, create / drop / describe / list / get table
     def test_after_disconnect_use_table(self):
@@ -352,7 +483,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # create table
         try:
@@ -438,7 +569,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # describe created table, describe not-created table, describe dropped table
     @pytest.mark.skip(reason="Feature request")
@@ -451,7 +582,6 @@ class TestTable:
         pass
 
     # create/drop/list/get 1K table to reach the limit
-    @pytest.mark.skip(reason="Cause service termination")
     def test_create_1K_table(self):
         """
         target: create/drop/list/get 1K table
@@ -492,9 +622,10 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop/list/get 1M table to reach the limit
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_1M_table(self):
         """
@@ -518,7 +649,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create/drop same table in different thread to test conflict
     @trace_expected_exceptions
@@ -549,7 +680,7 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create empty column table
     def test_create_empty_column_table(self):
@@ -570,4 +701,98 @@ class TestTable:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar",
+        "bool",
+        "vector, 3, float"])
+    def test_create_valid_option(self, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_valid_option")
+
+        db_obj.create_table("test_valid_option", {"c1": types}, None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar",
+        "bool",
+        "vector, 3, float"])
+    @pytest.mark.parametrize("bool", [True, False])
+    def test_drop_option(self, types, bool):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_drop_option")
+
+        db_obj.create_table("test_drop_option", {"c1": types}, None)
+        db_obj.drop_table("test_drop_option", if_exists=bool)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_create_same_name_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_same_name")
+
+        # create
+        db_obj.create_table("test_create_same_name", {"c1": "int"}, None)
+        with pytest.raises(Exception, match="ERROR:3017*"):
+            db_obj.create_table("test_create_same_name", {"c1": "int"}, None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_drop_same_name_table(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_drop_same_name")
+        # drop
+        db_obj.drop_table("test_drop_same_name")
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_same_column_name(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_same_column_name")
+
+        db_obj.create_table("test_same_column_name", {"c1": "int",
+                                                      "c1":"int"}, None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.skip(reason="May cause server kill.")
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar",
+        "bool",
+        "vector, 3, float"])
+    def test_column_numbers(self, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_column_numbers")
+
+        values = {"c" + str(i): types for i in range(pow(2, 63) - 1)}
+        db_obj.create_table("test_column_numbers", values, None)
+

@@ -64,7 +64,7 @@ class TableScanTest : public BaseTest {
 
 TEST_F(TableScanTest, block_read_test) {
     using namespace infinity;
-    auto catalog = MakeUnique<NewCatalog>(MakeShared<String>("/tmp/infinity"));
+    auto catalog = MakeUnique<Catalog>(MakeShared<String>("/tmp/infinity"));
 
     Config config;
     config.Init(nullptr);
@@ -166,7 +166,7 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            auto func = Catalog::GetTableFunctionByName(catalog.get(), "seq_scan");
             func->main_function_(query_context.get(), table_scan_func.get(), output);
             if(output.row_count() == 0) {
                 break;
@@ -200,7 +200,7 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            auto func = Catalog::GetTableFunctionByName(catalog.get(), "seq_scan");
             func->main_function_(query_context.get(), table_scan_func.get(), output);
             if(output.row_count() == 0) {
                 break;
@@ -233,7 +233,7 @@ TEST_F(TableScanTest, block_read_test) {
 
             DataBlock output;
             output.Init(column_types, 1024);
-            auto func = NewCatalog::GetTableFunctionByName(catalog.get(), "seq_scan");
+            auto func = Catalog::GetTableFunctionByName(catalog.get(), "seq_scan");
             func->main_function_(query_context.get(), table_scan_func.get(), output);
             if(output.row_count() == 0) {
                 break;

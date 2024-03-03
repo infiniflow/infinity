@@ -22,7 +22,7 @@ import crc;
 import serialize;
 import data_block;
 import table_def;
-import index_def;
+import index_base;
 import infinity_exception;
 import internal_types;
 import stl;
@@ -166,18 +166,17 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            //  TODO: index_def
+            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation =
-                MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_def);
+                MakeUnique<AddTableIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir, index_base);
             break;
         }
-        case CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY: {
+        case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIrsIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir);
+            operation = MakeUnique<AddFulltextIndexEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, index_name, index_dir);
             break;
         }
         case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
@@ -220,6 +219,9 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
         UnrecoverableError("ptr goes out of range when reading CatalogDeltaOperation");
+    }
+    if (operation.get() == nullptr) {
+        UnrecoverableError("operation is nullptr");
     }
     return operation;
 }
@@ -317,10 +319,10 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    index_def_->WriteAdv(buf);
+    index_base_->WriteAdv(buf);
 }
 
-void AddIrsIndexEntryOp::WriteAdv(char *&buf) const {
+void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
@@ -366,7 +368,7 @@ void AddDBEntryOp::SaveSate() {
     this->is_delete_ = this->db_entry_->deleted_;
     this->begin_ts_ = this->db_entry_->begin_ts_;
     this->db_name_ = this->db_entry_->db_name();
-    this->db_entry_dir_ = this->db_entry_->db_entry_dir();
+    this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
     is_saved_sate_ = true;
 }
 
@@ -441,17 +443,17 @@ void AddTableIndexEntryOp::SaveSate() {
     this->table_name_ = *this->table_index_entry_->table_index_meta()->GetTableEntry()->GetTableName();
     this->index_name_ = this->table_index_entry_->table_index_meta()->index_name();
     this->index_dir_ = *this->table_index_entry_->index_dir();
-    this->index_def_ = this->table_index_entry_->table_index_def();
+    this->index_base_ = this->table_index_entry_->table_index_def();
     is_saved_sate_ = true;
 }
 
-void AddIrsIndexEntryOp::SaveSate() {
-    this->is_delete_ = irs_index_entry_->deleted_;
-    this->begin_ts_ = irs_index_entry_->begin_ts_;
-    this->db_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
-    this->table_name_ = *this->irs_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
-    this->index_name_ = this->irs_index_entry_->table_index_entry()->table_index_meta()->index_name();
-    this->index_dir_ = this->irs_index_entry_->index_dir();
+void AddFulltextIndexEntryOp::SaveSate() {
+    this->is_delete_ = fulltext_index_entry_->deleted_;
+    this->begin_ts_ = fulltext_index_entry_->begin_ts_;
+    this->db_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName();
+    this->table_name_ = *this->fulltext_index_entry_->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName();
+    this->index_name_ = this->fulltext_index_entry_->table_index_entry()->table_index_meta()->index_name();
+    this->index_dir_ = this->fulltext_index_entry_->index_dir();
     is_saved_sate_ = true;
 }
 
@@ -552,16 +554,20 @@ const String AddIndexMetaOp::ToString() const {
 }
 
 const String AddTableIndexEntryOp::ToString() const {
-    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_def: {}",
+    return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
                        db_name_,
                        table_name_,
                        index_name_,
                        index_dir_,
-                       index_def_->ToString());
+                       index_base_->ToString());
 }
 
-const String AddIrsIndexEntryOp::ToString() const {
-    return fmt::format("AddIrsIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}", db_name_, table_name_, index_name_, index_dir_);
+const String AddFulltextIndexEntryOp::ToString() const {
+    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}",
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       index_dir_);
 }
 
 const String AddColumnIndexEntryOp::ToString() const {
@@ -654,6 +660,7 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
  * @param ptr
  * @return void
  */
+// called by bg_task
 void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     char *const saved_ptr = ptr;
     std::memcpy(ptr, this, sizeof(CatalogDeltaEntryHeader));
@@ -682,6 +689,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
 }
 
+// called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
     LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
@@ -702,7 +710,28 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
+UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
+    for (auto &op : operations_) {
+        TxnTimeStamp op_commit_ts = op->commit_ts();
+        if (op_commit_ts <= max_commit_ts) {
+            flush_delta_entry->operations_.push_back(std::move(op));
+        } else {
+            break; // commit_ts is in ascending order
+        }
+    }
+    auto flush_size = flush_delta_entry->operations_.size();
+    operations_.erase(operations_.begin(), operations_.begin() + flush_size);
+    return flush_delta_entry;
+}
+
+// called by bg_task
 void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
+    // FIXME: should make timestamp increase ? 
+    std::lock_guard<std::mutex> lock(mtx_);
+
     auto &global_operations = this->operations();
     auto &local_operations = other->operations();
 

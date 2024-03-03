@@ -34,7 +34,7 @@ module physical_merge_aggregate;
 namespace infinity {
 
 template <typename T>
-using MathOperation = StdFunction<T(T, T)>;
+using MathOperation = std::function<T(T, T)>;
 
 void PhysicalMergeAggregate::Init() {}
 

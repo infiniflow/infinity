@@ -22,7 +22,7 @@ import crc;
 import serialize;
 import data_block;
 import table_def;
-import index_def;
+import index_base;
 import infinity_exception;
 
 import stl;
@@ -120,8 +120,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String table_index_dir = ReadBufAdv<String>(ptr);
-            SharedPtr<IndexDef> index_def = IndexDef::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, table_index_dir, index_def);
+            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+            cmd = MakeShared<WalCmdCreateIndex>(db_name, table_name, table_index_dir, index_base);
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -167,8 +167,8 @@ bool WalCmdCreateTable::operator==(const WalCmd &other) const {
 
 bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
-    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_def_.get() != nullptr &&
-           other_cmd->index_def_.get() != nullptr && *index_def_ == *other_cmd->index_def_ && table_index_dir_ == other_cmd->table_index_dir_;
+    return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ && index_base_.get() != nullptr &&
+           other_cmd->index_base_.get() != nullptr && *index_base_ == *other_cmd->index_base_ && table_index_dir_ == other_cmd->table_index_dir_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -235,7 +235,7 @@ i32 WalCmdCreateTable::GetSizeInBytes() const {
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->table_index_dir_.size() + this->index_def_->GetSizeInBytes();
+           this->table_index_dir_.size() + this->index_base_->GetSizeInBytes();
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
@@ -291,7 +291,7 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->table_index_dir_);
-    index_def_->WriteAdv(buf);
+    index_base_->WriteAdv(buf);
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {
@@ -525,7 +525,7 @@ String WalEntry::ToString() const {
             ss << "db name: " << create_index_cmd->db_name_ << std::endl;
             ss << "table name: " << create_index_cmd->table_name_ << std::endl;
             ss << "table index dir: " << create_index_cmd->table_index_dir_ << std::endl;
-            ss << "index def: " << create_index_cmd->index_def_->ToString() << std::endl;
+            ss << "index def: " << create_index_cmd->index_base_->ToString() << std::endl;
         }
     }
     ss << "========================" << std::endl;

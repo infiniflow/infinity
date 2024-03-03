@@ -147,26 +147,21 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-            SizeT dimension = embedding_info->Dimension();
+            u32 dimension = embedding_info->Dimension();
+            u32 actual_row_count = segment_entry->actual_row_count();
             BufferHandle buffer_handle = GetIndex();
             switch (embedding_info->Type()) {
                 case kElemFloat: {
                     auto annivfflat_index = reinterpret_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
                     // TODO: How to select training data?
-                    Vector<f32> segment_column_data;
-                    segment_column_data.reserve(segment_entry->row_count() * dimension);
-                    auto iter = BlockEntryIter(segment_entry);
-                    for (auto *block_entry = iter.Next(); block_entry != nullptr; block_entry = iter.Next()) {
-                        BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-
-                        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
-                        auto *data_ptr = reinterpret_cast<float *>(column_vector.data());
-                        SizeT block_row_cnt = block_entry->row_count();
-                        segment_column_data.insert(segment_column_data.end(), data_ptr, data_ptr + block_row_cnt * dimension);
+                    if (check_ts) {
+                        OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        annivfflat_index->BuildIndex(iter, dimension, actual_row_count);
+                    } else {
+                        // Not check ts in uncommitted segment when compact segment
+                        OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        annivfflat_index->BuildIndex(iter, dimension, actual_row_count);
                     }
-                    SizeT total_row_cnt = segment_column_data.size() / dimension;
-                    annivfflat_index->train_centroids(dimension, total_row_cnt, segment_column_data.data());
-                    annivfflat_index->insert_data(dimension, total_row_cnt, segment_column_data.data());
                     break;
                 }
                 default: {
@@ -199,7 +194,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
                     InsertHnswInner(iter);
                 } else {
-                    // Not check ts in uncommitted segment when compress segment
+                    // Not check ts in uncommitted segment when compact segment
                     OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
                     InsertHnswInner(iter);
                 }
@@ -267,7 +262,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             break;
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_ERROR(*err_msg);
@@ -421,6 +416,15 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     this->checkpoint_ts_ = checkpoint_ts;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} checkpoint is change to {}", segment_id, index_name, this->checkpoint_ts_));
     return true;
+}
+
+void SegmentColumnIndexEntry::Cleanup() && {
+    for (auto *buffer_obj : vector_buffer_) {
+        if (buffer_obj == nullptr) {
+            UnrecoverableError("vector_buffer should not has nullptr.");
+        }
+        buffer_obj->Cleanup();
+    }
 }
 
 void SegmentColumnIndexEntry::SaveIndexFile() {

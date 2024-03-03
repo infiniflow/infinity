@@ -27,7 +27,6 @@ public:
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_{};
     std::string view_name_{};
 
     std::vector<std::string> *view_columns_{};

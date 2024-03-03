@@ -13,7 +13,10 @@
 // limitations under the License.
 
 #pragma once
+
 #include <math.h>
+#include <map>
+
 import stl;
 import spinlock;
 import memory_pool;

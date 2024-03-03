@@ -27,7 +27,7 @@ namespace infinity {
 export struct VarHeapManager {
     // Use to store string.
     static constexpr u64 CHUNK_COUNT_LIMIT = MAX_VECTOR_CHUNK_COUNT;
-    static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();;
+    static constexpr u64 INVALID_CHUNK_OFFSET = std::numeric_limits<u64>::max();
 
 public:
     inline explicit VarHeapManager(u64 chunk_size = MIN_VECTOR_CHUNK_SIZE) : current_chunk_size_(chunk_size) {

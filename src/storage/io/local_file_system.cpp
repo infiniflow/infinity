@@ -33,6 +33,10 @@ module local_file_system;
 
 namespace infinity {
 
+namespace fs = std::filesystem;
+
+constexpr std::size_t BUFFER_SIZE = 4096; // Adjust buffer size as needed
+
 LocalFileHandler::~LocalFileHandler() {
     if (fd_ != -1) {
         int ret = close(fd_);
@@ -168,6 +172,28 @@ void LocalFileSystem::SyncFile(FileHandler &file_handler) {
     }
 }
 
+void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path) {
+    Path dst{dst_path};
+    Path src{src_path};
+    std::ifstream srcFile(src, std::ios::binary);
+    if (!srcFile.is_open()) {
+        UnrecoverableError("Failed to open source file");
+        return;
+    }
+    std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
+    if (!dstFile.is_open()) {
+        UnrecoverableError("Failed to open destination file");
+        return;
+    }
+    char buffer[BUFFER_SIZE];
+    while (srcFile.read(buffer, BUFFER_SIZE)) {
+        dstFile.write(buffer, srcFile.gcount());
+    }
+    dstFile.write(buffer, srcFile.gcount());
+    srcFile.close();
+    dstFile.close();
+}
+
 // Directory related methods
 bool LocalFileSystem::Exists(const String &path) {
     std::error_code error_code;
@@ -200,6 +226,16 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
     u64 removed_count = std::filesystem::remove_all(p, error_code);
+    if (error_code.value() != 0) {
+        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+    }
+    return removed_count;
+}
+
+u64 LocalFileSystem::DeleteEmptyDirectory(const String &path) {
+    std::error_code error_code;
+    Path p{path};
+    u64 removed_count = std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }

@@ -17,7 +17,7 @@ module;
 export module index_hnsw;
 
 import stl;
-import index_def;
+import index_base;
 
 import third_party;
 import index_base;
@@ -39,16 +39,18 @@ export HnswEncodeType StringToHnswEncodeType(const String &str);
 
 export class IndexHnsw final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase>
+    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexHnsw(String file_name,
+    IndexHnsw(SharedPtr<String> index_name,
+              const String &file_name,
               Vector<String> column_names,
               MetricType metric_type,
               HnswEncodeType encode_type,
               SizeT M,
               SizeT ef_construction,
               SizeT ef)
-        : IndexBase(file_name, IndexType::kHnsw, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
+        : IndexBase(IndexType::kHnsw, index_name, file_name, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
           ef_construction_(ef_construction), ef_(ef) {}
 
     ~IndexHnsw() final = default;

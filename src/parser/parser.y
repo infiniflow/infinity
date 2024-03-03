@@ -92,6 +92,13 @@ struct SQL_LTYPE {
   @$.string_length = 0;
 };
 
+%code{
+// Avoid warnings with the error counter.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+}
+
 %union {
     bool    bool_value;
     char*   str_value;
@@ -2694,7 +2701,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     ParserHelper::ToLower($5);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($5, "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp($5, "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($5, "ivfflat") == 0) {
@@ -2742,7 +2749,7 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
     ParserHelper::ToLower($6);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($6, "fulltext") == 0) {
-        index_type = infinity::IndexType::kIRSFullText;
+        index_type = infinity::IndexType::kFullText;
     } else if (strcmp($6, "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($6, "ivfflat") == 0) {

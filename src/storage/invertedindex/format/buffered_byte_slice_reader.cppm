@@ -55,8 +55,8 @@ private:
     u8 location_cursor_;
     u8 short_buffer_cursor_;
     ByteSliceReader byte_slice_reader_;
-    const BufferedByteSlice *buffered_byte_slice_;
-    const PostingValues *posting_values_;
+    const BufferedByteSlice *buffered_byte_slice_{nullptr};
+    const PostingValues *posting_values_{nullptr};
 
     friend class BufferedByteSliceReaderTest;
 };

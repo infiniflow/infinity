@@ -7,7 +7,7 @@ import vbyte_compressor;
 import dynamic_bitmap;
 import index_defines;
 import bitmap;
-
+import byte_slice_writer;
 module position_bitmap_writer;
 
 namespace infinity {
@@ -35,4 +35,14 @@ void PositionBitmapWriter::Dump(const SharedPtr<FileWriter> &file, u32 bit_count
     }
     file->Write((char *)bitmap_.GetData(), Bitmap::GetDumpSize(bit_count));
 }
+
+void PositionBitmapWriter::Dump(ByteSliceWriter &byte_slice_writer, u32 bit_count) {
+    byte_slice_writer.WriteVInt(block_offsets_.size());
+    byte_slice_writer.WriteVInt(bit_count);
+    for (u32 i = 0; i < block_offsets_.size(); ++i) {
+        byte_slice_writer.Write((char *)(&block_offsets_[i]), sizeof(u32));
+    }
+    byte_slice_writer.Write((char *)bitmap_.GetData(), Bitmap::GetDumpSize(bit_count));
+}
+
 } // namespace infinity

@@ -37,6 +37,8 @@ public:
 
     void MoveFile();
 
+    void CleanupFile();
+
     virtual void AllocateInMemory() = 0;
 
     virtual void FreeInMemory() = 0;

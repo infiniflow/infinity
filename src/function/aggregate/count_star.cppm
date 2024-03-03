@@ -20,8 +20,8 @@ export module count_star;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterCountStarFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterCountStarFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

@@ -44,6 +44,8 @@ public:
 
     void Dump(const SharedPtr<FileWriter> &file);
 
+    u32 GetDumpLength();
+
     void Flush();
 
     InMemDocListDecoder *GetInMemDocListDecoder(MemoryPool *session_pool) const;
@@ -71,9 +73,9 @@ private:
     tf_t total_tf_;
     df_t df_;
 
-    PositionBitmapWriter *tf_bitmap_writer_;
-    BufferedSkipListWriter *doc_skiplist_writer_;
-    MemoryPool *byte_slice_pool_;
+    PositionBitmapWriter *tf_bitmap_writer_{nullptr};
+    BufferedSkipListWriter *doc_skiplist_writer_{nullptr};
+    MemoryPool *byte_slice_pool_{nullptr};
     friend class InMemDocListDecoderTest;
 };
 

@@ -21,7 +21,7 @@ class IndexType(Enum):
     IVFFlat = 1
     HnswLVQ = 2
     Hnsw = 3
-    IRSFullText = 4
+    FullText = 4
 
     def to_ttype(self):
         if self == IndexType.IVFFlat:
@@ -30,8 +30,8 @@ class IndexType(Enum):
             return ttypes.IndexType.HnswLVQ
         elif self == IndexType.Hnsw:
             return ttypes.IndexType.Hnsw
-        elif self == IndexType.IRSFullText:
-            return ttypes.IndexType.IRSFullText
+        elif self == IndexType.FullText:
+            return ttypes.IndexType.FullText
         else:
             raise Exception("Unknown index type")
 

@@ -215,8 +215,8 @@ public:
     inline void Reset() {
         if (ptr && new_allocated_) {
             delete[] ptr;
-            ptr = nullptr;
         }
+        ptr = nullptr;
     }
 
     inline void SetNull() { ptr = nullptr; }

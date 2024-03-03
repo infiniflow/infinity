@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -30,8 +44,8 @@ export struct SegmentMeta {
         file->WriteVLong(timestamp_);
     }
 
-    segmentid_t segment_id_;
-    docid_t base_doc_id_;
+    segmentid_t segment_id_{INVALID_SEGMENTID};
+    docid_t base_doc_id_{INVALID_DOCID};
     u64 doc_count_{0};
     i64 timestamp_;
 };
@@ -41,7 +55,7 @@ export class Segment {
 public:
     enum SegmentStatus {
         BUILDING, // In memory segment
-        DUMPLING, // Flush
+        DUMPING,  // Flush
         BUILT     // Disk segment
     };
     Segment(SegmentStatus segment_status) : segment_status_(segment_status) {}
@@ -51,14 +65,19 @@ public:
 public:
     static constexpr segmentid_t MERGED_SEGMENT_ID_MASK = (segmentid_t)0x0;
 
-    segmentid_t GetSegmentID() const { return segment_meta_.segment_id_; }
+    segmentid_t GetSegmentId() const { return segment_meta_.segment_id_; }
+    void SetSegmentId(segmentid_t segment_id) { segment_meta_.segment_id_ = segment_id; }
     bool IsMergedSegmentId(segmentid_t segment_id) { return segment_id != INVALID_SEGMENTID && (segment_id & MERGED_SEGMENT_ID_MASK) == 0; }
     docid_t GetBaseDocId() const { return segment_meta_.base_doc_id_; }
-    u64 GetDocCount() const { return segment_meta_.doc_count_; }
+    void SetBaseDocId(docid_t base_doc) { segment_meta_.base_doc_id_ = base_doc; }
+    void IncDocCount(u64 doc_count) { segment_meta_.doc_count_ += doc_count; }
+    void SetDocCount(u64 doc_count) { segment_meta_.doc_count_ = doc_count; }
+    docid_t GetNextDocId() { return segment_meta_.base_doc_id_ + segment_meta_.doc_count_; };
     void SetSegmentMeta(const SegmentMeta &segment_meta) { segment_meta_ = segment_meta; }
     i64 GetTimestamp() const { return segment_meta_.timestamp_; }
     void SetTimestamp(i64 timestamp) { segment_meta_.timestamp_ = timestamp; }
     SegmentStatus GetSegmentStatus() const { return segment_status_; }
+    void SetSegmentStatus(SegmentStatus status) { segment_status_ = status; }
     Indexer *GetIndexWriter() const { return indexer_; }
     void SetIndexWriter(Indexer *indexer) { indexer_ = indexer; }
 

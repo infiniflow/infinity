@@ -22,6 +22,7 @@ import pandas as pd
 
 import infinity
 from infinity import NetworkAddress
+from infinity.errors import ErrorCode
 
 
 def trace_unhandled_exceptions(func):
@@ -131,7 +132,7 @@ class TestBenchmark:
         def create_database(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.create_database(
                 f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_database failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -143,14 +144,14 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def list_databases(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.list_databases()
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"list_databases failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
         def drop_database(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.drop_database(
                 f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}")
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_database failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -158,7 +159,7 @@ class TestBenchmark:
             res = infinity_obj.get_database(f"default").create_table(
                 f"table_{port}_{process_id}_{thread_id}_{num_iteration}",
                 {"c1": "int, primary key", "c2": "float"}, None)
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -167,7 +168,7 @@ class TestBenchmark:
                    .get_database(f"default")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .insert([{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]))
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"insert_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -192,7 +193,7 @@ class TestBenchmark:
             res = (infinity_obj
                    .get_database(f"default")
                    .drop_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}"))
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_table failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -201,7 +202,7 @@ class TestBenchmark:
                    .get_database(f"default")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .create_index("my_index", ["c1"], "IVF_FLAT", None, None))
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_index failed: {res.error_msg}")
 
         @trace_unhandled_exceptions
@@ -210,7 +211,7 @@ class TestBenchmark:
                    .get_database(f"default")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
                    .drop_index("my_index"))
-            if not res.success:
+            if res.error_code != ErrorCode.OK:
                 raise Exception(f"drop_index failed: {res.error_msg}")
 
         ############################################

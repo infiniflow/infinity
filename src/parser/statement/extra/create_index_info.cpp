@@ -27,7 +27,7 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kHnsw: {
             return "HNSW";
         }
-        case IndexType::kIRSFullText: {
+        case IndexType::kFullText: {
             return "FULLTEXT";
         }
         case IndexType::kSecondary: {
@@ -46,7 +46,7 @@ IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
     } else if (index_type_str == "HNSW") {
         return IndexType::kHnsw;
     } else if (index_type_str == "FULLTEXT") {
-        return IndexType::kIRSFullText;
+        return IndexType::kFullText;
     } else if (index_type_str == "SECONDARY") {
         return IndexType::kSecondary;
     } else {

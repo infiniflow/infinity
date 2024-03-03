@@ -46,7 +46,7 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
 
 struct IntervalTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, const SharedPtr<ColumnVector> &) {
+    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
         UnrecoverableError(
             fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
@@ -54,7 +54,7 @@ struct IntervalTryCastToVarlen {
 };
 
 template <>
-inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, const SharedPtr<ColumnVector> &) {
+inline bool IntervalTryCastToVarlen::Run(IntervalT, VarcharT &, ColumnVector*) {
     UnrecoverableError("Not implement: IntegerTryCastToFixlen::Run");
     return false;
 }

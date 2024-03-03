@@ -17,6 +17,7 @@ export module database;
 import stl;
 import query_result;
 import query_options;
+import status;
 import table;
 import table_detail;
 import session;
@@ -42,7 +43,7 @@ public:
 
     QueryResult ShowTables();
 
-    UniquePtr<Table> GetTable(const String &table_name);
+    Tuple<UniquePtr<Table>, Status> GetTable(const String &table_name);
 
     [[nodiscard]] const String &db_name() const { return db_name_; }
 

@@ -21,7 +21,9 @@ import default_values;
 
 namespace infinity {
 
-export enum EntryType : i8 {
+class Catalog;
+
+export enum class EntryType : i8 {
     kDummy,
     kDatabase,
     kTable,

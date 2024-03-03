@@ -70,24 +70,24 @@ TEST_F(BufferHandleTest, test1) {
 
     {
         auto buf_handle1 = buf1->Load();
-        EXPECT_EQ(buf1->rc(), 1);
+        EXPECT_EQ(buf1->rc(), 1u);
 
         auto buf_handle2 = buf2->Load();
 
         // out of memory exception
         EXPECT_THROW({ auto buf_handle3 = buf3->Load(); }, UnrecoverableException);
-        EXPECT_EQ(buf3->rc(), 0);
+        EXPECT_EQ(buf3->rc(), 0u);
         EXPECT_EQ(buf3->status(), BufferStatus::kNew);
         EXPECT_EQ(buf3->type(), BufferType::kEphemeral);
     }
 
-    EXPECT_EQ(buf1->rc(), 0);
-    EXPECT_EQ(buf2->rc(), 0);
+    EXPECT_EQ(buf1->rc(), 0u);
+    EXPECT_EQ(buf2->rc(), 0u);
 
     {
         auto buf_handle1 = buf1->Load();
         auto buf_handle1_1 = buf1->Load();
-        EXPECT_EQ(buf1->rc(), 2);
+        EXPECT_EQ(buf1->rc(), 2u);
     }
 
     size_t write_size = 128;
@@ -109,7 +109,7 @@ TEST_F(BufferHandleTest, test1) {
         auto buf_handle1 = buf1->Load();
         auto data = static_cast<const int *>(buf_handle1.GetData());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], i);
+            EXPECT_EQ(data[i], (int)i);
         }
 
         EXPECT_EQ(buf1->Save(), true);
@@ -126,7 +126,7 @@ TEST_F(BufferHandleTest, test1) {
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], i);
+            EXPECT_EQ(data[i], (int)i);
             data[i] = 2 * i;
         }
     }
@@ -140,7 +140,7 @@ TEST_F(BufferHandleTest, test1) {
 
         auto data = static_cast<int *>(buf_handle1.GetDataMut());
         for (size_t i = 0; i < write_size; ++i) {
-            EXPECT_EQ(data[i], 2 * i);
+            EXPECT_EQ(data[i], int(2 * i));
         }
     }
 }

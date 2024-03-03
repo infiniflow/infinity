@@ -12,6 +12,7 @@ import inmem_pair_value_skiplist_reader;
 import inmem_tri_value_skiplist_reader;
 import index_defines;
 import skiplist_reader;
+import vbyte_compressor;
 module doc_list_encoder;
 
 namespace infinity {
@@ -112,6 +113,20 @@ void DocListEncoder::Dump(const SharedPtr<FileWriter> &file) {
     if (tf_bitmap_writer_) {
         tf_bitmap_writer_->Dump(file, total_tf_);
     }
+}
+
+u32 DocListEncoder::GetDumpLength() {
+    u32 doc_skiplist_size = 0;
+    if (doc_skiplist_writer_) {
+        doc_skiplist_size = doc_skiplist_writer_->EstimateDumpSize();
+    }
+    u32 doc_list_size = doc_list_buffer_.EstimateDumpSize();
+    u32 tf_bitmap_length = 0;
+    if (tf_bitmap_length) {
+        tf_bitmap_length = tf_bitmap_writer_->GetDumpLength(total_tf_);
+    }
+    return VByteCompressor::GetVInt32Length(doc_skiplist_size) + VByteCompressor::GetVInt32Length(doc_list_size) + doc_skiplist_size + doc_list_size +
+           tf_bitmap_length;
 }
 
 void DocListEncoder::FlushDocListBuffer() {

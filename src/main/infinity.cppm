@@ -20,6 +20,7 @@ import config;
 import resource_manager;
 import task_scheduler;
 import storage;
+import status;
 import database;
 import query_result;
 import query_options;
@@ -54,7 +55,7 @@ public:
 
     QueryResult ListDatabases();
 
-    UniquePtr<Database> GetDatabase(const String &db_name);
+    Tuple<UniquePtr<Database>, Status> GetDatabase(const String &db_name);
 
     QueryResult Flush();
 

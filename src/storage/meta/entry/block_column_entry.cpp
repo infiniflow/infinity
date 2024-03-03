@@ -172,6 +172,17 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT checkpo
     }
 }
 
+void BlockColumnEntry::Cleanup() {
+    if (buffer_ != nullptr) {
+        buffer_->Cleanup();
+    }
+    for (auto *outline_buffer : outline_buffers_) {
+        if (outline_buffer) {
+            outline_buffer->Cleanup();
+        }
+    }
+}
+
 nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = this->column_id_;

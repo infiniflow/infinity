@@ -1,26 +1,27 @@
 # python-infinity
 
-# dependency
-
-```shell
-pip install -r requirements.txt
-```
-
 # build
 
 ```shell
-python setup.py sdist bdist_wheel
+rm -f dist/* && python setup.py sdist bdist_wheel
 ```
 
 # install
 ```shell
-pip install dist/*.whl
+pip uninstall -y infinity-sdk && pip install dist/*.whl
 ```
 
-# upload
+This will install infinity-sdk and its dependencies.
+
+# upload to pypi.org
 ```shell
-twine upload dist/* 
+twine upload dist/*.whl
 ```
+
+Enter your pypi API token according to the prompt.
+
+Note that pypi allow a version of a package [be uploaded only once](https://pypi.org/help/#file-name-reuse). You need to change the `version` inside the `pyproject.toml` before build and upload.
+
 # using
 
 ```python

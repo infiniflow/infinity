@@ -93,7 +93,7 @@ static void GenerateGreaterFunction(SharedPtr<ScalarFunctionSet> &function_set_p
     function_set_ptr->AddFunction(greater_function);
 }
 
-void RegisterGreaterFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = ">";
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
@@ -157,7 +157,7 @@ void RegisterGreaterFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                          &ScalarFunction::BinaryFunction<VarcharT, MixedT, BooleanT, GreaterFunction>);
     function_set_ptr->AddFunction(varchar_greater_mixed);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

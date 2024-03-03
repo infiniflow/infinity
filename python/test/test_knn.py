@@ -14,7 +14,7 @@
 
 import pytest
 
-import common_values
+from common import common_values
 import infinity
 
 

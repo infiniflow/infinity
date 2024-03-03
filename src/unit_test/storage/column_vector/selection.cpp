@@ -41,8 +41,8 @@ TEST_F(SelectionTest, test1) {
     }
 
     s1.Initialize();
-    EXPECT_EQ(s1.Size(), 0);
-    EXPECT_EQ(s1.Capacity(), DEFAULT_VECTOR_SIZE);
+    EXPECT_EQ(s1.Size(), 0u);
+    EXPECT_EQ(s1.Capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_THROW(s1.Get(DEFAULT_VECTOR_SIZE), UnrecoverableException);
     EXPECT_THROW(s1.Get(0), UnrecoverableException);
 

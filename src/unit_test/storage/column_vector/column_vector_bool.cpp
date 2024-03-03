@@ -41,8 +41,8 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
 
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kCompactBit), UnrecoverableException);
 
-    EXPECT_EQ(column_vector.capacity(), DEFAULT_VECTOR_SIZE);
-    EXPECT_EQ(column_vector.Size(), 0);
+    EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
+    EXPECT_EQ(column_vector.Size(), 0u);
 
     EXPECT_THROW(column_vector.GetValue(0), UnrecoverableException);
     EXPECT_EQ(column_vector.data_type_size_, 1);

@@ -24,7 +24,6 @@ public:
 
     [[nodiscard]] std::string ToString() const final;
 
-    std::string schema_name_;
 };
 
 } // namespace infinity

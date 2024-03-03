@@ -166,10 +166,6 @@ private:
     ResourceManager *resource_manager_{};
     SessionManager* session_manager_{};
 
-    // Get following information from session.
-    // Current schema
-    String current_schema_;
-
     u64 catalog_version_{};
 
     // User / Tenant information

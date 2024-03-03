@@ -39,7 +39,7 @@ export class DeleteFilter final : public FilterBase<SegmentOffset> {
 public:
     explicit DeleteFilter(const SegmentEntry *segment, TxnTimeStamp query_ts) : segment_(segment), query_ts_(query_ts) {}
 
-    bool operator()(const SegmentOffset &segment_offset) const final { return segment_->CheckVisible(segment_offset, query_ts_); }
+    bool operator()(const SegmentOffset &segment_offset) const final { return segment_->CheckRowVisible(segment_offset, query_ts_); }
 
 private:
     const SegmentEntry *const segment_;

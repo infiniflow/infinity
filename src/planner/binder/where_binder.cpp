@@ -27,6 +27,7 @@ import third_party;
 import bind_alias_proxy;
 import parsed_expr;
 import column_expr;
+import status;
 
 namespace infinity {
 
@@ -54,7 +55,7 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
     }
 
     if (result.get() == nullptr) {
-        UnrecoverableError(fmt::format("Can't bind the expr: {}", expr.GetName()));
+        RecoverableError(Status::ColumnNotExist(expr.GetName()));
     }
     return result;
 }

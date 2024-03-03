@@ -1,3 +1,17 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
 import stl;
@@ -21,12 +35,10 @@ public:
                (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
     }
 
-    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count);
-
-    void Init(docid_t base_doc_id, u64 doc_count);
-
+    // for on disk segment posting
+    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
-    void Init(docid_t base_doc_id, u32 doc_count, PostingWriter *posting_writer);
+    void Init(docid_t base_doc_id, PostingWriter *posting_writer);
 
     docid_t GetBaseDocId() const { return base_doc_id_; }
     void SetBaseDocId(docid_t base_doc_id) { base_doc_id_ = base_doc_id; }
@@ -43,13 +55,11 @@ public:
     void GetInMemTermMeta(TermMeta &tm) {
         df_t df = posting_writer_->GetDF();
         tf_t ttf = posting_writer_->GetTotalTF();
-        // termpayload_t term_payload = posting_writer_->GetTermPayload();
         tm.SetDocFreq(df);
         tm.SetTotalTermFreq(ttf);
-        // tm.SetPayload(term_payload);
     }
 
-    TermMeta GetSegmentTermMeta() const;
+    const TermMeta &GetTermMeta() const { return term_meta_; }
 
     const SharedPtr<ByteSliceList> &GetSliceListPtr() const { return slice_list_; }
 

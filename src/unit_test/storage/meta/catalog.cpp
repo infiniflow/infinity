@@ -58,7 +58,7 @@ TEST_F(CatalogTest, simple_test1) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    NewCatalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto *txn1 = txn_mgr->CreateTxn();
@@ -117,7 +117,7 @@ TEST_F(CatalogTest, simple_test2) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    NewCatalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
     auto *txn1 = txn_mgr->CreateTxn();
@@ -159,7 +159,7 @@ TEST_F(CatalogTest, simple_test2) {
         EXPECT_TRUE(status.ok());
 
         // should not be visible to other txn
-        auto [db_entry2, status2] = catalog->NewCatalog::GetDatabase("db1", txn3->TxnID(), txn3->BeginTS());
+        auto [db_entry2, status2] = catalog->Catalog::GetDatabase("db1", txn3->TxnID(), txn3->BeginTS());
         EXPECT_TRUE(!status2.ok());
     }
 
@@ -170,7 +170,7 @@ TEST_F(CatalogTest, concurrent_test) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    NewCatalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     for (int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2
@@ -205,7 +205,7 @@ TEST_F(CatalogTest, concurrent_test) {
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
                 String db_name = "db" + std::to_string(db_id);
-                auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn->TxnID(), txn->BeginTS());
+                auto [db_entry, status] = catalog->Catalog::GetDatabase(db_name, txn->TxnID(), txn->BeginTS());
                 EXPECT_TRUE(status.ok());
                 // only read, don't need lock
                 EXPECT_NE(db_entry, nullptr);
@@ -249,7 +249,7 @@ TEST_F(CatalogTest, concurrent_test) {
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {
             String db_name = "db" + std::to_string(db_id);
-            auto [db_entry, status] = catalog->NewCatalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
+            auto [db_entry, status] = catalog->Catalog::GetDatabase(db_name, txn7->TxnID(), txn7->BeginTS());
             EXPECT_TRUE(!status.ok());
         }
     }

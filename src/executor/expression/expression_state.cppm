@@ -62,7 +62,7 @@ private:
     String name_;
 
     // output blocks and each block have one output column;
-    SharedPtr<ColumnVector> column_vector_;
+    SharedPtr<ColumnVector> column_vector_{nullptr};
 };
 
 } // namespace infinity

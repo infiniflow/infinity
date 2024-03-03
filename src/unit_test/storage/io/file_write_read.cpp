@@ -41,7 +41,7 @@ TEST_F(FileWriteReadTest, test1) {
     }
     file_writer.Flush();
     EXPECT_EQ(file_writer.GetFileSize(), 128 * 3);
-    EXPECT_EQ(file_writer.total_written_, 128 * 3);
+    EXPECT_EQ(file_writer.total_written_, (SizeT)128 * 3);
 
     FileReader file_reader(local_file_system, path, 128);
     String read_str;
@@ -49,5 +49,58 @@ TEST_F(FileWriteReadTest, test1) {
     file_reader.Read(read_str.data(), 4);
     EXPECT_STREQ(read_str.c_str(), "abca");
     EXPECT_FALSE(file_reader.Finished());
+    local_file_system.DeleteFile(path);
+}
+
+TEST_F(FileWriteReadTest, test2) {
+    using namespace infinity;
+    LocalFileSystem local_file_system;
+    String path = "/tmp/test_file2.abc";
+    FileWriter file_writer(local_file_system, path, 128);
+
+    for (u32 i = 0; i < 128; ++i) {
+        file_writer.WriteVInt(i);
+    }
+    file_writer.Flush();
+
+    FileReader file_reader(local_file_system, path, 128);
+    for (u32 i = 0; i < 128; ++i) {
+        u32 a = file_reader.ReadVInt();
+        EXPECT_EQ(a, i);
+    }
+    local_file_system.DeleteFile(path);
+}
+
+TEST_F(FileWriteReadTest, test3) {
+    using namespace infinity;
+    LocalFileSystem local_file_system;
+    String path = "/tmp/test_file3.abc";
+    FileWriter file_writer(local_file_system, path, 128);
+
+    for (u32 i = 0; i < 128; ++i) {
+        file_writer.WriteVInt(i);
+    }
+    for (SizeT i = 0; i < 3; ++i) {
+        String buffer = "abc";
+        file_writer.Write(buffer.c_str(), buffer.size());
+    }
+    for (u32 i = 0; i < 128; ++i) {
+        file_writer.WriteVInt(i);
+    }
+    file_writer.Flush();
+
+    FileReader file_reader(local_file_system, path, 128);
+    for (u32 i = 0; i < 128; ++i) {
+        u32 a = file_reader.ReadVInt();
+        EXPECT_EQ(a, i);
+    }
+    String read_str;
+    read_str.resize(9);
+    file_reader.Read(read_str.data(), 9);
+    EXPECT_STREQ(read_str.c_str(), "abcabcabc");
+    for (u32 i = 0; i < 128; ++i) {
+        u32 a = file_reader.ReadVInt();
+        EXPECT_EQ(a, i);
+    }
     local_file_system.DeleteFile(path);
 }

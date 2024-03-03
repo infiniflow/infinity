@@ -57,7 +57,7 @@ TEST_F(LockFreeVectorTest, test2) {
     unsigned number_of_threads = 4;
     unsigned number_of_pushes = 100;
 
-    Thread push_thread_list[number_of_threads];
+    Vector<Thread> push_thread_list(number_of_threads);
     for (unsigned i = 0; i < number_of_threads; i++) {
         push_thread_list[i] = Thread(PushTest, &vec, number_of_pushes, true);
     }
@@ -89,7 +89,7 @@ TEST_F(LockFreeVectorTest, test3) {
     unsigned number_of_pushes = 100;
 
     Thread push_thread = Thread(PushTest, &vec, number_of_pushes, false);
-    Thread read_thread_list[number_of_threads];
+    Vector<Thread> read_thread_list(number_of_threads);
     for (unsigned i = 0; i < number_of_threads; i++) {
         read_thread_list[i] = Thread(ReadTest, &vec);
     }

@@ -33,22 +33,26 @@ import txn_manager;
 import segment_entry;
 import block_entry;
 import table_index_meta;
+import compaction_alg;
+import meta_map;
+
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
-class IndexDef;
+class IndexBase;
 struct TableIndexEntry;
-class IrsIndexEntry;
+class FulltextIndexEntry;
 class TableMeta;
 class Txn;
-struct NewCatalog;
+struct Catalog;
 
-export struct TableEntry : public BaseEntry {
-    friend struct NewCatalog;
+export struct TableEntry final : public BaseEntry, public EntryInterface {
+    friend struct Catalog;
 
 public:
-    // for iterator unit test.
-    explicit TableEntry() : BaseEntry(EntryType::kTable) {}
+    explicit TableEntry();
 
     explicit TableEntry(const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
@@ -78,7 +82,7 @@ public:
                                                      SizeT row_count);
 
 private:
-    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
+    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
@@ -146,7 +150,7 @@ public:
 
     void GetFullTextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,
-                              SharedPtr<IrsIndexEntry> &irs_index_entry,
+                              SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                               Map<String, String> &column2analyzer);
 
 public:
@@ -154,27 +158,25 @@ public:
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    void MergeFrom(BaseEntry &other) final;
 
-    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Txn *delete_txn);
+    bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
-    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_; }
-
     Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
 
 private:
     TableMeta *table_meta_{};
 
+    MetaMap<TableIndexMeta> index_meta_map_{};
+
     HashMap<String, ColumnID> column_name2column_id_;
 
-    mutable std::shared_mutex rw_locker_{};
-
-    SharedPtr<String> table_entry_dir_{};
+    const SharedPtr<String> table_entry_dir_{};
 
     SharedPtr<String> table_name_{};
 
@@ -188,8 +190,30 @@ private:
     SegmentEntry *unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
-    // Index meta
-    HashMap<String, UniquePtr<TableIndexMeta>> index_meta_map_{};
+public:
+    // set nullptr to close auto compaction
+    void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
+
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn);
+
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn);
+
+    Vector<SegmentEntry *> PickCompactSegments() const;
+
+private:
+    // the compaction algorithm, mutable because all its interface are protected by lock
+    mutable UniquePtr<CompactionAlg> compaction_alg_{};
+
+private: // TODO: remote it
+    std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
+
+public: // TODO: remote it?
+    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+
+public:
+    void PickCleanup(CleanupScanner *scanner) override;
+
+    void Cleanup() && override;
 };
 
 } // namespace infinity

@@ -41,23 +41,24 @@ import table_entry_type;
 import database_detail;
 import status;
 import table_def;
-import index_def;
+import index_base;
 import catalog_delta_entry;
 import bg_task;
-import backgroud_process;
+import background_process;
 import base_table_ref;
+import compact_segments_task;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, NewCatalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
+Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id)
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
       local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, NewCatalog *catalog, TransactionID txn_id) {
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
     return txn;
 }
@@ -110,7 +111,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     if (!status.ok()) {
         return status;
     }
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, this)) {
+    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
@@ -125,7 +126,10 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     return delete_status;
 }
 
-Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data) {
+Status Txn::Compact(const String &db_name,
+                    const String &table_name,
+                    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                    CompactSegmentsTaskType type) {
     auto [table_entry, status] = GetTableEntry(db_name, table_name);
     if (!status.ok()) {
         return status;
@@ -137,7 +141,7 @@ Status Txn::Compact(const String &db_name, const String &table_name, Vector<Pair
     }
     table_store = txn_tables_store_[table_name].get();
 
-    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data));
+    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
 }
 
@@ -175,7 +179,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Status Txn::DropDatabase(const String &db_name, ConflictType) {
+Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     TxnState txn_state = txn_context_.GetTxnState();
 
@@ -185,8 +189,8 @@ Status Txn::DropDatabase(const String &db_name, ConflictType) {
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_);
-    if (!status.ok()) {
+    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
+    if (!status.ok() || dropped_db_entry == nullptr) {
         return status;
     }
 
@@ -296,7 +300,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
-Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type) {
+Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnState txn_state = txn_context_.GetTxnState();
 
     if (txn_state != TxnState::kStarted) {
@@ -304,11 +308,11 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
-    auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_def, conflict_type, txn_id_, begin_ts, txn_mgr_);
+    auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
         return {nullptr, index_status};
     }
-    txn_indexes_.emplace(*index_def->index_name_, table_index_entry);
+    txn_indexes_.emplace(*index_base->index_name_, table_index_entry);
     return {table_index_entry, index_status};
 }
 
@@ -318,8 +322,8 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();
-        auto index_def = table_index_entry->table_index_def();
-        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_def));
+        auto index_base = table_index_entry->table_index_def();
+        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
     }
     return Status::OK();
 }
@@ -340,13 +344,13 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
 }
 
-Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &index_def) {
-    String key = *index_def->index_name_;
+Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
+    String key = *index_base->index_name_;
     auto it = txn_indexes_.find(key);
     if (it != txn_indexes_.end()) {
         // Key found, it -> second is the value
         TableIndexEntry *found_entry = it->second;
-        this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *found_entry->index_dir(), index_def));
+        this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *found_entry->index_dir(), index_base));
         LOG_TRACE(fmt::format("The key {} exists in the map", key));
     } else {
         // Key not found
@@ -426,7 +430,7 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
 
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetTimestamp();
-    LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
     txn_context_.BeginCommit(ts);
 }
 
@@ -458,7 +462,7 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-void Txn::CommitBottom() {
+void Txn::CommitBottom() noexcept {
 
     // prepare to commit txn local data into table
     for (const auto &name_table_pair : txn_tables_store_) {
@@ -472,6 +476,7 @@ void Txn::CommitBottom() {
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
         table_local_store->Commit();
+        table_local_store->TryTriggerCompaction(bg_task_processor_, txn_mgr_);
     }
 
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
@@ -527,11 +532,11 @@ void Txn::Rollback() {
 
     for (const auto &base_entry : txn_tables_) {
         auto *table_entry = (TableEntry *)(base_entry);
-        NewCatalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        NewCatalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
     }
 
     for (const auto &db_name : db_names_) {
@@ -551,9 +556,9 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
-void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) {
-    local_catalog_delta_ops_entry_->operations().emplace_back(std::move(operation));
-}
+// called by worker thread when create new entry
+// Add lock because multiple threads may add catalog
+void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) { local_catalog_delta_ops_entry_->AddOperation(std::move(operation)); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {

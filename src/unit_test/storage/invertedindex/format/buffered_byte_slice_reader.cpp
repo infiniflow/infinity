@@ -237,10 +237,10 @@ TEST_F(BufferedByteSliceReaderTest, test2) {
     ASSERT_EQ((u32)58, doc_payload_buffer[4]);
 
     ASSERT_TRUE(reader->Decode(doc_id_buffer, MAX_DOC_PER_RECORD, decode_len));
-    ASSERT_EQ(3, decode_len);
+    ASSERT_EQ((u32)3, decode_len);
     ASSERT_EQ((u32)32, doc_id_buffer[2]);
     ASSERT_TRUE(reader->Decode(doc_payload_buffer, MAX_DOC_PER_RECORD, decode_len));
-    ASSERT_EQ(3, decode_len);
+    ASSERT_EQ((u32)3, decode_len);
     ASSERT_EQ((u32)64, doc_payload_buffer[2]);
 }
 

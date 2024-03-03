@@ -14,14 +14,14 @@
 
 #pragma once
 
-//#include "type/data_type.h"
+// #include "type/data_type.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <memory>
 
 namespace infinity {
 
@@ -37,6 +37,7 @@ enum class ConstraintType : char {
     kNotNull,
     kPrimaryKey,
     kUnique,
+    kInvalid,
 };
 
 std::string ConstrainTypeToString(ConstraintType type);

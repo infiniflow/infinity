@@ -13,6 +13,7 @@ listen_address          = "127.0.0.1"
 pg_port                 = 25432
 http_port               = 8089
 sdk_port                = 24817
+connection_limit        = 128
 
 [profiler]
 enable                  = false
@@ -30,12 +31,14 @@ log_level               = "trace"
 
 [storage]
 data_dir                = "/var/infinity/data"
-wal_dir                 = "/var/infinity/wal"
 default_row_size        = 4096
 
 [buffer]
 buffer_pool_size        = "3GB"
 temp_dir                = "/tmp"
+
+[wal]
+wal_dir                 = "/var/infinity/wal"
 
 [resource]
 dictionary_dir                = "/tmp/infinity/resource"

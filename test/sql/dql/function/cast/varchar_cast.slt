@@ -1,0 +1,162 @@
+query I
+SELECT CAST ('0' AS TINYINT);
+----
+0
+
+query I
+SELECT CAST ('1' AS TINYINT);
+----
+1
+
+query I
+SELECT CAST ('127' AS TINYINT);
+----
+127
+
+query I
+SELECT CAST ('128' AS TINYINT);
+----
+null
+
+query I
+SELECT CAST ('256' AS TINYINT);
+----
+null
+
+query I
+SELECT CAST ('-1' AS TINYINT);
+----
+-1
+
+query I
+SELECT CAST ('-127' AS TINYINT);
+----
+-127
+
+query I
+SELECT CAST ('0' AS SMALLINT);
+----
+0
+
+query I
+SELECT CAST ('1' AS SMALLINT);
+----
+1
+
+query I
+SELECT CAST ('32767' AS SMALLINT);
+----
+32767
+
+query I
+SELECT CAST ('32768' AS SMALLINT);
+----
+null
+
+query I
+SELECT CAST ('131072' AS SMALLINT);
+----
+null
+
+query I
+SELECT CAST ('-1' AS SMALLINT);
+----
+-1
+
+query I
+SELECT CAST ('-32767' AS SMALLINT);
+----
+-32767
+
+query I
+SELECT CAST ('0' AS INTEGER);
+----
+0
+
+query I
+SELECT CAST ('1' AS INTEGER);
+----
+1
+
+query I
+SELECT CAST ('2147483647' AS INTEGER);
+----
+2147483647
+
+query I
+SELECT CAST ('2147483648' AS INTEGER);
+----
+null
+
+query I
+SELECT CAST ('4294967296' AS INTEGER);
+----
+null
+
+query I
+SELECT CAST ('-2147483647' AS INTEGER);
+----
+-2147483647
+
+query I
+SELECT CAST ('-1' AS INTEGER);
+----
+-1
+
+query I
+SELECT CAST ('0' AS BIGINT);
+----
+0
+
+query I
+SELECT CAST ('1' AS BIGINT);
+----
+1
+
+query I
+SELECT CAST ('9223372036854775807' AS BIGINT);
+----
+9223372036854775807
+
+query I
+SELECT CAST ('9223372036854775808' AS BIGINT);
+----
+null
+
+query I
+SELECT CAST ('18446744073709551616' AS BIGINT);
+----
+null
+
+query I
+SELECT CAST ('-9223372036854775807' AS BIGINT);
+----
+-9223372036854775807
+
+query I
+SELECT CAST ('-1' AS BIGINT);
+----
+-1
+
+query I
+SELECT CAST ('254' AS FLOAT);
+----
+254.000000
+
+query I
+SELECT CAST ('254' AS DOUBLE);
+----
+254.000000
+
+query I
+SELECT CAST ('-254' AS FLOAT);
+----
+-254.000000
+
+query I
+SELECT CAST ('-254' AS DOUBLE);
+----
+-254.000000
+
+
+

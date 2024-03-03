@@ -22,5 +22,6 @@ export namespace infinity::Utility {
 
 SizeT NextPowerOfTwo(SizeT input);
 String FormatByteSize(u64 byte_size);
+String FormatTimeInfo(u64 seconds);
 
 }

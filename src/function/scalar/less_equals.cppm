@@ -20,8 +20,8 @@ export module less_equals;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterLessEqualsFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

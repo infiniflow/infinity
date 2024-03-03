@@ -52,6 +52,6 @@ TEST_F(StringChunkTest, string_chunk_a) {
         string_chunk_mgr.Allocate(i);
     }
 
-    EXPECT_EQ(string_chunk_mgr.current_chunk_idx(), 26);
-    EXPECT_EQ(string_chunk_mgr.current_chunk_size(), 8192);
+    EXPECT_EQ(string_chunk_mgr.current_chunk_idx(), 26u);
+    EXPECT_EQ(string_chunk_mgr.current_chunk_size(), 8192u);
 }

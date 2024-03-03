@@ -52,6 +52,7 @@ export struct OperatorState {
     Vector<UniquePtr<DataBlock>> data_block_array_{};
 //    UniquePtr<String> error_message_{};
     Status status_{};
+    bool empty_source_{false};
 
     bool complete_{false};
 

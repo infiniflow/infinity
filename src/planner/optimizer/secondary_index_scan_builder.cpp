@@ -337,7 +337,7 @@ private:
     }
 
     inline void PrepareResult() {
-        auto and_function_set_ptr = NewCatalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
+        auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
         auto and_scalar_function_set_ptr = static_pointer_cast<ScalarFunctionSet>(and_function_set_ptr);
         // 1. build column_index_map_
         for (auto &expression : index_filter_candidates_) {

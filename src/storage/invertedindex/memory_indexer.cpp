@@ -1,5 +1,20 @@
+// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 module;
 
+#include <ctpl_stl.h>
 #include <storage/invertedindex/common/vespa_alloc.h>
 #include <vespalib/btree/btree.hpp>
 #include <vespalib/btree/btreebuilder.hpp>
@@ -17,6 +32,7 @@ module;
 #include <string.h>
 
 module memory_indexer;
+
 import stl;
 import memory_pool;
 import segment_posting;
@@ -32,67 +48,34 @@ import column_vector;
 import analyzer;
 import analyzer_pool;
 import term;
-import sequential_column_inverter;
-import parallel_column_inverter;
+import column_inverter;
 import invert_task;
-import commit_task;
-import task_executor;
-import memory_posting;
 import indexer;
 import third_party;
+import ring;
 
 namespace infinity {
-
-int IndexInverter(Runnable &worker) {
-    worker.Run();
-    return 1;
-}
-
-int IndexCommiter(Runnable &worker) {
-    worker.Run();
-    return 1;
-}
 
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
     return ret < 0;
 }
 
-// bool MemoryIndexer::KeyComp::operator()(const TermKey &lhs, const TermKey &rhs) const { return lhs < rhs; }
-
-MemoryIndexer::MemoryIndexer(Indexer *indexer,
-                             ColumnIndexer *column_indexer,
-                             u64 column_id,
+MemoryIndexer::MemoryIndexer(u64 column_id,
                              const InvertedIndexConfig &index_config,
                              SharedPtr<MemoryPool> byte_slice_pool,
-                             SharedPtr<RecyclePool> buffer_pool)
-    : indexer_(indexer), column_indexer_(column_indexer), column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), num_inverters_(1), max_inverters_(4) {
+                             SharedPtr<RecyclePool> buffer_pool,
+                             ThreadPool &thread_pool)
+    : column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), thread_pool_(thread_pool),
+      ring_inverted_(10UL), ring_sorted_(10UL) {
     memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
+    posting_store_ = MakeUnique<PostingTable>(memory_allocator_.get());
     SetAnalyzer();
-    if (index_config_.GetIndexingParallelism() > 1) {
-        inverter_ = MakeUnique<SequentialColumnInverter>(this);
-    } else {
-        parallel_inverter_ = MakeUnique<ParallelColumnInverters>(this, index_config_.GetIndexingParallelism());
-    }
-    invert_executor_ =
-        SequencedTaskExecutor::Create(IndexInverter, index_config_.GetIndexingParallelism(), index_config_.GetIndexingParallelism() * 1000);
-    commit_executor_ = SequencedTaskExecutor::Create(IndexCommiter, 1, 1000);
 }
 
 MemoryIndexer::~MemoryIndexer() { Reset(); }
 
-void MemoryIndexer::SetIndexMode(IndexMode index_mode) {
-    index_mode_ = index_mode;
-    switch (index_mode_) {
-        case REAL_TIME:
-            rt_posting_store_ = MakeUnique<RTPostingTable>(memory_allocator_.get());
-        case NEAR_REAL_TIME:
-            posting_store_ = MakeUnique<PostingTable>(memory_allocator_.get());
-        default: {
-        }
-    }
-}
+void MemoryIndexer::SetIndexMode(IndexMode index_mode) { index_mode_ = index_mode; }
 
 void MemoryIndexer::SetAnalyzer() {
     String analyzer = index_config_.GetAnalyzer(column_id_);
@@ -100,106 +83,50 @@ void MemoryIndexer::SetAnalyzer() {
     jieba_specialize_ = analyzer.compare("chinese") == 0 ? true : false;
 }
 
-void MemoryIndexer::Insert(RowID row_id, String &data) { inverter_->InvertColumn(RowID2DocID(row_id), data); }
-
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, RowID start_row_id) {
-    if (index_config_.GetIndexingParallelism() > 1) {
-        docid_t start_doc_id = RowID2DocID(start_row_id);
-
-        u32 row_size = column_vector->Size();
-        for (u32 i = 0; i < row_size; i += parallel_inverter_->Size()) {
-            for (u32 j = 0; j < parallel_inverter_->inverters_.size(); ++j) {
-                auto task = MakeUnique<InvertTask>(parallel_inverter_->inverters_[j].get(), column_vector->ToString(i + j), start_doc_id + i + j);
-                invert_executor_->Execute(j, std::move(task));
-            }
-        }
-    } else {
-        auto task = MakeUnique<BatchInvertTask>(inverter_.get(), column_vector, start_row_id);
-        invert_executor_->Execute(0, std::move(task));
+void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin) {
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_++;
     }
-}
-
-void MemoryIndexer::SwitchActiveInverter() {
-    inflight_inverters_.emplace_back(std::move(inverter_));
-    while (!inflight_inverters_.empty() && inflight_inverters_.front()->ZeroRefCount()) {
-        free_inverters_.emplace_back(std::move(inflight_inverters_.front()));
-        inflight_inverters_.pop_front();
-    }
-    if (!free_inverters_.empty()) {
-        inverter_ = std::move(free_inverters_.back());
-        free_inverters_.pop_back();
-        return;
-    }
-    if (num_inverters_ >= max_inverters_) {
-        // assert(!inflight_inverters_.empty());
-        inverter_ = std::move(inflight_inverters_.front());
-        inflight_inverters_.pop_front();
-        inverter_->WaitForZeroRefCount();
-        return;
-    }
-    inverter_ = MakeUnique<SequentialColumnInverter>(this);
-    ++num_inverters_;
-}
-
-void MemoryIndexer::SwitchActiveParallelInverters() {
-    inflight_parallel_inverters_.emplace_back(std::move(parallel_inverter_));
-    while (!inflight_parallel_inverters_.empty() && inflight_inverters_.front()->ZeroRefCount()) {
-        free_parallel_inverters_.emplace_back(std::move(inflight_parallel_inverters_.front()));
-        inflight_inverters_.pop_front();
-    }
-    if (!free_parallel_inverters_.empty()) {
-        parallel_inverter_ = std::move(free_parallel_inverters_.back());
-        free_parallel_inverters_.pop_back();
-        return;
-    }
-    if (num_inverters_ >= max_inverters_) {
-        parallel_inverter_ = std::move(inflight_parallel_inverters_.front());
-        inflight_parallel_inverters_.pop_front();
-        return;
-    }
-
-    parallel_inverter_ = MakeUnique<ParallelColumnInverters>(this, index_config_.GetIndexingParallelism());
-
-    ++num_inverters_;
+    u64 seq_inserted = seq_inserted_++;
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, row_id_begin);
+    auto func = [this, &task](int id) {
+        auto inverter = MakeShared<ColumnInverter>(*this);
+        inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->row_id_begin_);
+        this->ring_inverted_.Put(task->task_seq_, inverter);
+    };
+    thread_pool_.push(func);
 }
 
 void MemoryIndexer::Commit() {
-    if (index_config_.GetIndexingParallelism() > 1) {
-        auto task = MakeUnique<CommitTask>(parallel_inverter_.get());
-        SwitchActiveParallelInverters();
-        invert_executor_->SyncAll();
-        commit_executor_->Execute(0, std::move(task));
-    } else {
-        auto task = MakeUnique<CommitTask>(inverter_.get());
-        commit_executor_->Execute(0, std::move(task));
-        SwitchActiveInverter();
-    }
+    thread_pool_.push([this](int id) {
+        Vector<SharedPtr<ColumnInverter>> inverters;
+        u64 seq_commit = this->ring_inverted_.GetMulti(inverters);
+        SizeT num = inverters.size();
+        for (SizeT i = 1; i < num; i++) {
+            inverters[0]->Merge(*inverters[i]);
+        }
+        inverters[0]->Sort();
+        this->ring_sorted_.Put(seq_commit, inverters[0]);
+        this->ring_sorted_.Iterate([](SharedPtr<ColumnInverter> &inverter) { inverter->GeneratePosting(); });
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            inflight_tasks_ -= num;
+            if (inflight_tasks_ == 0) {
+                cv_.notify_all();
+            }
+        }
+    });
 }
-
-bool MemoryIndexer::NeedDump() { return indexer_->NeedDump(); }
 
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
     MemoryIndexer::PostingTable::Iterator iter = posting_store_->find(term);
     if (iter.valid())
         return iter.getData();
     else {
-        // MemoryIndexer::PostingPtr posting = new MemoryPosting<false>(GetPool(), index_config_.GetPostingFormatOption());
-        // MemoryIndexer::PostingPtr posting = new PostingWriter(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         MemoryIndexer::PostingPtr posting =
             MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
         posting_store_->insert(iter, term, posting);
-        return posting;
-    }
-}
-
-MemoryIndexer::RTPostingPtr MemoryIndexer::GetOrAddRTPosting(const TermKey &term) {
-    MemoryIndexer::RTPostingTable::Iterator iter = rt_posting_store_->find(term);
-    if (iter.valid())
-        return iter.getData();
-    else {
-        // MemoryIndexer::RTPostingPtr posting = new MemoryPosting<true>(GetPool(), index_config_.GetPostingFormatOption());
-        MemoryIndexer::RTPostingPtr posting = MakeShared<MemoryPosting<true>>(GetPool(), index_config_.GetPostingFormatOption());
-        rt_posting_store_->insert(iter, term, posting);
         return posting;
     }
 }
@@ -225,15 +152,9 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->clear();
     }
-    if (rt_posting_store_.get()) {
-        for (auto it = rt_posting_store_->begin(); it.valid(); ++it) {
-            // delete it.getData();
-        }
-        rt_posting_store_->clear();
-    }
+    thread_pool_.stop(true);
+    cv_.notify_all();
 }
-
-void MemoryIndexer::Dump() { column_indexer_->Dump(); }
 
 } // namespace infinity
 
@@ -246,13 +167,9 @@ template class BTreeNodeT<MemoryIndexer::TermKey, BTreeDefaultTraits::INTERNAL_S
 
 template class BTreeNodeTT<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeNodeTT<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeInternalNode<MemoryIndexer::TermKey, NoAggregated, BTreeDefaultTraits::INTERNAL_SLOTS>;
 
 template class BTreeLeafNode<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeLeafNode<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
 
 template class BTreeNodeStore<MemoryIndexer::TermKey,
                               MemoryIndexer::PostingPtr,
@@ -260,23 +177,11 @@ template class BTreeNodeStore<MemoryIndexer::TermKey,
                               BTreeDefaultTraits::INTERNAL_SLOTS,
                               BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeNodeStore<MemoryIndexer::TermKey,
-                              MemoryIndexer::RTPostingPtr,
-                              NoAggregated,
-                              BTreeDefaultTraits::INTERNAL_SLOTS,
-                              BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeIterator<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeIterator<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
 template class BTree<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
-template class BTree<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
 template class BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
 
 template class BTreeRootBase<MemoryIndexer::TermKey,
                              MemoryIndexer::PostingPtr,
@@ -284,20 +189,8 @@ template class BTreeRootBase<MemoryIndexer::TermKey,
                              BTreeDefaultTraits::INTERNAL_SLOTS,
                              BTreeDefaultTraits::LEAF_SLOTS>;
 
-template class BTreeRootBase<MemoryIndexer::TermKey,
-                             MemoryIndexer::RTPostingPtr,
-                             NoAggregated,
-                             BTreeDefaultTraits::INTERNAL_SLOTS,
-                             BTreeDefaultTraits::LEAF_SLOTS>;
-
 template class BTreeNodeAllocator<MemoryIndexer::TermKey,
                                   MemoryIndexer::PostingPtr,
-                                  NoAggregated,
-                                  BTreeDefaultTraits::INTERNAL_SLOTS,
-                                  BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeNodeAllocator<MemoryIndexer::TermKey,
-                                  MemoryIndexer::RTPostingPtr,
                                   NoAggregated,
                                   BTreeDefaultTraits::INTERNAL_SLOTS,
                                   BTreeDefaultTraits::LEAF_SLOTS>;
@@ -311,12 +204,8 @@ using namespace infinity;
 
 template class BufferType<
     BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, std::less<MemoryIndexer::TermKey>, BTreeDefaultTraits>>;
-template class BufferType<
-    BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, std::less<MemoryIndexer::TermKey>, BTreeDefaultTraits>>;
 template class BufferType<BTreeKeyData<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr>>;
-template class BufferType<BTreeKeyData<MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr>>;
 
 VESPALIB_DATASTORE_INSTANTIATE_BUFFERTYPE_LEAFNODE(MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS);
-VESPALIB_DATASTORE_INSTANTIATE_BUFFERTYPE_LEAFNODE(MemoryIndexer::TermKey, MemoryIndexer::RTPostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS);
 
 } // namespace vespalib::datastore

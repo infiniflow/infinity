@@ -88,13 +88,15 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
-    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024;
+    constexpr SizeT DEFAULT_WAL_FILE_SIZE_THRESHOLD = 10 * 1024 * 1024;
     constexpr SizeT FULL_CHECKPOINT_INTERVAL_SEC = 60;          // 60 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_SEC = 20;         // 20 seconds
     constexpr SizeT DELTA_CHECKPOINT_INTERVAL_WAL_BYTES = 1000; // wal size
     constexpr std::string_view WAL_FILE_TEMP_FILE = "wal.log";
     constexpr std::string_view WAL_FILE_PREFIX = "wal.log.";
     constexpr std::string_view CATALOG_FILE_DIR = "catalog";
+
+    constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 1;
 
     constexpr std::string_view SYSTEM_DB_NAME = "system";
     constexpr std::string_view DEFAULT_DB_NAME = "default";
@@ -109,6 +111,10 @@ export {
     // default distance compute blas parameter
     constexpr SizeT DISTANCE_COMPUTE_BLAS_QUERY_BS = 4096;
     constexpr SizeT DISTANCE_COMPUTE_BLAS_DATABASE_BS = 1024;
+
+    constexpr SizeT DBT_COMPACTION_M = 4;
+    constexpr SizeT DBT_COMPACTION_C = 4;
+    constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
 }
 
 // constexpr SizeT DEFAULT_BUFFER_SIZE = 8192;

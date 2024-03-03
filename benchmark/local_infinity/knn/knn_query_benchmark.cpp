@@ -68,10 +68,11 @@ template <typename Function>
 inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-    std::shared_ptr<Database> data_base = infinity->GetDatabase("default");
-    std::shared_ptr<Table> table = data_base->GetTable(table_name);
+    auto [ data_base, status1 ] = infinity->GetDatabase("default");
+    auto [ table, status2 ] = data_base->GetTable(table_name);
+    std::shared_ptr<Table> shared_table(std::move(table));
     for (auto id = id_begin; id < id_end; ++id) {
-        fn(id, table, threadId);
+        fn(id, shared_table, threadId);
     }
 }
 
@@ -80,7 +81,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
-    std::vector<std::jthread> threads;
+    std::vector<std::thread> threads;
     threads.reserve(numThreads);
     size_t avg_cnt = (end - start) / numThreads;
     size_t extra_cnt = (end - start) % numThreads;
@@ -88,6 +89,9 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
         threads.emplace_back([id_begin, id_end, threadId, fn, table_name] { LoopFor(id_begin, id_end, threadId, fn, table_name); });
         id_begin = id_end;
+    }
+    for(auto& thread: threads) {
+        thread.join();
     }
 }
 

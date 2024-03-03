@@ -26,11 +26,14 @@ namespace infinity {
 
 class Txn;
 struct TableIndexEntry;
-struct IrsIndexEntry;
+struct FulltextIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
 class DataBlock;
 class SegmentColumnIndexEntry;
+class BGTaskProcessor;
+class TxnManager;
+enum class CompactSegmentsTaskType;
 
 struct TxnSegmentIndexStore {
     HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_entry_map_{};
@@ -45,13 +48,15 @@ public:
 
     //    Vector<ColumnIndexEntry*> column_index_entry_{};
     //
-    IrsIndexEntry *irs_index_entry_{};
+    FulltextIndexEntry *fulltext_index_entry_{};
 
     HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
 };
 
 export struct TxnCompactStore {
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+
+    CompactSegmentsTaskType task_type_;
 };
 
 export class TxnTableStore {
@@ -62,11 +67,13 @@ public:
 
     Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
 
-    Tuple<UniquePtr<String>, Status> CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
+    Tuple<UniquePtr<String>, Status>
+    CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
-    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data);
+    Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
+                                             CompactSegmentsTaskType type);
 
     void Scan(SharedPtr<DataBlock> &output_block);
 
@@ -75,6 +82,8 @@ public:
     void PrepareCommit();
 
     void Commit() const;
+
+    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};

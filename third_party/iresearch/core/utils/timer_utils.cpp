@@ -25,6 +25,7 @@
 
 #include <map>
 #include <mutex>
+#include <iostream>
 
 #include "singleton.hpp"
 

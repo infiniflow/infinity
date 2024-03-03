@@ -149,8 +149,8 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             auto right_pushed_plan = PushDependentJoinInternal(subquery_plan->right_node());
             auto right_correlated_binding = this->base_binding_;
 
-            NewCatalog *catalog = query_context_->storage()->catalog();
-            SharedPtr<FunctionSet> function_set_ptr = NewCatalog::GetFunctionSetByName(catalog, "=");
+            Catalog *catalog = query_context_->storage()->catalog();
+            SharedPtr<FunctionSet> function_set_ptr = Catalog::GetFunctionSetByName(catalog, "=");
             Vector<SharedPtr<BaseExpression>> join_conditions;
 
             SizeT column_count = bind_context_ptr_->correlated_column_exprs_.size();
@@ -317,7 +317,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
         RecoverableError(Status::SyntaxError(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name())));
     }
 
-    //    NewCatalog *catalog = query_context_->storage()->catalog();
+    //    Catalog *catalog = query_context_->storage()->catalog();
 
     SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(table_binding_ptr->table_collection_entry_ptr_,
                                                                       column_ids,

@@ -72,7 +72,7 @@ inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
     return false;
 }
 
-void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "/";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -119,7 +119,7 @@ void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_double);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

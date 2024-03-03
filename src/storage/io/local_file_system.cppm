@@ -56,6 +56,8 @@ public:
 
     void Close(FileHandler &file_handler) final;
 
+    void AppendFile(const String &dst_path, const String &src_path) final;
+
     // Directory related methods
     bool Exists(const String &path) final; // if file or directory exists
 
@@ -65,6 +67,8 @@ public:
     bool CreateDirectoryNoExp(const String &path);
 
     u64 DeleteDirectory(const String &path) final;
+
+    u64 DeleteEmptyDirectory(const String &path) final;
 
     Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) final;
 

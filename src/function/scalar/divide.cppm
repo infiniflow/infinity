@@ -20,8 +20,8 @@ export module divide;
 
 namespace infinity {
 
-class NewCatalog;
+class Catalog;
 
-export void RegisterDivFunction(const UniquePtr<NewCatalog> &catalog_ptr);
+export void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }

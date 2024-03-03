@@ -64,7 +64,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->where_expr_, nullptr);
             EXPECT_EQ(select_statement->table_ref_->type_, TableRefType::kTable);
             auto *table_ref = (TableReference *)(select_statement->table_ref_);
-            EXPECT_EQ(table_ref->db_name_, "default");
+            EXPECT_EQ(table_ref->db_name_, "");
             EXPECT_EQ(table_ref->table_name_, "t1");
             EXPECT_EQ(table_ref->alias_, nullptr);
 
@@ -72,7 +72,7 @@ TEST_F(SelectStatementParsingTest, good_test1) {
             EXPECT_EQ(select_statement->having_expr_, nullptr);
             EXPECT_EQ(select_statement->select_distinct_, false);
             EXPECT_NE(select_statement->select_list_, nullptr);
-            EXPECT_EQ(select_statement->select_list_->size(), 1);
+            EXPECT_EQ(select_statement->select_list_->size(), 1u);
             EXPECT_EQ((*select_statement->select_list_)[0]->type_, ParsedExprType::kColumn);
             auto *col_expr = (ColumnExpr *)(*select_statement->select_list_)[0];
             EXPECT_EQ(col_expr->names_[0], "a");
@@ -137,7 +137,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *table_ref_ptr = (TableReference *)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
-                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "");
             }
 
             EXPECT_EQ(select_statement->group_by_list_, nullptr);
@@ -214,7 +214,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *table_ref_ptr = (TableReference *)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t2");
-                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "");
             }
 
             EXPECT_EQ(select_statement->group_by_list_, nullptr);
@@ -326,7 +326,7 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 auto *table_ref_ptr = (TableReference *)(select_statement->table_ref_);
                 EXPECT_EQ(table_ref_ptr->alias_, nullptr);
                 EXPECT_EQ(table_ref_ptr->table_name_, "t1");
-                EXPECT_EQ(table_ref_ptr->db_name_, "default");
+                EXPECT_EQ(table_ref_ptr->db_name_, "");
             }
 
             EXPECT_NE(select_statement->group_by_list_, nullptr);

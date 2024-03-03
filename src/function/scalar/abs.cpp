@@ -49,7 +49,7 @@ struct AbsFunctionFloat {
     }
 };
 
-void RegisterAbsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
+void RegisterAbsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "ABS";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -90,7 +90,7 @@ void RegisterAbsFunction(const UniquePtr<NewCatalog> &catalog_ptr) {
                               &ScalarFunction::UnaryFunction<DoubleT, DoubleT, AbsFunctionFloat>);
     function_set_ptr->AddFunction(abs_double);
 
-    NewCatalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
 } // namespace infinity

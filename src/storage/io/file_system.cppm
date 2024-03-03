@@ -69,12 +69,16 @@ public:
 
     virtual void Close(FileHandler &file_handler) = 0;
 
+    virtual void AppendFile(const String &dst_path, const String &src_path) = 0;
+
     // Directory related methods
     virtual bool Exists(const String &path) = 0; // if file or directory exists
 
     virtual void CreateDirectory(const String &path) = 0;
 
     virtual u64 DeleteDirectory(const String &path) = 0;
+
+    virtual u64 DeleteEmptyDirectory(const String &path) = 0;
 
     virtual Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) = 0;
 

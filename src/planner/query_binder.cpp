@@ -68,7 +68,7 @@ import subquery_reference;
 import join_reference;
 import cross_product_reference;
 import data_type;
-
+import logical_type;
 import base_entry;
 import view_entry;
 
@@ -184,7 +184,9 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     if (statement.where_expr_) {
         auto where_binder = MakeShared<WhereBinder>(query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-
+        if(where_expr->Type().type() != LogicalType::kBoolean) {
+            RecoverableError(Status::InvalidFilterExpression(where_expr->Type().ToString()));
+        }
         bound_select_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
 
@@ -393,7 +395,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
 SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
     String schema_name;
     if (from_table->db_name_.empty()) {
-        schema_name = DEFAULT_DB_NAME;
+        schema_name = query_context->schema_name();
     } else {
         schema_name = from_table->db_name_;
     }
@@ -423,7 +425,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         columns.emplace_back(idx);
     }
 
-    TransactionID txn_id = query_context->GetTxn()->TxnID();
+//    TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(begin_ts);

@@ -20,7 +20,6 @@ import stl;
 
 import index_base;
 import third_party;
-import index_base;
 import index_file_worker;
 import status;
 import column_def;
@@ -71,6 +70,8 @@ public:
                                                    TableIndexEntry *table_index_entry,
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
+
+    void Cleanup() &&;
 
 public:
     // Getter

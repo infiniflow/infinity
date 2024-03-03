@@ -114,7 +114,6 @@ import logical_command;
 import logical_match;
 import logical_fusion;
 
-
 import value;
 import value_expression;
 import explain_physical_plan;
@@ -326,8 +325,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<Lo
     SharedPtr<String> schema_name = logical_create_index->base_table_ref()->schema_name();
     SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_name();
     const auto &index_def_ptr = logical_create_index->index_definition();
-    if (false || index_def_ptr->index_array_.size() != 1 || index_def_ptr->index_array_[0]->index_type_ != IndexType::kHnsw) {
-        // TODO: invalidate multiple index in one statement.
+    if (index_def_ptr->index_type_ != IndexType::kHnsw) {
         // TODO: support other index types build in parallel.
         return MakeUnique<PhysicalCreateIndexPrepare>(logical_create_index->node_id(),
                                                       logical_create_index->base_table_ref(),
@@ -895,7 +893,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCommand(const SharedPtr<Logica
                                            logical_command->GetOutputTypes(),
                                            logical_operator->load_metas());
     if (command_info->type() == CommandType::kCompactTable) {
-        ret->table_ref_ = logical_command->table_ref_;
+        ret->table_entry_ = logical_command->table_entry_;
     }
     return ret;
 }
@@ -943,6 +941,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<Logica
                                                        nullptr,
                                                        std::move(input_physical_operator),
                                                        logical_operator->load_metas());
+            break;
+        }
+        case ExplainType::kInvalid: {
+            UnrecoverableError("Invalid explain type");
             break;
         }
     }

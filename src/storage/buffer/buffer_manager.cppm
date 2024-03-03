@@ -32,10 +32,10 @@ public:
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *Allocate(UniquePtr<FileWorker> file_worker);
 
-    // BufferObj *
-
     // Get an existing BufferHandle from memory or disk.
     BufferObj *Get(UniquePtr<FileWorker> file_worker);
+
+    bool Cleanup(const String &file_path);
 
     SharedPtr<String> BaseDir() const { return base_dir_; }
 

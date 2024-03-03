@@ -19,14 +19,17 @@ export module table_index_entry;
 import stl;
 
 import txn_store;
-import irs_index_entry;
+import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 import base_entry;
-import index_def;
+import index_base;
 import block_index;
 import third_party;
 import status;
+
+import cleanup_scanner;
+import meta_entry_interface;
 
 namespace infinity {
 
@@ -36,12 +39,14 @@ class BufferManager;
 struct TableEntry;
 class BaseTableRef;
 
-export struct TableIndexEntry : public BaseEntry {
+export struct TableIndexEntry : public BaseEntry, public EntryInterface {
 
     friend struct TableEntry;
 
 public:
-    TableIndexEntry(const SharedPtr<IndexDef> &index_def,
+    TableIndexEntry();
+
+    TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                     TableIndexMeta *table_index_meta,
                     SharedPtr<String> index_dir,
                     TransactionID txn_id,
@@ -50,7 +55,7 @@ public:
 
     TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexDef> &index_def,
+    static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          TableIndexMeta *table_index_meta,
                                                          Txn *txn,
                                                          TransactionID txn_id,
@@ -61,7 +66,7 @@ public:
     static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
-                                                               const SharedPtr<IndexDef> &index_def,
+                                                               const SharedPtr<IndexBase> &index_base,
                                                                const SharedPtr<String> &index_dir,
                                                                TransactionID txn_id,
                                                                TxnTimeStamp begin_ts,
@@ -76,11 +81,12 @@ public:
 public:
     // Getter
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
-    inline const IndexDef *index_def() const { return index_def_.get(); }
-    const SharedPtr<IndexDef> &table_index_def() { return index_def_; }
-    SharedPtr<IrsIndexEntry> &irs_index_entry() { return irs_index_entry_; }
+    inline const IndexBase *index_base() const { return index_base_.get(); }
+    const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
+    SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
     SharedPtr<String> index_dir() { return index_dir_; }
+    bool IsFulltextIndexHomebrewed() const;
 
     Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
@@ -91,18 +97,24 @@ private:
 
     // For SegmentColumnIndexEntry
     void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);
-    // For IrsIndexEntry
-    void CommitCreateIndex(const SharedPtr<IrsIndexEntry> &irs_index_entry);
+    // For FulltextIndexEntry
+    void CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry);
 
 private:
     std::shared_mutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
-    const SharedPtr<IndexDef> index_def_{};
+    const SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
 
+    // TODO yzc: replace column_index_map_ and fulltext_index_entry_ with segment_index_map_
     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
 
-    SharedPtr<IrsIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
+
+public:
+    void Cleanup() && override;
+
+    void PickCleanup(CleanupScanner *scanner) override;
 };
 
 } // namespace infinity

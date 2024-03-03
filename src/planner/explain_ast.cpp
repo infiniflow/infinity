@@ -38,7 +38,7 @@ import create_table_info;
 import create_index_info;
 import create_collection_info;
 import drop_collection_info;
-//import drop_index_info;
+// import drop_index_info;
 import drop_schema_info;
 import drop_table_info;
 import base_table_reference;
@@ -489,7 +489,7 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW DATABASES: "));
             break;
         }
-        case ShowStmtType::kSegments : {
+        case ShowStmtType::kSegments: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
             break;
         }
@@ -589,6 +589,9 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
             break;
+        }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
         }
     }
 }

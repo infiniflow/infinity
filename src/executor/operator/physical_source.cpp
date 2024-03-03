@@ -43,8 +43,11 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         }
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
-        case SourceStateType::kIndexScan:
+        case SourceStateType::kIndexScan: {
+            return true;
+        }
         case SourceStateType::kEmpty: {
+            source_state->next_op_state_->empty_source_ = true;
             return true;
         }
         case SourceStateType::kQueue: {

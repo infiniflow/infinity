@@ -17,7 +17,6 @@ module;
 export module catalog_delta_entry;
 
 import table_def;
-import index_def;
 import data_block;
 import stl;
 
@@ -30,7 +29,7 @@ import segment_entry;
 import block_entry;
 import block_column_entry;
 import table_index_entry;
-import irs_index_entry;
+import fulltext_index_entry;
 import column_index_entry;
 import segment_column_index_entry;
 import catalog;
@@ -63,7 +62,7 @@ export enum class CatalogDeltaOpType : i8 {
     // INDEX
     // -----------------------------
     ADD_TABLE_INDEX_ENTRY = 21,
-    ADD_IRS_INDEX_ENTRY = 22,
+    ADD_FULLTEXT_INDEX_ENTRY = 22,
     ADD_COLUMN_INDEX_ENTRY = 23,
     ADD_SEGMENT_COLUMN_INDEX_ENTRY = 24,
 };
@@ -587,10 +586,10 @@ public:
                                   String table_name,
                                   String index_name,
                                   String index_dir,
-                                  SharedPtr<IndexDef> index_def)
+                                  SharedPtr<IndexBase> index_base)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)), index_def_(std::move(index_def)) {
-    }
+          table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)),
+          index_base_(std::move(index_base)) {}
     explicit AddTableIndexEntryOp(SharedPtr<TableIndexEntry> table_index_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY; }
@@ -601,7 +600,7 @@ public:
         total_size += sizeof(i32) + this->table_name_.size();
         total_size += sizeof(i32) + this->index_name_.size();
         total_size += sizeof(i32) + this->index_dir_.size();
-        total_size += this->index_def_->GetSizeInBytes();
+        total_size += this->index_base_->GetSizeInBytes();
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -619,33 +618,33 @@ public:
     const String &table_name() const { return table_name_; }
     const String &index_name() const { return index_name_; }
     const String &index_dir() const { return index_dir_; }
-    SharedPtr<IndexDef> index_def() const { return index_def_; }
+    SharedPtr<IndexBase> index_base() const { return index_base_; }
 
 private:
     String db_name_{};
     String table_name_{};
     String index_name_{};
     String index_dir_{};
-    SharedPtr<IndexDef> index_def_{};
+    SharedPtr<IndexBase> index_base_{};
 };
 
-/// class AddIrsIndexEntryOp
-export class AddIrsIndexEntryOp : public CatalogDeltaOperation {
+/// class AddFulltextIndexEntryOp
+export class AddFulltextIndexEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddIrsIndexEntryOp(TxnTimeStamp begin_ts,
-                                bool is_delete,
-                                TransactionID txn_id,
-                                TxnTimeStamp commit_ts,
-                                String db_name,
-                                String table_name,
-                                String index_name,
-                                String index_dir)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+    explicit AddFulltextIndexEntryOp(TxnTimeStamp begin_ts,
+                                     bool is_delete,
+                                     TransactionID txn_id,
+                                     TxnTimeStamp commit_ts,
+                                     String db_name,
+                                     String table_name,
+                                     String index_name,
+                                     String index_dir)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), index_name_(std::move(index_name)), index_dir_(std::move(index_dir)) {}
-    explicit AddIrsIndexEntryOp(SharedPtr<IrsIndexEntry> irs_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY), irs_index_entry_(irs_index_entry) {}
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_IRS_INDEX_ENTRY; }
-    String GetTypeStr() const final { return "ADD_IRS_INDEX_ENTRY"; }
+    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> fulltext_index_entry)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY), fulltext_index_entry_(fulltext_index_entry) {}
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY; }
+    String GetTypeStr() const final { return "ADD_FULLTEXT_INDEX_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
         total_size += sizeof(i32) + this->db_name_.size();
@@ -662,7 +661,7 @@ public:
     }
 
 public:
-    SharedPtr<IrsIndexEntry> irs_index_entry_{};
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
 public:
     const String &db_name() const { return db_name_; }
@@ -822,10 +821,24 @@ public:
     void set_txn_id(TransactionID txn_id) { txn_id_ = txn_id; }
     TxnTimeStamp commit_ts() const { return commit_ts_; }
     void set_commit_ts(TransactionID commit_ts) { commit_ts_ = commit_ts; }
-    Deque<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
 
-private:
-    Deque<UniquePtr<CatalogDeltaOperation>> operations_{};
+    // called by `AddCatalogDeltaOperation`
+    void AddOperation(UniquePtr<CatalogDeltaOperation> operation) {
+        std::lock_guard lock(mtx_);
+        operations_.emplace_back(std::move(operation));
+    }
+
+    // Pick and remove all operations that are committed before `max_commit_ts`
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+    // FIXME:  should not contain mutex so that it can be moved out
+
+public:
+    // Attention: only use in unit test or thread safe context
+    Vector<UniquePtr<CatalogDeltaOperation>> &operations() { return operations_; }
+
+protected:
+    std::mutex mtx_{};
+    Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
 export class GlobalCatalogDeltaEntry : public CatalogDeltaEntry {

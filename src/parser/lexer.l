@@ -11,7 +11,7 @@ static thread_local std::stringstream string_buffer;
 %option reentrant
 %option bison-bridge
 
-%option noyywrap nounput
+%option noyywrap nounput noinput
 %option warn
 %option never-interactive
 %option batch

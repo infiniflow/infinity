@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import threading
-from utils import trace_expected_exceptions
 import infinity
-import common_values
+from common import common_values
 import pytest
+from infinity.errors import ErrorCode
+from utils import trace_expected_exceptions
 
 
 class TestDatabase:
@@ -78,13 +79,13 @@ class TestDatabase:
         assert res.db_names[1] == 'my_database'
 
         res = infinity_obj.drop_database("my_database")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # res = infinity_obj.drop_database("default")
         # assert not res.success
 
         res = infinity_obj.list_databases()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         for db in res.db_names:
             assert db == 'default'
@@ -92,7 +93,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_create_database_invalid_name(self):
         """
@@ -120,7 +121,7 @@ class TestDatabase:
         # 3. disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_create_drop_show_1K_databases(self):
 
@@ -163,8 +164,9 @@ class TestDatabase:
 
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_drop_show_1M_databases(self):
 
@@ -211,7 +213,7 @@ class TestDatabase:
         # 3. disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_repeatedly_create_drop_show_databases(self):
 
@@ -251,7 +253,7 @@ class TestDatabase:
         # 3. disconnect server
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_drop_database_with_invalid_name(self):
         """
@@ -277,7 +279,7 @@ class TestDatabase:
         # 3. disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.skip(reason="No if not exists flag now")
     def test_create_database_with_invalid_option(self):
@@ -297,7 +299,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.skip(reason="No if not exists flag now")
     def test_create_database_with_if_not_exists(self):
@@ -317,7 +319,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.skip(reason="No if not exists flag now")
     def test_drop_database_with_invalid_option(self):
@@ -337,7 +339,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     @pytest.mark.skip(reason="No if not exists flag now")
     def test_drop_database_with_if_not_exists(self):
@@ -357,7 +359,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_describe_db(self):
         """
@@ -393,7 +395,7 @@ class TestDatabase:
 
         # 4.
         res = infinity_obj.drop_database("my_database")
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
         # 2. drop db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -406,7 +408,7 @@ class TestDatabase:
         # disconnect
         res = infinity_obj.disconnect()
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     def test_db_ops_after_disconnection(self):
         """
@@ -456,7 +458,7 @@ class TestDatabase:
         except Exception as e:
             print(f'Caught exception: {e}')
 
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # TODO create_database("my_database", IF_NOT_EXISTS)
     # TODO create db with ignore-if-existence option
@@ -475,11 +477,11 @@ class TestDatabase:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # one thread get db, another thread drop this db
     @trace_expected_exceptions
-    def test_get_drop_db_with_two_thread(self):
+    def test_get_drop_db_with_two_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         infinity_obj.create_database("test_get_drop_db_with_two_thread")
@@ -507,25 +509,28 @@ class TestDatabase:
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK
 
     # create same db in different thread to test conflict and show dbs
-    @trace_expected_exceptions
+    # @trace_expected_exceptions
     def test_create_same_db_in_different_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
 
-        thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                   args=(1,))
-        thread2 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                   args=(2,))
+        with pytest.raises(Exception, match="ERROR:3016*"):
+            thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                       args=(1,))
+            thread2 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                                       args=(2,))
+            thread1.start()
+            thread2.start()
 
-        thread1.start()
-        thread2.start()
+            thread1.join()
+            thread2.join()
 
-        thread1.join()
-        thread2.join()
+        # drop
+        infinity_obj.drop_database("test_create_same_db_in_different_threads")
 
         # disconnect
         res = infinity_obj.disconnect()
-        assert res.success
+        assert res.error_code == ErrorCode.OK

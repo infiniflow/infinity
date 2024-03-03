@@ -31,6 +31,7 @@ import data_block;
 import column_vector;
 import expression_evaluator;
 import expression_state;
+import expression_type;
 import base_expression;
 import logical_type;
 import internal_types;
@@ -67,8 +68,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
                 SizeT column_idx = update_columns_[expr_idx].first;
                 const SharedPtr<BaseExpression> &expr = update_columns_[expr_idx].second;
                 SharedPtr<ColumnVector> output_column = ColumnVector::Make(column_vectors[column_idx]->data_type());
-                output_column->Initialize(ColumnVectorType::kFlat);
                 SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
+                output_column->Initialize(expr_state->OutputColumnVector()->vector_type());
                 evaluator.Execute(expr, expr_state, output_column);
                 column_vectors[column_idx] = output_column;
             }

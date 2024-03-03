@@ -109,12 +109,12 @@ int main(int argc, char *argv[]) {
         create_db_options.conflict_type_ = ConflictType::kIgnore;
         auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
 
-        std::shared_ptr<Database> data_base = infinity->GetDatabase(db_name);
+        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;
         auto r2 = data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
-        std::shared_ptr<Table> table = data_base->GetTable(table_name);
+        auto [ table, status2 ] = data_base->GetTable(table_name);
 
         if (!fs.Exists(base_path)) {
             std::cout << "File: " << base_path << " doesn't exist" << std::endl;

@@ -50,7 +50,7 @@ TEST_F(EmbeddingCastTest, embedding_cast1) {
     {
         DataType source_type(LogicalType::kDecimal);
         DataType target_type(LogicalType::kDecimal);
-        EXPECT_THROW(BindEmbeddingCast(source_type, target_type), UnrecoverableException);
+        EXPECT_THROW(BindEmbeddingCast(source_type, target_type), RecoverableException);
     }
 
     auto embedding_info = EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 16);

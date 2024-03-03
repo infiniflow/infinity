@@ -42,6 +42,7 @@ public:
     DDLType type_{DDLType::kInvalid};
 
     ConflictType conflict_type_{ConflictType::kInvalid};
+    std::string schema_name_{};
 };
 
 } // namespace infinity

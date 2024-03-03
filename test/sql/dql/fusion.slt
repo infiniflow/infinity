@@ -15,7 +15,7 @@ COPY enwiki_embedding FROM '/tmp/infinity/test_data/enwiki_embedding_9999.csv' W
 ----
 
 statement ok
-CREATE INDEX ft_index ON enwiki_embedding(body) USING FULLTEXT WITH(ANALYZER=segmentation) (doctitle, docdate) USING FULLTEXT;
+CREATE INDEX ft_index ON enwiki_embedding(body) USING FULLTEXT WITH(ANALYZER=segmentation);
 
 query TTT
 SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
@@ -29,7 +29,7 @@ Anarchism 30-APR-2012 03:25:17.000  [[hierarchical organization]] in the conduct
 
 
 query I
-SELECT num FROM enwiki_embedding SEARCH MATCH('doctitle^2,body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
+SELECT num FROM enwiki_embedding SEARCH MATCH('body^5', 'harmful chemical', 'topn=3'), KNN(vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
 ----
 9893
 0
