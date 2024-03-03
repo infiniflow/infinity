@@ -148,7 +148,7 @@ class TestIndex:
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
             1, 2), False), ({"1": 2}, False),
         (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
-                                        True), (index.IndexType.FullText, True)
+                                        True), (index.IndexType.FullText, False)
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
@@ -156,7 +156,7 @@ class TestIndex:
         ([index.InitParameter("centroids_count", "128"),
          index.InitParameter("metric", "l2")], True)
     ])
-    def test_create_drop_index_invalid_options(self, cl_name, index_type, params):
+    def test_create_drop_vector_index_invalid_options(self, cl_name, index_type, params):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
