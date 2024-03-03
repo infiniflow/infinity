@@ -28,9 +28,9 @@ namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *column_indexer) : posting_table_(column_indexer->GetPostingTable()) {}
 
 PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
-    MemoryIndexer::PostingTable::Iterator iter = posting_table_->find(term);
-    if (iter.valid())
-        return iter.getData().get();
+    MemoryIndexer::PostingTable::iterator iter = posting_table_->find(term);
+    if (iter != posting_table_->end())
+        return iter->second.get();
     else
         return nullptr;
 }

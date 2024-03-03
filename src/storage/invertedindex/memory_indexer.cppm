@@ -43,7 +43,7 @@ export class MemoryIndexer {
 public:
     using TermKey = String;
     using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = Btree<TermKey, PostingPtr>;
+    using PostingTable = HashMap<TermKey, PostingPtr>;
 
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
@@ -83,8 +83,6 @@ public:
 
     PostingPtr GetOrAddPosting(const TermKey &term);
 
-    void ReclaimMemory();
-
     void Reset();
 
 private:
@@ -98,8 +96,6 @@ private:
     InvertedIndexConfig index_config_;
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
-    SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
-    GenerationHandler generation_handler_;
     UniquePtr<PostingTable> posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
