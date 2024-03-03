@@ -68,7 +68,7 @@ public:
 
     u64 DeleteDirectory(const String &path) final;
 
-    u64 DeleteEmptyDirectory(const String &path) final;
+    void DeleteEmptyDirectory(const String &path) final;
 
     Vector<SharedPtr<DirEntry>> ListDirectory(const String &path) final;
 

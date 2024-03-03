@@ -418,7 +418,7 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentColumnIndexEntry::Cleanup() && {
+void SegmentColumnIndexEntry::Cleanup() {
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
@@ -426,6 +426,8 @@ void SegmentColumnIndexEntry::Cleanup() && {
         buffer_obj->Cleanup();
     }
 }
+
+void SegmentColumnIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
 void SegmentColumnIndexEntry::SaveIndexFile() {
     String &index_name = *this->column_index_entry_->col_index_dir();

@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <ctime>
 #include <string>
 
@@ -147,20 +148,24 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
-void ColumnIndexEntry::Cleanup() && {
+void ColumnIndexEntry::Cleanup() {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
-        std::move(*segment_column_index_entry).Cleanup();
+        segment_column_index_entry->Cleanup();
     }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*col_index_dir_);
 }
 
-SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
-    LocalFileSystem fs;
-    SharedPtr<String> index_dir;
-    do {
-        u32 seed = time(nullptr);
-        index_dir = MakeShared<String>(parent_dir + "/" + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_index_" + index_name);
-    } while (!fs.CreateDirectoryNoExp(*index_dir));
-    return index_dir;
+void ColumnIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
+        auto &[segment_id, segment_column_index_entry] = *iter;
+        if (std::binary_search(sorted_segment_ids.begin(), sorted_segment_ids.end(), segment_id)) {
+            scanner->AddEntry(std::move(segment_column_index_entry));
+            iter = index_by_segment_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
 
 Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {

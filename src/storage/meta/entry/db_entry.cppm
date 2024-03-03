@@ -28,24 +28,29 @@ import status;
 import extra_ddl_info;
 import column_def;
 import meta_map;
-
+import random;
 import meta_entry_interface;
 import cleanup_scanner;
 
 namespace infinity {
 
 class TxnManager;
+class AddDBEntryOp;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
-    explicit DBEntry();
+    using EntryOp = AddDBEntryOp;
 
-    explicit DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    explicit DBEntry(bool is_delete,
+                     const SharedPtr<String> &data_dir,
+                     const SharedPtr<String> &db_name,
+                     TransactionID txn_id,
+                     TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry>
-    NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    NewDBEntry(bool is_delete, const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> NewReplayDBEntry(const SharedPtr<String> &data_dir,
                                                const SharedPtr<String> &db_name,
@@ -75,18 +80,23 @@ private:
                                             const Vector<SharedPtr<ColumnDef>> &columns,
                                             TransactionID txn_id,
                                             TxnTimeStamp begin_ts,
-                                            TxnManager *txn_mgr);
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type);
 
     Tuple<TableEntry *, Status>
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr);
+    void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+
+    static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
+        return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
+    }
 
 private:
     const SharedPtr<String> db_entry_dir_{};
@@ -102,6 +112,6 @@ private: // TODO: remote it
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() && override;
+    void Cleanup() override;
 };
 } // namespace infinity

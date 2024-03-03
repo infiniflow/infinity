@@ -140,7 +140,7 @@ void Storage::InitNewCatalog() {
     if (!fs.Exists(catalog_dir)) {
         fs.CreateDirectory(catalog_dir);
     }
-    new_catalog_ = MakeUnique<Catalog>(MakeShared<String>(catalog_dir), true);
+    new_catalog_ = Catalog::NewCatalog(MakeShared<String>(catalog_dir), true);
 }
 
 } // namespace infinity
