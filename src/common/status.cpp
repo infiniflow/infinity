@@ -326,12 +326,15 @@ Status Status::InvalidIndexParam(const String &param_name) {
 Status Status::LackIndexParam() { return Status(ErrorCode::kLackIndexParam, MakeUnique<String>("Lack index parameter")); }
 
 Status Status::InvalidFilterExpression(const String &expr_str) {
-    return Status(ErrorCode::kInvalidFilterExpression, MakeUnique<String>(fmt::format("Invalid expression in where clause: {} expression", expr_str)));
+    return Status(ErrorCode::kInvalidFilterExpression,
+                  MakeUnique<String>(fmt::format("Invalid expression in where clause: {} expression", expr_str)));
 }
 
-Status Status::MultipleFunctionMatched(const String& function, const String& functions) {
+Status Status::MultipleFunctionMatched(const String &function, const String &functions) {
     return Status(ErrorCode::kMultipleFunctionMatched, MakeUnique<String>(fmt::format("{}: matched multiple functions: {}", function, functions)));
 }
+
+Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, MakeUnique<String>("Insert into table without any values")); }
 
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {

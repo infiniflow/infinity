@@ -244,7 +244,10 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         if (statement->columns_ != nullptr) {
             SizeT statement_column_count = statement->columns_->size();
             if (statement_column_count != value_list.size()) {
-                UnrecoverableError("INSERT: Target column count and input column count mismatch");
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT: Target column count ({}) and "
+                                                                 "input value count mismatch ({})",
+                                                                 statement_column_count,
+                                                                 value_list.size())));
             }
 
             //        Value null_value = Value::MakeNullData();

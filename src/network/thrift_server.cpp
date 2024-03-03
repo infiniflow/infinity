@@ -213,6 +213,12 @@ public:
         }
 
         Status constant_status;
+
+        if(request.fields.empty()) {
+            ProcessStatus(response, Status::InsertWithoutValues());
+            return;
+        }
+
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
         for (auto &value : request.fields) {

@@ -39,7 +39,6 @@ void AndIterator::DoSeek(docid_t doc_id) {
     docid_t current = doc_id;
     do {
         docid_t tmp_id = INVALID_DOCID;
-        bool ret = (*current_iter)->Seek(current);
         tmp_id = doc_id_;
         if (tmp_id == INVALID_DOCID) {
             current = tmp_id;
