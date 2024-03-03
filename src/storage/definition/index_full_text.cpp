@@ -114,7 +114,7 @@ void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_t
         RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kVarchar) {
         RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Invalid parameter for Full text index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
+            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
 

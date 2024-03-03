@@ -35,7 +35,7 @@ void IndexSecondary::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_
         RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; !(data_type->CanBuildSecondaryIndex())) {
         RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Invalid parameter for secondary index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
+            fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
 
