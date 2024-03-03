@@ -14,6 +14,12 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-W#pragma-messages"
+
 #include "CLI11.hpp"
 
 #include "spdlog/details/registry.h"
@@ -55,6 +61,8 @@ module;
 #include "vespalib/btree/btreestore.h"
 #include "vespalib/btree/btreestore.hpp"
 #include "vespalib/util/generationhandler.h"
+
+#pragma clang diagnostic pop
 
 export module third_party;
 
