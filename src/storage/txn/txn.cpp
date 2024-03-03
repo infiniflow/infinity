@@ -169,7 +169,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [db_entry, status] = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
-    if (!status.ok()) {
+    if (db_entry == nullptr) { // nullptr means some exception happened
         return status;
     }
 
@@ -260,13 +260,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     auto [table_entry, table_status] = catalog_->CreateTable(db_name, txn_id_, begin_ts, table_def, conflict_type, txn_mgr_);
 
     if (table_entry == nullptr) {
-        if (table_status.ok()) {
-            UniquePtr<String> err_msg = MakeUnique<String>("TODO: CreateTableCollectionFailed");
-            LOG_ERROR(*err_msg);
-            return Status(ErrorCode::kUnexpectedError, std::move(err_msg));
-        } else {
-            return table_status;
-        }
+        return table_status;
     }
 
     txn_tables_.insert(table_entry);
@@ -309,7 +303,7 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
-    if (!index_status.ok() || (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore)) {
+    if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
     txn_indexes_.emplace(*index_base->index_name_, table_index_entry);
@@ -532,15 +526,15 @@ void Txn::Rollback() {
 
     for (const auto &base_entry : txn_tables_) {
         auto *table_entry = (TableEntry *)(base_entry);
-        Catalog::RemoveTableEntry(table_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveTableEntry(table_entry, txn_id_);
     }
 
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_, txn_mgr_);
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);
     }
 
     for (const auto &db_name : db_names_) {
-        catalog_->RemoveDBEntry(db_name, this->txn_id_, txn_mgr_);
+        catalog_->RemoveDBEntry(db_name, this->txn_id_);
     }
 
     // Rollback the prepared data

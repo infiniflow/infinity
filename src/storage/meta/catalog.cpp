@@ -56,23 +56,7 @@ import segment_column_index_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(std::move(dir)) {
-    if (create_default_db) {
-        // db current dir is same level as catalog
-        Path catalog_path(*this->current_dir_);
-        Path parent_path = catalog_path.parent_path();
-        auto data_dir = MakeShared<String>(parent_path.string());
-        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta->data_dir(), db_meta->db_name(), 0, 0);
-        // TODO commit ts == 0 is true??
-        db_entry->commit_ts_ = 0;
-        DBMeta::AddEntry(db_meta.get(), std::move(db_entry));
-
-        this->rw_locker().lock();
-        this->db_meta_map()["default"] = std::move(db_meta);
-        this->rw_locker().unlock();
-    }
-}
+Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)) {}
 
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
@@ -80,47 +64,17 @@ Catalog::Catalog(SharedPtr<String> dir, bool create_default_db) : current_dir_(s
 // use Txn::CreateDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-
-    // Check if there is db_meta with the db_name
-    DBMeta *db_meta{nullptr};
-
-    this->rw_locker().lock_shared();
-    auto db_iter = this->db_meta_map().find(db_name);
-    if (db_iter != this->db_meta_map().end()) {
-        // Find the db
-        db_meta = db_iter->second.get();
-        this->rw_locker().unlock_shared();
-    } else {
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Create new database: {}", db_name));
+    auto init_db_meta = [&]() {
         // Not find the db and create new db meta
         Path catalog_path(*this->current_dir_);
         Path parent_path = catalog_path.parent_path();
         auto db_dir = MakeShared<String>(parent_path.string());
         // Physical wal log
-        UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
-
-        // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
-        // In replay phase, not need to recording the catalog delta operation.
-        if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddDBMetaOp>(new_db_meta.get(), begin_ts);
-            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-        }
-
-        db_meta = new_db_meta.get();
-        this->rw_locker().lock();
-        auto db_iter2 = this->db_meta_map().find(db_name);
-        if (db_iter2 == this->db_meta_map().end()) {
-            this->db_meta_map()[db_name] = std::move(new_db_meta);
-        } else {
-            db_meta = db_iter2->second.get();
-        }
-        this->rw_locker().unlock();
-    }
-
+        return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
+    };
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
-    return db_meta->CreateNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
+    return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 // do not only use this method to drop database
@@ -129,56 +83,25 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
 // use Txn::DropDatabase instead
 Tuple<DBEntry *, Status>
 Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-
-    this->rw_locker().lock_shared();
-
-    DBMeta *db_meta{nullptr};
-    if (this->db_meta_map().find(db_name) != this->db_meta_map().end()) {
-        db_meta = this->db_meta_map()[db_name].get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, conflict_type);
     if (db_meta == nullptr) {
-        if (conflict_type == ConflictType::kIgnore) {
-            LOG_TRACE(fmt::format("Ignore drop a not existed table/collection entry {}", db_name));
-            return {nullptr, Status::OK()};
-        }
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed database entry {}", db_name));
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
-
-    LOG_TRACE(fmt::format("Drop a database entry {}", db_name));
-    return db_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, conflict_type);
+    return db_meta->DropNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-
-    DBMeta *db_meta{nullptr};
-    this->rw_locker().lock_shared();
-    auto iter = this->db_meta_map().find(db_name);
-    if (iter != this->db_meta_map().end()) {
-        db_meta = iter->second.get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys): add conflict_type
     if (db_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get not existed database {}", db_name));
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
     return db_meta->GetEntry(txn_id, begin_ts);
 }
 
-void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    DBMeta *db_meta{nullptr};
-    if (this->db_meta_map().find(db_name) != this->db_meta_map().end()) {
-        db_meta = this->db_meta_map()[db_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
+void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id) {
+    auto [db_meta, _, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys)
     LOG_TRACE(fmt::format("Remove a database entry {}", db_name));
-    db_meta->DeleteNewEntry(txn_id, txn_mgr);
+    db_meta->DeleteNewEntry(txn_id);
 }
 
 Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -198,11 +121,11 @@ Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts
 }
 
 Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
-                                                    TransactionID txn_id,
-                                                    TxnTimeStamp begin_ts,
-                                                    const SharedPtr<TableDef> &table_def,
-                                                    ConflictType conflict_type,
-                                                    TxnManager *txn_mgr) {
+                                                 TransactionID txn_id,
+                                                 TxnTimeStamp begin_ts,
+                                                 const SharedPtr<TableDef> &table_def,
+                                                 ConflictType conflict_type,
+                                                 TxnManager *txn_mgr) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -210,15 +133,16 @@ Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
         return {nullptr, status};
     }
 
-    return db_entry->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr);
+    return db_entry
+        ->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status> Catalog::DropTableByName(const String &db_name,
-                                                        const String &table_name,
-                                                        ConflictType conflict_type,
-                                                        TransactionID txn_id,
-                                                        TxnTimeStamp begin_ts,
-                                                        TxnManager *txn_mgr) {
+                                                     const String &table_name,
+                                                     ConflictType conflict_type,
+                                                     TransactionID txn_id,
+                                                     TxnTimeStamp begin_ts,
+                                                     TxnManager *txn_mgr) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -251,10 +175,10 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr) {
+Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
-    table_meta->DeleteNewEntry(txn_id, txn_mgr);
+    table_meta->DeleteNewEntry(txn_id);
 
     return Status::OK();
 }
@@ -272,12 +196,12 @@ Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
 }
 
 Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
-                                                       const String &table_name,
-                                                       const String &index_name,
-                                                       ConflictType conflict_type,
-                                                       TransactionID txn_id,
-                                                       TxnTimeStamp begin_ts,
-                                                       TxnManager *txn_mgr) {
+                                                    const String &table_name,
+                                                    const String &index_name,
+                                                    ConflictType conflict_type,
+                                                    TransactionID txn_id,
+                                                    TxnTimeStamp begin_ts,
+                                                    TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
         LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));
@@ -287,10 +211,10 @@ Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
     return table_entry->DropIndex(index_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
-Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr) {
+Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();
-    table_entry->RemoveIndexEntry(index_name, txn_id, txn_mgr);
+    table_entry->RemoveIndexEntry(index_name, txn_id);
     return Status::OK();
 }
 
@@ -322,7 +246,7 @@ Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, De
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
+Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
 }
 
@@ -398,6 +322,24 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     return json_res;
 }
 
+UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_default_db) {
+    auto catalog = MakeUnique<Catalog>(dir);
+    if (create_default_db) {
+        // db current dir is same level as catalog
+        Path catalog_path(*catalog->current_dir_);
+        Path parent_path = catalog_path.parent_path();
+        auto data_dir = MakeShared<String>(parent_path.string());
+        UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        // TODO commit ts == 0 is true??
+        db_entry->commit_ts_ = 0;
+        db_meta->db_entry_list().emplace_front(std::move(db_entry));
+
+        catalog->db_meta_map()["default"] = std::move(db_meta);
+    }
+    return catalog;
+}
+
 UniquePtr<Catalog> Catalog::LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr) {
     auto catalog = MakeUnique<Catalog>(nullptr);
     if (catalog_paths.empty()) {
@@ -464,10 +406,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
 
                 auto db_meta = catalog->db_meta_map().at(db_name).get();
                 auto db_entry = DBEntry::NewReplayDBEntry(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
-                if (db_meta->db_entry_list().empty()) {
-                    auto dummy_entry = MakeUnique<DBEntry>();
-                    db_meta->db_entry_list().emplace_front(std::move(dummy_entry));
-                }
                 db_meta->db_entry_list().emplace_front(std::move(db_entry));
                 break;
             }
@@ -510,10 +448,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                    commit_ts,
                                                                    is_delete,
                                                                    row_count);
-                if (table_meta->table_entry_list().empty()) {
-                    auto dummy_entry = MakeUnique<TableEntry>();
-                    table_meta->table_entry_list().emplace_front(std::move(dummy_entry));
-                }
                 table_meta->table_entry_list().emplace_front(std::move(table_entry));
                 break;
             }
@@ -664,10 +598,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                    begin_ts,
                                                                                    commit_ts,
                                                                                    is_delete);
-                if (index_meta->index_entry_list().empty()) {
-                    auto dummy_entry = MakeUnique<TableIndexEntry>();
-                    index_meta->index_entry_list().emplace_front(std::move(dummy_entry));
-                }
                 index_meta->index_entry_list().emplace_front(std::move(table_index_entry));
                 break;
             }
@@ -874,7 +804,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                add_table_entry_op->SaveSate();
+                add_table_entry_op->SaveState();
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {

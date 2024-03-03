@@ -25,6 +25,8 @@ import index_file_worker;
 import status;
 import index_base;
 import column_def;
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -35,7 +37,7 @@ class FaissIndexPtr;
 class BufferManager;
 struct SegmentEntry;
 
-export class SegmentColumnIndexEntry : public BaseEntry {
+export class SegmentColumnIndexEntry : public BaseEntry, public EntryInterface {
     friend ColumnIndexEntry;
 
 public:
@@ -71,7 +73,9 @@ public:
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup() &&;
+    virtual void Cleanup() override;
+
+    virtual void PickCleanup(CleanupScanner *scanner) override;
 
 public:
     // Getter
@@ -99,7 +103,7 @@ private:
 
 private:
     const ColumnIndexEntry *column_index_entry_{};
-    SegmentID segment_id_{};
+    const SegmentID segment_id_{};
 
     Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 

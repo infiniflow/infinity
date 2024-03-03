@@ -34,7 +34,6 @@ import defer_op;
 import buffer_handle;
 import logger;
 import local_file_system;
-import random;
 
 import txn_store;
 import segment_iter;
@@ -415,13 +414,7 @@ void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
 }
 
 SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u32 seg_id) {
-    LocalFileSystem fs;
-    SharedPtr<String> segment_dir;
-    do {
-        u32 seed = time(nullptr);
-        segment_dir = MakeShared<String>(parent_dir + '/' + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_seg_" + std::to_string(seg_id));
-    } while (!fs.CreateDirectoryNoExp(*segment_dir));
-    return segment_dir;
+    return MakeShared<String>(fmt::format("{}/seg_{}", parent_dir, std::to_string(seg_id)));
 }
 
 void SegmentEntry::MergeFrom(BaseEntry &other) {
@@ -477,7 +470,7 @@ void SegmentEntry::MergeFrom(BaseEntry &other) {
     // }
 }
 
-void SegmentEntry::Cleanup() && {
+void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
     }

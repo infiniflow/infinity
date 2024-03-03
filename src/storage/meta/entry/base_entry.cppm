@@ -39,10 +39,9 @@ export enum class EntryType : i8 {
 };
 
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type) : entry_type_(entry_type) {
+    explicit BaseEntry(EntryType entry_type, bool is_delete = false) : entry_type_(entry_type), deleted_(is_delete) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
-            deleted_ = true;
         }
     }
 
@@ -59,16 +58,15 @@ public:
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
+    bool Deleted() const { return deleted_; }
+
 public:
     atomic_u64 txn_id_{0};
     TxnTimeStamp begin_ts_{0};
     atomic_u64 commit_ts_{UNCOMMIT_TS};
-    bool deleted_{false};
+    bool deleted_;
 
-    EntryType entry_type_{EntryType::kDummy};
+    const EntryType entry_type_{EntryType::kDummy};
 };
-
-// Merge two reverse-ordered list inplace.
-export void MergeLists(List<SharedPtr<BaseEntry>> &list1, List<SharedPtr<BaseEntry>> &list2);
 
 } // namespace infinity

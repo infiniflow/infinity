@@ -21,7 +21,6 @@ module table_index_entry;
 import third_party;
 import local_file_system;
 import default_values;
-import random;
 import index_base;
 import segment_iter;
 
@@ -32,10 +31,9 @@ import base_table_ref;
 import iresearch_datastore;
 import create_index_info;
 import base_entry;
+import logger;
 
 namespace infinity {
-
-TableIndexEntry::TableIndexEntry() : BaseEntry(EntryType::kDummy) {}
 
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  TableIndexMeta *table_index_meta,
@@ -224,16 +222,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-SharedPtr<String> TableIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
-    LocalFileSystem fs;
-    SharedPtr<String> index_dir;
-    do {
-        u32 seed = std::time(nullptr);
-        index_dir = MakeShared<String>(fmt::format("{}/{}_index_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN, seed), index_name));
-    } while (!fs.CreateDirectoryNoExp(*index_dir));
-    return index_dir;
-}
-
 Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr) {
@@ -273,13 +261,23 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
     return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
 }
 
-void TableIndexEntry::Cleanup() && {
+void TableIndexEntry::Cleanup() {
     for (auto &[column_id, column_index_entry] : column_index_map_) {
-        std::move(*column_index_entry).Cleanup();
+        column_index_entry->Cleanup();
     }
-    // FIXME: to cleanup fulltext_index_entry_
+    fulltext_index_entry_->Cleanup();
+
+    LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
+    LocalFileSystem fs;
+    fs.DeleteDirectory(*index_dir_); // FIXME(sys): delete full text index by whole directory tmply
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+
+void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    for (auto &[column_id, column_index_entry] : column_index_map_) {
+        column_index_entry->PickCleanupBySegments(sorted_segment_ids, scanner);
+    }
+}
 
 } // namespace infinity

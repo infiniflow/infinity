@@ -39,338 +39,31 @@ UniquePtr<DBMeta> DBMeta::NewDBMeta(const SharedPtr<String> &data_dir, const Sha
 }
 
 // TODO: Use Txn* txn as parma instead of TransactionID txn_id and TxnManager *txn_mgr
-Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
-    DBEntry *db_entry_ptr{nullptr};
-    //    rw_locker_.lock();
-    if (this->db_entry_list().empty()) {
-        // Insert a dummy entry.
-        auto dummy_entry = MakeUnique<DBEntry>();
-        dummy_entry->deleted_ = true;
-        this->db_entry_list().emplace_back(std::move(dummy_entry));
-
-        // Insert the new db entry
-        // physical wal log
-        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-        // Physical log
-        {
-            if (txn_mgr != nullptr) {
-                auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-            }
-        }
-
-        db_entry_ptr = db_entry.get();
-        this->db_entry_list().emplace_front(std::move(db_entry));
-
-        LOG_TRACE("New database entry is added.");
-        return {db_entry_ptr, Status::OK()};
-    } else {
-        // Already have a db_entry, check if the db_entry is valid here.
-        BaseEntry *header_base_entry = this->db_entry_list().front().get();
-        if (header_base_entry->entry_type_ == EntryType::kDummy) {
-            // physical wal log
-            SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-            // Physical log
-            {
-                if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                }
-            }
-
-            db_entry_ptr = db_entry.get();
-            this->db_entry_list().emplace_front(std::move(db_entry));
-            return {db_entry_ptr, Status::OK()};
-        }
-
-        DBEntry *header_db_entry = (DBEntry *)header_base_entry;
-        if (header_db_entry->Committed()) {
-            if (begin_ts > header_db_entry->commit_ts_) {
-                if (header_db_entry->deleted_) {
-                    // No conflict
-
-                    SharedPtr<DBEntry> db_entry = DBEntry::DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-                    {
-                        if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                        }
-                    }
-
-                    db_entry_ptr = db_entry.get();
-                    this->db_entry_list().emplace_front(std::move(db_entry));
-                    return {db_entry_ptr, Status::OK()};
-                } else {
-                    switch (conflict_type) {
-                        case ConflictType::kIgnore: {
-                            db_entry_ptr = header_db_entry;
-                            return {db_entry_ptr, Status::OK()};
-                        }
-                        default: {
-                            // Duplicated database
-                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
-                            LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
-                        }
-                    }
-                }
-            } else {
-                // Write-Write conflict
-                UniquePtr<String> err_msg =
-                    MakeUnique<String>(fmt::format("Write-write conflict: There is a committed database which is later than current transaction."));
-                LOG_ERROR(*err_msg);
-                return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
-            }
-        } else {
-
-            TxnState head_db_entry_state = txn_mgr->GetTxnState(header_db_entry->txn_id_);
-
-            switch (head_db_entry_state) {
-                case TxnState::kStarted: {
-                    // Started
-                    if (header_db_entry->txn_id_ == txn_id) {
-                        // Same txn
-                        if (header_db_entry->deleted_) {
-
-                            SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-                            if (txn_mgr != nullptr) {
-                                auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                                txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                            }
-
-                            db_entry_ptr = db_entry.get();
-                            this->db_entry_list().emplace_front(std::move(db_entry));
-                            return {db_entry_ptr, Status::OK()};
-                        } else {
-                            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Duplicated database name: {}.", *this->db_name_));
-                            LOG_ERROR(*err_msg);
-                            return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
-                        }
-                    } else {
-                        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Write-write conflict: There is a uncommitted transaction."));
-                        LOG_ERROR(*err_msg);
-                        return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
-                    }
-                }
-                case TxnState::kCommitting:
-                case TxnState::kCommitted: {
-                    // Committing / Committed, report WW conflict and rollback current txn
-                    UniquePtr<String> err_msg = MakeUnique<String>(
-                        fmt::format("Write-write conflict: There is a committing/committed database which is later than current transaction."));
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
-                }
-                case TxnState::kRollbacking:
-                case TxnState::kRollbacked: {
-                    // Remove the header entry
-                    //
-                    this->db_entry_list().erase(this->db_entry_list().begin());
-
-                    // Rollback Txn will not merge the txn catalog delta operations to global catalog delta operations.
-                    // So, rollback catalog operations shouldn't be recorded.
-                    // But this new Txn catalog delta operations need to be recorded.
-                    SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-                    {
-                        if (txn_mgr != nullptr) {
-                            auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                        }
-                    }
-
-                    db_entry_ptr = db_entry.get();
-                    this->db_entry_list().emplace_front(std::move(db_entry));
-                    return {db_entry_ptr, Status::OK()};
-                }
-                default: {
-                    UniquePtr<String> err_msg = MakeUnique<String>("Invalid db entry txn state");
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
-                }
-            }
-        }
-    }
+Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                TransactionID txn_id,
+                                                TxnTimeStamp begin_ts,
+                                                TxnManager *txn_mgr,
+                                                ConflictType conflict_type) {
+    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(false, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> DBMeta::DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
-    DBEntry *db_entry_ptr{nullptr};
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
-    if (this->db_entry_list().empty()) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status::EmptyEntryList()};
-    }
-
-    BaseEntry *header_base_entry = this->db_entry_list().front().get();
-
-    if (header_base_entry->entry_type_ == EntryType::kDummy) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status::InvalidEntry()};
-    }
-
-    DBEntry *header_db_entry = (DBEntry *)header_base_entry;
-    if (header_db_entry->Committed()) {
-        if (begin_ts > header_db_entry->commit_ts_) {
-            // No conflict
-            if (header_db_entry->deleted_) {
-                if (conflict_type == ConflictType::kIgnore) {
-                    LOG_TRACE(fmt::format("Ignore drop a not existed table entry."));
-                    return {nullptr, Status::OK()};
-                }
-                UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped before.");
-                LOG_TRACE(*err_msg);
-                return {nullptr, Status::DBNotExist(*this->db_name_)};
-            }
-
-            SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(this->data_dir_, this->db_name_, txn_id, begin_ts);
-
-            // Physical log
-            {
-                if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                }
-            }
-
-            db_entry_ptr = db_entry.get();
-            db_entry_ptr->deleted_ = true;
-            this->db_entry_list().emplace_front(std::move(db_entry));
-
-            return {db_entry_ptr, Status::OK()};
-        } else {
-            // Write-Write conflict
-            UniquePtr<String> err_msg =
-                MakeUnique<String>("Write-write conflict: There is a committed database which is later than current transaction.");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
-        }
-    } else {
-        // Uncommitted, check if the same txn
-        if (txn_id == header_db_entry->txn_id_) {
-            // Same txn, remove the header db entry
-            auto base_entry_ptr = this->db_entry_list().front();
-            auto db_entry = std::static_pointer_cast<DBEntry>(base_entry_ptr);
-            {
-                if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<AddDBEntryOp>(db_entry);
-                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                }
-            }
-
-            this->db_entry_list().pop_front();
-            return {db_entry.get(), Status::OK()};
-        } else {
-            // Not same txn, issue WW conflict
-            UniquePtr<String> err_msg = MakeUnique<String>("Write-write conflict: There is another uncommitted db entry.");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kTxnConflict, std::move(err_msg))};
-        }
-    }
+Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                              TransactionID txn_id,
+                                              TxnTimeStamp begin_ts,
+                                              TxnManager *txn_mgr,
+                                              ConflictType conflict_type) {
+    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(true, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-void DBMeta::AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry) {
-    std::unique_lock<std::shared_mutex> rw_locker(db_meta->rw_locker());
-    if (db_meta->db_entry_list().empty()) {
-        auto dummy_entry = MakeShared<DBEntry>();
-        db_meta->db_entry_list().emplace_front(std::move(dummy_entry));
-    }
-    db_meta->db_entry_list().emplace_front(std::move(db_entry));
-}
-
-void DBMeta::DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr) {
-    std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker());
-    if (this->db_entry_list().empty()) {
-        LOG_TRACE("Empty db entry list.");
-        return;
-    }
-
-    auto removed_iter =
-        std::remove_if(this->db_entry_list().begin(), this->db_entry_list().end(), [&](auto &entry) -> bool { return entry->txn_id_ == txn_id; });
-    // DeleteNewEntry is only called when txn is rollback, so no need to add physical log
-    this->db_entry_list().erase(removed_iter, this->db_entry_list().end());
-}
-
-Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
-    if (this->db_entry_list().empty()) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Empty db entry list.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status::EmptyEntryList()};
-    }
-
-    for (const auto &db_entry : this->db_entry_list()) {
-        if (db_entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid db entry.");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status::InvalidEntry()};
-        }
-
-        if (db_entry->Committed()) {
-            if (begin_ts > db_entry->commit_ts_) {
-                if (db_entry->deleted_) {
-                    UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
-                    LOG_TRACE(*err_msg);
-                    return {nullptr, Status::DBNotExist(*this->db_name_)};
-                } else {
-                    // check the tables meta
-                    auto db_entry_ptr = static_cast<DBEntry *>(db_entry.get());
-                    return {db_entry_ptr, Status::OK()};
-                }
-            }
-        } else {
-            // Only committed txn is visible. Committing txn isn't visble,
-            // except same txn is visible
-            if (txn_id == db_entry->txn_id_) {
-                if (db_entry->deleted_) {
-                    UniquePtr<String> err_msg = MakeUnique<String>("DB is dropped.");
-                    LOG_ERROR(*err_msg);
-                    return {nullptr, Status::DBNotExist(*this->db_name_)};
-                } else {
-                    auto db_entry_ptr = static_cast<DBEntry *>(db_entry.get());
-                    return {db_entry_ptr, Status::OK()};
-                }
-            }
-        }
-    }
-    UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No db entry {} found.", *this->db_name_));
-    LOG_ERROR(*err_msg);
-    return {nullptr, Status::NotFoundEntry()};
-}
+Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntry(txn_id, begin_ts); }
 
 Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    if (!this->db_entry_list().empty()) {
-        const auto &entry = db_entry_list().front();
-        if (entry->entry_type_ == EntryType::kDummy) {
-            UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status::InvalidEntry()};
-        }
-
-        TransactionID entry_txn_id = entry->txn_id_.load();
-        // committed
-        if (begin_ts > entry->commit_ts_) {
-            if (entry->deleted_) {
-                UniquePtr<String> err_msg = MakeUnique<String>("No valid entry");
-                LOG_ERROR(*err_msg);
-                return {nullptr, Status::InvalidEntry()};
-            } else {
-                auto db_entry = static_cast<DBEntry *>(entry.get());
-                return {db_entry, Status::OK()};
-            }
-        } else {
-            if (txn_id == entry_txn_id) {
-                auto db_entry = static_cast<DBEntry *>(entry.get());
-                return {db_entry, Status::OK()};
-            }
-        }
-    }
-    UniquePtr<String> err_msg = MakeUnique<String>("No db entry found.");
-    LOG_ERROR(*err_msg);
-    return {nullptr, Status::NotFoundEntry()};
+    return db_entry_list_.GetEntryReplay(txn_id, begin_ts);
 }
+
+void DBMeta::DeleteNewEntry(TransactionID txn_id) { db_entry_list_.DeleteEntry(txn_id); }
 
 SharedPtr<String> DBMeta::ToString() {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
@@ -412,8 +105,6 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
         }
     }
     res->db_entry_list().sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
-    auto dummy_entry = MakeShared<DBEntry>();
-    res->db_entry_list().emplace_back(dummy_entry);
     return res;
 }
 
@@ -428,13 +119,7 @@ void DBMeta::MergeFrom(DBMeta &other) {
     this->db_entry_list_.MergeWith(db_entry_list_);
 }
 
-void DBMeta::Cleanup() && {
-    std::move(db_entry_list_).Cleanup();
-
-    String db_meta_dir = fmt::format("{}/{}", *data_dir_, *db_name_);
-    // LocalFileSystem fs;
-    // fs.DeleteEmptyDirectory(db_meta_dir);
-}
+void DBMeta::Cleanup() { db_entry_list_.Cleanup(); }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
 
