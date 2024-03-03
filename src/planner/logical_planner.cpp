@@ -856,9 +856,10 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kCompactTable: {
             auto *compact_table = static_cast<CompactTable *>(command_statement->command_info_.get());
+            BindSchemaName(compact_table->schema_name_);
 
             Txn *txn = query_context_ptr_->GetTxn();
-            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name(), compact_table->table_name());
+            auto [table_entry, status] = txn->GetTableByName(compact_table->schema_name_, compact_table->table_name_);
             if (!status.ok()) {
                 RecoverableError(status);
             }
