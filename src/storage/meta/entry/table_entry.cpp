@@ -199,12 +199,15 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
                 SegmentID new_segment_id = this->next_segment_id_++;
                 SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
-                this->segment_map_.emplace(new_segment_id, new_segment);
+                // FIXME: here sharedptr will be freed
                 this->unsealed_segment_ = new_segment.get();
+                this->segment_map_.emplace(new_segment_id, new_segment);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
+        auto operation = MakeUnique<AddSegmentEntryOp>(unsealed_segment_);
+        txn->AddCatalogDeltaOperation(std::move(operation));
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
     }
@@ -224,7 +227,9 @@ void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_s
     }
 }
 
-Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
+    TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
+    Txn *txn = txn_store_ptr->txn_;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         SegmentID segment_id = to_delete_seg_rows.first;
         SegmentEntry *segment_entry = GetSegmentByID(segment_id, commit_ts);
@@ -233,7 +238,9 @@ Status TableEntry::Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteSt
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap);
+        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry);
+        txn->AddCatalogDeltaOperation(std::move(operation));
+        segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
     }
     return Status::OK();
 }

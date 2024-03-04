@@ -499,7 +499,7 @@ i64 WalManager::ReplayWalFile() {
     }
 
     // phase 3: replay the entries
-    LOG_INFO("Replay phase 3: replay the entries");
+    LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
     std::reverse(replay_entries.begin(), replay_entries.end());
     TxnTimeStamp system_start_ts = 0;
     TransactionID last_txn_id = 0;
@@ -714,7 +714,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), (void *)table_store.get(), table_store->txn_->CommitTS(), table_store->delete_state_);
     Catalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
 }
 

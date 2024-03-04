@@ -373,8 +373,8 @@ class TestInsert:
         table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
 
         # insert
-        for i in range(10):
-            values = [{"c1": 1, "c2": 2} for _ in range(100)]
+        for i in range(100):
+            values = [{"c1": i*100+j, "c2": i*100+j+1} for j in range(100)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)

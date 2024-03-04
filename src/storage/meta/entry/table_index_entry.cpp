@@ -122,7 +122,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
+    return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
 }
 
 // For segment_column_index_entry

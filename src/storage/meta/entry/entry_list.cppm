@@ -160,7 +160,7 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
             SharedPtr<Entry> entry = init_func();
             entry_list_.push_front(entry);
             if (txn_mgr != nullptr) {
-                auto op = MakeUnique<typename Entry::EntryOp>(entry);
+                auto op = MakeUnique<typename Entry::EntryOp>(entry, false);
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }
@@ -238,7 +238,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
             Entry *drop_entry_ptr = entry_list_.front().get();
             entry_list_.pop_front();
             if (txn_mgr != nullptr) {
-                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
+                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry, true);
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }
@@ -248,7 +248,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
             SharedPtr<Entry> drop_entry = init_func();
             entry_list_.push_front(drop_entry);
             if (txn_mgr != nullptr) {
-                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry);
+                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry, true);
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }

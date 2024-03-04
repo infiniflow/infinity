@@ -201,6 +201,18 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     block_entries_.emplace_back(std::move(block_entry));
 }
 
+void SegmentEntry::SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry) {
+    std::unique_lock lock(this->rw_locker_);
+    if (index == block_entries_.size()) {
+        IncreaseRowCount(block_entry->row_count());
+        block_entries_.emplace_back(std::move(block_entry));
+    } else {
+        SizeT increased_row_count = block_entry->row_count() - block_entries_[index]->row_count();
+        IncreaseRowCount(increased_row_count);
+        block_entries_[index] = std::move(block_entry);
+    }
+}
+
 // One writer
 u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
@@ -225,6 +237,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
                 this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, new_block_id, 0, this->column_count_, txn));
             }
             BlockEntry *last_block_entry = this->block_entries_.back().get();
+            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(last_block_entry);
+            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
+            for (auto &column_block_entry : last_block_entry->columns()) {
+                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
+                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
+            }
 
             SegmentID range_segment_id = this->segment_id_;
             BlockID range_block_id = last_block_entry->block_id();
@@ -255,12 +273,21 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
 }
 
 // One writer
-void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id,
+                              TxnTimeStamp commit_ts,
+                              const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
+                              Txn *txn) {
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = nullptr;
         {
             std::shared_lock lck(this->rw_locker_);
             block_entry = block_entries_.at(block_id).get();
+            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(block_entry);
+            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
+            for (auto &column_block_entry : block_entry->columns()) {
+                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
+                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
+            }
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);

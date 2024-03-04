@@ -112,7 +112,7 @@ private:
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    Status Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    Status Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 

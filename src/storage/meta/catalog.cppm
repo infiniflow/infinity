@@ -189,7 +189,7 @@ public:
 
     static void RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    static Status Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    static Status Delete(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
     static void CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 

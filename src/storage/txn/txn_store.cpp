@@ -30,6 +30,7 @@ import txn;
 import default_values;
 import table_entry;
 import catalog;
+import catalog_delta_entry;
 import internal_types;
 import data_type;
 import background_process;
@@ -160,7 +161,7 @@ void TxnTableStore::PrepareCommit() {
     // Attention: "compact" needs to be ahead of "delete"
     Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
 
-    Catalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::Delete(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), delete_state_);
     Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));

@@ -116,6 +116,9 @@ public:
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
+    // used in Catalog::LoadFromEntry when restart
+    void SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry);
+
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
@@ -154,7 +157,7 @@ public:
     // called by wal thread
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 

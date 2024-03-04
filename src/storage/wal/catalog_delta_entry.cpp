@@ -174,7 +174,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), std::move(index_name));
+            operation =
+                MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), std::move(index_name));
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
@@ -182,7 +183,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+            SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
                                                          is_delete,
                                                          txn_id,
@@ -216,7 +217,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String col_index_dir = ReadBufAdv<String>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
 
-            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+            SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddColumnIndexEntryOp>(begin_ts,
                                                           is_delete,
                                                           txn_id,
@@ -357,7 +358,9 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    index_base_->WriteAdv(buf);
+    if (!is_delete()) {
+        index_base_->WriteAdv(buf);
+    }
 }
 
 void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
@@ -375,7 +378,9 @@ void AddColumnIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->col_index_dir_);
     WriteBufAdv(buf, this->column_id_);
-    index_base_->WriteAdv(buf);
+    if (!is_delete()) {
+        index_base_->WriteAdv(buf);
+    }
 }
 
 void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
@@ -573,7 +578,7 @@ const String AddTableIndexEntryOp::ToString() const {
                        *table_name_,
                        *index_name_,
                        index_dir_,
-                       index_base_->ToString());
+                       index_base_ ? index_base_->ToString() : "nullptr");
 }
 
 const String AddFulltextIndexEntryOp::ToString() const {
@@ -731,7 +736,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_
     for (auto &op : operations_) {
         TxnTimeStamp op_commit_ts = op->commit_ts();
         if (op_commit_ts <= max_commit_ts) {
-            flush_delta_entry->operations_.push_back(std::move(op));
+            flush_delta_entry->operations_.emplace_back(std::move(op));
         } else {
             break; // commit_ts is in ascending order
         }
