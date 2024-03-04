@@ -32,18 +32,19 @@ import column_inverter;
 import third_party;
 import internal_types;
 import ring;
+import skiplist;
 
 namespace infinity {
 class ColumnIndexer;
 export class MemoryIndexer {
 public:
-    using TermKey = String;
-    using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = HashMap<TermKey, PostingPtr>;
-
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
     };
+
+    using TermKey = String;
+    using PostingPtr = SharedPtr<PostingWriter>;
+    using PostingTable = SkipList<TermKey, PostingPtr, KeyComp>;
 
     enum IndexMode {
         NEAR_REAL_TIME,

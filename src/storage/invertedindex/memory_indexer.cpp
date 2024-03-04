@@ -63,7 +63,7 @@ MemoryIndexer::MemoryIndexer(u64 column_id,
                              ThreadPool &thread_pool)
     : column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), thread_pool_(thread_pool),
       ring_inverted_(10UL), ring_sorted_(10UL) {
-    posting_store_ = MakeUnique<PostingTable>();
+    posting_store_ = MakeUnique<PostingTable>(KeyComp(), byte_slice_pool_.get());
     SetAnalyzer();
 }
 
@@ -114,23 +114,23 @@ void MemoryIndexer::Commit() {
 }
 
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
-    MemoryIndexer::PostingTable::iterator iter = posting_store_->find(term);
-    if (iter != posting_store_->end())
-        return iter->second;
+    MemoryIndexer::PostingTable::Iterator iter = posting_store_->Find(term);
+    if (iter != posting_store_->End())
+        return iter.Value();
     else {
         MemoryIndexer::PostingPtr posting =
             MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
-        posting_store_->emplace(term, posting);
+        posting_store_->Insert(term, posting);
         return posting;
     }
 }
 
 void MemoryIndexer::Reset() {
     if (posting_store_.get()) {
-        for (auto it = posting_store_->begin(); it != posting_store_->end(); ++it) {
+        for (auto it = posting_store_->Begin(); it != posting_store_->End(); ++it) {
             // delete it.getData();
         }
-        posting_store_->clear();
+        posting_store_->Clear();
     }
     thread_pool_.stop(true);
     cv_.notify_all();

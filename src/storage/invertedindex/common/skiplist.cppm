@@ -37,7 +37,7 @@ struct Node {
 export template <typename KeyType, typename ValueType, class Comparator>
 class SkipList {
 public:
-    SkipList(Comparator cmp, MemoryPool *arena) : level_(1), size_(0), arena_(arena) {
+    SkipList(Comparator cmp, MemoryPool *arena) : level_(1), size_(0), arena_(arena), compare_(cmp) {
         head_ = (new Node<KeyType, ValueType>(KeyType(), ValueType(), MAX_LEVEL));
     }
 
@@ -146,6 +146,14 @@ public:
         return false;
     }
 
+    Iterator Find(const KeyType &key) {
+        Node<KeyType, ValueType> *x = FindGreaterOrEqual(key);
+        if (x != nullptr && Equal(key, x->key_)) {
+            return Iterator(x);
+        }
+        return Iterator(nullptr);
+    }
+
     Node<KeyType, ValueType> *FindGreaterOrEqual(const KeyType &target) {
         Node<KeyType, ValueType> *x = head_.load();
         int level = level_ - 1;
@@ -199,10 +207,13 @@ public:
     }
 
 private:
+    bool Equal(const KeyType &a, const KeyType &b) const { return (compare_(a, b) == 0); }
+
     Atomic<int> level_;
     Atomic<int> size_;
     Atomic<Node<KeyType, ValueType> *> head_;
     MemoryPool *arena_{nullptr};
+    Comparator const compare_;
 
     int RandomLevel() {
         int new_level = 1;

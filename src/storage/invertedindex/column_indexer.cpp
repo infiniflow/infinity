@@ -85,12 +85,12 @@ void ColumnIndexer::Dump() {
 
     if (posting_table) {
         SizeT term_meta_offset = 0;
-        for (auto it = posting_table->begin(); it != posting_table->end(); ++it) {
-            const MemoryIndexer::PostingPtr posting_writer = it->second;
+        for (auto it = posting_table->Begin(); it != posting_table->End(); ++it) {
+            const MemoryIndexer::PostingPtr posting_writer = it.Value();
             TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
             posting_writer->Dump(posting_file_writer, term_meta);
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
-            const String &term = it->first;
+            const String &term = it.Key();
             builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
             term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
