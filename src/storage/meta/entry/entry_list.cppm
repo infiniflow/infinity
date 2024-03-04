@@ -315,6 +315,7 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
             UnrecoverableError("Invalid find result");
         }
     }
+    return {nullptr, Status::UnexpectedError("Unreachable")};
 }
 
 template <EntryConcept Entry>
