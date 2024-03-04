@@ -73,7 +73,8 @@ public:
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
                                                TransactionID txn_id,
-                                               TxnTimeStamp begin_ts);
+                                               TxnTimeStamp begin_ts,
+                                               TxnManager *txn_mgr);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
                                                      SharedPtr<String> db_entry_dir,
@@ -84,7 +85,7 @@ public:
                                                      TxnTimeStamp begin_ts,
                                                      TxnTimeStamp commit_ts,
                                                      bool is_delete,
-                                                     SizeT row_count);
+                                                     SizeT row_count) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,

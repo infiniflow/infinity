@@ -33,8 +33,6 @@ public:
 
     void Cleanup() &&;
 
-    void AddMeta(UniquePtr<MetaInterface> meta);
-
     void AddEntry(SharedPtr<EntryInterface> entry);
 
     TxnTimeStamp visible_ts() const { return visible_ts_; }
@@ -44,8 +42,6 @@ private:
     const TxnTimeStamp visible_ts_;
 
     Vector<SharedPtr<EntryInterface>> entries_;
-
-    Vector<UniquePtr<MetaInterface>> metas_;
 };
 
 } // namespace infinity

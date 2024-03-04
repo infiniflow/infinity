@@ -81,10 +81,17 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
-                                                TxnTimeStamp begin_ts) {
+                                                TxnTimeStamp begin_ts,
+                                                TxnManager *txn_mgr) {
 
     auto table_entry =
         MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    auto *txn = txn_mgr->GetTxn(txn_id);
+    if (is_delete) {
+        txn->DropTableStore(table_entry.get());
+    } else {
+        txn->AddTableStore(table_entry.get());
+    }
     return table_entry;
 }
 
@@ -97,7 +104,7 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
                                                       TxnTimeStamp begin_ts,
                                                       TxnTimeStamp commit_ts,
                                                       bool is_delete,
-                                                      SizeT row_count) {
+                                                      SizeT row_count) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete, db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
@@ -137,7 +144,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys): conflict_type
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     if (index_meta == nullptr) {
         return {nullptr, status};
     }
@@ -145,7 +152,8 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
-    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys)
+    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
+    r_lock.unlock();
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
     return index_meta->DeleteNewEntry(txn_id);
 }

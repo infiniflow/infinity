@@ -69,7 +69,7 @@ public:
 
     Tuple<Entry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void DeleteEntry(TransactionID txn_id);
+    List<SharedPtr<Entry>> DeleteEntry(TransactionID txn_id);
 
     bool PickCleanup(CleanupScanner *scanner);
 
@@ -367,14 +367,12 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, Tx
 }
 
 template <EntryConcept Entry>
-void EntryList<Entry>::DeleteEntry(TransactionID txn_id) {
+List<SharedPtr<Entry>> EntryList<Entry>::DeleteEntry(TransactionID txn_id) {
     std::unique_lock lock(rw_locker_);
-    if (entry_list_.empty()) {
-        LOG_TRACE("Empty entry list.");
-        return;
-    }
     auto removed_iter = std::remove_if(entry_list_.begin(), entry_list_.end(), [&](auto &entry) { return entry->txn_id_ == txn_id; });
-    entry_list_.erase(removed_iter, entry_list_.end());
+    List<SharedPtr<Entry>> erase_list;
+    erase_list.splice(erase_list.begin(), entry_list_, removed_iter, entry_list_.end());
+    return erase_list;
 }
 
 template <EntryConcept Entry>

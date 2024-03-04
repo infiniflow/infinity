@@ -36,6 +36,7 @@ namespace infinity {
 
 class TxnManager;
 class AddDBEntryOp;
+class DBMeta;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
@@ -43,28 +44,35 @@ export class DBEntry final : public BaseEntry, public EntryInterface {
 public:
     using EntryOp = AddDBEntryOp;
 
-    explicit DBEntry(bool is_delete,
+    explicit DBEntry(DBMeta *db_meta,
+                     bool is_delete,
                      const SharedPtr<String> &data_dir,
                      const SharedPtr<String> &db_name,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
-    static SharedPtr<DBEntry>
-    NewDBEntry(bool is_delete, const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
+                                         bool is_delete,
+                                         const SharedPtr<String> &data_dir,
+                                         const SharedPtr<String> &db_name,
+                                         TransactionID txn_id,
+                                         TxnTimeStamp begin_ts,
+                                         TxnManager *txn_mgr);
 
-    static SharedPtr<DBEntry> NewReplayDBEntry(const SharedPtr<String> &data_dir,
+    static SharedPtr<DBEntry> NewReplayDBEntry(DBMeta *db_meta,
+                                               const SharedPtr<String> &data_dir,
                                                const SharedPtr<String> &db_name,
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
                                                TxnTimeStamp commit_ts,
-                                               bool is_delete);
+                                               bool is_delete) noexcept;
 
 public:
     SharedPtr<String> ToString();
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr);
+    static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
 
     void MergeFrom(BaseEntry &other) final;
 
@@ -97,6 +105,9 @@ private:
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
     }
+
+public:
+    DBMeta *const db_meta_;
 
 private:
     const SharedPtr<String> db_entry_dir_{};

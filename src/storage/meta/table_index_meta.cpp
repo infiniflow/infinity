@@ -70,14 +70,14 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared
                                                                      TxnTimeStamp begin_ts,
                                                                      TxnManager *txn_mgr) {
     auto init_drop_entry = [&]() {
-        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
+        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts, txn_mgr);
         drop_entry->deleted_ = true;
         return drop_entry;
     };
     return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { index_entry_list_.DeleteEntry(txn_id); }
+void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = index_entry_list_.DeleteEntry(txn_id); }
 
 SharedPtr<String> TableIndexMeta::ToString() {
     UnrecoverableError("Not implemented");
