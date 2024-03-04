@@ -88,7 +88,7 @@ public:
     // Used in segment column index entry
     Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
-    UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, SizeT seg_actual_row_count, const ColumnDef *column_def);
+    UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def);
 
 private:
     Status
