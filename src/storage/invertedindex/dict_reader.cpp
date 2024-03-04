@@ -43,8 +43,11 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
 
 DictionaryReader::~DictionaryReader() {
     if (data_ptr_ != nullptr) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
         int rc = MunmapFile(data_ptr_, data_len_);
         assert(rc == 0);
+#pragma clang diagnostic pop
     }
 }
 
