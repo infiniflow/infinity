@@ -74,12 +74,13 @@ TEST_F(SkiplistTest, test1) {
     }
 
     for (int i = 0; i < R; i++) {
-        SkipList<Key, Value, Comparator>::Iterator iter = list.Find(i);
-        if (iter.Valid()) {
-            ASSERT_EQ(keys[i], iter.value());
-            ASSERT_EQ(keys.count(i), 1);
+        // SkipList<Key, Value, Comparator>::Iterator iter = list.Find(i);
+        Value v;
+        if (list.Search(i, v)) {
+            ASSERT_EQ(keys[i], v);
+            ASSERT_EQ(keys.count(i), (unsigned)1);
         } else {
-            ASSERT_EQ(keys.count(i), 0);
+            ASSERT_EQ(keys.count(i), (unsigned)0);
         }
     }
 }
@@ -87,28 +88,71 @@ TEST_F(SkiplistTest, test1) {
 TEST_F(SkiplistTest, test2) {
     MemoryPool memory_pool;
     StringComparator cmp;
-    SkipList<const char *, Value, StringComparator> list(cmp, &memory_pool);
+    SkipList<String, Value, StringComparator> list(cmp, &memory_pool);
 
-    const int N = 20;
+    const int N = 200;
     const int R = 5000;
     std::map<String, Value> keys;
 
-    Vector<String> strings;
     for (int i = 0; i < N; i++) {
         String key = RandStr();
-        strings.push_back(key);
         Value value = rand() % R;
         if (keys.emplace(key, value).second) {
-            list.Insert(strings[i].c_str(), value);
+            list.Insert(key, value);
         }
     }
 
     for (std::map<String, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
-        std::cout << "key1 " << it->first << " value " << it->second << std::endl;
-        SkipList<const char *, Value, StringComparator>::Iterator iter = list.Find(it->first.c_str());
-        if (iter.Valid()) {
-            std::cout << "key " << iter.key() << std::endl;
-            //  ASSERT_EQ(it->second, iter.value());
+        Value v;
+        if (list.Search(it->first, v)) {
+            ASSERT_EQ(it->second, v);
         }
     }
+
+    for (std::map<String, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        SkipList<String, Value, StringComparator>::Iterator iter = list.Begin(it->first);
+        if (iter != list.End()) {
+            ASSERT_EQ(it->second, iter.Value());
+        }
+    }
+}
+
+const int NUM_THREADS = 4;
+const int NUM_OPERATIONS = 1000;
+Comparator cmp;
+MemoryPool arena;
+SkipList<int, int, Comparator> skipList(cmp, &arena);
+
+void PerformOperations(int thread_id) {
+    for (int i = 0; i < NUM_OPERATIONS; ++i) {
+        if (thread_id == 0) {
+            int key = rand() % 100;
+            skipList.Insert(key, key);
+            int result;
+            bool ret = skipList.Search(key, result);
+            ASSERT_EQ(ret, true) << "Insertion failed";
+            ASSERT_EQ(result, key);
+        } else {
+            int key = rand() % 100;
+            int result;
+            bool ret = skipList.Search(key, result);
+            if (ret) {
+                ASSERT_EQ(result, key);
+            }
+        }
+    }
+}
+
+TEST_F(SkiplistTest, test3) {
+    std::thread threads[NUM_THREADS];
+
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        threads[i] = std::thread(PerformOperations, i);
+    }
+
+    for (int i = 0; i < NUM_THREADS; ++i) {
+        threads[i].join();
+    }
+
+    // You can add additional assertions here to validate the correctness of the SkipList
 }
