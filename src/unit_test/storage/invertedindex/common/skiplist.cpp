@@ -40,6 +40,22 @@ struct Comparator {
     }
 };
 
+struct StringComparator {
+    int operator()(const String &lhs, const String &rhs) const {
+        int ret = strcmp(lhs.c_str(), rhs.c_str());
+        return ret < 0;
+    }
+};
+
+String RandStr() {
+    u32 len = rand() % 100;
+    String str;
+    str.reserve(len);
+    for (u32 i = 0; i < len; ++i)
+        str.push_back('a' + rand() % 26);
+    return str;
+}
+
 TEST_F(SkiplistTest, test1) {
     MemoryPool memory_pool;
     Comparator cmp;
@@ -58,13 +74,41 @@ TEST_F(SkiplistTest, test1) {
     }
 
     for (int i = 0; i < R; i++) {
-        Value v;
-        bool ret = list.Find(i, v);
-        if (ret) {
-            ASSERT_EQ(keys[i], v);
+        SkipList<Key, Value, Comparator>::Iterator iter = list.Find(i);
+        if (iter.Valid()) {
+            ASSERT_EQ(keys[i], iter.value());
             ASSERT_EQ(keys.count(i), 1);
         } else {
             ASSERT_EQ(keys.count(i), 0);
+        }
+    }
+}
+
+TEST_F(SkiplistTest, test2) {
+    MemoryPool memory_pool;
+    StringComparator cmp;
+    SkipList<const char *, Value, StringComparator> list(cmp, &memory_pool);
+
+    const int N = 20;
+    const int R = 5000;
+    std::map<String, Value> keys;
+
+    Vector<String> strings;
+    for (int i = 0; i < N; i++) {
+        String key = RandStr();
+        strings.push_back(key);
+        Value value = rand() % R;
+        if (keys.emplace(key, value).second) {
+            list.Insert(strings[i].c_str(), value);
+        }
+    }
+
+    for (std::map<String, Value>::iterator it = keys.begin(); it != keys.end(); ++it) {
+        std::cout << "key1 " << it->first << " value " << it->second << std::endl;
+        SkipList<const char *, Value, StringComparator>::Iterator iter = list.Find(it->first.c_str());
+        if (iter.Valid()) {
+            std::cout << "key " << iter.key() << std::endl;
+            //  ASSERT_EQ(it->second, iter.value());
         }
     }
 }

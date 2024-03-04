@@ -26,7 +26,7 @@
 module;
 
 #include <cassert>
-
+#include <iostream>
 export module skiplist;
 import stl;
 import memory_pool;
@@ -105,8 +105,11 @@ public:
     public:
         // Initialize an iterator over the specified list.
         // The returned iterator is not valid.
-        explicit Iterator(const SkipList *list);
+        Iterator(const SkipList *list) : list_(list), node_(nullptr) {}
 
+        Iterator(const SkipList *list, Node *node) : list_(list), node_(node) {}
+
+        Iterator(const Iterator &other) : list_(other.list_), node_(other.node_) {}
         // Returns true iff the iterator is positioned at a valid node.
         bool Valid() const;
 
@@ -137,11 +140,11 @@ public:
 
     private:
         const SkipList *list_;
-        Node *node_;
+        Node *node_{nullptr};
         // Intentionally copyable
     };
 
-    bool Find(const Key &key, Value &value);
+    Iterator Find(const Key &key);
 
 private:
     enum { kMaxHeight = 12 };
@@ -187,11 +190,9 @@ private:
 // Implementation details follow
 template <typename Key, typename Value, class Comparator>
 struct SkipList<Key, Value, Comparator>::Node {
-    explicit Node(const Key &k, const Value &v) : key(k), value(v) {}
+    explicit Node(const Key &k, const Value &v) : key(k) {}
 
-    Key const key;
-
-    Value const value;
+    Key key;
 
     // Accessors/mutators for links.  Wrapped in methods so we can
     // add the appropriate barriers as necessary.
@@ -230,12 +231,6 @@ typename SkipList<Key, Value, Comparator>::Node *SkipList<Key, Value, Comparator
 }
 
 template <typename Key, typename Value, class Comparator>
-inline SkipList<Key, Value, Comparator>::Iterator::Iterator(const SkipList *list) {
-    list_ = list;
-    node_ = nullptr;
-}
-
-template <typename Key, typename Value, class Comparator>
 inline bool SkipList<Key, Value, Comparator>::Iterator::Valid() const {
     return node_ != nullptr;
 }
@@ -249,7 +244,7 @@ inline const Key &SkipList<Key, Value, Comparator>::Iterator::key() const {
 template <typename Key, typename Value, class Comparator>
 inline const Value &SkipList<Key, Value, Comparator>::Iterator::value() const {
     assert(Valid());
-    return node_->value;
+    return Value(); //;node_->value;
 }
 
 template <typename Key, typename Value, class Comparator>
@@ -420,13 +415,18 @@ bool SkipList<Key, Value, Comparator>::Contains(const Key &key) const {
 }
 
 template <typename Key, typename Value, class Comparator>
-bool SkipList<Key, Value, Comparator>::Find(const Key &key, Value &value) {
+SkipList<Key, Value, Comparator>::Iterator SkipList<Key, Value, Comparator>::Find(const Key &key) {
     Node *x = FindGreaterOrEqual(key, nullptr);
+    if (x != nullptr)
+        std::cout << "key " << key << " found: " << x->key << std::endl;
+    else
+        std::cout << "not found" << std::endl;
     if (x != nullptr && SkipList<Key, Value, Comparator>::Equal(key, x->key)) {
-        value = x->value;
-        return true;
+        SkipList<Key, Value, Comparator>::Iterator iterator(this, x);
+        return iterator;
     } else {
-        return false;
+        SkipList<Key, Value, Comparator>::Iterator iterator(this);
+        return iterator;
     }
 }
 
