@@ -63,11 +63,13 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        TxnTimeStamp begin_ts,
                                        TxnManager *txn_mgr) {
     auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
-    auto *txn = txn_mgr->GetTxn(txn_id);
-    if (is_delete) {
-        txn->DropDBStore(db_entry.get());
-    } else {
-        txn->AddDBStore(db_entry.get());
+    if (txn_mgr) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        if (is_delete) {
+            txn->DropDBStore(db_entry.get());
+        } else {
+            txn->AddDBStore(db_entry.get());
+        }
     }
     return db_entry;
 }
@@ -251,6 +253,9 @@ void DBEntry::MergeFrom(BaseEntry &other) {
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
 void DBEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
     table_meta_map_.Cleanup();
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));

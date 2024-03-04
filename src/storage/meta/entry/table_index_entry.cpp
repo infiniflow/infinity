@@ -127,7 +127,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
 SharedPtr<TableIndexEntry>
 TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto dropped_index_entry = MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
-    {
+    if (txn_mgr) {
         auto *txn = txn_mgr->GetTxn(txn_id);
         auto &index_name = *table_index_meta->index_name();
         txn->DropIndexStore(index_name, dropped_index_entry.get());
@@ -277,6 +277,9 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 }
 
 void TableIndexEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
     for (auto &[column_id, column_index_entry] : column_index_map_) {
         column_index_entry->Cleanup();
     }

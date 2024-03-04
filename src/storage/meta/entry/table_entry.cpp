@@ -86,11 +86,13 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
 
     auto table_entry =
         MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
-    auto *txn = txn_mgr->GetTxn(txn_id);
-    if (is_delete) {
-        txn->DropTableStore(table_entry.get());
-    } else {
-        txn->AddTableStore(table_entry.get());
+    if (txn_mgr) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        if (is_delete) {
+            txn->DropTableStore(table_entry.get());
+        } else {
+            txn->AddTableStore(table_entry.get());
+        }
     }
     return table_entry;
 }
@@ -692,6 +694,9 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
 }
 
 void TableEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
     for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup();
     }

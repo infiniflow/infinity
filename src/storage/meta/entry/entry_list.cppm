@@ -414,9 +414,6 @@ template <EntryConcept Entry>
 void EntryList<Entry>::Cleanup() {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
-        if (entry->deleted_) {
-            continue;
-        }
         entry->Cleanup();
     }
 }
