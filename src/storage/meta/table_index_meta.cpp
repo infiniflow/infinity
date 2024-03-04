@@ -77,14 +77,6 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared
     return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return index_entry_list_.GetEntry(txn_id, begin_ts);
-}
-
-Tuple<TableIndexEntry *, Status> TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return index_entry_list_.GetEntryReplay(txn_id, begin_ts);
-}
-
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { index_entry_list_.DeleteEntry(txn_id); }
 
 SharedPtr<String> TableIndexMeta::ToString() {

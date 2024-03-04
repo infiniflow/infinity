@@ -87,12 +87,6 @@ Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared
     return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> TableMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return table_entry_list_.GetEntry(txn_id, begin_ts); }
-
-Tuple<TableEntry *, Status> TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return table_entry_list_.GetEntryReplay(txn_id, begin_ts);
-}
-
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { table_entry_list_.DeleteEntry(txn_id); }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }

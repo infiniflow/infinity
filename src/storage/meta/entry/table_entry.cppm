@@ -86,7 +86,7 @@ public:
                                                      bool is_delete,
                                                      SizeT row_count);
 
-private:
+public:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
@@ -102,6 +102,9 @@ private:
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
+    MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+
+public:
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }

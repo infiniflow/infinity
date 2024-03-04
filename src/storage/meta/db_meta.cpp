@@ -57,12 +57,6 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex
     return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntry(txn_id, begin_ts); }
-
-Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return db_entry_list_.GetEntryReplay(txn_id, begin_ts);
-}
-
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { db_entry_list_.DeleteEntry(txn_id); }
 
 SharedPtr<String> DBMeta::ToString() {

@@ -95,7 +95,7 @@ Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, Transaction
     if (db_meta == nullptr) {
         return {nullptr, status};
     }
-    return db_meta->GetEntry(txn_id, begin_ts);
+    return db_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id) {
@@ -111,7 +111,7 @@ Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts
     res.reserve(this->db_meta_map().size());
     for (const auto &db_meta_pair : this->db_meta_map()) {
         DBMeta *db_meta = db_meta_pair.second.get();
-        auto [db_entry, status] = db_meta->GetEntry(txn_id, begin_ts);
+        auto [db_entry, status] = db_meta->GetEntryNolock(txn_id, begin_ts);
         if (status.ok()) {
             res.emplace_back(db_entry);
         }

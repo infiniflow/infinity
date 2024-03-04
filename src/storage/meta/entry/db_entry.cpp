@@ -102,7 +102,7 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
     if (table_meta == nullptr) {
         return {nullptr, status};
     }
-    return table_meta->GetEntry(txn_id, begin_ts);
+    return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
@@ -114,19 +114,19 @@ void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
 Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Vector<TableEntry *> results;
 
-    this->rw_locker().lock_shared();
-
-    results.reserve(this->table_meta_map().size());
-    for (auto &table_collection_meta_pair : this->table_meta_map()) {
-        TableMeta *table_meta = table_collection_meta_pair.second.get();
-        auto [table_entry, status] = table_meta->GetEntry(txn_id, begin_ts);
-        if (!status.ok()) {
-            LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
-        } else {
-            results.emplace_back((TableEntry *)table_entry);
+    {
+        auto map_guard = table_meta_map_.GetMetaMap();
+        results.reserve((*map_guard).size());
+        for (auto &table_collection_meta_pair : *map_guard) {
+            TableMeta *table_meta = table_collection_meta_pair.second.get();
+            auto [table_entry, status] = table_meta->GetEntryNolock(txn_id, begin_ts);
+            if (!status.ok()) {
+                LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
+            } else {
+                results.emplace_back((TableEntry *)table_entry);
+            }
         }
     }
-    this->rw_locker().unlock_shared();
 
     return results;
 }

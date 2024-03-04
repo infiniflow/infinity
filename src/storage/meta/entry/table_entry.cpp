@@ -141,7 +141,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     if (index_meta == nullptr) {
         return {nullptr, status};
     }
-    return index_meta->GetEntry(txn_id, begin_ts);
+    return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
@@ -155,20 +155,23 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    for (auto &[_, table_index_meta] : this->index_meta_map()) {
-        auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
-        if (status.ok()) {
-            fulltext_index_entry = table_index_entry->fulltext_index_entry();
-            const IndexBase *index_base = table_index_entry->index_base();
-            if (index_base->index_type_ != IndexType::kFullText)
-                continue;
-            auto index_full_text = static_cast<const IndexFullText *>(index_base);
-            for (auto &column_name : index_full_text->column_names_) {
-                column2analyzer[column_name] = index_full_text->analyzer_;
-            }
-            if (!column2analyzer.empty()) {
-                // iresearch requires there is exactly one full index per table.
-                break;
+    {
+        auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+        for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            if (status.ok()) {
+                fulltext_index_entry = table_index_entry->fulltext_index_entry();
+                const IndexBase *index_base = table_index_entry->index_base();
+                if (index_base->index_type_ != IndexType::kFullText)
+                    continue;
+                auto index_full_text = static_cast<const IndexFullText *>(index_base);
+                for (auto &column_name : index_full_text->column_names_) {
+                    column2analyzer[column_name] = index_full_text->analyzer_;
+                }
+                if (!column2analyzer.empty()) {
+                    // iresearch requires there is exactly one full index per table.
+                    break;
+                }
             }
         }
     }
@@ -672,7 +675,12 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         }
     }
     std::sort(cleanup_segment_ids.begin(), cleanup_segment_ids.end());
-    index_meta_map_.Iterate([&](auto *meta) { meta->PickCleanupBySegments(cleanup_segment_ids, scanner); });
+    {
+        auto map_guard = index_meta_map_.GetMetaMap();
+        for (auto &[_, table_index_meta] : *map_guard) {
+            table_index_meta->PickCleanupBySegments(cleanup_segment_ids, scanner);
+        }
+    }
 }
 
 void TableEntry::Cleanup() {
