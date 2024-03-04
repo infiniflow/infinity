@@ -14,6 +14,8 @@
 import os
 
 import pandas as pd
+import pytest
+
 from common import common_values
 import infinity
 from numpy import dtype
@@ -408,6 +410,42 @@ class TestSelect:
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
             {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))
+
+    @pytest.mark.parametrize("filter_list", [
+        "c1 > 10",
+        "c2 > 1",
+        "c1 > 0.1 and c2 < 3.0",
+        "c1 > 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c1 > 1.0",
+        pytest.param("c1", marks=pytest.mark.xfail),
+        "c1 = 0",
+        pytest.param("_row_id", marks=pytest.mark.xfail),
+        pytest.param("*", marks=pytest.mark.xfail),
+        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
+        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
+    ])
+    def test_filter_expression(self, filter_list):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_output_filter_function", True)
+        table_obj = db_obj.create_table("test_output_filter_function", {
+            "c1": "int", "c2": "float"}, None)
+        table_obj.insert([{"c1": 1, "c2": 2.0},
+                          {"c1": 10, "c2": 2.0},
+                          {"c1": 100, "c2": 2.0},
+                          {"c1": 1000, "c2": 2.0},
+                          {"c1": 10000, "c2": 2.0}])
+        # TODO add more filter function
+        insert_res_df = table_obj.output(["*"]).filter(filter_list).to_pl()
+        print(str(insert_res_df))
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
     # create a table with all types supported, each column can be output correctly.
     # create a table, insert more than one data block, each column data is output correctly.
