@@ -50,7 +50,7 @@ public:
                                        const IndexBase *index_base,
                                        const ColumnDef *column_def,
                                        SizeT row_count)
-        : IndexFileWorker(file_dir, file_name, index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
+        : IndexFileWorker(std::move(file_dir), std::move(file_name), index_base, column_def), default_centroid_num_((u32)std::sqrt(row_count)) {}
 
     virtual ~AnnIVFFlatIndexFileWorker() override;
 
@@ -94,8 +94,8 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
 
     const auto *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base_);
     auto centroids_count = index_ivfflat->centroids_count_;
-    if (default_centroid_num_ < centroids_count) {
-        centroids_count = 1;
+    if (centroids_count == 0) {
+        centroids_count = default_centroid_num_;
     }
     switch (GetType()) {
         case kElemFloat: {

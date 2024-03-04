@@ -38,21 +38,21 @@ namespace infinity {
 template <typename RawValueType, bool CheckTS, typename KeyType, typename OffsetType>
 inline void LoadFromSegmentColumnIterator(OneColumnIterator<RawValueType, CheckTS> &iter,
                                           UniquePtr<Pair<KeyType, OffsetType>[]> &sorted_key_offset_pair,
-                                          u32 data_num) {
-    u32 cnt = 0;
+                                          const u32 full_data_num,
+                                          u32 &data_num) {
+    if (data_num != 0) {
+        UnrecoverableError("LoadFromSegmentColumnIterator(): data_num is not initially 0");
+    }
     while (true) {
         auto pair_opt = iter.Next();
         if (!pair_opt) {
             break;
         }
-        if (cnt >= data_num) {
+        if (data_num >= full_data_num) {
             UnrecoverableError("LoadFromSegmentColumnIterator(): segment row count more than expected");
         }
         auto &[val_ptr, offset] = pair_opt.value(); // val_ptr is const RawValueType * type, offset is SegmentOffset type
-        sorted_key_offset_pair[cnt++] = {ConvertToOrderedKeyValue<RawValueType>(*val_ptr), offset};
-    }
-    if (cnt != data_num) {
-        UnrecoverableError("LoadFromSegmentColumnIterator(): segment row count les than expected");
+        sorted_key_offset_pair[data_num++] = {ConvertToOrderedKeyValue<RawValueType>(*val_ptr), offset};
     }
     // finally, sort
     std::sort(sorted_key_offset_pair.get(), sorted_key_offset_pair.get() + data_num);
@@ -69,12 +69,11 @@ public:
     using OffsetType = SegmentOffset;
     using KeyOffsetPair = Pair<KeyType, OffsetType>;
 
-    explicit SecondaryIndexDataBuilder(u32 full_data_num, u32 data_num, u32 part_capacity)
-        : full_data_num_(full_data_num), data_num_(data_num), output_part_capacity_(part_capacity) {
+    explicit SecondaryIndexDataBuilder(u32 full_data_num, u32 part_capacity) : full_data_num_(full_data_num), output_part_capacity_(part_capacity) {
         output_part_num_ = (full_data_num + output_part_capacity_ - 1) / output_part_capacity_;
         index_key_type_ = GetLogicalType<KeyType>;
         output_offset_type_ = LogicalType::kInteger; // used to store u32 offsets
-        sorted_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(data_num_);
+        sorted_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(full_data_num_);
     }
 
     ~SecondaryIndexDataBuilder() override final = default;
@@ -87,10 +86,10 @@ public:
         static_assert(std::is_same_v<OffsetType, SegmentOffset>, "OffsetType != SegmentOffset, need to fix");
         if (check_ts) {
             OneColumnIterator<RawValueType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-            return LoadFromSegmentColumnIterator(iter, sorted_key_offset_pair_, data_num_);
+            return LoadFromSegmentColumnIterator(iter, sorted_key_offset_pair_, full_data_num_, data_num_);
         } else {
             OneColumnIterator<RawValueType, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-            return LoadFromSegmentColumnIterator(iter, sorted_key_offset_pair_, data_num_);
+            return LoadFromSegmentColumnIterator(iter, sorted_key_offset_pair_, full_data_num_, data_num_);
         }
     }
 
@@ -127,9 +126,10 @@ public:
             if (index_head->full_data_num_ != full_data_num_) {
                 UnrecoverableError("OutputToHeader(): error: index_head->full_data_num_ != full_data_num_");
             }
-            if (index_head->data_num_ != data_num_) {
-                UnrecoverableError("OutputToHeader(): error: index_head->data_num_ != data_num_");
+            if (index_head->data_num_ != 0) {
+                UnrecoverableError("OutputToHeader(): index_head->data_num_ already exist");
             }
+            index_head->data_num_ = data_num_;
             if (index_head->part_capacity_ != output_part_capacity_) {
                 UnrecoverableError("OutputToHeader(): error: index_head->part_capacity_ != output_part_capacity_");
             }
@@ -158,8 +158,7 @@ public:
         if (output_part_progress_ != index_part->part_id_) {
             UnrecoverableError("OutputToPart(): error: unexpected index_part->part_id_ value");
         }
-        if (index_part->part_size_ != std::min(output_part_capacity_, data_num_ - output_row_progress_)) {
-            auto expect_size = std::min(output_part_capacity_, data_num_ - output_row_progress_);
+        if (auto expect_size = std::min(output_part_capacity_, data_num_ - output_row_progress_); expect_size != index_part->part_size_) {
             if (index_part->part_size_ < expect_size) {
                 UnrecoverableError("OutputToPart(): error: index_part->part_size_");
             } else {
@@ -213,9 +212,10 @@ public:
 
 private:
     const u32 full_data_num_{};                          // number of rows in the segment, include those deleted
-    const u32 data_num_{};                               // number of rows in the segment, except those deleted
+    u32 data_num_{};                                     // number of rows in the segment, except those deleted, start from 0, grow during input
     LogicalType index_key_type_ = LogicalType::kInvalid; // type of ordered keys stored in the raw index
-    UniquePtr<KeyOffsetPair[]> sorted_key_offset_pair_;  // size: data_num_. Will be destroyed in OutputToHeader().
+    UniquePtr<KeyOffsetPair[]> sorted_key_offset_pair_;  // size: full_data_num_. Will be destroyed in OutputToHeader().
+
 private:
     // record output progress
     u32 output_part_capacity_{};                             // number of rows in each full output part
@@ -226,42 +226,41 @@ private:
     UniquePtr<KeyType[]> sorted_keys_;                       // for pgm. Will be created in StartOutput().
 };
 
-UniquePtr<SecondaryIndexDataBuilderBase>
-GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 data_num, u32 part_capacity) {
+UniquePtr<SecondaryIndexDataBuilderBase> GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 part_capacity) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return {};
     }
     switch (data_type->type()) {
         case LogicalType::kTinyInt: {
-            return MakeUnique<SecondaryIndexDataBuilder<TinyIntT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<TinyIntT>>(full_data_num, part_capacity);
         }
         case LogicalType::kSmallInt: {
-            return MakeUnique<SecondaryIndexDataBuilder<SmallIntT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<SmallIntT>>(full_data_num, part_capacity);
         }
         case LogicalType::kInteger: {
-            return MakeUnique<SecondaryIndexDataBuilder<IntegerT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<IntegerT>>(full_data_num, part_capacity);
         }
         case LogicalType::kBigInt: {
-            return MakeUnique<SecondaryIndexDataBuilder<BigIntT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<BigIntT>>(full_data_num, part_capacity);
         }
         case LogicalType::kFloat: {
-            return MakeUnique<SecondaryIndexDataBuilder<FloatT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<FloatT>>(full_data_num, part_capacity);
         }
         case LogicalType::kDouble: {
-            return MakeUnique<SecondaryIndexDataBuilder<DoubleT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<DoubleT>>(full_data_num, part_capacity);
         }
         case LogicalType::kDate: {
-            return MakeUnique<SecondaryIndexDataBuilder<DateT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<DateT>>(full_data_num, part_capacity);
         }
         case LogicalType::kTime: {
-            return MakeUnique<SecondaryIndexDataBuilder<TimeT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<TimeT>>(full_data_num, part_capacity);
         }
         case LogicalType::kDateTime: {
-            return MakeUnique<SecondaryIndexDataBuilder<DateTimeT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<DateTimeT>>(full_data_num, part_capacity);
         }
         case LogicalType::kTimestamp: {
-            return MakeUnique<SecondaryIndexDataBuilder<TimestampT>>(full_data_num, data_num, part_capacity);
+            return MakeUnique<SecondaryIndexDataBuilder<TimestampT>>(full_data_num, part_capacity);
         }
         default: {
             UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));
