@@ -12,16 +12,16 @@ table_count_limit = 65536
 table_column_count_limit = 65536
 
 types_array = [
-    # int
+    # # int
     "int", "int8", "int16", "int32", "int64", "integer",
     # "int128",
-    # float
+    # # float
     # "float", "float32", "double", "float64",
-    # string
+    # # string
     # "varchar",
-    # bool
+    # # bool
     # "bool",
-    # vector
+    # # vector
     # "vector, 3, float"
 ]
 

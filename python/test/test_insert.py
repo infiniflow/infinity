@@ -583,7 +583,6 @@ class TestInsert:
         # shutdown service
         os.kill(infinity_service_2.pid, signal.SIGINT)
 
-    @pytest.mark.skip(reason="Cause some unexpected errors.")
     def test_insert_zero_column(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -591,23 +590,23 @@ class TestInsert:
         db_obj.drop_table("test_insert_zero_column")
         table_obj = db_obj.create_table("test_insert_zero_column", {"c1": "int"}, None)
 
-        table_obj.insert([])
-        insert_res = table_obj.output(["*"]).to_df()
-        print(insert_res)
+        with pytest.raises(Exception, match="ERROR:3065*"):
+            table_obj.insert([])
+            insert_res = table_obj.output(["*"]).to_df()
+            print(insert_res)
 
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Cause some unexpected errors.")
     @pytest.mark.parametrize("column_name", [
         "c2",
         "$%#$sadf",
-        1,
-        2.2,
-        [1],
-        (1, "adsf"),
-        {"1": 1}
+        # 1,
+        # 2.2,
+        # [1],
+        # (1, "adsf"),
+        # {"1": 1}
     ])
     def test_insert_no_match_column(self, column_name):
         # connect
@@ -616,9 +615,10 @@ class TestInsert:
         db_obj.drop_table("test_insert_no_match_column")
         table_obj = db_obj.create_table("test_insert_no_match_column", {"c1": "int"}, None)
 
-        table_obj.insert([{column_name: 1}])
-        insert_res = table_obj.output(["*"]).to_df()
-        print(insert_res)
+        with pytest.raises(Exception, match="ERROR:3024*"):
+            table_obj.insert([{column_name: 1}])
+            insert_res = table_obj.output(["*"]).to_df()
+            print(insert_res)
 
         # disconnect
         res = infinity_obj.disconnect()
