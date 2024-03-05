@@ -143,7 +143,7 @@ export int32_t I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     sum = _mm_hadd_epi32(sum, sum);
 
     // Extract the result
-    return _mm_extract_epi32(sum, 0) + _mm_extract_epi32(sum, 1);
+    return _mm_extract_epi32(sum, 0);
 }
 
 export int32_t I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {

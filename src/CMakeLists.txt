@@ -11,7 +11,21 @@ add_subdirectory(parser)
 ### Infinity
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
+
 add_definitions(-march=native)
+add_definitions(-msse4.2 -mfma)
+add_definitions(-mavx2 -mf16c -mpopcnt)
+
+execute_process(COMMAND grep -q avx2 /proc/cpuinfo  
+                RESULT_VARIABLE SUPPORT_AVX2  
+                OUTPUT_QUIET  
+                ERROR_QUIET)  
+
+execute_process(COMMAND grep -q avx512 /proc/cpuinfo  
+RESULT_VARIABLE SUPPORT_AVX512  
+OUTPUT_QUIET  
+ERROR_QUIET)  
+  
 
 file(GLOB_RECURSE
         main_cpp
@@ -198,7 +212,14 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/vespalib")
 
-target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+else()
+        message("Compiled by SSE")
+        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif()
+
 
 add_executable(infinity
         ${main_cpp}
@@ -373,7 +394,14 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 
-target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+# target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
+        message("Compiled by AVX2 or AVX512")
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+else()
+        message("Compiled by SSE")
+        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif()
 
 add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/test_hnsw.cpp")
 
