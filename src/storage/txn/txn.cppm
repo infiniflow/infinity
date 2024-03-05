@@ -63,11 +63,7 @@ enum class CompactSegmentsTaskType;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 Catalog *catalog,
-                 BGTaskProcessor *bg_task_processor,
-                 TransactionID txn_id);
+    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id);
 
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
@@ -179,6 +175,25 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
+public:
+    void AddDBStore(DBEntry *db_entry);
+
+    void DropDBStore(DBEntry *dropped_db_entry);
+
+    void AddTableStore(TableEntry *table_entry);
+
+    void DropTableStore(TableEntry *dropped_table_entry);
+
+    void AddIndexStore(const String &index_name, TableIndexEntry *index_entry);
+
+    void DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry);
+
+private:
+    // Txn store
+    Set<DBEntry *> txn_dbs_{};
+    Set<TableEntry *> txn_tables_{};
+    HashMap<String, TableIndexEntry *> txn_indexes_{};
+
 private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
@@ -188,14 +203,6 @@ private:
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};
-
-    // Related database
-    Set<String> db_names_{};
-
-    // Txn store
-    Set<DBEntry *> txn_dbs_{};
-    Set<TableEntry *> txn_tables_{};
-    HashMap<String, TableIndexEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};

@@ -44,6 +44,7 @@ import column_expression;
 import secondary_index_scan_execute_expression;
 import column_index_entry;
 import create_index_info;
+import table_index_meta;
 
 namespace infinity {
 
@@ -124,19 +125,22 @@ private:
         TxnTimeStamp begin_ts = query_context_->GetTxn()->BeginTS();
 
         auto &table_entry = base_table_ref_.table_entry_ptr_;
-        for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
-            auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
-            if (!status.ok()) {
-                // Table index entry isn't found
-                RecoverableError(status);
-            }
-            auto &index_map = table_index_entry->column_index_map();
-            for (auto &[column_id, column_index_entry] : index_map) {
-                if (column_index_entry->index_base_ptr()->index_type_ == IndexType::kSecondary) {
-                    if (candidate_column_index_map_.contains(column_id)) {
-                        LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
-                    } else {
-                        candidate_column_index_map_.emplace(column_id, column_index_entry);
+        {
+            auto map_guard = table_entry->IndexMetaMap();
+            for (auto &[index_name, table_index_meta] : *map_guard) {
+                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+                if (!status.ok()) {
+                    // Table index entry isn't found
+                    RecoverableError(status);
+                }
+                auto &index_map = table_index_entry->column_index_map();
+                for (auto &[column_id, column_index_entry] : index_map) {
+                    if (column_index_entry->index_base_ptr()->index_type_ == IndexType::kSecondary) {
+                        if (candidate_column_index_map_.contains(column_id)) {
+                            LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
+                        } else {
+                            candidate_column_index_map_.emplace(column_id, column_index_entry);
+                        }
                     }
                 }
             }

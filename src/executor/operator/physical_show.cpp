@@ -1323,113 +1323,116 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
-    for (const auto &[index_name, index_def_meta] : table_entry->index_meta_map()) {
-        auto [table_index_entry, status] = index_def_meta->GetEntry(txn->TxnID(), txn->BeginTS());
-        if (!status.ok()) {
-            // Index isn't found.
-            continue;
-        }
+    {
+        auto map_guard = table_entry->IndexMetaMap();
+        for (const auto &[index_name, index_meta] : *map_guard) {
+            auto [table_index_entry, status] = index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+            if (!status.ok()) {
+                // Index isn't found.
+                continue;
+            }
 
-        for (const auto &column_index_entry_pair : table_index_entry->column_index_map()) {
-            u64 index_column_id = column_index_entry_pair.first;
-            ColumnIndexEntry *column_index_entry = column_index_entry_pair.second.get();
-            const IndexBase *index_base = column_index_entry->index_base_ptr();
-            SizeT column_id = 0;
-            {
-                // Append index name to the first column
-                Value value = Value::MakeVarchar(index_name);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append index method type to the second column
-                Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(index_base->index_type_));
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append index column id
-                Value value = Value::MakeBigInt(index_column_id);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append index column names to the third column
-                String column_names;
-                SizeT idx = 0;
-                for (auto &column_name : index_base->column_names_) {
-                    column_names += column_name;
-                    if (idx < index_base->column_names_.size() - 1) {
-                        column_names += ",";
-                    }
-                    idx++;
+            for (const auto &column_index_entry_pair : table_index_entry->column_index_map()) {
+                u64 index_column_id = column_index_entry_pair.first;
+                ColumnIndexEntry *column_index_entry = column_index_entry_pair.second.get();
+                const IndexBase *index_base = column_index_entry->index_base_ptr();
+                SizeT column_id = 0;
+                {
+                    // Append index name to the first column
+                    Value value = Value::MakeVarchar(index_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }
-                Value value = Value::MakeVarchar(column_names);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append index path
-                Value value = Value::MakeVarchar(*column_index_entry->col_index_dir());
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append Index segment
-                SizeT segment_count = table_entry->segment_map().size();
-                SizeT index_segment_count = column_index_entry->index_by_segment().size();
-                String result_value = fmt::format("{}/{}", index_segment_count, segment_count);
-                Value value = Value::MakeVarchar(result_value);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-            }
-            ++column_id;
-            {
-                // Append index other parameters to the fourth column
-                String other_parameters;
-                switch (index_base->index_type_) {
-                    case IndexType::kIVFFlat: {
-                        const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base);
-                        other_parameters = fmt::format("metric = {}, centroids_count = {}",
-                                                       MetricTypeToString(index_ivfflat->metric_type_),
-                                                       index_ivfflat->centroids_count_);
-                        break;
-                    }
-                    case IndexType::kHnsw: {
-                        const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base);
-                        other_parameters = fmt::format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
-                                                       MetricTypeToString(index_hnsw->metric_type_),
-                                                       HnswEncodeTypeToString(index_hnsw->encode_type_),
-                                                       index_hnsw->M_,
-                                                       index_hnsw->ef_construction_,
-                                                       index_hnsw->ef_);
-                        break;
-                    }
-                    case IndexType::kFullText: {
-                        const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
-                        other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
-                        break;
-                    }
-                    case IndexType::kSecondary: {
-                        // there is no other_parameters
-                        break;
-                    }
-                    case IndexType::kInvalid: {
-                        UnrecoverableError("Invalid index method type");
-                    }
-                    default: {
-                        RecoverableError(Status::NotSupport("Not implemented"));
-                        break;
-                    }
+                ++column_id;
+                {
+                    // Append index method type to the second column
+                    Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(index_base->index_type_));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                 }
-                Value value = Value::MakeVarchar(other_parameters);
-                ValueExpression value_expr(value);
-                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                ++column_id;
+                {
+                    // Append index column id
+                    Value value = Value::MakeBigInt(index_column_id);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+                ++column_id;
+                {
+                    // Append index column names to the third column
+                    String column_names;
+                    SizeT idx = 0;
+                    for (auto &column_name : index_base->column_names_) {
+                        column_names += column_name;
+                        if (idx < index_base->column_names_.size() - 1) {
+                            column_names += ",";
+                        }
+                        idx++;
+                    }
+                    Value value = Value::MakeVarchar(column_names);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+                ++column_id;
+                {
+                    // Append index path
+                    Value value = Value::MakeVarchar(*column_index_entry->col_index_dir());
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+                ++column_id;
+                {
+                    // Append Index segment
+                    SizeT segment_count = table_entry->segment_map().size();
+                    SizeT index_segment_count = column_index_entry->index_by_segment().size();
+                    String result_value = fmt::format("{}/{}", index_segment_count, segment_count);
+                    Value value = Value::MakeVarchar(result_value);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
+                ++column_id;
+                {
+                    // Append index other parameters to the fourth column
+                    String other_parameters;
+                    switch (index_base->index_type_) {
+                        case IndexType::kIVFFlat: {
+                            const IndexIVFFlat *index_ivfflat = static_cast<const IndexIVFFlat *>(index_base);
+                            other_parameters = fmt::format("metric = {}, centroids_count = {}",
+                                                           MetricTypeToString(index_ivfflat->metric_type_),
+                                                           index_ivfflat->centroids_count_);
+                            break;
+                        }
+                        case IndexType::kHnsw: {
+                            const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+                            other_parameters = fmt::format("metric = {}, encode_type = {}, M = {}, ef_construction = {}, ef = {}",
+                                                           MetricTypeToString(index_hnsw->metric_type_),
+                                                           HnswEncodeTypeToString(index_hnsw->encode_type_),
+                                                           index_hnsw->M_,
+                                                           index_hnsw->ef_construction_,
+                                                           index_hnsw->ef_);
+                            break;
+                        }
+                        case IndexType::kFullText: {
+                            const IndexFullText *index_full_text = static_cast<const IndexFullText *>(index_base);
+                            other_parameters = fmt::format("analyzer = {}", index_full_text->analyzer_);
+                            break;
+                        }
+                        case IndexType::kSecondary: {
+                            // there is no other_parameters
+                            break;
+                        }
+                        case IndexType::kInvalid: {
+                            UnrecoverableError("Invalid index method type");
+                        }
+                        default: {
+                            RecoverableError(Status::NotSupport("Not implemented"));
+                            break;
+                        }
+                    }
+                    Value value = Value::MakeVarchar(other_parameters);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                }
             }
         }
     }

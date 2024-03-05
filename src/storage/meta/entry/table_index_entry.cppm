@@ -35,6 +35,7 @@ import meta_entry_interface;
 namespace infinity {
 
 class Txn;
+class TxnManager;
 class TableIndexMeta;
 class BufferManager;
 struct TableEntry;
@@ -65,7 +66,8 @@ public:
                                                          bool is_replay = false,
                                                          String replay_table_index_dir = "");
 
-    static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<TableIndexEntry>
+    NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
                                                                const SharedPtr<IndexBase> &index_base,
@@ -73,7 +75,9 @@ public:
                                                                TransactionID txn_id,
                                                                TxnTimeStamp begin_ts,
                                                                TxnTimeStamp commit_ts,
-                                                               bool is_delete);
+                                                               bool is_delete) noexcept;
+
+    static SharedPtr<TableIndexEntry> NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
