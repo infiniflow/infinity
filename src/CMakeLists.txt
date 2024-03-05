@@ -196,7 +196,6 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/vespalib")
 
 target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
 
@@ -227,7 +226,6 @@ target_link_libraries(infinity
         lz4.a
         atomic.a
         event.a
-        vespalib
 #        profiler
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -347,7 +345,6 @@ target_link_libraries(unit_test
         atomic.a
 #        profiler
         thrift.a
-        vespalib
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -401,6 +398,5 @@ target_link_libraries(test_hnsw_bitmask
     lz4.a
     atomic.a
     event.a
-    vespalib
     #        profiler
 )

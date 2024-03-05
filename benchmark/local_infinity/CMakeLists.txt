@@ -13,7 +13,6 @@ target_link_libraries(
     zsv_parser
     iresearch
     newpfor
-    vespalib
     lz4.a
     atomic.a
 )
@@ -35,7 +34,6 @@ target_link_libraries(
     zsv_parser
     iresearch
     newpfor
-    vespalib
     lz4.a
     atomic.a
 )
@@ -55,7 +53,6 @@ target_link_libraries(
     zsv_parser
     iresearch
     newpfor
-    vespalib
     lz4.a
     atomic.a
 )
@@ -77,7 +74,6 @@ target_link_libraries(
     zsv_parser
     iresearch
     newpfor
-    vespalib
     lz4.a
     atomic.a
 )
@@ -97,7 +93,6 @@ target_link_libraries(
     zsv_parser
     iresearch
     newpfor
-    vespalib
     lz4.a
     atomic.a
 )
