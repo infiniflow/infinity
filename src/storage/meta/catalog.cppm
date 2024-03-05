@@ -134,7 +134,7 @@ public:
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveDBEntry(const String &db_name, TransactionID txn_id);
+    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);

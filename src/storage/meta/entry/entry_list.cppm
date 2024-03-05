@@ -37,15 +37,16 @@ class DBEntry;
 class TableEntry;
 class TableIndexEntry;
 
+enum class FindResult : u8 {
+    kFound,
+    kNotFound,
+    kUncommitted,
+    kUncommittedDelete,
+    kConflict,
+};
+
 export template <EntryConcept Entry>
 class EntryList {
-    enum class FindResult : u8 {
-        kFound,
-        kNotFound,
-        kUncommitted,
-        kUncommittedDelete,
-        kConflict,
-    };
 
 public:
     Tuple<Entry *, Status> AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,
@@ -62,11 +63,13 @@ public:
                                      TxnManager *txn_mgr,
                                      ConflictType conflict_type);
 
-    Tuple<Entry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<Entry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<Entry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<Entry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void DeleteEntry(TransactionID txn_id);
+    List<SharedPtr<Entry>> DeleteEntry(TransactionID txn_id);
 
     bool PickCleanup(CleanupScanner *scanner);
 
@@ -84,6 +87,10 @@ public:
 private:
     FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
+    Pair<Entry *, FindResult> GetEntryInner1(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Pair<Entry *, Status> GetEntryInner2(Entry *entry_ptr, FindResult find_res);
+
 public: // TODO: make both private
     std::shared_mutex rw_locker_{};
 
@@ -91,7 +98,7 @@ public: // TODO: make both private
 };
 
 template <EntryConcept Entry>
-EntryList<Entry>::FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     FindResult find_res = FindResult::kNotFound;
     bool continue_loop = true;
     for (auto iter = entry_list_.begin(); iter != entry_list_.end() && continue_loop; ++iter) {
@@ -267,23 +274,12 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    FindResult find_res = FindResult::kNotFound;
+Pair<Entry *, FindResult> EntryList<Entry>::GetEntryInner1(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Entry *entry_ptr = nullptr;
-    {
-        std::shared_lock lock(rw_locker_);
-        for (const auto &entry : entry_list_) {
-            if (entry->Committed()) {
-                if (entry->commit_ts_ < begin_ts) {
-                    if (!entry->Deleted()) {
-                        entry_ptr = entry.get();
-                        find_res = FindResult::kFound;
-                    } else {
-                        find_res = FindResult::kNotFound;
-                    }
-                    break;
-                }
-            } else if (txn_id == entry->txn_id_) {
+    FindResult find_res = FindResult::kNotFound;
+    for (const auto &entry : entry_list_) {
+        if (entry->Committed()) {
+            if (entry->commit_ts_ < begin_ts) {
                 if (!entry->Deleted()) {
                     entry_ptr = entry.get();
                     find_res = FindResult::kFound;
@@ -292,8 +288,21 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
                 }
                 break;
             }
+        } else if (txn_id == entry->txn_id_) {
+            if (!entry->Deleted()) {
+                entry_ptr = entry.get();
+                find_res = FindResult::kFound;
+            } else {
+                find_res = FindResult::kNotFound;
+            }
+            break;
         }
     }
+    return {entry_ptr, find_res};
+}
+
+template <EntryConcept Entry>
+Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2(Entry *entry_ptr, FindResult find_res) {
     switch (find_res) {
         case FindResult::kNotFound: {
             auto err_msg = MakeUnique<String>("Not existed entry.");
@@ -315,6 +324,22 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntry(TransactionID txn_id, TxnTimeS
             UnrecoverableError("Invalid find result");
         }
     }
+}
+
+template <EntryConcept Entry>
+Tuple<Entry *, Status> EntryList<Entry>::GetEntry(std::shared_lock<std::shared_mutex> &&parent_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    std::shared_lock r_lock(rw_locker_);
+    parent_lock.unlock();
+    auto [entry_ptr, find_res] = GetEntryInner1(txn_id, begin_ts);
+    r_lock.unlock();
+
+    return GetEntryInner2(entry_ptr, find_res);
+}
+
+template <EntryConcept Entry>
+Tuple<Entry *, Status> EntryList<Entry>::GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [entry_ptr, find_res] = GetEntryInner1(txn_id, begin_ts);
+    return GetEntryInner2(entry_ptr, find_res);
 }
 
 template <EntryConcept Entry>
@@ -342,14 +367,12 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, Tx
 }
 
 template <EntryConcept Entry>
-void EntryList<Entry>::DeleteEntry(TransactionID txn_id) {
+List<SharedPtr<Entry>> EntryList<Entry>::DeleteEntry(TransactionID txn_id) {
     std::unique_lock lock(rw_locker_);
-    if (entry_list_.empty()) {
-        LOG_TRACE("Empty entry list.");
-        return;
-    }
     auto removed_iter = std::remove_if(entry_list_.begin(), entry_list_.end(), [&](auto &entry) { return entry->txn_id_ == txn_id; });
-    entry_list_.erase(removed_iter, entry_list_.end());
+    List<SharedPtr<Entry>> erase_list;
+    erase_list.splice(erase_list.begin(), entry_list_, removed_iter, entry_list_.end());
+    return erase_list;
 }
 
 template <EntryConcept Entry>
@@ -391,9 +414,6 @@ template <EntryConcept Entry>
 void EntryList<Entry>::Cleanup() {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
         SharedPtr<Entry> &entry = *iter;
-        if (entry->deleted_) {
-            continue;
-        }
         entry->Cleanup();
     }
 }

@@ -299,7 +299,7 @@ public:
 
     void AppendMessage(const String &msg);
 
-    inline Status clone() { return Status{code_, MakeUnique<String>(*msg_)}; }
+    inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};

@@ -81,10 +81,19 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
-                                                TxnTimeStamp begin_ts) {
+                                                TxnTimeStamp begin_ts,
+                                                TxnManager *txn_mgr) {
 
     auto table_entry =
         MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+    if (txn_mgr) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        if (is_delete) {
+            txn->DropTableStore(table_entry.get());
+        } else {
+            txn->AddTableStore(table_entry.get());
+        }
+    }
     return table_entry;
 }
 
@@ -97,7 +106,7 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
                                                       TxnTimeStamp begin_ts,
                                                       TxnTimeStamp commit_ts,
                                                       bool is_delete,
-                                                      SizeT row_count) {
+                                                      SizeT row_count) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete, db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
@@ -137,15 +146,16 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 }
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys): conflict_type
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     if (index_meta == nullptr) {
         return {nullptr, status};
     }
-    return index_meta->GetEntry(txn_id, begin_ts);
+    return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
-    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError); // FIXME(sys)
+    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
+    r_lock.unlock();
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
     return index_meta->DeleteNewEntry(txn_id);
 }
@@ -155,20 +165,23 @@ void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {
     column2analyzer.clear();
-    for (auto &[_, table_index_meta] : this->index_meta_map()) {
-        auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
-        if (status.ok()) {
-            fulltext_index_entry = table_index_entry->fulltext_index_entry();
-            const IndexBase *index_base = table_index_entry->index_base();
-            if (index_base->index_type_ != IndexType::kFullText)
-                continue;
-            auto index_full_text = static_cast<const IndexFullText *>(index_base);
-            for (auto &column_name : index_full_text->column_names_) {
-                column2analyzer[column_name] = index_full_text->analyzer_;
-            }
-            if (!column2analyzer.empty()) {
-                // iresearch requires there is exactly one full index per table.
-                break;
+    {
+        auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+        for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            if (status.ok()) {
+                fulltext_index_entry = table_index_entry->fulltext_index_entry();
+                const IndexBase *index_base = table_index_entry->index_base();
+                if (index_base->index_type_ != IndexType::kFullText)
+                    continue;
+                auto index_full_text = static_cast<const IndexFullText *>(index_base);
+                for (auto &column_name : index_full_text->column_names_) {
+                    column2analyzer[column_name] = index_full_text->analyzer_;
+                }
+                if (!column2analyzer.empty()) {
+                    // iresearch requires there is exactly one full index per table.
+                    break;
+                }
             }
         }
     }
@@ -672,10 +685,18 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         }
     }
     std::sort(cleanup_segment_ids.begin(), cleanup_segment_ids.end());
-    index_meta_map_.Iterate([&](auto *meta) { meta->PickCleanupBySegments(cleanup_segment_ids, scanner); });
+    {
+        auto map_guard = index_meta_map_.GetMetaMap();
+        for (auto &[_, table_index_meta] : *map_guard) {
+            table_index_meta->PickCleanupBySegments(cleanup_segment_ids, scanner);
+        }
+    }
 }
 
 void TableEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
     for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup();
     }

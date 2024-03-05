@@ -179,7 +179,7 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Core dumped.")
+    # @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("column_name", [
         (1, False),
         (2.2, False),
@@ -188,7 +188,7 @@ class TestIndex:
         ((1, 2), False),
         ({"1": 2}, False),
         ("c1", True)])
-    @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, False)])
+    @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, True)])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
         ([index.InitParameter("ANALYZER", "segmentation")], True)
