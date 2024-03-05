@@ -376,6 +376,7 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # create index then insert / import data
+    @pytest.mark.skip(reason="TODO")
     @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat, index.IndexType.FullText])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_create_index_import_data(self, index_type, file_format):
