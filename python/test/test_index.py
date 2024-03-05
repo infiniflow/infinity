@@ -159,7 +159,6 @@ class TestIndex:
         ([index.InitParameter("centroids_count", "128"),
           index.InitParameter("metric", "l2")], True)
     ])
-
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     def test_create_drop_vector_index_invalid_options(self, column_name, index_type, params, types):
         # connect
@@ -284,8 +283,9 @@ class TestIndex:
     # create index on different type of column and show index
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     @pytest.mark.parametrize("index_type", [
-        (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
-                                        True), (index.IndexType.FullText, True)
+        (index.IndexType.Hnsw, False, "ERROR:3061*"),
+        (index.IndexType.IVFFlat, True),
+        (index.IndexType.FullText, False, "ERROR:3009*")
     ])
     def test_create_index_on_different_type_of_column(self, types, index_type):
         # connect
@@ -297,7 +297,7 @@ class TestIndex:
             "c1": types}, None)
         # create created index
         if not index_type[1]:
-            with pytest.raises(Exception, match="ERROR:3061*"):
+            with pytest.raises(Exception, match=index_type[2]):
                 table_obj.create_index("my_index",
                                        [index.IndexInfo("c1",
                                                         index_type[0],
@@ -341,7 +341,8 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat, index.IndexType.FullText
+        (index.IndexType.IVFFlat, True),
+        (index.IndexType.FullText, False, "ERROR:3009*")
     ])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_import_data_create_index(self, index_type, file_format):
@@ -355,12 +356,20 @@ class TestIndex:
 
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
-        res = table_obj.create_index("my_index",
-                                     [index.IndexInfo("c2",
-                                                      index_type,
-                                                      [index.InitParameter("centroids_count", "128"),
-                                                       index.InitParameter("metric", "l2")])], None)
-        assert res.error_code == ErrorCode.OK
+        if (index_type[1]):
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c2",
+                                                          index_type[0],
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "l2")])], None)
+            assert res.error_code == ErrorCode.OK
+        else:
+            with pytest.raises(Exception, match=index_type[2]):
+                table_obj.create_index("my_index",
+                                       [index.IndexInfo("c2",
+                                                        index_type[0],
+                                                        [index.InitParameter("centroids_count", "128"),
+                                                         index.InitParameter("metric", "l2")])], None)
 
         # disconnect
         res = infinity_obj.disconnect()
