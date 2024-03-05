@@ -457,7 +457,7 @@ i64 WalManager::ReplayWalFile() {
                     }
                     LOG_TRACE(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
                     LOG_TRACE(fmt::format("Find catalog path: {}", catalog_path));
-                    break;
+                    break; // why here break
                 } else {
                     // delta checkpoint
                     auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();
@@ -698,7 +698,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
     }
     segment_entry->WalLoadFilterBinaryData(segment_info.segment_filter_binary_data_, segment_info.block_filter_binary_data_);
 
-    Catalog::AddSegment(table_entry, segment_entry);
+    table_entry->WalReplaySegment(segment_entry);
 }
 
 void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

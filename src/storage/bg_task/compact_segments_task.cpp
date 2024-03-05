@@ -118,9 +118,9 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<Segment
 
 void CompactSegmentsTask::Execute() {
     auto state = CompactSegments();
-    CreateNewIndex(state.new_table_ref_.get());
     SaveSegmentsData(std::move(state.segment_data_));
     ApplyDeletes(state.remapper_, state.old_segments_);
+    CreateNewIndex(state.new_table_ref_.get());
 }
 
 // generate new_table_ref_ to compact

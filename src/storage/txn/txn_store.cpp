@@ -178,7 +178,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
 
     // FIXME OPT: trigger compaction one time for all segments
     for (const SharedPtr<SegmentEntry> &new_segment : uncommitted_segments_) {
-        auto ret = table_entry_->AddSegment(new_segment.get(), generate_txn);
+        auto ret = table_entry_->TryCompactAddSegment(new_segment.get(), generate_txn);
         if (!ret.has_value()) {
             continue;
         }
@@ -187,7 +187,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         bg_task_processor->Submit(std::move(compact_task));
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
-        auto ret = table_entry_->DeleteInSegment(segment_id, generate_txn);
+        auto ret = table_entry_->TryCompactDeleteRow(segment_id, generate_txn);
         if (!ret.has_value()) {
             continue;
         }

@@ -70,9 +70,8 @@ TableEntry::TableEntry(bool is_delete,
     txn_id_ = txn_id;
 
     // SetCompactionAlg(nullptr);
-    SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
-    Vector<SegmentEntry *> segments = this->PickCompactSegments();
-    compaction_alg_->Enable(segments);
+    this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
+    compaction_alg_->Enable({});
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
@@ -654,14 +653,27 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
+void TableEntry::WalReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
+    this->DeltaReplaySegment(std::move(segment_entry));
+    // ATTENTION: focusing on the segment id
+    next_segment_id_++;
+}
+
+void TableEntry::DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(segment_entry.get());
+    }
+    segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
+}
+
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
     return compaction_alg_->AddSegment(new_segment, generate_txn);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactDeleteRow(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }

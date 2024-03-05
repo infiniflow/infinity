@@ -56,6 +56,9 @@ public:
 
     // Wait for all compaction to finish and disable auto compaction
     virtual void Disable() = 0;
+
+    // Used by replay, merely add the segment without checking
+    virtual void AddSegmentNoCheck(SegmentEntry *new_segment) = 0;
 };
 
 } // namespace infinity

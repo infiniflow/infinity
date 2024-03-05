@@ -95,9 +95,11 @@ public:
 
     virtual void Disable() override;
 
+    virtual void AddSegmentNoCheck(SegmentEntry *new_segment) override;
+
 private:
     // return layer
-    int AddSegmentNoCheck(SegmentEntry *new_segment);
+    int AddSegmentNoCheckInner(SegmentEntry *new_segment);
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
