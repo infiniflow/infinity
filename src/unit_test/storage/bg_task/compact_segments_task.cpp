@@ -147,11 +147,11 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             for (size_t i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kUnFlush);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kUnFlush);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
             EXPECT_EQ(compact_segment->actual_row_count(), row_count);
 
             txn_mgr->CommitTxn(txn5);
@@ -222,13 +222,13 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kUnFlush);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
                 auto *compact_segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_NE(compact_segment->status(), SegmentStatus::kUnFlush);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
                 cnt += compact_segment->actual_row_count();
             }
             EXPECT_EQ(cnt, row_count);
@@ -324,11 +324,11 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kUnFlush);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kUnFlush);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -450,11 +450,11 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             for (int i = 0; i < test_segment_n; ++i) {
                 auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kUnFlush);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
             auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kUnFlush);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -615,11 +615,11 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 for (int i = 0; i < test_segment_n; ++i) {
                     auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                     EXPECT_NE(segment_entry, nullptr);
-                    EXPECT_EQ(segment_entry->status(), SegmentStatus::kUnFlush);
+                    EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
                 }
                 auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_NE(compact_segment->status(), SegmentStatus::kUnFlush);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
                 EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 

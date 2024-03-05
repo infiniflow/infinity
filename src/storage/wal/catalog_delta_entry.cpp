@@ -612,7 +612,7 @@ const String AddSegmentColumnIndexEntryOp::ToString() const {
 
 void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
-    this->segment_entry_->SetDeprecated(max_commit_ts);
+    this->segment_entry_->TrySetDeprecated();
 }
 
 void AddSegmentColumnIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_column_index_entry_->Flush(max_commit_ts); }

@@ -41,7 +41,7 @@ export enum class SegmentStatus : u8 {
     kSealed,
     kCompacting,
     kNoDelete,
-    kUnFlush,
+    kForbidCleanup,
     kDeprecated,
 };
 
@@ -91,7 +91,7 @@ public:
 
     void SetUnFlush(TxnTimeStamp deprecate_ts);
 
-    void SetDeprecated(TxnTimeStamp deprecate_ts);
+    void TrySetDeprecated();
 
     void RollbackCompact();
 

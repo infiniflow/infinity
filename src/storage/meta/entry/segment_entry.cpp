@@ -134,20 +134,18 @@ void SegmentEntry::SetNoDelete() {
 void SegmentEntry::SetUnFlush(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kUnFlush is only allowed to set on kNoDelete segment.");
+        UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");
     }
 
-    status_ = SegmentStatus::kUnFlush;
+    status_ = SegmentStatus::kForbidCleanup;
     deprecate_ts_ = deprecate_ts;
 }
 
-void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
+void SegmentEntry::TrySetDeprecated() {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kUnFlush) {
-        return;
+    if (status_ == SegmentStatus::kForbidCleanup) {
+        status_ = SegmentStatus::kDeprecated;
     }
-
-    status_ = SegmentStatus::kDeprecated;
 }
 
 void SegmentEntry::RollbackCompact() {
@@ -164,7 +162,7 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     Vector<std::shared_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
         locks.emplace_back(segment_entry->rw_locker_);
-        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kUnFlush ||
+        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kForbidCleanup ||
             segment_entry->status_ == SegmentStatus::kNoDelete) {
             return true;
         }

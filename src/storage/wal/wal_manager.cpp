@@ -735,7 +735,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         }
         segment_entry->SetNoDelete();
         segment_entry->SetUnFlush(commit_ts);
-        segment_entry->SetDeprecated(commit_ts);
+        segment_entry->TrySetDeprecated();
     }
 }
 

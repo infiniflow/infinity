@@ -271,6 +271,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
         checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
+            LOG_TRACE(fmt::format("Block entry {} is empty at checkpoint_ts {}", this->block_id_, checkpoint_ts));
             return;
         }
         const Vector<TxnTimeStamp> &deleted = this->block_version_->deleted_;
