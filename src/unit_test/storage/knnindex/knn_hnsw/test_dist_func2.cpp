@@ -18,6 +18,7 @@
 
 import dist_func_ip;
 import lvq_store;
+import stl;
 
 using namespace infinity;
 
@@ -57,7 +58,7 @@ TEST_F(DistFuncTest2, test2) {
     Distance distance(lvq_store.dim());
 
     auto ret = lvq_store.AddVec(vecs1.get(), vec_n);
-    EXPECT_EQ(ret, 0);
+    EXPECT_EQ(ret, 0u);
 
     for (size_t i = 0; i < vec_n; ++i) {
         const float *v2 = vecs2.get() + i * dim;
@@ -68,8 +69,8 @@ TEST_F(DistFuncTest2, test2) {
 
         float dist1 = distance(lvq1, lvq2, lvq_store);
 
-        float qv1[dim];
-        float qv2[dim];
+        Vector<float> qv1(dim);
+        Vector<float> qv2(dim);
         {
             auto c1 = lvq1.GetCompressVec();
             auto c2 = lvq2.GetCompressVec();
@@ -82,7 +83,7 @@ TEST_F(DistFuncTest2, test2) {
             }
         }
 
-        float dist2 = F32IPTest(qv1, qv2, dim);
+        float dist2 = F32IPTest(qv1.data(), qv2.data(), dim);
 
         float err = std::abs((dist1 - dist2) / dist1);
         EXPECT_LT(err, 1e-5);

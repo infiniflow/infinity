@@ -144,7 +144,7 @@ TEST_F(StatementParsingTest, good_test1) {
             auto *insert_statement = (InsertStatement *)(statement);
             EXPECT_EQ(insert_statement->table_name_, "t1");
             EXPECT_EQ(insert_statement->schema_name_, "");
-            EXPECT_EQ(insert_statement->values_->size(), 2);
+            EXPECT_EQ(insert_statement->values_->size(), 2u);
 
             ConstantExpr *insert0_expr = (ConstantExpr *)(*insert_statement->values_->at(0))[0];
             EXPECT_STREQ(insert0_expr->str_value_, "abc");
@@ -179,18 +179,18 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
         Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
-        EXPECT_EQ(index_info_list.size(), 2);
+        EXPECT_EQ(index_info_list.size(), 2u);
         IndexInfo * index_info1 = index_info_list[0];
         EXPECT_EQ(index_info1->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info1->column_name_, "c1");
-        EXPECT_EQ(index_info1->index_param_list_->size(), 1);
+        EXPECT_EQ(index_info1->index_param_list_->size(), 1u);
         EXPECT_EQ((*index_info1->index_param_list_)[0]->param_name_, "metric");
         EXPECT_EQ((*index_info1->index_param_list_)[0]->param_value_, "l2");
 
         IndexInfo * index_info2 = index_info_list[1];
         EXPECT_EQ(index_info2->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info2->column_name_, "c2");
-        EXPECT_EQ(index_info2->index_param_list_->size(), 1);
+        EXPECT_EQ(index_info2->index_param_list_->size(), 1u);
         EXPECT_EQ((*index_info2->index_param_list_)[0]->param_name_, "metric");
         EXPECT_EQ((*index_info2->index_param_list_)[0]->param_value_, "l2");
 

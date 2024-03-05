@@ -59,12 +59,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBool(i % 2 == 0));
         }
         data_block.Finalize();
@@ -88,12 +88,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeTinyInt(static_cast<TinyIntT>(i)));
         }
         data_block.Finalize();
@@ -117,17 +117,17 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeSmallInt(static_cast<SmallIntT>(i)));
         }
         data_block.Finalize();
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             Value v = data_block.GetValue(0, i);
             EXPECT_EQ(v.type_.type(), LogicalType::kSmallInt);
             EXPECT_EQ(v.value_.small_int, static_cast<SmallIntT>(i));
@@ -139,7 +139,7 @@ TEST_F(MaxFunctionTest, max_func) {
         SmallIntT result;
         result = *(SmallIntT *)func.finalize_func_(data_state.get());
 
-        EXPECT_EQ(result, row_count - 1);
+        EXPECT_EQ((i64)result, row_count - 1);
     }
 
     {
@@ -152,12 +152,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeInt(static_cast<IntegerT>(2 * i)));
         }
         data_block.Finalize();
@@ -181,12 +181,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeBigInt(static_cast<BigIntT>(2 * i)));
         }
         data_block.Finalize();
@@ -210,12 +210,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeFloat(static_cast<FloatT>(2 * i)));
         }
         data_block.Finalize();
@@ -239,12 +239,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             data_block.AppendValue(0, Value::MakeDouble(static_cast<DoubleT>(2 * i)));
         }
         data_block.Finalize();
@@ -268,12 +268,12 @@ TEST_F(MaxFunctionTest, max_func) {
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(data_type);
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
+        i64 row_count = DEFAULT_VECTOR_SIZE;
 
         DataBlock data_block;
         data_block.Init(column_types);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (i64 i = 0; i < row_count; ++i) {
             HugeIntT input(0, 2 * i);
             Value v = Value::MakeHugeInt(input);
             data_block.AppendValue(0, v);

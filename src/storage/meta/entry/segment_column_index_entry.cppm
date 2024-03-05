@@ -37,7 +37,7 @@ class FaissIndexPtr;
 class BufferManager;
 struct SegmentEntry;
 
-export class SegmentColumnIndexEntry : public BaseEntry, public EntryInterface {
+export class SegmentColumnIndexEntry final : public BaseEntry, public EntryInterface {
     friend ColumnIndexEntry;
 
 public:
@@ -69,13 +69,13 @@ public:
     static UniquePtr<SegmentColumnIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
-    void MergeFrom(BaseEntry &other);
+    void MergeFrom(BaseEntry &other) final;
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    virtual void Cleanup() override;
+    void Cleanup() final;
 
-    virtual void PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) final;
 
 public:
     // Getter

@@ -235,7 +235,7 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
 void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
-    u64 removed_count = std::filesystem::remove(p, error_code);
+    std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }

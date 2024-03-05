@@ -213,6 +213,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
+//    EntryType entry_type = db_entry_json["entry_type"];
     res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
 

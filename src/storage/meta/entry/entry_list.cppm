@@ -324,6 +324,7 @@ Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2(Entry *entry_ptr, FindRes
             UnrecoverableError("Invalid find result");
         }
     }
+    return {nullptr, Status::UnexpectedError("Unreachable")};
 }
 
 template <EntryConcept Entry>

@@ -39,7 +39,7 @@ export enum class EntryType : i8 {
 };
 
 export struct BaseEntry {
-    explicit BaseEntry(EntryType entry_type, bool is_delete = false) : entry_type_(entry_type), deleted_(is_delete) {
+    explicit BaseEntry(EntryType entry_type, bool is_delete = false) : deleted_(is_delete), entry_type_(entry_type) {
         if (entry_type == EntryType::kDummy) {
             commit_ts_ = 0;
         }
