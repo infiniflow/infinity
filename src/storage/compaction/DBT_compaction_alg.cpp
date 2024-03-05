@@ -135,8 +135,8 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
 
 void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Commit compact when compaction not running");
+    if (status_ == DBTStatus::kEnable) {
+        UnrecoverableError("Wrong status of compaction alg");
     }
 
     for (auto &segment_layer : segment_layers_) {
