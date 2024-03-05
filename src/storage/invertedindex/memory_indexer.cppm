@@ -32,22 +32,19 @@ import column_inverter;
 import third_party;
 import internal_types;
 import ring;
-
-namespace vespalib::alloc {
-class MemoryPoolAllocator;
-}
+import skiplist;
 
 namespace infinity {
 class ColumnIndexer;
 export class MemoryIndexer {
 public:
-    using TermKey = String;
-    using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = Btree<TermKey, PostingPtr>;
-
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
     };
+
+    using TermKey = String;
+    using PostingPtr = SharedPtr<PostingWriter>;
+    using PostingTable = SkipList<TermKey, PostingPtr, KeyComp>;
 
     enum IndexMode {
         NEAR_REAL_TIME,
@@ -83,8 +80,6 @@ public:
 
     PostingPtr GetOrAddPosting(const TermKey &term);
 
-    void ReclaimMemory();
-
     void Reset();
 
 private:
@@ -98,8 +93,6 @@ private:
     InvertedIndexConfig index_config_;
     SharedPtr<MemoryPool> byte_slice_pool_;
     SharedPtr<RecyclePool> buffer_pool_;
-    SharedPtr<vespalib::alloc::MemoryPoolAllocator> memory_allocator_;
-    GenerationHandler generation_handler_;
     UniquePtr<PostingTable> posting_store_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};

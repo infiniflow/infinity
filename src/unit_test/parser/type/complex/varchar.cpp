@@ -28,10 +28,10 @@ class VarcharTest : public BaseTest {};
 
 TEST_F(VarcharTest, structure_check) {
     using namespace infinity;
-    EXPECT_EQ(sizeof(ValueVarchar), 13);
-    EXPECT_EQ(sizeof(InlineVarchar), 13);
-    EXPECT_EQ(sizeof(VectorVarchar), 13);
-    EXPECT_EQ(sizeof(Varchar), 16);
+    EXPECT_EQ(sizeof(ValueVarchar), 13u);
+    EXPECT_EQ(sizeof(InlineVarchar), 13u);
+    EXPECT_EQ(sizeof(VectorVarchar), 13u);
+    EXPECT_EQ(sizeof(Varchar), 16u);
 }
 
 TEST_F(VarcharTest, value_varchar) {

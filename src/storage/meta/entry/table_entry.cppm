@@ -73,7 +73,8 @@ public:
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
                                                TransactionID txn_id,
-                                               TxnTimeStamp begin_ts);
+                                               TxnTimeStamp begin_ts,
+                                               TxnManager *txn_mgr);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
                                                      SharedPtr<String> db_entry_dir,
@@ -84,9 +85,9 @@ public:
                                                      TxnTimeStamp begin_ts,
                                                      TxnTimeStamp commit_ts,
                                                      bool is_delete,
-                                                     SizeT row_count);
+                                                     SizeT row_count) noexcept;
 
-private:
+public:
     Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
@@ -102,6 +103,9 @@ private:
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
+    MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+
+public:
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }
@@ -152,7 +156,7 @@ public:
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
 
-    Tuple<SizeT, SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
+    Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 

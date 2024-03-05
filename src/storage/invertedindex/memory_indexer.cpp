@@ -14,20 +14,15 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-W#pragma-messages"
+
 #include <ctpl_stl.h>
-#include <storage/invertedindex/common/vespa_alloc.h>
-#include <vespalib/btree/btree.hpp>
-#include <vespalib/btree/btreebuilder.hpp>
-#include <vespalib/btree/btreeiterator.hpp>
-#include <vespalib/btree/btreenode.hpp>
-#include <vespalib/btree/btreenodeallocator.hpp>
-#include <vespalib/btree/btreenodestore.hpp>
-#include <vespalib/btree/btreeroot.hpp>
-#include <vespalib/btree/btreerootbase.hpp>
-#include <vespalib/btree/btreestore.hpp>
-#include <vespalib/btree/btreetraits.h>
-#include <vespalib/btree/noaggregated.h>
-#include <vespalib/datastore/buffer_type.hpp>
+
+#pragma clang diagnostic pop
 
 #include <string.h>
 
@@ -68,8 +63,7 @@ MemoryIndexer::MemoryIndexer(u64 column_id,
                              ThreadPool &thread_pool)
     : column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), thread_pool_(thread_pool),
       ring_inverted_(10UL), ring_sorted_(10UL) {
-    memory_allocator_ = MakeShared<vespalib::alloc::MemoryPoolAllocator>(GetPool());
-    posting_store_ = MakeUnique<PostingTable>(memory_allocator_.get());
+    posting_store_ = MakeUnique<PostingTable>(KeyComp(), byte_slice_pool_.get());
     SetAnalyzer();
 }
 
@@ -120,92 +114,26 @@ void MemoryIndexer::Commit() {
 }
 
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
-    MemoryIndexer::PostingTable::Iterator iter = posting_store_->find(term);
-    if (iter.valid())
-        return iter.getData();
+    MemoryIndexer::PostingTable::Iterator iter = posting_store_->Find(term);
+    if (iter != posting_store_->End())
+        return iter.Value();
     else {
         MemoryIndexer::PostingPtr posting =
             MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
-        posting_store_->insert(iter, term, posting);
+        posting_store_->Insert(term, posting);
         return posting;
-    }
-}
-
-void MemoryIndexer::ReclaimMemory() {
-    if (posting_store_.get()) {
-        posting_store_->getAllocator().freeze();
-
-        GenerationHandler::generation_t generation = generation_handler_.getCurrentGeneration();
-        posting_store_->getAllocator().assign_generation(generation);
-
-        generation_handler_.incGeneration();
-        GenerationHandler::generation_t oldest_gen = generation_handler_.get_oldest_used_generation();
-
-        posting_store_->getAllocator().reclaim_memory(oldest_gen);
     }
 }
 
 void MemoryIndexer::Reset() {
     if (posting_store_.get()) {
-        for (auto it = posting_store_->begin(); it.valid(); ++it) {
+        for (auto it = posting_store_->Begin(); it != posting_store_->End(); ++it) {
             // delete it.getData();
         }
-        posting_store_->clear();
+        posting_store_->Clear();
     }
     thread_pool_.stop(true);
     cv_.notify_all();
 }
 
 } // namespace infinity
-
-namespace vespalib::btree {
-using namespace infinity;
-
-template class BTreeNodeDataWrap<MemoryIndexer::TermKey, BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeNodeT<MemoryIndexer::TermKey, BTreeDefaultTraits::INTERNAL_SLOTS>;
-
-template class BTreeNodeTT<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeInternalNode<MemoryIndexer::TermKey, NoAggregated, BTreeDefaultTraits::INTERNAL_SLOTS>;
-
-template class BTreeLeafNode<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeNodeStore<MemoryIndexer::TermKey,
-                              MemoryIndexer::PostingPtr,
-                              NoAggregated,
-                              BTreeDefaultTraits::INTERNAL_SLOTS,
-                              BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeIterator<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTree<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, const MemoryIndexer::KeyComp, BTreeDefaultTraits>;
-
-template class BTreeRootBase<MemoryIndexer::TermKey,
-                             MemoryIndexer::PostingPtr,
-                             NoAggregated,
-                             BTreeDefaultTraits::INTERNAL_SLOTS,
-                             BTreeDefaultTraits::LEAF_SLOTS>;
-
-template class BTreeNodeAllocator<MemoryIndexer::TermKey,
-                                  MemoryIndexer::PostingPtr,
-                                  NoAggregated,
-                                  BTreeDefaultTraits::INTERNAL_SLOTS,
-                                  BTreeDefaultTraits::LEAF_SLOTS>;
-
-} // namespace vespalib::btree
-
-namespace vespalib::datastore {
-
-using namespace vespalib::btree;
-using namespace infinity;
-
-template class BufferType<
-    BTreeRoot<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, std::less<MemoryIndexer::TermKey>, BTreeDefaultTraits>>;
-template class BufferType<BTreeKeyData<MemoryIndexer::TermKey, MemoryIndexer::PostingPtr>>;
-
-VESPALIB_DATASTORE_INSTANTIATE_BUFFERTYPE_LEAFNODE(MemoryIndexer::TermKey, MemoryIndexer::PostingPtr, NoAggregated, BTreeDefaultTraits::LEAF_SLOTS);
-
-} // namespace vespalib::datastore

@@ -26,8 +26,6 @@ namespace infinity {
 
 CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts) : catalog_(catalog), visible_ts_(visible_ts) {}
 
-void CleanupScanner::AddMeta(UniquePtr<MetaInterface> meta) { metas_.emplace_back(std::move(meta)); }
-
 void CleanupScanner::AddEntry(SharedPtr<EntryInterface> entry) { entries_.emplace_back(std::move(entry)); }
 
 void CleanupScanner::Scan() { catalog_->PickCleanup(this); }
@@ -35,9 +33,6 @@ void CleanupScanner::Scan() { catalog_->PickCleanup(this); }
 void CleanupScanner::Cleanup() && {
     for (auto &entry : entries_) {
         std::move(*entry).Cleanup();
-    }
-    for (auto &meta : metas_) {
-        std::move(*meta).Cleanup();
     }
 }
 

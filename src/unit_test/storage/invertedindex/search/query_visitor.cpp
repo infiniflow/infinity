@@ -36,5 +36,5 @@ TEST_F(QueryVisitorTest, test1) {
     }
     root->AddChild(UniquePtr<TermQuery>(query.release()));
     Optimize(root);
-    ASSERT_EQ(root->GetChildrenCount(), 4);
+    ASSERT_EQ(root->GetChildrenCount(), 4u);
 }

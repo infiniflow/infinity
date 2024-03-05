@@ -133,7 +133,7 @@ public:
 // need to convert values in column into ordered number type
 // data_num : number of rows in the segment, except those deleted
 export UniquePtr<SecondaryIndexDataBuilderBase>
-GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 data_num, u32 part_capacity);
+GetSecondaryIndexDataBuilder(const SharedPtr<DataType> &data_type, u32 full_data_num, u32 part_capacity);
 
 // includes: metadata and PGM index
 class SecondaryIndexDataHead {
@@ -146,7 +146,7 @@ private:
     u32 part_capacity_{}; // number of rows in each full part
     u32 part_num_{};      // number of parts
     u32 full_data_num_{}; // number of rows in the segment (include those deleted)
-    u32 data_num_{};      // number of rows in the segment (except those deleted) when the index is created
+    u32 data_num_{};      // number of rows in the segment (except those deleted), init as 0
     // sorted values in segment
     LogicalType data_type_raw_ = LogicalType::kInvalid; // type of original data
     LogicalType data_type_key_ = LogicalType::kInvalid; // type of data stored in the raw index
@@ -163,8 +163,8 @@ public:
 
     // will be called when a new index is created
     // used in SecondaryIndexFileWorker::AllocateInMemory()
-    explicit SecondaryIndexDataHead(u32 part_capacity, u32 full_data_num, u32 data_num, const SharedPtr<DataType> &data_type)
-        : part_capacity_(part_capacity), full_data_num_(full_data_num), data_num_(data_num) {
+    explicit SecondaryIndexDataHead(u32 part_capacity, u32 full_data_num, const SharedPtr<DataType> &data_type)
+        : part_capacity_(part_capacity), full_data_num_(full_data_num) {
         part_num_ = (full_data_num + part_capacity_ - 1) / part_capacity_;
         data_type_raw_ = data_type->type();
     }

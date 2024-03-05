@@ -124,11 +124,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 13);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 13u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {
@@ -164,11 +164,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 33);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 33u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {
@@ -224,12 +224,12 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         new_segment = static_cast<MockSegmentEntry *>(compacted_segments[0].get());
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3u);
         {
             Vector<SegmentEntry *> tmp;
             std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
@@ -245,7 +245,7 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         EXPECT_TRUE(ret.has_value());
         auto [segments, txn] = ret.value();
         txn->Begin();
-        EXPECT_EQ(segments.size(), 0); // the delete trigger layer change but no compaction
+        EXPECT_EQ(segments.size(), 0u); // the delete trigger layer change but no compaction
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -262,12 +262,12 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         new_segment = static_cast<MockSegmentEntry *>(compacted_segments[0].get());
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3u);
         {
             Vector<SegmentEntry *> tmp;
             std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
@@ -297,9 +297,9 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 4);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 4u);
         {
             Vector<SegmentEntry *> tmp;
             std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
@@ -355,11 +355,11 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 4);
+        EXPECT_EQ(segments.size(), 4u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 800);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 800u);
         {
             Vector<SegmentEntry *> tmp;
             std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
@@ -434,11 +434,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 4);
+        EXPECT_EQ(segments.size(), 4u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 7);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 7u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {
@@ -473,11 +473,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 4);
+        EXPECT_EQ(segments.size(), 4u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 20);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 20u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {
@@ -524,12 +524,12 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 4);
+        EXPECT_EQ(segments.size(), 4u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
-        EXPECT_EQ(compacted_segments.size(), 1);
+        EXPECT_EQ(compacted_segments.size(), 1u);
         shrink_segment = compacted_segments[0].get();
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 51);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 51u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {
@@ -561,11 +561,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         auto [segments, txn] = ret.value();
         txn->Begin();
         TransactionID txn_id = txn->TxnID();
-        EXPECT_EQ(segments.size(), 3);
+        EXPECT_EQ(segments.size(), 3u);
         auto compacted_segments = MockSegmentEntry::MockCompact(segments);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
-        EXPECT_EQ(compacted_segments.size(), 1);
-        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 12);
+        EXPECT_EQ(compacted_segments.size(), 1u);
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 12u);
         {
             Vector<SegmentEntry *> tmp;
             for (auto &segment : compacted_segments) {

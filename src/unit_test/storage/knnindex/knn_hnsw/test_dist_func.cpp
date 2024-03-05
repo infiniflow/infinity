@@ -20,6 +20,7 @@ import dist_func_l2;
 import hnsw_simd_func;
 import lvq_store;
 import hnsw_common;
+import stl;
 
 using namespace infinity;
 
@@ -94,7 +95,7 @@ TEST_F(DistFuncTest, test2) {
     Distance distance(lvq_store.dim());
     DenseVectorIter iter(vecs1.get(), dim, vec_n, 0);
     auto ret = lvq_store.AddVec(std::move(iter), vec_n);
-    EXPECT_EQ(ret, 0);
+    EXPECT_EQ(ret, 0u);
 
     for (size_t i = 0; i < vec_n; ++i) {
         // const float *v1 = vecs1.get() + i * dim;
@@ -108,8 +109,8 @@ TEST_F(DistFuncTest, test2) {
 
         float dist1 = distance(lvq1, lvq2, lvq_store);
 
-        float qv1[dim];
-        float qv2[dim];
+        Vector<float> qv1(dim);
+        Vector<float> qv2(dim);
         {
             auto c1 = lvq1.GetCompressVec();
             auto c2 = lvq2.GetCompressVec();
@@ -122,7 +123,7 @@ TEST_F(DistFuncTest, test2) {
             }
         }
 
-        float dist2 = F32L2Test(qv1, qv2, dim);
+        float dist2 = F32L2Test(qv1.data(), qv2.data(), dim);
 
         // std::cout << dist1 << "\t" << dist2 << "\t" << dist_true << std::endl;
         float err = std::abs((dist1 - dist2) / dist1);

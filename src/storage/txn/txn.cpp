@@ -173,8 +173,6 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
         return status;
     }
 
-    txn_dbs_.insert(db_entry);
-    db_names_.insert(db_name);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
     return Status::OK();
 }
@@ -192,18 +190,6 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
     if (!status.ok() || dropped_db_entry == nullptr) {
         return status;
-    }
-
-    if (txn_dbs_.contains(dropped_db_entry)) {
-        txn_dbs_.erase(dropped_db_entry);
-    } else {
-        txn_dbs_.insert(dropped_db_entry);
-    }
-
-    if (db_names_.contains(db_name)) {
-        db_names_.erase(db_name);
-    } else {
-        db_names_.insert(db_name);
     }
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
@@ -263,7 +249,6 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         return table_status;
     }
 
-    txn_tables_.insert(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
 
     return Status::OK();
@@ -284,12 +269,6 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
         return table_status;
     }
 
-    if (txn_tables_.contains(table_entry)) {
-        txn_tables_.erase(table_entry);
-    } else {
-        txn_tables_.insert(table_entry);
-    }
-
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
     return Status::OK();
 }
@@ -306,7 +285,6 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
-    txn_indexes_.emplace(*index_base->index_name_, table_index_entry);
     return {table_index_entry, index_status};
 }
 
@@ -368,12 +346,6 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
 
     if (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore) {
         return index_status;
-    }
-
-    if (auto iter = txn_indexes_.find(index_name); iter != txn_indexes_.end()) {
-        txn_indexes_.erase(iter);
-    } else {
-        txn_indexes_.emplace(index_name, table_index_entry);
     }
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
@@ -524,17 +496,19 @@ void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
-    for (const auto &base_entry : txn_tables_) {
-        auto *table_entry = (TableEntry *)(base_entry);
-        Catalog::RemoveTableEntry(table_entry, txn_id_);
-    }
-
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
+        table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);
     }
 
-    for (const auto &db_name : db_names_) {
-        catalog_->RemoveDBEntry(db_name, this->txn_id_);
+    for (auto *table_entry : txn_tables_) {
+        table_entry->Cleanup();
+        Catalog::RemoveTableEntry(table_entry, txn_id_);
+    }
+
+    for (auto *db_entry : txn_dbs_) {
+        db_entry->Cleanup();
+        catalog_->RemoveDBEntry(db_entry, txn_id_);
     }
 
     // Rollback the prepared data
@@ -582,6 +556,39 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, true);
     catalog_->SaveAsFile(catalog_path, max_commit_ts);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, catalog_path));
+}
+
+void Txn::AddDBStore(DBEntry *db_entry) { txn_dbs_.insert(db_entry); }
+
+void Txn::DropDBStore(DBEntry *dropped_db_entry) {
+    if (txn_dbs_.contains(dropped_db_entry)) {
+        txn_dbs_.erase(dropped_db_entry);
+        dropped_db_entry->Cleanup();
+    } else {
+        txn_dbs_.insert(dropped_db_entry);
+    }
+}
+
+void Txn::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entry); }
+
+void Txn::DropTableStore(TableEntry *dropped_table_entry) {
+    if (txn_tables_.contains(dropped_table_entry)) {
+        txn_tables_.erase(dropped_table_entry);
+        dropped_table_entry->Cleanup();
+    } else {
+        txn_tables_.insert(dropped_table_entry);
+    }
+}
+
+void Txn::AddIndexStore(const String &index_name, TableIndexEntry *index_entry) { txn_indexes_.emplace(index_name, index_entry); }
+
+void Txn::DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry) {
+    if (auto iter = txn_indexes_.find(index_name); iter != txn_indexes_.end()) {
+        txn_indexes_.erase(iter);
+        dropped_index_entry->Cleanup();
+    } else {
+        txn_indexes_.emplace(index_name, dropped_index_entry);
+    }
 }
 
 } // namespace infinity

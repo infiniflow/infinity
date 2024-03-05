@@ -77,13 +77,13 @@ class TestConvert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Cause core dumped.")
+    # @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
                                                 "c1 > 0.1 and c2 < 1.0",
                                                 "c1 < 0.1 and c2 < 1.0",
-                                                "c1 + 0.1 and c2 - 1.0",
-                                                "c1 * 0.1 and c2 / 1.0",
-                                                "c1 > 0.1 %@#$sf c2 < 1.0",
+                                                pytest.param("c1 + 0.1 and c2 - 1.0",marks=pytest.mark.xfail),
+                                                pytest.param("c1 * 0.1 and c2 / 1.0",marks=pytest.mark.xfail),
+                                                pytest.param("c1 > 0.1 %@#$sf c2 < 1.0",marks=pytest.mark.xfail),
                                                 "c1",
                                                 "c1 = 0",
                                                 "_row_id",
@@ -108,7 +108,7 @@ class TestConvert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="Cause core dumped.")
+    # @pytest.mark.skip(reason="Cause core dumped.")
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
         "c2 > 1",
@@ -116,14 +116,14 @@ class TestConvert:
         "c1 > 0.1 and c2 < 1.0",
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
-        "c1",
+        pytest.param("c1", marks=pytest.mark.xfail),
         "c1 = 0",
-        "_row_id",
-        "*",
-        "#@$%@#f",
-        "c1 + 0.1 and c2 - 1.0",
-        "c1 * 0.1 and c2 / 1.0",
-        "c1 > 0.1 %@#$sf c2 < 1.0",
+        pytest.param("_row_id", marks=pytest.mark.xfail),
+        pytest.param("*", marks=pytest.mark.xfail),
+        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
+        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
     ])
     def test_output_filter_function(self, filter_list):
         # connect

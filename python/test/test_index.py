@@ -20,7 +20,6 @@ import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
 
-
 TEST_DATA_DIR = "/test/data/"
 
 
@@ -143,30 +142,71 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # create / drop index with invalid options
-    @pytest.mark.parametrize("cl_name", [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
+    @pytest.mark.parametrize("column_name",
+                             [(1, False), (2.2, False), ((1, 2), False), ([1, 2, 3], False), ("c1", True)])
     @pytest.mark.parametrize("index_type", [
-        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
-            1, 2), False), ({"1": 2}, False),
-        (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
-                                        True), (index.IndexType.FullText, False)
+        (1, False),
+        (2.2, False),
+        ([1, 2], False),
+        ("$#%dfva", False),
+        ((1, 2), False),
+        ({"1": 2}, False),
+        (index.IndexType.Hnsw, False),
+        (index.IndexType.IVFFlat, True)
     ])
     @pytest.mark.parametrize("params", [
-        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((
-            1, 2), False), ({"1": 2}, False),
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
         ([index.InitParameter("centroids_count", "128"),
-         index.InitParameter("metric", "l2")], True)
+          index.InitParameter("metric", "l2")], True)
     ])
-    def test_create_drop_vector_index_invalid_options(self, cl_name, index_type, params):
+
+    @pytest.mark.parametrize("types", ["vector, 3, float"])
+    def test_create_drop_vector_index_invalid_options(self, column_name, index_type, params, types):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table(
-            "test_create_drop_index_invalid_options", if_exists=True)
-        table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
-            "c1": "vector,3,float"}, None)
+        db_obj.drop_table("test_create_drop_vector_index_invalid_options", if_exists=True)
+        table_obj = db_obj.create_table("test_create_drop_vector_index_invalid_options", {
+            "c1": types}, None)
 
-        index_info = [index.IndexInfo(cl_name[0], index_type[0], params[0])]
-        if not cl_name[1] or not index_type[1] or not params[1]:
+        index_info = [index.IndexInfo(column_name[0], index_type[0], params[0])]
+        if not column_name[1] or not index_type[1] or not params[1]:
+            with pytest.raises(Exception):
+                table_obj.create_index("my_index", index_info, None)
+        else:
+            table_obj.create_index("my_index", index_info, None)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    # @pytest.mark.skip(reason="Core dumped.")
+    @pytest.mark.parametrize("column_name", [
+        (1, False),
+        (2.2, False),
+        ([1, 2], False),
+        ("$#%dfva", False),
+        ((1, 2), False),
+        ({"1": 2}, False),
+        ("c1", True)])
+    @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, True)])
+    @pytest.mark.parametrize("params", [
+        (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
+        ([index.InitParameter("ANALYZER", "segmentation")], True)
+    ])
+    @pytest.mark.parametrize("types", ["int", "int8", "int16", "int32", "int64", "integer",
+                                       "float", "float32", "double", "float64",
+                                       "varchar", "bool", "vector, 3, float"])
+    def test_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type, params, types):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_create_drop_different_fulltext_index_invalid_options", if_exists=True)
+        table_obj = db_obj.create_table("test_create_drop_different_fulltext_index_invalid_options", {
+            "c1": types}, None)
+
+        index_info = [index.IndexInfo(column_name[0], index_type[0], params[0])]
+        if not column_name[1] or not index_type[1] or not params[1]:
             with pytest.raises(Exception):
                 table_obj.create_index("my_index", index_info, None)
         else:
