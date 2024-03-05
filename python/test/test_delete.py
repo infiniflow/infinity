@@ -13,6 +13,7 @@
 # limitations under the License.
 import time
 
+import numpy as np
 import pandas as pd
 import pytest
 from numpy import dtype
@@ -330,9 +331,18 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # various expression will be given in where clause, and check result correctness
-    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
-    @pytest.mark.parametrize('column_types', ["varchar"])
-    @pytest.mark.parametrize('column_types_example', [[1, 2, 3]])
+    @pytest.mark.slow
+    @trace_expected_exceptions
+    @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
+                                              "float", "float32", "double", "float64",
+                                              "varchar",
+                                              "bool",
+                                              "vector, 3, float"])
+    @pytest.mark.parametrize('column_types_example', [1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
+                                                      float(1.1), np.float32(1 / 3), np.double(1 / 3), np.float64(1 / 3),
+                                                      "^789$ test insert varchar",
+                                                      True,
+                                                      np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
     def test_various_expression_in_where_clause(self, column_types, column_types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -409,8 +419,8 @@ class TestDelete:
         "c1 > 0.1 and c2 < 1.0",
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
-        # FIXME pytest.param("c1", marks=pytest.mark.xfail),
         "c1 = 0",
+        pytest.param("c1", marks=pytest.mark.xfail),
         pytest.param("_row_id", marks=pytest.mark.xfail),
         pytest.param("*", marks=pytest.mark.xfail),
         pytest.param("#@$%@#f", marks=pytest.mark.xfail),
