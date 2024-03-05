@@ -25,6 +25,8 @@ import index_file_worker;
 import status;
 import index_base;
 import column_def;
+import meta_entry_interface;
+import cleanup_scanner;
 
 namespace infinity {
 
@@ -33,10 +35,9 @@ class Txn;
 struct TableEntry;
 class FaissIndexPtr;
 class BufferManager;
-class IndexDef;
 struct SegmentEntry;
 
-export class SegmentColumnIndexEntry : public BaseEntry {
+export class SegmentColumnIndexEntry final : public BaseEntry, public EntryInterface {
     friend ColumnIndexEntry;
 
 public:
@@ -68,11 +69,13 @@ public:
     static UniquePtr<SegmentColumnIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, ColumnIndexEntry *column_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
-    void MergeFrom(BaseEntry &other);
+    void MergeFrom(BaseEntry &other) final;
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
-    void Cleanup() &&;
+    void Cleanup() final;
+
+    void PickCleanup(CleanupScanner *scanner) final;
 
 public:
     // Getter
@@ -100,7 +103,7 @@ private:
 
 private:
     const ColumnIndexEntry *column_index_entry_{};
-    SegmentID segment_id_{};
+    const SegmentID segment_id_{};
 
     Vector<BufferObj *> vector_buffer_{}; // size: 1 + GetIndexPartNum().
 

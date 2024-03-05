@@ -17,21 +17,23 @@ module;
 export module index_full_text;
 
 import stl;
-import index_def;
+import index_base;
 
 import third_party;
 import index_base;
 import create_index_info;
 import statement_common;
+import base_table_ref;
 
 namespace infinity {
 
 export class IndexFullText final : public IndexBase {
 public:
-    static SharedPtr<IndexBase> Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
+    static SharedPtr<IndexBase>
+    Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexFullText(String file_name, Vector<String> column_names, String analyzer, bool homebrewed)
-        : IndexBase(file_name, IndexType::kFullText, std::move(column_names)), analyzer_(std::move(analyzer)), homebrewed_(homebrewed) {}
+    IndexFullText(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const String &analyzer, bool homebrewed)
+        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), homebrewed_(homebrewed) {};
 
     ~IndexFullText() final = default;
 
@@ -51,6 +53,9 @@ public:
     virtual nlohmann::json Serialize() const override;
 
     static SharedPtr<IndexFullText> Deserialize(const nlohmann::json &index_def_json);
+
+public:
+    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
 public:
     String analyzer_{};

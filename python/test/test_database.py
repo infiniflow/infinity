@@ -14,7 +14,7 @@
 
 import threading
 import infinity
-from python.test.common import common_values
+from common import common_values
 import pytest
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -166,6 +166,7 @@ class TestDatabase:
 
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times")
     def test_create_drop_show_1M_databases(self):
 

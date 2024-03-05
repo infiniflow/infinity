@@ -20,3 +20,15 @@ requires-python = ">=3.10"
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers =[
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly"
+]

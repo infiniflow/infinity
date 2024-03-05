@@ -20,7 +20,6 @@ import stl;
 
 import index_base;
 import third_party;
-import index_base;
 import index_file_worker;
 import status;
 import column_def;
@@ -35,6 +34,7 @@ class BufferManager;
 struct TableEntry;
 class Txn;
 class BlockIndex;
+class CleanupScanner;
 
 export struct ColumnIndexEntry : public BaseEntry {
     friend struct TableEntry;
@@ -72,7 +72,9 @@ public:
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
 
-    void Cleanup() &&;
+    void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
+
+    void Cleanup();
 
 public:
     // Getter
@@ -86,7 +88,7 @@ public:
     // Used in segment column index entry
     Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
 
-    UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, SizeT seg_actual_row_count, const ColumnDef *column_def);
+    UniquePtr<CreateIndexParam> GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def);
 
 private:
     Status
@@ -94,7 +96,6 @@ private:
 
     Status CreateIndexDo(const ColumnDef *column_def, HashMap<u32, atomic_u64> &create_index_idxes);
 
-    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name);
     void CommitCreatedIndex(u32 segment_id, UniquePtr<SegmentColumnIndexEntry> index_entry);
     static String IndexFileName(const String &index_name, u32 segment_id);
 

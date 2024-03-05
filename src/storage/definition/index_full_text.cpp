@@ -17,21 +17,26 @@ module;
 #include <string>
 #include <vector>
 
+module index_full_text;
+
 import stl;
 import index_base;
 import third_party;
-
+import status;
 import serialize;
 import infinity_exception;
 import statement_common;
-
-module index_full_text;
+import base_table_ref;
+import logical_type;
 
 namespace infinity {
 
 void ToLowerString(String &lower) { std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower); }
 
-SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
+                                         const String &file_name,
+                                         Vector<String> column_names,
+                                         const Vector<InitParameter *> &index_param_list) {
     String analyzer{};
     bool homebrewed = false;
     SizeT param_count = index_param_list.size();
@@ -49,7 +54,7 @@ SharedPtr<IndexBase> IndexFullText::Make(String file_name, Vector<String> column
             }
         }
     }
-    return MakeShared<IndexFullText>(file_name, std::move(column_names), analyzer, homebrewed);
+    return MakeShared<IndexFullText>(index_name, file_name, std::move(column_names), analyzer, homebrewed);
 }
 
 bool IndexFullText::operator==(const IndexFullText &other) const {
@@ -75,7 +80,7 @@ void IndexFullText::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, is_homebrewed);
 }
 
-SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
+SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t) {
     UnrecoverableError("Not implemented");
     return nullptr;
 }
@@ -83,7 +88,7 @@ SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t ) {
 String IndexFullText::ToString() const {
     std::stringstream ss;
     String output_str = IndexBase::ToString();
-    if(!analyzer_.empty()) {
+    if (!analyzer_.empty()) {
         output_str += ", " + analyzer_;
     }
     return output_str;
@@ -99,6 +104,18 @@ nlohmann::json IndexFullText::Serialize() const {
 SharedPtr<IndexFullText> IndexFullText::Deserialize(const nlohmann::json &) {
     UnrecoverableError("Not implemented");
     return nullptr;
+}
+
+void IndexFullText::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+    auto &column_names_vector = *(base_table_ref->column_names_);
+    auto &column_types_vector = *(base_table_ref->column_types_);
+    SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
+    if (column_id == column_names_vector.size()) {
+        RecoverableError(Status::ColumnNotExist(column_name));
+    } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kVarchar) {
+        RecoverableError(Status::InvalidIndexDefinition(
+            fmt::format("Attempt to create full-text index on column: {}, data type: {}.", column_name, data_type->ToString())));
+    }
 }
 
 } // namespace infinity

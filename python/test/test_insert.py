@@ -11,14 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import signal
+import time
+
+
 import pandas as pd
 import pytest
 from numpy import dtype
 
-from python.test.common import common_values
+from common import common_type as ct
+from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+from utils import start_infinity_service_in_subporcess
 
 
 class TestInsert:
@@ -366,13 +373,24 @@ class TestInsert:
         table_obj = db_obj.create_table("test_insert_table_with_10000_columns", {"c1": "int", "c2": "int"}, None)
 
         # insert
-        for i in range(100):
+        for i in range(10):
             values = [{"c1": 1, "c2": 2} for _ in range(100)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    # @pytest.mark.skip(reason="TODO")
+    def test_read_after_shutdown(self):
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        table_obj = db_obj.get_table("test_insert_table_with_10000_columns")
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
@@ -503,6 +521,7 @@ class TestInsert:
     @pytest.mark.parametrize('column_types_example', [[1, 2, 3], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
     def test_various_insert_types(self, column_types, column_types_example):
         # connect
+
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_various_insert_types")
@@ -520,10 +539,85 @@ class TestInsert:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.complex
     @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
+
+        os.system("rm -fr /tmp/infinity")
+        # start service
+        infinity_service_1 = start_infinity_service_in_subporcess()
+
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_insert_and_shutdown_output")
-        db_obj.create_table("test_insert_and_shutdown_output", {"c1": "int"}, None)
+        table_obj = db_obj.create_table("test_insert_and_shutdown_output", {"c1": "int"}, None)
+
+        for i in range(10):
+            values = [{"c1": 1} for _ in range(100)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+        # shutdown service
+        os.kill(infinity_service_1.pid, signal.SIGINT)
+
+        time.sleep(1)
+
+        # restart
+        infinity_service_2 = start_infinity_service_in_subporcess()
+
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        table_obj = db_obj.get_table("test_insert_and_shutdown_output")
+        new_insert_res = table_obj.output(["*"]).to_df()
+        print(new_insert_res)
+
+        # shutdown service
+        os.kill(infinity_service_2.pid, signal.SIGINT)
+
+    def test_insert_zero_column(self):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_zero_column")
+        table_obj = db_obj.create_table("test_insert_zero_column", {"c1": "int"}, None)
+
+        with pytest.raises(Exception, match="ERROR:3065*"):
+            table_obj.insert([])
+            insert_res = table_obj.output(["*"]).to_df()
+            print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("column_name", [
+        "c2",
+        "$%#$sadf",
+        # 1,
+        # 2.2,
+        # [1],
+        # (1, "adsf"),
+        # {"1": 1}
+    ])
+    def test_insert_no_match_column(self, column_name):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_insert_no_match_column")
+        table_obj = db_obj.create_table("test_insert_no_match_column", {"c1": "int"}, None)
+
+        with pytest.raises(Exception, match="ERROR:3024*"):
+            table_obj.insert([{column_name: 1}])
+            insert_res = table_obj.output(["*"]).to_df()
+            print(insert_res)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK

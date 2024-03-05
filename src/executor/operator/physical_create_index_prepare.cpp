@@ -26,7 +26,6 @@ import query_context;
 import operator_state;
 import load_meta;
 
-import index_def;
 import status;
 import infinity_exception;
 import index_base;
@@ -48,7 +47,7 @@ import extra_ddl_info;
 namespace infinity {
 PhysicalCreateIndexPrepare::PhysicalCreateIndexPrepare(u64 id,
                                                        SharedPtr<BaseTableRef> base_table_ref,
-                                                       SharedPtr<IndexDef> index_definition,
+                                                       SharedPtr<IndexBase> index_definition,
                                                        ConflictType conflict_type,
                                                        SharedPtr<Vector<String>> output_names,
                                                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,

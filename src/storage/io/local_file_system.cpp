@@ -232,14 +232,13 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
     return removed_count;
 }
 
-u64 LocalFileSystem::DeleteEmptyDirectory(const String &path) {
+void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     std::error_code error_code;
     Path p{path};
-    u64 removed_count = std::filesystem::remove(p, error_code);
+    std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
-    return removed_count;
 }
 
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
@@ -259,14 +258,12 @@ String LocalFileSystem::GetAbsolutePath(const String &path) {
     return std::filesystem::absolute(p).string();
 }
 
-u64 LocalFileSystem::GetFileSizeByPath(const String& path) {
-    return std::filesystem::file_size(path);
-}
+u64 LocalFileSystem::GetFileSizeByPath(const String &path) { return std::filesystem::file_size(path); }
 
-u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
+u64 LocalFileSystem::GetFolderSizeByPath(const String &path) {
     u64 totalSize = 0;
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(path)) {
         if (std::filesystem::is_regular_file(entry.status())) {
             totalSize += std::filesystem::file_size(entry);
         }
@@ -275,7 +272,7 @@ u64 LocalFileSystem::GetFolderSizeByPath(const String& path) {
     return totalSize;
 }
 
-String LocalFileSystem::ConcatenateFilePath(const String& dir_path, const String& file_path) {
+String LocalFileSystem::ConcatenateFilePath(const String &dir_path, const String &file_path) {
     std::filesystem::path full_path = std::filesystem::path(dir_path) / file_path;
     return full_path.string();
 }

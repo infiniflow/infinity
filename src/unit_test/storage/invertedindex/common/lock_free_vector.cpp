@@ -111,7 +111,7 @@ TEST_F(LockFreeVectorTest, test4) {
     unsigned number_of_threads = 4;
     unsigned number_of_pushes = 100;
 
-    Thread push_thread_list[number_of_threads];
+    Vector<Thread> push_thread_list(number_of_threads);
     for (unsigned i = 0; i < number_of_threads; i++) {
         push_thread_list[i] = Thread(PushTest2, &vec, number_of_pushes);
     }

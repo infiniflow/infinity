@@ -38,23 +38,27 @@ import meta_map;
 
 import meta_entry_interface;
 import cleanup_scanner;
+import random;
 
 namespace infinity {
 
-class IndexDef;
+class IndexBase;
 struct TableIndexEntry;
 class FulltextIndexEntry;
 class TableMeta;
 class Txn;
 struct Catalog;
+class AddTableEntryOp;
 
-export struct TableEntry : public BaseEntry, public EntryInterface {
+export struct TableEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
-    explicit TableEntry();
+    using EntryOp = AddTableEntryOp;
 
-    explicit TableEntry(const SharedPtr<String> &db_entry_dir,
+public:
+    explicit TableEntry(bool is_delete,
+                        const SharedPtr<String> &db_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
@@ -62,13 +66,15 @@ public:
                         TransactionID txn_id,
                         TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableEntry> NewTableEntry(const SharedPtr<String> &db_entry_dir,
+    static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
+                                               const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
                                                TransactionID txn_id,
-                                               TxnTimeStamp begin_ts);
+                                               TxnTimeStamp begin_ts,
+                                               TxnManager *txn_mgr);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
                                                      SharedPtr<String> db_entry_dir,
@@ -79,10 +85,10 @@ public:
                                                      TxnTimeStamp begin_ts,
                                                      TxnTimeStamp commit_ts,
                                                      bool is_delete,
-                                                     SizeT row_count);
+                                                     SizeT row_count) noexcept;
 
-private:
-    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexDef> &index_def,
+public:
+    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
@@ -95,8 +101,11 @@ private:
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveIndexEntry(const String &index_name, TransactionID txn_id, TxnManager *txn_mgr);
+    void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
+    MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+
+public:
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
 
     TableMeta *GetTableMeta() const { return table_meta_; }
@@ -113,17 +122,20 @@ private:
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
+    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_state);
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    // the `call_with_lock` is set true if the caller has already hold the lock.
-    Status CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock = false);
+    Status CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
 
     // This is private, **DO NOT** use by catalog
-    Status ImportSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment, bool call_with_lock);
+    Status CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> &segment);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
+
+    static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name) {
+        return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
+    }
 
 public:
     // Getter
@@ -144,7 +156,7 @@ public:
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
 
-    Tuple<SizeT, SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
+    Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
@@ -158,7 +170,7 @@ public:
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
 
-    virtual void MergeFrom(BaseEntry &other);
+    void MergeFrom(BaseEntry &other) final;
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
@@ -213,7 +225,7 @@ public: // TODO: remote it?
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    void Cleanup() && override;
+    void Cleanup() override;
 };
 
 } // namespace infinity

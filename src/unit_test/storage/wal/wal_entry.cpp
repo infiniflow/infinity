@@ -30,7 +30,7 @@ import value;
 import data_block;
 import default_values;
 import index_ivfflat;
-import index_def;
+import index_base;
 import logical_type;
 import internal_types;
 import column_def;
@@ -192,14 +192,13 @@ TEST_F(WalEntryTest, ReadWrite) {
 
     Vector<InitParameter *> parameters = {new InitParameter("centroids_count", "100"), new InitParameter("metric", "l2")};
 
-    SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(MakeShared<String>("idx1"));
-
-    auto index_base = IndexIVFFlat::Make("idx1", Vector<String>{"col1", "col2"}, parameters);
+    SharedPtr<String> index_name = MakeShared<String>("idx1");
+    auto index_base = IndexIVFFlat::Make(index_name, "idx1_tbl1", Vector<String>{"col1", "col2"}, parameters);
     for (auto parameter : parameters) {
         delete parameter;
     }
 
-    entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "", index_def));
+    entry->cmds_.push_back(MakeShared<WalCmdCreateIndex>("db1", "tbl1", "", index_base));
 
     entry->cmds_.push_back(MakeShared<WalCmdDropIndex>("db1", "tbl1", "idx1"));
 
@@ -368,5 +367,5 @@ TEST_F(WalEntryTest, WalListIterator) {
     }
     EXPECT_EQ(max_commit_ts, 123);
     EXPECT_EQ(catalog_path, "/tmp/infinity/data/catalog/META_123.full.json");
-    EXPECT_EQ(replay_entries.size(), 1);
+    EXPECT_EQ(replay_entries.size(), 1u);
 }

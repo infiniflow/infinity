@@ -34,11 +34,15 @@ import cleanup_scanner;
 namespace infinity {
 
 struct Catalog;
+class AddDBMetaOp;
 
 export struct DBMeta : public MetaInterface {
     using EntryT = DBEntry;
 
     friend struct Catalog;
+
+public:
+    using MetaOp = AddDBMetaOp;
 
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> db_name) : db_name_(std::move(db_name)), data_dir_(data_dir) {}
@@ -58,29 +62,38 @@ public:
     SharedPtr<String> data_dir() const { return data_dir_; }
 
 private:
-    Tuple<DBEntry *, Status>
-    CreateNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status>
-    DropNewEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type = ConflictType::kError);
+    Tuple<DBEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts,
+                                          TxnManager *txn_mgr,
+                                          ConflictType conflict_type = ConflictType::kError);
 
-    void DeleteNewEntry(TransactionID txn_id, TxnManager *txn_mgr);
+    void DeleteNewEntry(TransactionID txn_id);
 
-    Tuple<DBEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<DBEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    }
 
-    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }
 
-    // Used in initialization phase
-    static void AddEntry(DBMeta *db_meta, UniquePtr<DBEntry> db_entry);
+    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryReplay(txn_id, begin_ts); }
 
 private:
     SharedPtr<String> db_name_{};
     SharedPtr<String> data_dir_{};
 
 public:
-    void Cleanup() && override;
+    void Cleanup() override;
 
     bool PickCleanup(CleanupScanner *scanner) override;
+
+    bool Empty() override { return db_entry_list_.Empty(); }
 
 private:
     EntryList<DBEntry> db_entry_list_{};

@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
-from python.test.common import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -372,10 +372,8 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    # @pytest.mark.skip(reason="Cast error.")
-    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
     @pytest.mark.parametrize("types", ["varchar"])
-    @pytest.mark.parametrize("types_example", [[1,2,3]])
+    @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -384,9 +382,10 @@ class TestUpdate:
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": types_example}])
-        update_res = table_obj.output(["*"]).to_df()
-        print(update_res)
+        with pytest.raises(Exception, match="Invalid constant expression"):
+            table_obj.update("c1 = 1", [{"c2": types_example}])
+            update_res = table_obj.output(["*"]).to_df()
+            print(update_res)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -411,3 +410,39 @@ class TestUpdate:
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("filter_list", [
+        "c1 > 10",
+        "c2 > 1",
+        "c1 > 0.1 and c2 < 3.0",
+        "c1 > 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c1 > 1.0",
+        "c1 = 0",
+        pytest.param("c1", marks=pytest.mark.xfail),
+        pytest.param("_row_id", marks=pytest.mark.xfail),
+        pytest.param("*", marks=pytest.mark.xfail),
+        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
+        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
+    ])
+    @pytest.mark.parametrize("types_example", [1, 1.333])
+    def test_filter_expression(self, filter_list, types_example):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_filter_expression")
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, None)
+
+        # insert
+        for i in range(10):
+            values = [{"c1": i, "c2": 3.0} for _ in range(10)]
+            table_obj.insert(values)
+        insert_res = table_obj.output(["*"]).to_df()
+        print(insert_res)
+
+        # delete
+        table_obj.update(filter_list, [{"c2": types_example}])
+        delete_res = table_obj.output(["*"]).to_df()
+        print(delete_res)

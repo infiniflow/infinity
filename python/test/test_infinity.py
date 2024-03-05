@@ -11,20 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
+
 import infinity
+import pytest
 from infinity.errors import ErrorCode
 
-from python.infinity.infinity import ShowVariable
-from python.test.common import common_values
+from infinity.infinity import ShowVariable
+from infinity.remote_thrift.client import ThriftInfinityClient
+
+from common import common_values
 
 
 class TestInfinity:
 
     def test_get_database(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         database_res = infinity_obj.get_database('default')
-        print(database_res)
-        # assert database_res.error_code == ErrorCode.OK
+        assert database_res.error_code == ErrorCode.OK
         # disconnect
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
@@ -93,4 +97,50 @@ class TestInfinity:
         res = infinity_obj.show_variable(ShowVariable.TIME_ZONE)
         print(res)
 
+    @pytest.mark.slow
+    def test_timeout_infinity(self):
+        infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
+        time.sleep(3600)
+        database_res = infinity_obj.get_database('default')
+        print(database_res)
+        res = infinity_obj.show_variable(ShowVariable.QUERY_COUNT)
+        print(res)
 
+        res = infinity_obj.show_variable(ShowVariable.SESSION_COUNT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.BUFFER_POOL_USAGE)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.VERSION)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.QUERY_MEMORY_LIMIT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.QUERY_CPU_LIMIT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.LOG_LEVEL)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.SCHEDULE_POLICY)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.LISTEN_ADDRESS)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.SQL_PORT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.SDK_PORT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.HTTP_API_PORT)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.DATA_URL)
+        print(res)
+
+        res = infinity_obj.show_variable(ShowVariable.TIME_ZONE)
+        print(res)

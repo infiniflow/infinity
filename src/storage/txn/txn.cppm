@@ -19,7 +19,7 @@ import stl;
 
 import table_detail;
 import table_def;
-import index_def;
+import index_base;
 import data_block;
 import meta_state;
 import data_access_state;
@@ -63,11 +63,7 @@ enum class CompactSegmentsTaskType;
 
 export class Txn {
 public:
-    explicit Txn(TxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 Catalog *catalog,
-                 BGTaskProcessor *bg_task_processor,
-                 TransactionID txn_id);
+    explicit Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id);
 
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
 
@@ -112,14 +108,14 @@ public:
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
-    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexDef> &index_def, ConflictType conflict_type);
+    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
     // write wal
-    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexDef> &indef);
+    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -179,6 +175,25 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
+public:
+    void AddDBStore(DBEntry *db_entry);
+
+    void DropDBStore(DBEntry *dropped_db_entry);
+
+    void AddTableStore(TableEntry *table_entry);
+
+    void DropTableStore(TableEntry *dropped_table_entry);
+
+    void AddIndexStore(const String &index_name, TableIndexEntry *index_entry);
+
+    void DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry);
+
+private:
+    // Txn store
+    Set<DBEntry *> txn_dbs_{};
+    Set<TableEntry *> txn_tables_{};
+    HashMap<String, TableIndexEntry *> txn_indexes_{};
+
 private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
@@ -188,14 +203,6 @@ private:
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};
-
-    // Related database
-    Set<String> db_names_{};
-
-    // Txn store
-    Set<DBEntry *> txn_dbs_{};
-    Set<TableEntry *> txn_tables_{};
-    HashMap<String, TableIndexEntry *> txn_indexes_{};
 
     // Only one db can be handled in one transaction.
     HashMap<String, BaseEntry *> txn_table_entries_{};

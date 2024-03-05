@@ -21,7 +21,7 @@ module index_hnsw;
 
 import stl;
 import status;
-import index_def;
+import index_base;
 import third_party;
 import infinity_exception;
 import serialize;
@@ -53,7 +53,8 @@ String HnswEncodeTypeToString(HnswEncodeType encode_type) {
     }
 }
 
-SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
+SharedPtr<IndexBase>
+IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
     SizeT ef = HNSW_EF;
@@ -77,7 +78,7 @@ SharedPtr<IndexBase> IndexHnsw::Make(String file_name, Vector<String> column_nam
     if (metric_type == MetricType::kInvalid || encode_type == HnswEncodeType::kInvalid) {
         RecoverableError(Status::LackIndexParam());
     }
-    return MakeShared<IndexHnsw>(file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
+    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {
@@ -133,7 +134,7 @@ void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
         RecoverableError(Status::ColumnNotExist(column_name));
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
         RecoverableError(Status::InvalidIndexDefinition(
-            fmt::format("Invalid parameter for Hnsw index: column name: {}, data type not supported: {}.", column_name, data_type->ToString())));
+            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type->ToString())));
     }
 }
 

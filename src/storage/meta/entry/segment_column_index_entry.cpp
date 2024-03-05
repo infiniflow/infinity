@@ -91,13 +91,12 @@ SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewReplaySegmentInde
                                                                                        TxnTimeStamp commit_ts,
                                                                                        bool is_delete) {
 
-    auto [segment_row_count, actual_segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     ColumnID column_id = column_index_entry->column_id();
-    auto create_index_param =
-        column_index_entry->GetCreateIndexParam(segment_row_count, actual_segment_row_count, table_entry->GetColumnDefByID(column_id));
+    auto create_index_param = column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
     auto vector_file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
@@ -148,7 +147,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             TypeInfo *type_info = column_def->type()->type_info().get();
             auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
             u32 dimension = embedding_info->Dimension();
-            u32 actual_row_count = segment_entry->actual_row_count();
+            u32 full_row_count = segment_entry->row_count();
             BufferHandle buffer_handle = GetIndex();
             switch (embedding_info->Type()) {
                 case kElemFloat: {
@@ -156,11 +155,11 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     // TODO: How to select training data?
                     if (check_ts) {
                         OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                        annivfflat_index->BuildIndex(iter, dimension, actual_row_count);
+                        annivfflat_index->BuildIndex(iter, dimension, full_row_count);
                     } else {
                         // Not check ts in uncommitted segment when compact segment
                         OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                        annivfflat_index->BuildIndex(iter, dimension, actual_row_count);
+                        annivfflat_index->BuildIndex(iter, dimension, full_row_count);
                     }
                     break;
                 }
@@ -275,9 +274,8 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             // 1. build secondary index by merge sort
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            // fetch the actual_row_count from segment_entry
-            auto secondary_index_builder =
-                GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), segment_entry->actual_row_count(), part_capacity);
+            // fetch the row_count from segment_entry
+            auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), part_capacity);
             secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_id, begin_ts, check_ts);
             secondary_index_builder->StartOutput();
             // 2. output into SecondaryIndexDataPart
@@ -418,7 +416,7 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentColumnIndexEntry::Cleanup() && {
+void SegmentColumnIndexEntry::Cleanup() {
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
@@ -426,6 +424,8 @@ void SegmentColumnIndexEntry::Cleanup() && {
         buffer_obj->Cleanup();
     }
 }
+
+void SegmentColumnIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
 void SegmentColumnIndexEntry::SaveIndexFile() {
     String &index_name = *this->column_index_entry_->col_index_dir();
@@ -461,7 +461,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
                                                                         BufferManager *buffer_mgr,
                                                                         TableEntry *table_entry) {
     u32 segment_id = index_entry_json["segment_id"];
-    auto [segment_row_count, actual_segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
+    auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -469,7 +469,7 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
     }
     u64 column_id = column_index_entry->column_id();
     UniquePtr<CreateIndexParam> create_index_param =
-        column_index_entry->GetCreateIndexParam(segment_row_count, actual_segment_row_count, table_entry->GetColumnDefByID(column_id));
+        column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
     // TODO: need to get create index param;
     //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
     auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());

@@ -43,7 +43,7 @@ import profiler;
 import status;
 import default_values;
 import table_detail;
-import index_def;
+import index_base;
 import txn_store;
 import data_access_state;
 import extra_ddl_info;
@@ -116,7 +116,7 @@ class GlobalCatalogDeltaEntry;
 class CatalogDeltaEntry;
 export struct Catalog {
 public:
-    explicit Catalog(SharedPtr<String> dir, bool create_default_db = false);
+    explicit Catalog(SharedPtr<String> dir);
 
 public:
     // Database related functions
@@ -134,7 +134,7 @@ public:
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void RemoveDBEntry(const String &db_name, TransactionID txn_id, TxnManager *txn_mgr);
+    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -158,11 +158,11 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id, TxnManager *txn_mgr);
+    static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 
     // Index Related methods
     Tuple<TableIndexEntry *, Status> CreateIndex(TableEntry *table_entry,
-                                                 const SharedPtr<IndexDef> &index_def,
+                                                 const SharedPtr<IndexBase> &index_base,
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
@@ -178,7 +178,7 @@ public:
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr);
 
-    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id, TxnManager *txn_mgr);
+    static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id);
 
     static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay = false);
 
@@ -195,7 +195,7 @@ public:
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
+    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
@@ -227,6 +227,8 @@ public:
     void MergeFrom(Catalog &other);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
+
+    static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);
 
     static UniquePtr<Catalog> LoadFromFiles(const Vector<String> &catalog_paths, BufferManager *buffer_mgr);
 

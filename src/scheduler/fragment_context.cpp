@@ -1038,7 +1038,7 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count) {
         }
         case PhysicalOperatorType::kCreateIndexDo: {
             const auto *create_index_do_operator = static_cast<const PhysicalCreateIndexDo *>(first_operator);
-            auto _ = InitCreateIndexDoFragmentContext(create_index_do_operator, this);
+            InitCreateIndexDoFragmentContext(create_index_do_operator, this);
             parallel_count = std::max(parallel_count, 1l);
             break;
         }

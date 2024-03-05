@@ -26,7 +26,6 @@ target_link_libraries(
         onnxruntime_mlas
         iresearch
         newpfor
-        vespalib
         atomic.a
         lz4.a
 )

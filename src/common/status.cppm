@@ -101,6 +101,9 @@ export enum class ErrorCode : long {
     kInvalidIndexType = 3060,
     kInvalidIndexParam = 3061,
     kLackIndexParam = 3062,
+    kInvalidFilterExpression = 3063,
+    kMultipleFunctionMatched = 3064,
+    kInsertWithoutValues = 3065,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -218,6 +221,9 @@ public:
     static Status InvalidIndexType();
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
+    static Status InvalidFilterExpression(const String& expr);
+    static Status MultipleFunctionMatched(const String& function, const String& matched_functions);
+    static Status InsertWithoutValues();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -293,7 +299,7 @@ public:
 
     void AppendMessage(const String &msg);
 
-    inline Status clone() { return Status{code_, MakeUnique<String>(*msg_)}; }
+    inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};

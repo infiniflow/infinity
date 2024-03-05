@@ -38,7 +38,7 @@ String QueryResult::ToString() const {
             return "DELETE 0 1";
         }
         default: {
-            ss <<std::endl;;
+            ss <<std::endl;
         }
     }
 
@@ -50,7 +50,7 @@ String QueryResult::ToString() const {
         }
         ss << result_table_->GetColumnNameById(idx) << end;
     }
-    ss <<std::endl;;
+    ss <<std::endl;
 
     // Get Block count
     SizeT block_count = result_table_->DataBlockCount();

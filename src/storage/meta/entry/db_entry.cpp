@@ -33,15 +33,19 @@ import status;
 import catalog_delta_entry;
 import column_def;
 import local_file_system;
+import extra_ddl_info;
 
 namespace infinity {
 
-DBEntry::DBEntry() : BaseEntry(EntryType::kDummy) {}
-
-DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts)
+DBEntry::DBEntry(DBMeta *db_meta,
+                 bool is_delete,
+                 const SharedPtr<String> &data_dir,
+                 const SharedPtr<String> &db_name,
+                 TransactionID txn_id,
+                 TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase), db_entry_dir_(MakeShared<String>(fmt::format("{}/{}/txn_{}", *data_dir, *db_name, txn_id))),
+    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)),
       db_name_(db_name) {
     //    atomic_u64 txn_id_{0};
     //    TxnTimeStamp begin_ts_{0};
@@ -51,22 +55,34 @@ DBEntry::DBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_
     txn_id_.store(txn_id);
 }
 
-SharedPtr<DBEntry>
-DBEntry::NewDBEntry(const SharedPtr<String> &data_dir, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-
-    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
+                                       bool is_delete,
+                                       const SharedPtr<String> &data_dir,
+                                       const SharedPtr<String> &db_name,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts,
+                                       TxnManager *txn_mgr) {
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
+    if (txn_mgr) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        if (is_delete) {
+            txn->DropDBStore(db_entry.get());
+        } else {
+            txn->AddDBStore(db_entry.get());
+        }
+    }
     return db_entry;
 }
 
-SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(const SharedPtr<String> &data_dir,
+SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(DBMeta *db_meta,
+                                             const SharedPtr<String> &data_dir,
                                              const SharedPtr<String> &db_name,
                                              TransactionID txn_id,
                                              TxnTimeStamp begin_ts,
                                              TxnTimeStamp commit_ts,
-                                             bool is_delete) {
-    auto db_entry = MakeShared<DBEntry>(data_dir, db_name, txn_id, begin_ts);
+                                             bool is_delete) noexcept {
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
-    db_entry->deleted_ = is_delete;
     return db_entry;
 }
 
@@ -75,46 +91,14 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  const Vector<SharedPtr<ColumnDef>> &columns,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr) {
+                                                 TxnManager *txn_mgr,
+                                                 ConflictType conflict_type) {
     const String &table_name = *table_collection_name;
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this); };
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta), txn_id, begin_ts, txn_mgr);
 
-    // Check if there is table_meta with the table_name
-    TableMeta *table_meta{nullptr};
-    this->rw_locker().lock_shared();
-    auto table_iter = this->table_meta_map().find(table_name);
-    if (table_iter != this->table_meta_map().end()) {
-        table_meta = table_iter->second.get();
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Add new table entry for {} in existed table meta of db_entry {}", table_name, *this->db_entry_dir_));
-
-    } else {
-        this->rw_locker().unlock_shared();
-
-        LOG_TRACE(fmt::format("Create new table/collection: {}", table_name));
-        UniquePtr<TableMeta> new_table_meta = TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this);
-        table_meta = new_table_meta.get();
-
-        if (txn_mgr != nullptr) {
-            auto operation = MakeUnique<AddTableMetaOp>(table_meta, begin_ts);
-            txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-        }
-
-        this->rw_locker().lock();
-        auto table_iter2 = this->table_meta_map().find(table_name);
-        if (table_iter2 != this->table_meta_map().end()) {
-            table_meta = table_iter2->second.get();
-        } else {
-            this->table_meta_map()[table_name] = std::move(new_table_meta);
-        }
-        this->rw_locker().unlock();
-
-        LOG_TRACE(fmt::format("Add new table entry for {} in new table meta of db_entry {} ", table_name, *this->db_entry_dir_));
-    }
-
-    auto table_entry = table_meta->CreateNewEntry(table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr);
-
-    return table_entry;
+    return table_meta->CreateNewEntry(std::move(r_lock), table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_name,
@@ -122,75 +106,44 @@ Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_na
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
                                                TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_collection_name, conflict_type);
     if (table_meta == nullptr) {
-        if (conflict_type == ConflictType::kIgnore) {
-            LOG_TRACE(fmt::format("Ignore drop a not existed table/collection entry {}", table_collection_name));
-            return {nullptr, Status::OK()};
-        }
-
-        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to drop not existed table/collection entry {}", table_collection_name));
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
-
-    LOG_TRACE(fmt::format("Drop a table/collection entry {}", table_collection_name));
-    return table_meta->DropNewEntry(txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
+    return table_meta->DropNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
 }
 
-Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_collection_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
-    //    LOG_TRACE("Get a table entry {}", table_name);
+Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    LOG_TRACE(fmt::format("Get a table entry {}", table_name));
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
     if (table_meta == nullptr) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No valid table meta.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg))};
+        return {nullptr, status};
     }
-    return table_meta->GetEntry(txn_id, begin_ts);
+    return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-void DBEntry::RemoveTableEntry(const String &table_collection_name, TransactionID txn_id, TxnManager *txn_mgr) {
-    this->rw_locker().lock_shared();
-
-    TableMeta *table_meta{nullptr};
-    if (this->table_meta_map().find(table_collection_name) != this->table_meta_map().end()) {
-        table_meta = this->table_meta_map()[table_collection_name].get();
-    }
-    this->rw_locker().unlock_shared();
-
-    LOG_TRACE(fmt::format("Remove a table/collection entry: {}", table_collection_name));
-    table_meta->DeleteNewEntry(txn_id, txn_mgr);
+void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
+    auto [table_meta, _1, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
+    LOG_TRACE(fmt::format("Remove a db entry: {}", table_name));
+    table_meta->DeleteNewEntry(txn_id);
 }
 
 Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Vector<TableEntry *> results;
 
-    this->rw_locker().lock_shared();
-
-    results.reserve(this->table_meta_map().size());
-    for (auto &table_collection_meta_pair : this->table_meta_map()) {
-        TableMeta *table_meta = table_collection_meta_pair.second.get();
-        auto [table_entry, status] = table_meta->GetEntry(txn_id, begin_ts);
-        if (!status.ok()) {
-            LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
-        } else {
-            results.emplace_back((TableEntry *)table_entry);
+    {
+        auto map_guard = table_meta_map_.GetMetaMap();
+        results.reserve((*map_guard).size());
+        for (auto &table_collection_meta_pair : *map_guard) {
+            TableMeta *table_meta = table_collection_meta_pair.second.get();
+            auto [table_entry, status] = table_meta->GetEntryNolock(txn_id, begin_ts);
+            if (!status.ok()) {
+                LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
+            } else {
+                results.emplace_back((TableEntry *)table_entry);
+            }
         }
     }
-    this->rw_locker().unlock_shared();
 
     return results;
 }
@@ -229,12 +182,14 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     Vector<TableMeta *> table_metas;
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["db_entry_dir"] = *this->db_entry_dir_;
         json_res["db_name"] = *this->db_name_;
         json_res["txn_id"] = this->txn_id_.load();
         json_res["begin_ts"] = this->begin_ts_;
         json_res["commit_ts"] = this->commit_ts_.load();
         json_res["deleted"] = this->deleted_;
+        if (!this->deleted_) {
+            json_res["db_entry_dir"] = *this->db_entry_dir_;
+        }
         json_res["entry_type"] = this->entry_type_;
         table_metas.reserve(this->table_meta_map().size());
         for (auto &table_meta_pair : this->table_meta_map()) {
@@ -247,21 +202,20 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
     return json_res;
 }
 
-UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, BufferManager *buffer_mgr) {
+UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr) {
     nlohmann::json json_res;
 
     SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
     TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
-    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_entry_dir, db_name, txn_id, begin_ts);
+    bool deleted = db_entry_json["deleted"];
+    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
-    bool deleted = db_entry_json["deleted"];
-    EntryType entry_type = db_entry_json["entry_type"];
+//    EntryType entry_type = db_entry_json["entry_type"];
     res->commit_ts_.store(commit_ts);
     res->deleted_ = deleted;
-    res->entry_type_ = entry_type;
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
@@ -299,11 +253,15 @@ void DBEntry::MergeFrom(BaseEntry &other) {
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
-void DBEntry::Cleanup() && {
-    std::move(table_meta_map_).Cleanup();
+void DBEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
+    table_meta_map_.Cleanup();
 
-    // LocalFileSystem fs;
-    // fs.DeleteDirectory(*db_entry_dir_);
+    LOG_INFO(fmt::format("Cleanup dir: {}", *db_entry_dir_));
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

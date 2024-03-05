@@ -14,6 +14,12 @@
 
 module;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-W#pragma-messages"
+
 #include "CLI11.hpp"
 
 #include "spdlog/details/registry.h"
@@ -48,13 +54,7 @@ module;
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
 
-#include "vespalib/btree/btree.h"
-#include "vespalib/btree/btree.hpp"
-#include "vespalib/btree/btreeroot.h"
-#include "vespalib/btree/btreeroot.hpp"
-#include "vespalib/btree/btreestore.h"
-#include "vespalib/btree/btreestore.hpp"
-#include "vespalib/util/generationhandler.h"
+#pragma clang diagnostic pop
 
 export module third_party;
 
@@ -213,30 +213,5 @@ using FlatHashSet = phmap::flat_hash_set<T, Hash, Eq, Alloc>;
 
 export template <typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
 using PGMIndex = pgm::PGMIndex<K, Epsilon, EpsilonRecursive, Floating>;
-
-export template <typename KeyT,
-                 typename DataT,
-                 typename AggrT = vespalib::btree::NoAggregated,
-                 typename CompareT = std::less<KeyT>,
-                 typename TraitsT = vespalib::btree::BTreeDefaultTraits,
-                 typename AggrCalcT = vespalib::btree::NoAggrCalc>
-using Btree = vespalib::btree::BTree<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>;
-
-export template <typename KeyT,
-                 typename DataT,
-                 typename AggrT = vespalib::btree::NoAggregated,
-                 typename CompareT = std::less<KeyT>,
-                 typename TraitsT = vespalib::btree::BTreeDefaultTraits,
-                 typename AggrCalcT = vespalib::btree::NoAggrCalc>
-using BtreeRoot = vespalib::btree::BTreeRoot<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>;
-
-export template <typename KeyT,
-                 typename DataT,
-                 typename AggrT = vespalib::btree::NoAggregated,
-                 typename CompareT = std::less<KeyT>,
-                 typename TraitsT = vespalib::btree::BTreeDefaultTraits,
-                 typename AggrCalcT = vespalib::btree::NoAggrCalc>
-using BtreeStore = vespalib::btree::BTreeStore<KeyT, DataT, AggrT, CompareT, TraitsT, AggrCalcT>;
-export using GenerationHandler = vespalib::GenerationHandler;
 
 } // namespace infinity

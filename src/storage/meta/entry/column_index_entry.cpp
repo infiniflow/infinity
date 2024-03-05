@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <ctime>
 #include <string>
 
@@ -147,20 +148,24 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
-void ColumnIndexEntry::Cleanup() && {
+void ColumnIndexEntry::Cleanup() {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
-        std::move(*segment_column_index_entry).Cleanup();
+        segment_column_index_entry->Cleanup();
     }
+    LocalFileSystem fs;
+    fs.DeleteEmptyDirectory(*col_index_dir_);
 }
 
-SharedPtr<String> ColumnIndexEntry::DetermineIndexDir(const String &parent_dir, const String &index_name) {
-    LocalFileSystem fs;
-    SharedPtr<String> index_dir;
-    do {
-        u32 seed = time(nullptr);
-        index_dir = MakeShared<String>(parent_dir + "/" + RandomString(DEFAULT_RANDOM_NAME_LEN, seed) + "_index_" + index_name);
-    } while (!fs.CreateDirectoryNoExp(*index_dir));
-    return index_dir;
+void ColumnIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
+    for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
+        auto &[segment_id, segment_column_index_entry] = *iter;
+        if (std::binary_search(sorted_segment_ids.begin(), sorted_segment_ids.end(), segment_id)) {
+            scanner->AddEntry(std::move(segment_column_index_entry));
+            iter = index_by_segment_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
 }
 
 Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
@@ -205,32 +210,19 @@ Vector<UniquePtr<IndexFileWorker>> ColumnIndexEntry::CreateFileWorker(CreateInde
         case IndexType::kSecondary: {
             auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
             auto const row_count = create_secondary_param->row_count_;
-            auto const actual_row_count = create_secondary_param->actual_row_count_;
             auto const part_capacity = create_secondary_param->part_capacity_;
             // now we can only use row_count to calculate the part_num
             // because the actual_row_count will reduce when we delete rows
-            // which will cause the index file worker count to be inconsistent when we read the index file
+            // consider the timestamp, actual_row_count may be less than, equal to or greater than rows we can actually read
             u32 part_num = (row_count + part_capacity - 1) / part_capacity;
             vector_file_worker.resize(part_num + 1);
             // cannot use invalid file_worker
-            vector_file_worker[0] = MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(),
-                                                                         file_name,
-                                                                         index_base,
-                                                                         column_def,
-                                                                         0,
-                                                                         row_count,
-                                                                         actual_row_count,
-                                                                         part_capacity);
+            vector_file_worker[0] =
+                MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), file_name, index_base, column_def, 0, row_count, part_capacity);
             for (u32 i = 1; i <= part_num; ++i) {
                 auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
-                vector_file_worker[i] = MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(),
-                                                                             part_file_name,
-                                                                             index_base,
-                                                                             column_def,
-                                                                             i,
-                                                                             row_count,
-                                                                             actual_row_count,
-                                                                             part_capacity);
+                vector_file_worker[i] =
+                    MakeUnique<SecondaryIndexFileWorker>(this->col_index_dir(), part_file_name, index_base, column_def, i, row_count, part_capacity);
             }
             break;
         }
@@ -263,8 +255,7 @@ Status ColumnIndexEntry::CreateIndexPrepare(TableEntry *table_entry,
     auto *txn_store = txn->GetTxnTableStore(table_entry);
 
     for (const auto *segment_entry : block_index->segments_) {
-        // use actual_row_count to exclude the deleted rows
-        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), segment_entry->actual_row_count(), column_def);
+        auto create_index_param = GetCreateIndexParam(segment_entry->row_count(), column_def);
         SegmentID segment_id = segment_entry->segment_id();
         SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry =
             SegmentColumnIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
@@ -288,11 +279,11 @@ Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32,
     return Status::OK();
 }
 
-UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, SizeT seg_actual_row_count, const ColumnDef *column_def) {
+UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, const ColumnDef *column_def) {
     switch (index_base_->index_type_) {
         case IndexType::kIVFFlat: {
             // FIXME: actually the seg_actual_row_count is a bad feature, we should remove it in the future
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_actual_row_count);
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_row_count);
         }
         case IndexType::kHnsw: {
             SizeT max_element = seg_row_count;
@@ -303,7 +294,7 @@ UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_
         }
         case IndexType::kSecondary: {
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
-            return MakeUnique<CreateSecondaryIndexParam>(index_base_.get(), column_def, seg_row_count, seg_actual_row_count, part_capacity);
+            return MakeUnique<CreateSecondaryIndexParam>(index_base_.get(), column_def, seg_row_count, part_capacity);
         }
         default: {
             UniquePtr<String> err_msg =

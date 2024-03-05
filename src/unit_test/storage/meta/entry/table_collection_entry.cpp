@@ -96,7 +96,7 @@ TEST_F(TableEntryTest, test1) {
     }
 
     SharedPtr<TableEntry> table_entry =
-        MakeShared<TableEntry>(table_dir, table_def->table_name(), table_def->columns(), TableEntryType::kTableEntry, nullptr, 0, 0);
+        MakeShared<TableEntry>(false, table_dir, table_def->table_name(), table_def->columns(), TableEntryType::kTableEntry, nullptr, 0, 0);
 }
 
 TEST_F(TableEntryTest, test2) {

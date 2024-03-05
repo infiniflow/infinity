@@ -15,6 +15,7 @@
 module;
 
 #include <filesystem>
+#include <unistd.h>
 
 module indexer;
 
@@ -38,7 +39,6 @@ import column_indexer;
 
 import logical_type;
 import internal_types;
-#include <unistd.h>
 
 namespace infinity {
 

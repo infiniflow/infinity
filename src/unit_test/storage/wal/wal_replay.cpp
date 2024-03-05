@@ -38,9 +38,7 @@ import catalog;
 import index_base;
 import index_ivfflat;
 import index_hnsw;
-import index_base;
 import index_full_text;
-import index_def;
 import bg_task;
 import background_process;
 import compact_segments_task;
@@ -416,15 +414,15 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         //            UniquePtr<MetaTableState> read_table_meta = MakeUnique<MetaTableState>();
         //
         //            txn->GetMetaTableState(read_table_meta.get(), "default", "tbl4", column_ids);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
+        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1u);
         //
         //            EXPECT_EQ(read_table_meta->local_blocks_.size(), 0);
-        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1);
+        //            EXPECT_EQ(read_table_meta->segment_map_.size(), 1u);
         //            for (const auto &segment_pair : read_table_meta->segment_map_) {
         //                EXPECT_EQ(segment_pair.first, 0);
         //                EXPECT_NE(segment_pair.second.segment_entry_, nullptr);
-        //                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1);
-        //                EXPECT_EQ(segment_pair.second.block_map_.size(), 1);
+        //                EXPECT_EQ(segment_pair.second.segment_entry_->block_entries_.size(), 1u);
+        //                EXPECT_EQ(segment_pair.second.block_map_.size(), 1u);
         //                for (const auto &block_pair : segment_pair.second.block_map_) {
         //                    //                    EXPECT_EQ(block_pair.first, 0);
         //                    EXPECT_NE(block_pair.second.block_entry_, nullptr);
@@ -579,7 +577,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type1 = block_column_entry0->column_type().get();
                 EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = columns_vector[0]->data_type_size_;
-                EXPECT_EQ(data_type_size, 1);
+                EXPECT_EQ(data_type_size, 1u);
                 block_column_entry0->Append(columns_vector[0].get(), 0, 1, buffer_manager);
             }
             {
@@ -587,7 +585,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type2 = block_column_entry1->column_type().get();
                 EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
                 SizeT data_type_size = columns_vector[1]->data_type_size_;
-                EXPECT_EQ(data_type_size, 8);
+                EXPECT_EQ(data_type_size, 8u);
                 block_column_entry1->Append(columns_vector[1].get(), 0, 1, buffer_manager);
             }
             {
@@ -595,7 +593,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
                 auto column_type3 = block_column_entry2->column_type().get();
                 EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
                 SizeT data_type_size = columns_vector[2]->data_type_size_;
-                EXPECT_EQ(data_type_size, 8);
+                EXPECT_EQ(data_type_size, 8u);
                 block_column_entry2->Append(columns_vector[2].get(), 0, 1, buffer_manager);
             }
 
@@ -633,10 +631,10 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             auto *segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
-            EXPECT_EQ(segment_entry->segment_id(), 0);
+            EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto *block_entry = segment_entry->GetBlockEntryByID(0);
-            EXPECT_EQ(block_entry->block_id(), 0);
-            EXPECT_EQ(block_entry->row_count(), 1);
+            EXPECT_EQ(block_entry->block_id(), 0u);
+            EXPECT_EQ(block_entry->row_count(), 1u);
 
             BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
@@ -667,7 +665,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
 }
 
 TEST_F(WalReplayTest, WalReplayCompact) {
-    int test_segment_n = 2;
+    u64 test_segment_n = 2;
     {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
@@ -699,7 +697,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             txn_mgr->CommitTxn(txn);
         }
 
-        for (int i = 0; i < test_segment_n; ++i) { // add 2 segments
+        for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
             auto txn2 = txn_mgr->CreateTxn();
             txn2->Begin();
 
@@ -726,7 +724,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
                 auto column_type0 = block_column_entry0->column_type().get();
                 EXPECT_EQ(column_type0->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = column_vectors[0]->data_type_size_;
-                EXPECT_EQ(data_type_size, 1);
+                EXPECT_EQ(data_type_size, 1u);
                 block_column_entry0->Append(column_vectors[0].get(), 0, 1, buffer_manager);
                 block_entry->IncreaseRowCount(1);
             }
@@ -771,7 +769,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
-            for (int i = 0; i < test_segment_n; ++i) {
+            for (u64 i = 0; i < test_segment_n; ++i) {
                 auto *segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment, nullptr);
                 EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
@@ -824,22 +822,21 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             parameters1.emplace_back(new InitParameter("centroids_count", "100"));
             parameters1.emplace_back(new InitParameter("metric", "l2"));
 
-            auto index_base_ivf = IndexIVFFlat::Make("name1", columns1, parameters1);
+            SharedPtr<String> index_name = MakeShared<String>("idx1");
+            auto index_base_ivf = IndexIVFFlat::Make(index_name, "idx1_tbl1", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }
 
             const String &db_name = "default";
             const String &table_name = "test_annivfflat";
-            const SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(MakeShared<String>("idx1"));
-            index_def->index_array_.emplace_back(index_base_ivf);
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
@@ -873,12 +870,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
             EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(table_index_meta->index_name(), "idx1");
-            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            EXPECT_EQ(*table_index_meta->index_name(), "idx1");
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
             auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-            EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "idx1");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
+            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "idx1");
             txn_mgr->CommitTxn(txn);
         }
 
@@ -931,22 +926,21 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
             parameters1.emplace_back(new InitParameter("ef", "200"));
 
-            auto index_base_hnsw = IndexHnsw::Make("hnsw_index", columns1, parameters1);
+            SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
+            auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
             for (auto *init_parameter : parameters1) {
                 delete init_parameter;
             }
 
             const String &db_name = "default";
             const String &table_name = "test_hnsw";
-            const SharedPtr<IndexDef> index_def = MakeShared<IndexDef>(MakeShared<String>("hnsw_index"));
-            index_def->index_array_.emplace_back(index_base_hnsw);
             ConflictType conflict_type = ConflictType::kError;
             bool prepare = false;
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
                 auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn->BeginTS());
-                auto result = txn->CreateIndexDef(table_entry, index_def, conflict_type);
+                auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
@@ -980,12 +974,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(table_index_meta->index_name(), "hnsw_index");
-            EXPECT_EQ(table_index_meta->index_entry_list().size(), 2);
+            EXPECT_EQ(*table_index_meta->index_name(), "hnsw_index");
+            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
             auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-            EXPECT_EQ(*table_index_entry_front->index_def()->index_name_, "hnsw_index");
-            auto entry_back = table_index_meta->index_entry_list().back().get();
-            EXPECT_EQ(entry_back->entry_type_, EntryType::kDummy);
+            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
             txn_mgr->CommitTxn(txn);
         }
 

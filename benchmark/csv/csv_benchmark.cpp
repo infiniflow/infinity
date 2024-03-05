@@ -69,9 +69,9 @@ main() -> int {
      * delimited; header row span etc)-- for details, see
      * ../../include/zsv/api.h
      */
-    struct zsv_opts opts = {0};
+    struct zsv_opts opts = {};
     opts.row_handler = my_row_handler;
-    struct my_data data = {0, 0};
+    struct my_data data = {};
     opts.ctx = &data;
     opts.stream = f;
     opts.delimiter = ',';

@@ -1,9 +1,10 @@
 module;
 
+#include <cassert>
+
 export module ring;
 
 import stl;
-#include <cassert>
 
 namespace infinity {
 
@@ -50,7 +51,7 @@ public:
         return off_ceiling_ - off_ground_;
     }
 
-    u64 GetSigle(T &elem) {
+    u64 Get(T &elem) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (off_ground_ == off_filled_) {
             cv_empty_.wait(lock, [this] { return off_ground_ < off_filled_; });
@@ -62,7 +63,7 @@ public:
         return seq;
     }
 
-    u64 GetMulti(Vector<T> &batch) {
+    u64 GetBatch(Vector<T> &batch) {
         std::unique_lock<std::mutex> lock(mutex_);
         if (off_ground_ == off_filled_) {
             cv_empty_.wait(lock, [this] { return off_ground_ < off_filled_; });

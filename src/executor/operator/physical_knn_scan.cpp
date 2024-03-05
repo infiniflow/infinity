@@ -42,7 +42,6 @@ import index_base;
 import buffer_manager;
 import merge_knn;
 import knn_result_handler;
-import index_def;
 import ann_ivf_flat;
 import annivfflat_index_data;
 import buffer_handle;
@@ -196,32 +195,36 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     HashMap<u32, Vector<SegmentColumnIndexEntry *>> index_entry_map;
-    for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
-        auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
-        if (!status.ok()) {
-            // Table index entry isn't found
-            RecoverableError(status);
-        }
 
-        auto &index_map = table_index_entry->column_index_map();
-        auto column_index_iter = index_map.find(knn_column_id);
-        if (column_index_iter == index_map.end()) {
-            // knn_column_id isn't in this table index
-            continue;
-        }
+    {
+        auto map_guard = table_entry->IndexMetaMap();
+        for (auto &[index_name, table_index_meta] : *map_guard) {
+            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            if (!status.ok()) {
+                // Table index entry isn't found
+                RecoverableError(status);
+            }
 
-        // Fill the segment with index
-        ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
-        // check index type
-        if (auto index_type = column_index_entry->index_base_ptr()->index_type_;
-            index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
-            LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-            continue;
-        }
-        const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
-        index_entry_map.reserve(index_by_segment.size());
-        for (auto &[segment_id, segment_column_index] : index_by_segment) {
-            index_entry_map[segment_id].emplace_back(segment_column_index.get());
+            auto &index_map = table_index_entry->column_index_map();
+            auto column_index_iter = index_map.find(knn_column_id);
+            if (column_index_iter == index_map.end()) {
+                // knn_column_id isn't in this table index
+                continue;
+            }
+
+            // Fill the segment with index
+            ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
+            // check index type
+            if (auto index_type = column_index_entry->index_base_ptr()->index_type_;
+                index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+                continue;
+            }
+            const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
+            index_entry_map.reserve(index_by_segment.size());
+            for (auto &[segment_id, segment_column_index] : index_by_segment) {
+                index_entry_map[segment_id].emplace_back(segment_column_index.get());
+            }
         }
     }
 

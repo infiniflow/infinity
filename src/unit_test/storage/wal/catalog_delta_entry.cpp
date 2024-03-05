@@ -17,7 +17,6 @@
 
 import infinity_exception;
 import index_base;
-import index_def;
 import logger;
 import third_party;
 import stl;
@@ -47,7 +46,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     String index_dir{"data/db_test/table_test/0/0/index_test"};
     String col_index_dir{"data/db_test/table_test/0/0/index_test"};
     Vector<SharedPtr<ColumnDef>> column_defs{};
-    SharedPtr<IndexDef> index_def{nullptr};
     SharedPtr<IndexBase> index_base{nullptr};
 
     // db meta
@@ -103,8 +101,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op10_same_name));
 
     // table index entry
-    auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_def);
-    auto op11_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_def);
+    auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
+    auto op11_same_name = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
     local_catalog_delta_entry->operations().push_back(std::move(op11));
     local_catalog_delta_entry->operations().push_back(std::move(op11_same_name));
 
@@ -126,12 +124,12 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op14));
     local_catalog_delta_entry->operations().push_back(std::move(op14_same_name));
 
-    EXPECT_EQ(local_catalog_delta_entry->operations().size(), 26);
+    EXPECT_EQ(local_catalog_delta_entry->operations().size(), 26u);
     // merge
     global_catalog_delta_entry->Merge(std::move(local_catalog_delta_entry));
     // check ops
-    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 26);
+    EXPECT_EQ(global_catalog_delta_entry->operations().size(), 26u);
     // check member
-    EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1);
-    EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1);
+    EXPECT_EQ(global_catalog_delta_entry->txn_id(), 1u);
+    EXPECT_EQ(global_catalog_delta_entry->commit_ts(), 1u);
 }

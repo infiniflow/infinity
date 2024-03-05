@@ -13,10 +13,11 @@
 # limitations under the License.
 import time
 
+import numpy as np
 import pandas as pd
 import pytest
 from numpy import dtype
-from python.test.common import common_values
+from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -289,6 +290,7 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # delete inserted long before and select to check
+    @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much time.")
     def test_delete_inserted_long_before_data(self):
         # connect
@@ -329,9 +331,18 @@ class TestDelete:
         assert res.error_code == ErrorCode.OK
 
     # various expression will be given in where clause, and check result correctness
-    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
-    @pytest.mark.parametrize('column_types', ["varchar"])
-    @pytest.mark.parametrize('column_types_example', [[1, 2, 3]])
+    @pytest.mark.slow
+    @trace_expected_exceptions
+    @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
+                                              "float", "float32", "double", "float64",
+                                              "varchar",
+                                              "bool",
+                                              "vector, 3, float"])
+    @pytest.mark.parametrize('column_types_example', [1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
+                                                      float(1.1), np.float32(1 / 3), np.double(1 / 3), np.float64(1 / 3),
+                                                      "^789$ test insert varchar",
+                                                      True,
+                                                      np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
     def test_various_expression_in_where_clause(self, column_types, column_types_example):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -400,22 +411,38 @@ class TestDelete:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip(reason="TODO")
-    def test_filter_expression(self):
+    # @pytest.mark.skip(reason="TODO")
+    @pytest.mark.parametrize("filter_list", [
+        "c1 > 10",
+        "c2 > 1",
+        "c1 > 0.1 and c2 < 3.0",
+        "c1 > 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c1 > 1.0",
+        "c1 = 0",
+        pytest.param("c1", marks=pytest.mark.xfail),
+        pytest.param("_row_id", marks=pytest.mark.xfail),
+        pytest.param("*", marks=pytest.mark.xfail),
+        pytest.param("#@$%@#f", marks=pytest.mark.xfail),
+        pytest.param("c1 + 0.1 and c2 - 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 * 0.1 and c2 / 1.0", marks=pytest.mark.xfail),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
+    ])
+    def test_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_filter_expression")
-        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int"}, None)
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, None)
 
         # insert
-        for i in range(1024):
-            values = [{"c1": i} for _ in range(10)]
+        for i in range(10):
+            values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             table_obj.insert(values)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
-        table_obj.delete()
+        table_obj.delete(filter_list)
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
