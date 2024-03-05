@@ -206,7 +206,7 @@ class TestIndex:
             "c1": types}, None)
 
         index_info = [index.IndexInfo(column_name[0], index_type[0], params[0])]
-        if not column_name[1] or not index_type[1] or not params[1]:
+        if types != "varchar" or not column_name[1] or not index_type[1] or not params[1]:
             with pytest.raises(Exception):
                 table_obj.create_index("my_index", index_info, None)
         else:
