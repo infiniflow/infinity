@@ -179,6 +179,7 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    # @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("column_name", [
         (1, False),
         (2.2, False),
@@ -204,7 +205,7 @@ class TestIndex:
             "c1": types}, None)
 
         index_info = [index.IndexInfo(column_name[0], index_type[0], params[0])]
-        if not column_name[1] or not index_type[1] or not params[1]:
+        if types != "varchar" or not column_name[1] or not index_type[1] or not params[1]:
             with pytest.raises(Exception):
                 table_obj.create_index("my_index", index_info, None)
         else:
@@ -282,8 +283,9 @@ class TestIndex:
     # create index on different type of column and show index
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     @pytest.mark.parametrize("index_type", [
-        (index.IndexType.Hnsw, False), (index.IndexType.IVFFlat,
-                                        True), (index.IndexType.FullText, True)
+        (index.IndexType.Hnsw, False, "ERROR:3061*"),
+        (index.IndexType.IVFFlat, True),
+        (index.IndexType.FullText, False, "ERROR:3009*")
     ])
     def test_create_index_on_different_type_of_column(self, types, index_type):
         # connect
@@ -295,7 +297,7 @@ class TestIndex:
             "c1": types}, None)
         # create created index
         if not index_type[1]:
-            with pytest.raises(Exception, match="ERROR:3061*"):
+            with pytest.raises(Exception, match=index_type[2]):
                 table_obj.create_index("my_index",
                                        [index.IndexInfo("c1",
                                                         index_type[0],
@@ -338,9 +340,9 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # import data, then create index
     @pytest.mark.parametrize("index_type", [
-        index.IndexType.IVFFlat, index.IndexType.FullText
+        (index.IndexType.IVFFlat, True),
+        (index.IndexType.FullText, False, "ERROR:3009*")
     ])
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_import_data_create_index(self, index_type, file_format):
@@ -354,12 +356,20 @@ class TestIndex:
 
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
-        res = table_obj.create_index("my_index",
-                                     [index.IndexInfo("c2",
-                                                      index_type,
-                                                      [index.InitParameter("centroids_count", "128"),
-                                                       index.InitParameter("metric", "l2")])], None)
-        assert res.error_code == ErrorCode.OK
+        if (index_type[1]):
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c2",
+                                                          index_type[0],
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "l2")])], None)
+            assert res.error_code == ErrorCode.OK
+        else:
+            with pytest.raises(Exception, match=index_type[2]):
+                table_obj.create_index("my_index",
+                                       [index.IndexInfo("c2",
+                                                        index_type[0],
+                                                        [index.InitParameter("centroids_count", "128"),
+                                                         index.InitParameter("metric", "l2")])], None)
 
         # disconnect
         res = infinity_obj.disconnect()
