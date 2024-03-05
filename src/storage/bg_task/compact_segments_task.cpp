@@ -43,6 +43,7 @@ import segment_entry;
 import table_index_entry;
 import table_index_meta;
 import block_entry;
+import compact_task_type;
 
 namespace infinity {
 
