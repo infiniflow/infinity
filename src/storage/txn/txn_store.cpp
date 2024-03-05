@@ -158,7 +158,9 @@ void TxnTableStore::PrepareCommit() {
         Catalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
     // Attention: "compact" needs to be ahead of "delete"
-    Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    if (!compact_state_.segment_data_.empty()) {
+        Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    }
 
     Catalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
     Catalog::CommitCreateIndex(txn_indexes_store_);
