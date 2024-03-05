@@ -72,7 +72,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
         return None;
     }
 
-    int layer = AddSegmentNoCheck(new_segment);
+    int layer = AddSegmentNoCheckInner(new_segment);
     // Now: prohibit the top layer to merge
     // TODO: merge the top layer if possible
     if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
@@ -143,7 +143,7 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
         segment_layer.CommitCompact(commit_txn_id);
     }
     for (auto *new_segment : new_segments) {
-        AddSegmentNoCheck(new_segment);
+        this->AddSegmentNoCheckInner(new_segment);
     }
     status_ = DBTStatus::kEnable;
 }
@@ -160,7 +160,7 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     status_ = DBTStatus::kEnable;
 }
 
-int DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
+int DBTCompactionAlg::AddSegmentNoCheckInner(SegmentEntry *new_segment) {
     SegmentOffset new_row_cnt = new_segment->actual_row_count();
     int layer = config_.CalculateLayer(new_row_cnt);
     if (layer >= (int)segment_layers_.size()) {
@@ -209,7 +209,7 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     }
     segment_layers_.clear();
     for (auto *segment_entry : segment_entries) {
-        AddSegmentNoCheck(segment_entry);
+        this->AddSegmentNoCheckInner(segment_entry);
     }
     status_ = DBTStatus::kEnable;
 }
@@ -218,6 +218,13 @@ void DBTCompactionAlg::Disable() {
     std::unique_lock lock(mtx_);
     cv_.wait(lock, [this]() { return status_ != DBTStatus::kRunning; });
     status_ = DBTStatus::kDisable;
+}
+
+void DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
+    if (status_ != DBTStatus::kEnable) {
+        UnrecoverableError("Called when compaction not enable");
+    }
+    AddSegmentNoCheckInner(new_segment);
 }
 
 } // namespace infinity

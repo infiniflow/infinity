@@ -174,6 +174,11 @@ public:
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 
+    // wal entry replay
+    void WalReplaySegment(SharedPtr<SegmentEntry> segment_entry);
+
+    void DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry);
+
 public:
     u64 GetColumnIdByName(const String &column_name) const;
 
@@ -206,9 +211,9 @@ public:
     // set nullptr to close auto compaction
     void SetCompactionAlg(UniquePtr<CompactionAlg> compaction_alg) { compaction_alg_ = std::move(compaction_alg); }
 
-    Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn);
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn);
 
-    Optional<Pair<Vector<SegmentEntry *>, Txn *>> DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn);
+    Optional<Pair<Vector<SegmentEntry *>, Txn *>> TryCompactDeleteRow(SegmentID segment_id, std::function<Txn *()> generate_txn);
 
     Vector<SegmentEntry *> PickCompactSegments() const;
 
