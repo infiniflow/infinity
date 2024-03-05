@@ -269,8 +269,9 @@ Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *
                 for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                     fulltext_index_entry->indexer_->BatchInsert(block_entry, 0, block_entry->row_count(), buffer_mgr);
                 }
+                fulltext_index_entry->indexer_->Commit();
+                fulltext_index_entry->indexer_->Dump();
             }
-            // Don't need to commit explictly here since it's done in the indexer_ thread.
         }
     }
     for (const auto &[column_id, column_index_entry] : column_index_map_) {
@@ -297,14 +298,6 @@ void TableIndexEntry::Cleanup() && {
     // FIXME: to cleanup fulltext_index_entry_
 }
 
-bool TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
-    if (this->Cleanupable(scanner->visible_ts())) {
-        return true;
-    }
-    std::unique_lock lock(rw_locker_);
-    // TODO(sys)
-
-    return false;
-}
+void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
 } // namespace infinity

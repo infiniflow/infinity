@@ -100,7 +100,7 @@ private: // TODO: remote it
     HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
-    bool PickCleanup(CleanupScanner *scanner) override;
+    void PickCleanup(CleanupScanner *scanner) override;
 
     void Cleanup() && override;
 };

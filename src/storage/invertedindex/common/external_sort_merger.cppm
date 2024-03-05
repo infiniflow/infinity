@@ -47,11 +47,149 @@ export struct DirectIO {
     SizeT length_;
 };
 
+export struct TermTuple {
+    std::string_view term_;
+    u32 doc_id_;
+    u32 term_pos_;
+    int Compare(const TermTuple &rhs) const {
+        int ret = term_.compare(rhs.term_);
+        if (ret == 0) {
+            if (doc_id_ != rhs.doc_id_) {
+                if (doc_id_ < rhs.doc_id_)
+                    return -1;
+                else
+                    return 1;
+            } else {
+                if (term_pos_ != rhs.term_pos_) {
+                    if (term_pos_ < rhs.term_pos_)
+                        return -1;
+                    else
+                        return 1;
+                }
+                return 0;
+            }
+        } else
+            return ret < 0 ? -1 : 1;
+    }
+
+    bool operator==(const TermTuple &other) const { return Compare(other) == 0; }
+
+    bool operator>(const TermTuple &other) const { return Compare(other) < 0; }
+
+    bool operator<(const TermTuple &other) const { return Compare(other) > 0; }
+
+    TermTuple(char *p, u16 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
+        doc_id_ = *((u32 *)(p + term_.size() + 1));
+        term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
+    }
+};
+
+template <typename KeyType, typename LenType, typename = void>
+struct KeyAddress {
+    char *data{nullptr};
+    u64 addr;
+    u32 idx;
+
+    KeyAddress(char *p, u64 ad, u32 i) {
+        data = p;
+        addr = ad;
+        idx = i;
+    }
+
+    KeyAddress() {
+        data = nullptr;
+        addr = -1;
+        idx = -1;
+    }
+
+    KeyType KEY() { return KeyType(data + sizeof(LenType), LEN()); }
+    KeyType KEY() const { return KeyType(data + sizeof(LenType), LEN()); }
+    LenType LEN() const { return *(LenType *)data; }
+    u64 &ADDR() { return addr; }
+    u64 ADDR() const { return addr; }
+    u32 IDX() const { return idx; }
+    u32 &IDX() { return idx; }
+
+    int Compare(const KeyAddress &p) const {
+        if (KEY() == p.KEY())
+            return 0;
+        else if (KEY() > p.KEY())
+            return 1;
+        else
+            return -1;
+    }
+
+    bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
+
+    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+
+    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+};
+
+template <typename KeyType, typename LenType>
+struct KeyAddress<KeyType, LenType, typename std::enable_if<std::is_scalar<KeyType>::value>::type> {
+    char *data{nullptr};
+    u64 addr;
+    u32 idx;
+
+    KeyAddress(char *p, u64 ad, u32 i) {
+        data = p;
+        addr = ad;
+        idx = i;
+    }
+
+    KeyAddress() {
+        data = nullptr;
+        addr = -1;
+        idx = -1;
+    }
+
+    KeyType &KEY() { return *(KeyType *)(data + sizeof(LenType)); }
+    KeyType KEY() const { return *(KeyType *)(data + sizeof(LenType)); }
+
+    LenType LEN() const { return *(LenType *)data; }
+    u64 &ADDR() { return addr; }
+    u64 ADDR() const { return addr; }
+    u32 IDX() const { return idx; }
+    u32 &IDX() { return idx; }
+
+    int Compare(const KeyAddress &p) const {
+        if (KEY() == p.KEY())
+            return 0;
+        else if (KEY() > p.KEY())
+            return 1;
+        else
+            return -1;
+
+        LenType len1 = LEN() / sizeof(KeyType);
+        LenType len2 = p.LEN() / sizeof(KeyType);
+
+        for (LenType i = 1; i < len1 && i < len2; ++i) {
+            if (((KeyType *)(data + sizeof(LenType)))[i] > ((KeyType *)(p.data + sizeof(LenType)))[i])
+                return 1;
+            if (((KeyType *)(data + sizeof(LenType)))[i] < ((KeyType *)(p.data + sizeof(LenType)))[i])
+                return -1;
+        }
+
+        if (len1 == len2)
+            return 0;
+
+        if (len1 > len2)
+            return 1;
+        return -1;
+    }
+
+    bool operator==(const KeyAddress &other) const { return Compare(other) == 0; }
+
+    bool operator>(const KeyAddress &other) const { return Compare(other) < 0; }
+
+    bool operator<(const KeyAddress &other) const { return Compare(other) > 0; }
+};
+
 export template <typename KeyType, typename LenType>
 class SortMerger {
     typedef SortMerger<KeyType, LenType> self_t;
-
-    struct KeyAddr;
+    typedef KeyAddress<KeyType, LenType> KeyAddr;
     String filenm_;
     const u32 MAX_GROUP_SIZE_; //!< max group size
     const u32 BS_SIZE_;        //!< in fact it equals to memory size
@@ -60,8 +198,8 @@ class SortMerger {
     u32 OUT_BUF_SIZE_;         //!< max size of output buffer
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
-    std::priority_queue<struct KeyAddr> pre_heap_;   //!< predict heap
-    std::priority_queue<struct KeyAddr> merge_heap_; //!< merge heap
+    std::priority_queue<KeyAddr> pre_heap_;   //!< predict heap
+    std::priority_queue<KeyAddr> merge_heap_; //!< merge heap
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
     u32 *micro_run_pos_{nullptr};   //!< the access position within each microruns
@@ -101,65 +239,6 @@ class SortMerger {
     u32 group_size_; //!< the real run number that can get from the input file.
 
     u64 FILE_LEN_;
-
-    struct KeyAddr {
-        char *data{nullptr};
-        u64 addr;
-        u32 idx;
-
-        KeyAddr(char *p, u64 ad, u32 i) {
-            data = p;
-            addr = ad;
-            idx = i;
-        }
-
-        KeyAddr() {
-            data = nullptr;
-            addr = -1;
-            idx = -1;
-        }
-
-        KeyType &KEY() { return *(KeyType *)(data + sizeof(LenType)); }
-        KeyType KEY() const { return *(KeyType *)(data + sizeof(LenType)); }
-        LenType LEN() const { return *(LenType *)data; }
-        u64 &ADDR() { return addr; }
-        u64 ADDR() const { return addr; }
-        u32 IDX() const { return idx; }
-        u32 &IDX() { return idx; }
-
-        int Compare(const KeyAddr &p) const {
-            if (KEY() == p.KEY())
-                return 0;
-
-            if (KEY() > p.KEY())
-                return 1;
-            if (KEY() < p.KEY())
-                return -1;
-
-            LenType len1 = LEN() / sizeof(KeyType);
-            LenType len2 = p.LEN() / sizeof(KeyType);
-
-            for (LenType i = 1; i < len1 && i < len2; ++i) {
-                if (((KeyType *)(data + sizeof(LenType)))[i] > ((KeyType *)(p.data + sizeof(LenType)))[i])
-                    return 1;
-                if (((KeyType *)(data + sizeof(LenType)))[i] < ((KeyType *)(p.data + sizeof(LenType)))[i])
-                    return -1;
-            }
-
-            if (len1 == len2)
-                return 0;
-
-            if (len1 > len2)
-                return 1;
-            return -1;
-        }
-
-        bool operator==(const KeyAddr &other) const { return Compare(other) == 0; }
-
-        bool operator>(const KeyAddr &other) const { return Compare(other) < 0; }
-
-        bool operator<(const KeyAddr &other) const { return Compare(other) > 0; }
-    };
 
     void NewBuffer();
 

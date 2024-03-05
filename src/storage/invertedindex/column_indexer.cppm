@@ -32,29 +32,36 @@ namespace infinity {
 class Indexer;
 export class ColumnIndexer {
 public:
-    ColumnIndexer(Indexer *indexer,
-                  u64 column_id,
+    ColumnIndexer(u64 column_id,
+                  const String directory,
                   const InvertedIndexConfig &index_config,
                   SharedPtr<MemoryPool> byte_slice_pool,
-                  SharedPtr<RecyclePool> buffer_pool);
+                  SharedPtr<RecyclePool> buffer_pool,
+                  ThreadPool &thread_pool);
 
     ~ColumnIndexer();
 
-    MemoryIndexer *GetMemoryIndexer() { return active_memory_indexer_.get(); }
-    // realtime insert
-    void Insert(RowID row_id, String &data);
+    MemoryIndexer *GetMemoryIndexer() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return active_memory_indexer_.get();
+    }
 
-    void Insert(const ColumnVector &column_vector, RowID start_row_id);
+    // One thread can call this method. This's non-blocking.
+    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
 
-    void PreCommit();
-
+    // A background thread of Indexer calls this method regularly (for example, every 2 seconds). This's non-blocking.
+    // Other threads can also call this method.
     void Commit();
 
+    // One thread can call this method when memory limit reach (for example, 200MB). This's blocking.
     void Dump();
 
 private:
-    UniquePtr<MemoryIndexer> active_memory_indexer_;
-    String index_name_;
+    std::mutex mutex_;
+    UniquePtr<MemoryIndexer> active_memory_indexer_, standby_memory_indexer_;
+
+    String directory_;
+    ThreadPool &thread_pool_;
     u32 current_segment_id_{0};
 };
 

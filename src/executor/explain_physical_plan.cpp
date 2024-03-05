@@ -1404,6 +1404,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
+        }
     }
 
     if (import_node->left() != nullptr or import_node->right() != nullptr) {
@@ -1465,6 +1468,9 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: FVECS");
             result->emplace_back(file_type);
             break;
+        }
+        case CopyFileType::kInvalid: {
+            UnrecoverableError("Invalid file type");
         }
     }
 

@@ -60,11 +60,10 @@ docker run -d --name infinity -v /tmp/infinity/:/tmp/infinity --network=host inf
 
 #### Deploy Infinity using binary package on Linux x86_64
 
-You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases.
+You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
 
-Fedora/RHEL/OpenSUSE/CentOS
+Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-# not older than centos 7
 sudo rpm -i infinity-0.1.0-dev-x86_64.rpm
 sudo systemctl start infinity
 ```

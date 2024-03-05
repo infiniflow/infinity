@@ -297,19 +297,13 @@ void DBEntry::MergeFrom(BaseEntry &other) {
     }
 }
 
-bool DBEntry::PickCleanup(CleanupScanner *scanner) {
-    if (Cleanupable(scanner->visible_ts())) {
-        return true;
-    }
-    table_meta_map_.PickCleanup(scanner);
-    return false;
-}
+void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }
 
 void DBEntry::Cleanup() && {
     std::move(table_meta_map_).Cleanup();
 
-    LocalFileSystem fs;
-    fs.DeleteDirectory(*db_entry_dir_);
+    // LocalFileSystem fs;
+    // fs.DeleteDirectory(*db_entry_dir_);
 }
 
 } // namespace infinity

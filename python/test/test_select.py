@@ -14,7 +14,7 @@
 import os
 
 import pandas as pd
-import common_values
+from python.test.common import common_values
 import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode

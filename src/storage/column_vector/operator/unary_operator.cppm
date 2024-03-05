@@ -89,6 +89,10 @@ public:
                         BooleanT result_value;
                         Operator::template Execute(input->buffer_->GetCompactBit(0), result_value, result_null.get(), 0, state_ptr);
                         result->buffer_->SetCompactBit(0, result_value);
+                    } else if constexpr (std::is_same_v<InputType, EmbeddingT>) {
+                        EmbeddingT embedding_input(input->data(), false);
+                        Operator::template Execute<InputType, ResultType>(embedding_input, result_ptr[0], result_null.get(), 0, state_ptr);
+                        embedding_input.Reset();
                     } else {
                         Operator::template Execute<InputType, ResultType>(input_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr);
                     }

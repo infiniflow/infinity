@@ -147,9 +147,9 @@ SharedPtr<ColumnIndexEntry> ColumnIndexEntry::Deserialize(const nlohmann::json &
     return column_index_entry;
 }
 
-void ColumnIndexEntry::Cleanup() {
+void ColumnIndexEntry::Cleanup() && {
     for (auto &[segment_id, segment_column_index_entry] : index_by_segment_) {
-        segment_column_index_entry->Cleanup();
+        std::move(*segment_column_index_entry).Cleanup();
     }
 }
 
@@ -291,7 +291,8 @@ Status ColumnIndexEntry::CreateIndexDo(const ColumnDef *column_def, HashMap<u32,
 UniquePtr<CreateIndexParam> ColumnIndexEntry::GetCreateIndexParam(SizeT seg_row_count, SizeT seg_actual_row_count, const ColumnDef *column_def) {
     switch (index_base_->index_type_) {
         case IndexType::kIVFFlat: {
-            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_row_count);
+            // FIXME: actually the seg_actual_row_count is a bad feature, we should remove it in the future
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base_.get(), column_def, seg_actual_row_count);
         }
         case IndexType::kHnsw: {
             SizeT max_element = seg_row_count;

@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
-import common_values
+from python.test.common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from utils import trace_expected_exceptions
@@ -327,7 +327,7 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
-    @pytest.mark.skip(reason="May cause core dumped, and cost too much time.")
+    @pytest.mark.skip(reason="Taking too much time.")
     def test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -353,7 +353,6 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update dropped table
-    @pytest.mark.skip(reason="May cause core dumped.")
     def test_update_dropped_table(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -363,9 +362,10 @@ class TestUpdate:
         db_obj.drop_table("test_update_inserted_long_before")
 
         # update
-        table_obj.update("c1 = 1", [{"c2": 21}])
-        update_res = table_obj.output(["*"]).to_df()
-        print(update_res)
+        with pytest.raises(Exception, match="ERROR:3022*"):
+            table_obj.update("c1 = 1", [{"c2": 21}])
+            update_res = table_obj.output(["*"]).to_df()
+            print(update_res)
 
         # disconnect
         res = infinity_obj.disconnect()

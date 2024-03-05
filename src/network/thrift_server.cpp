@@ -70,6 +70,7 @@ import extra_ddl_info;
 import column_def;
 import statement_common;
 import data_type;
+import type_info;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -130,7 +131,11 @@ public:
         Vector<ColumnDef *> column_defs;
 
         for (auto &proto_column_def : request.column_defs) {
-            auto column_def = GetColumnDefFromProto(proto_column_def);
+            auto [column_def, column_def_status] = GetColumnDefFromProto(proto_column_def);
+            if (!column_def_status.ok()) {
+                ProcessStatus(response, column_def_status);
+                return;
+            }
             column_defs.emplace_back(column_def);
         }
 
@@ -207,13 +212,18 @@ public:
             columns->emplace_back(column);
         }
 
+        Status constant_status;
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
         for (auto &value : request.fields) {
             auto value_list = new Vector<ParsedExpr *>();
             value_list->reserve(value.parse_exprs.size());
             for (auto &expr : value.parse_exprs) {
-                auto parsed_expr = GetConstantFromProto(*expr.type.constant_expr);
+                auto parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
+                if (!constant_status.ok()) {
+                    ProcessStatus(response, constant_status);
+                    return;
+                }
                 value_list->emplace_back(parsed_expr);
             }
             values->emplace_back(value_list);
@@ -223,18 +233,18 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    CopyFileType GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
+    Tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type) {
         switch (copy_file_type) {
             case infinity_thrift_rpc::CopyFileType::CSV:
-                return CopyFileType::kCSV;
+                return {CopyFileType::kCSV, Status::OK()};
             case infinity_thrift_rpc::CopyFileType::JSON:
-                return CopyFileType::kJSON;
+                return {CopyFileType::kJSON, Status::OK()};
             case infinity_thrift_rpc::CopyFileType::JSONL:
-                return CopyFileType::kJSONL;
+                return {CopyFileType::kJSONL, Status::OK()};
             case infinity_thrift_rpc::CopyFileType::FVECS:
-                return CopyFileType::kFVECS;
+                return {CopyFileType::kFVECS, Status::OK()};
             default: {
-                UnrecoverableError("Not implemented copy file type");
+                return {CopyFileType::kInvalid, Status::ImportFileFormatError("Not implemented yet")};
             }
         }
     }
@@ -264,8 +274,13 @@ public:
                               request.table_name,
                               request.file_name));
 
+        auto [copy_file_type, status] = GetCopyFileType(request.import_option.copy_file_type);
+        if (!status.ok()) {
+            ProcessStatus(response, status);
+        }
+
         ImportOptions import_options;
-        import_options.copy_file_type_ = GetCopyFileType(request.import_option.copy_file_type);
+        import_options.copy_file_type_ = copy_file_type;
         auto &delimiter_string = request.import_option.delimiter;
         if (import_options.copy_file_type_ == CopyFileType::kCSV && delimiter_string.size() != 1) {
             ProcessStatus(response, Status::SyntaxError("CSV file delimiter isn't a char."));
@@ -338,7 +353,7 @@ public:
         // auto start2 = std::chrono::steady_clock::now();
 
         // select list
-        if (request.__isset.select_list == false) {
+        if (request.__isset.select_list == false or request.select_list.empty()) {
             ProcessStatus(response, Status::EmptySelectFields());
             return;
         }
@@ -346,14 +361,20 @@ public:
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(request.select_list.size());
 
+        Status parsed_expr_status;
         for (auto &expr : request.select_list) {
-            auto parsed_expr = GetParsedExprFromProto(expr);
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
             output_columns->emplace_back(parsed_expr);
         }
 
         // search expr
         SearchExpr *search_expr = nullptr;
         if (request.__isset.search_expr) {
+            Status knn_expr_status;
             search_expr = new SearchExpr();
             auto search_expr_list = new Vector<ParsedExpr *>();
             SizeT knn_expr_count = request.search_expr.knn_exprs.size();
@@ -362,7 +383,11 @@ public:
             SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
             search_expr_list->reserve(total_expr_count);
             for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-                ParsedExpr *knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+                ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
+                if (!knn_expr_status.ok()) {
+                    ProcessStatus(response, knn_expr_status);
+                    return;
+                }
                 search_expr_list->emplace_back(knn_expr);
             }
 
@@ -382,7 +407,11 @@ public:
         // filter
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
-            filter = GetParsedExprFromProto(request.where_expr);
+            filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
         }
 
         // TODO:
@@ -467,14 +496,20 @@ public:
         Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
         output_columns->reserve(request.select_list.size());
 
+        Status parsed_expr_status;
         for (auto &expr : request.select_list) {
-            auto parsed_expr = GetParsedExprFromProto(expr);
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
             output_columns->emplace_back(parsed_expr);
         }
 
         // search expr
         SearchExpr *search_expr = nullptr;
         if (request.__isset.search_expr) {
+            Status knn_expr_status;
             search_expr = new SearchExpr();
             auto search_expr_list = new Vector<ParsedExpr *>();
             SizeT knn_expr_count = request.search_expr.knn_exprs.size();
@@ -483,7 +518,11 @@ public:
             SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
             search_expr_list->reserve(total_expr_count);
             for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-                ParsedExpr *knn_expr = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
+                ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
+                if (!knn_expr_status.ok()) {
+                    ProcessStatus(response, knn_expr_status);
+                    return;
+                }
                 search_expr_list->emplace_back(knn_expr);
             }
 
@@ -503,7 +542,11 @@ public:
         // filter
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
-            filter = GetParsedExprFromProto(request.where_expr);
+            filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
         }
 
         // TODO:
@@ -567,7 +610,12 @@ public:
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
-            filter = GetParsedExprFromProto(request.where_expr);
+            Status parsed_expr_status;
+            filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
         }
 
         const QueryResult result = table->Delete(filter);
@@ -595,7 +643,12 @@ public:
 
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
-            filter = GetParsedExprFromProto(request.where_expr);
+            Status parsed_expr_status;
+            filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
         }
 
         std::vector<UpdateExpr *> *update_expr_array_{nullptr};
@@ -603,7 +656,11 @@ public:
             update_expr_array_ = new std::vector<UpdateExpr *>();
             update_expr_array_->reserve(request.update_expr_array.size());
             for (auto &update_expr : request.update_expr_array) {
-                auto parsed_expr = GetUpdateExprFromProto(update_expr);
+                auto [parsed_expr, update_expr_status] = GetUpdateExprFromProto(update_expr);
+                if (!update_expr_status.ok()) {
+                    ProcessStatus(response, update_expr_status);
+                    return;
+                }
                 update_expr_array_->emplace_back(parsed_expr);
             }
         }
@@ -764,6 +821,11 @@ public:
         for (auto &index_info : request.index_info_list) {
             auto index_info_to_use = new IndexInfo();
             index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
+            if (index_info_to_use->index_type_ == IndexType::kInvalid) {
+                ProcessStatus(response, Status::InvalidIndexType());
+                return;
+            }
+
             index_info_to_use->column_name_ = index_info.column_name;
 
             auto *index_param_list = new Vector<InitParameter *>();
@@ -836,18 +898,25 @@ private:
         return Status::OK();
     }
 
-    static ColumnDef *GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def) {
+    static Tuple<ColumnDef *, Status> GetColumnDefFromProto(const infinity_thrift_rpc::ColumnDef &column_def) {
         auto column_def_data_type_ptr = GetColumnTypeFromProto(column_def.data_type);
+        if (column_def_data_type_ptr->type() == infinity::LogicalType::kInvalid) {
+            return {nullptr, Status::InvalidDataType()};
+        }
+
         auto constraints = HashSet<ConstraintType>();
 
         for (auto constraint : column_def.constraints) {
             auto type = GetConstraintTypeFromProto(constraint);
+            if (type == ConstraintType::kInvalid) {
+                return {nullptr, Status::InvalidConstraintType()};
+            }
             constraints.insert(type);
         }
 
         const auto &column_def_name = column_def.name;
         auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints);
-        return col_def;
+        return {col_def, Status::OK()};
     }
 
     static SharedPtr<DataType> GetColumnTypeFromProto(const infinity_thrift_rpc::DataType &type) {
@@ -872,15 +941,18 @@ private:
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kDouble);
             case infinity_thrift_rpc::LogicType::Embedding: {
                 auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
+                if (embedding_type == EmbeddingDataType::kElemInvalid) {
+                    return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
+                }
                 auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kEmbedding, embedding_info);
             };
             case infinity_thrift_rpc::LogicType::Varchar:
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
             default:
-                UnrecoverableError("Invalid data type");
+                return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
         }
-        return nullptr;
+        return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
     }
 
     static ConstraintType GetConstraintTypeFromProto(infinity_thrift_rpc::Constraint::type constraint) {
@@ -894,7 +966,7 @@ private:
             case infinity_thrift_rpc::Constraint::Unique:
                 return ConstraintType::kUnique;
             default:
-                UnrecoverableError("Invalid constraint type");
+                return ConstraintType::kInvalid;
         }
     }
 
@@ -915,7 +987,7 @@ private:
             case infinity_thrift_rpc::ElementType::ElementFloat64:
                 return EmbeddingDataType::kElemDouble;
             default:
-                UnrecoverableError("Invalid embedding data type");
+                return EmbeddingDataType::kElemInvalid;
         }
     }
 
@@ -928,12 +1000,12 @@ private:
             case infinity_thrift_rpc::IndexType::FullText:
                 return IndexType::kFullText;
             default:
-                UnrecoverableError("Invalid index type");
+                return IndexType::kInvalid;
         }
         return IndexType::kInvalid;
     }
 
-    static ConstantExpr *GetConstantFromProto(const infinity_thrift_rpc::ConstantExpr &expr) {
+    static ConstantExpr *GetConstantFromProto(Status &status, const infinity_thrift_rpc::ConstantExpr &expr) {
         switch (expr.literal_type) {
             case infinity_thrift_rpc::LiteralType::Boolean: {
                 auto parsed_expr = new ConstantExpr(LiteralType::kBoolean);
@@ -976,7 +1048,7 @@ private:
                 return parsed_expr;
             }
             default: {
-                UnrecoverableError("Invalid constant type");
+                status = Status::InvalidConstantType();
             }
         }
     }
@@ -992,7 +1064,7 @@ private:
         return parsed_expr;
     }
 
-    static FunctionExpr *GetFunctionExprFromProto(const infinity_thrift_rpc::FunctionExpr &function_expr) {
+    static FunctionExpr *GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr) {
         auto *parsed_expr = new FunctionExpr();
         parsed_expr->func_name_ = function_expr.function_name;
         Vector<ParsedExpr *> *arguments;
@@ -1000,19 +1072,36 @@ private:
         arguments->reserve(function_expr.arguments.size());
 
         for (auto &args : function_expr.arguments) {
-            arguments->emplace_back(GetParsedExprFromProto(args));
+            arguments->emplace_back(GetParsedExprFromProto(status, args));
+            if (!status.ok()) {
+                return nullptr;
+            }
         }
 
         parsed_expr->arguments_ = arguments;
         return parsed_expr;
     }
 
-    static KnnExpr *GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
+    static KnnExpr *GetKnnExprFromProto(Status &status, const infinity_thrift_rpc::KnnExpr &expr) {
         auto knn_expr = new KnnExpr(false);
         knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
+
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
+        if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
+            status = Status::InvalidKnnDistanceType();
+            return nullptr;
+        }
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
-        std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+        if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
+            status = Status::InvalidEmbeddingDataType();
+            return nullptr;
+        }
+
+        std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(status, expr.embedding_data);
+        if (!status.ok()) {
+            return nullptr;
+        }
+
         knn_expr->topn_ = expr.topn;
         knn_expr->opt_params_ = new Vector<InitParameter *>();
         for (auto &param : expr.opt_params) {
@@ -1039,18 +1128,18 @@ private:
         return fusion_expr;
     }
 
-    static ParsedExpr *GetParsedExprFromProto(const infinity_thrift_rpc::ParsedExpr &expr) {
+    static ParsedExpr *GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr) {
         if (expr.type.__isset.column_expr == true) {
             auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
             return parsed_expr;
         } else if (expr.type.__isset.constant_expr == true) {
-            auto parsed_expr = GetConstantFromProto(*expr.type.constant_expr);
+            auto parsed_expr = GetConstantFromProto(status, *expr.type.constant_expr);
             return parsed_expr;
         } else if (expr.type.__isset.function_expr == true) {
-            auto parsed_expr = GetFunctionExprFromProto(*expr.type.function_expr);
+            auto parsed_expr = GetFunctionExprFromProto(status, *expr.type.function_expr);
             return parsed_expr;
         } else if (expr.type.__isset.knn_expr == true) {
-            auto parsed_expr = GetKnnExprFromProto(*expr.type.knn_expr);
+            auto parsed_expr = GetKnnExprFromProto(status, *expr.type.knn_expr);
             return parsed_expr;
         } else if (expr.type.__isset.match_expr == true) {
             auto parsed_expr = GetMatchExprFromProto(*expr.type.match_expr);
@@ -1059,7 +1148,7 @@ private:
             auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
             return parsed_expr;
         } else {
-            UnrecoverableError("Invalid parsed expression type");
+            status = Status::InvalidParsedExprType();
         }
         return nullptr;
     }
@@ -1075,7 +1164,7 @@ private:
             case infinity_thrift_rpc::KnnDistanceType::Hamming:
                 return KnnDistanceType::kHamming;
             default:
-                UnrecoverableError("Invalid distance type");
+                return KnnDistanceType::kInvalid;
         }
     }
 
@@ -1096,11 +1185,11 @@ private:
             case infinity_thrift_rpc::ExplainType::Fragment:
                 return ExplainType ::kFragment;
             default:
-                UnrecoverableError("Invalid explain type");
+                return ExplainType::kInvalid;
         }
     }
 
-    static std::pair<void *, int64_t> GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
+    static std::pair<void *, int64_t> GetEmbeddingDataTypeDataPtrFromProto(Status &status, const infinity_thrift_rpc::EmbeddingData &embedding_data) {
         if (embedding_data.__isset.i8_array_value) {
             return std::make_pair((void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size());
         } else if (embedding_data.__isset.i16_array_value) {
@@ -1119,16 +1208,17 @@ private:
         } else if (embedding_data.__isset.f64_array_value) {
             return std::make_pair((void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size());
         } else {
-            UnrecoverableError("Invalid embedding data type");
+            status = Status::InvalidEmbeddingDataType();
         }
         return std::make_pair(nullptr, 0);
     }
 
-    static UpdateExpr *GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
+    static Tuple<UpdateExpr *, Status> GetUpdateExprFromProto(const infinity_thrift_rpc::UpdateExpr &update_expr) {
+        Status status;
         auto up_expr = new UpdateExpr();
         up_expr->column_name = update_expr.column_name;
-        up_expr->value = GetParsedExprFromProto(update_expr.value);
-        return up_expr;
+        up_expr->value = GetParsedExprFromProto(status, update_expr.value);
+        return {up_expr, status};
     }
 
     static infinity_thrift_rpc::ColumnType::type DataTypeToProtoColumnType(const SharedPtr<DataType> &data_type) {
@@ -1154,6 +1244,7 @@ private:
             case LogicalType::kRowID:
                 return infinity_thrift_rpc::ColumnType::ColumnRowID;
             default:
+                // necessary cause it was internal error
                 UnrecoverableError("Invalid data type");
         }
         return infinity_thrift_rpc::ColumnType::ColumnInvalid;
@@ -1219,6 +1310,7 @@ private:
             }
             case LogicalType::kInvalid:
             default: {
+                // necessary cause it was internal error
                 UnrecoverableError("Invalid data type");
             }
         }
@@ -1242,6 +1334,7 @@ private:
             case EmbeddingDataType::kElemDouble:
                 return infinity_thrift_rpc::ElementType::ElementFloat64;
             case EmbeddingDataType::kElemInvalid: {
+                // necessary cause it was internal error
                 UnrecoverableError("Invalid embedding element data type");
             }
         }

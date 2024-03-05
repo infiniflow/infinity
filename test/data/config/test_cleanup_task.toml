@@ -1,0 +1,6 @@
+[general]
+version                 = "0.1.0"
+timezone                = "utc-8"
+
+[resource]
+cleanup_interval = 0

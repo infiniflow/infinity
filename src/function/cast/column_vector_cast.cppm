@@ -134,7 +134,7 @@ struct TryCastValueToVarlenWithType {
     template <typename SourceValueType, typename TargetValueType>
     inline static void Execute(const SourceValueType &input, TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *state_ptr) {
         auto *cast_data_ptr = (ColumnVectorCastData *)(state_ptr);
-        //        LOG_TRACE("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString());
+        // LOG_INFO(fmt::format("{}, {}", cast_data_ptr->source_type_.ToString(), cast_data_ptr->target_type_.ToString()));
         if (Operator::template Run<SourceValueType, TargetValueType>(input,
                                                                      cast_data_ptr->source_type_,
                                                                      result,

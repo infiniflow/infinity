@@ -19,7 +19,7 @@ import blocking_queue;
 import bg_task;
 import stl;
 
-export module backgroud_process;
+export module background_process;
 
 namespace infinity {
 

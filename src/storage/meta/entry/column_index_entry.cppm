@@ -72,7 +72,7 @@ public:
                                                    BufferManager *buffer_mgr,
                                                    TableEntry *table_entry);
 
-    void Cleanup();
+    void Cleanup() &&;
 
 public:
     // Getter
