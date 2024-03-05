@@ -24,6 +24,7 @@ import txn;
 import global_block_id;
 import base_table_ref;
 import internal_types;
+import compact_task_type;
 
 namespace infinity {
 
@@ -76,11 +77,6 @@ export struct CompactSegmentsTaskState {
     UniquePtr<BaseTableRef> new_table_ref_ = nullptr;
 };
 
-export enum class CompactSegmentsTaskType : i8 {
-    kCompactTable,
-    kCompactPickedSegments,
-};
-
 export class CompactSegmentsTask final : public BGTask {
 public:
     static SharedPtr<CompactSegmentsTask> MakeTaskWithPickedSegments(TableEntry *table_entry, Vector<SegmentEntry *> &&segments, Txn *txn);
@@ -121,7 +117,7 @@ private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
 
 private:
-    CompactSegmentsTaskType task_type_;
+    const CompactSegmentsTaskType task_type_;
     TableEntry *table_entry_;
     Vector<SegmentEntry *> segments_;
 

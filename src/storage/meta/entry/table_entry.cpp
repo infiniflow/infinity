@@ -46,6 +46,7 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
+import compact_task_type;
 import compact_segments_task;
 
 namespace infinity {

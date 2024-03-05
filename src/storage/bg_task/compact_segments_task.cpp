@@ -43,6 +43,7 @@ import segment_entry;
 import table_index_entry;
 import table_index_meta;
 import block_entry;
+import compact_task_type;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 

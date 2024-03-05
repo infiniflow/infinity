@@ -24,6 +24,7 @@ import segment_entry;
 import infinity_exception;
 import txn;
 import compaction_alg;
+import third_party;
 
 namespace infinity {
 
@@ -136,7 +137,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
 void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
     if (status_ == DBTStatus::kEnable) {
-        UnrecoverableError("Wrong status of compaction alg");
+        UnrecoverableError(fmt::format("Wrong status of compaction alg: {}", (u8)status_));
     }
 
     for (auto &segment_layer : segment_layers_) {
@@ -150,8 +151,8 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Rollback compact when compaction not running");
+    if (status_ == DBTStatus::kEnable) {
+        UnrecoverableError(fmt::format("Rollback compact when compaction not running, {}", (u8)status_));
     }
 
     for (auto &segment_layer : segment_layers_) {
@@ -205,7 +206,7 @@ Pair<SegmentEntry *, int> DBTCompactionAlg::FindSegmentAndLayer(SegmentID segmen
 void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     std::unique_lock lock(mtx_);
     if (status_ != DBTStatus::kDisable) {
-        UnrecoverableError("Enable compaction when compaction not disable");
+        UnrecoverableError(fmt::format("Enable compaction when compaction not disable, {}", (u8)status_));
     }
     segment_layers_.clear();
     for (auto *segment_entry : segment_entries) {
@@ -222,7 +223,7 @@ void DBTCompactionAlg::Disable() {
 
 void DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
     if (status_ != DBTStatus::kEnable) {
-        UnrecoverableError("Called when compaction not enable");
+        UnrecoverableError(fmt::format("Called when compaction not enable, {}", (u8)status_));
     }
     AddSegmentNoCheckInner(new_segment);
 }

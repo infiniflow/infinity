@@ -21,6 +21,7 @@ import stl;
 import data_access_state;
 import status;
 import internal_types;
+import compact_task_type;
 
 namespace infinity {
 
@@ -33,7 +34,6 @@ class DataBlock;
 class SegmentIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
-enum class CompactSegmentsTaskType;
 
 struct TxnSegmentIndexStore {
     HashMap<u32, SharedPtr<SegmentIndexEntry>> index_entry_map_{};
@@ -54,7 +54,7 @@ public:
 export struct TxnCompactStore {
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
 
-    CompactSegmentsTaskType task_type_;
+    CompactSegmentsTaskType task_type_ = CompactSegmentsTaskType::kInvalid;
 };
 
 export class TxnTableStore {
