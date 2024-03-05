@@ -392,7 +392,6 @@ class TestIndex:
                                                       [index.InitParameter("centroids_count", "128"),
                                                        index.InitParameter("metric", "l2")])], None)
         assert res.error_code == ErrorCode.OK
-
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
 
         # disconnect
