@@ -303,9 +303,22 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         }
     }
     {
+        {
+            String ss = "Commit compact: ";
+            for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+                ss += "new segment: " + std::to_string(new_segment->segment_id_) + " old segment: ";
+                for (const auto *old_segment : old_segments) {
+                    ss += std::to_string(old_segment->segment_id_) + " ";
+                }
+            }
+            LOG_INFO(ss);
+        }
         std::unique_lock lock(this->rw_locker());
         for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-            this->segment_map_.emplace(new_segment->segment_id_, new_segment);
+            auto [_, insert_ok] = this->segment_map_.emplace(new_segment->segment_id_, new_segment);
+            if (!insert_ok) {
+                UnrecoverableError(fmt::format("Insert new segment {} failed.", new_segment->segment_id()));
+            }
             for (const auto &old_segment : old_segments) {
                 old_segment->SetDeprecated(commit_ts);
             }

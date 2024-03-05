@@ -237,6 +237,20 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
     Path p{path};
     u64 removed_count = std::filesystem::remove(p, error_code);
     if (error_code.value() != 0) {
+        // log all files in path
+        std::stringstream ss;
+        // recursively traverse the directory
+        std::function<void(const Path &)> list_dir = [&](const Path path) {
+            for (const auto &entry : std::filesystem::directory_iterator{path}) {
+                ss << entry.path().string() << " ";
+                if (entry.is_directory()) {
+                    list_dir(entry.path());
+                }
+            }
+        };
+        list_dir(p);
+
+        LOG_CRITICAL(fmt::format("ListDirectory: {} is not empty, files: {}", path, ss.str()));
         UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
     }
 }

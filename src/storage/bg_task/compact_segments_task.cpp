@@ -130,17 +130,17 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
         if (to_compact_segments.empty()) {
             return;
         }
+
+        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
+        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         {
             String ss;
             ss += "Compacting segments: ";
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_TRACE(fmt::format("Compacting segments: {}", ss));
+            LOG_INFO(fmt::format("Table {}, compacting segments: {}, into {}", *table_entry_->GetTableName(), ss, new_segment->segment_id()));
         }
-
-        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
-        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
         state.old_segments_.insert(state.old_segments_.end(), to_compact_segments.begin(), to_compact_segments.end());
     };
