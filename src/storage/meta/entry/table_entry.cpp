@@ -315,7 +315,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
             this->segment_map_.emplace(new_segment->segment_id_, new_segment);
             for (const auto &old_segment : old_segments) {
-                old_segment->SetDeprecated(commit_ts);
+                old_segment->SetUnFlush(commit_ts);
             }
         }
     }

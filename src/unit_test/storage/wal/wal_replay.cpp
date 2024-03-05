@@ -747,6 +747,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
+            usleep(2000);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();

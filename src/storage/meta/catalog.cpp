@@ -446,7 +446,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto db_name = add_db_entry_op->db_name();
 
                 auto db_meta = catalog->db_meta_map().at(db_name).get();
-                auto db_entry = DBEntry::NewReplayDBEntry(db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
+                auto db_entry = DBEntry::NewReplayDBEntry(db_meta, db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
                 db_meta->db_entry_list().emplace_front(std::move(db_entry));
                 break;
             }
