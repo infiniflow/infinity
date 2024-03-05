@@ -168,6 +168,7 @@ void BufferObj::Cleanup() {
         UnrecoverableError("Assert: buffer object status isn't freed.");
     }
     file_worker_->CleanupFile();
+    buffer_mgr_->Cleanup(this->GetFilename());
 }
 
 void BufferObj::CheckState() const {
