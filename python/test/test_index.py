@@ -179,7 +179,6 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("column_name", [
         (1, False),
         (2.2, False),
@@ -339,6 +338,7 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    # import data, then create index
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat, index.IndexType.FullText
     ])
@@ -365,9 +365,30 @@ class TestIndex:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # import data, then create index
-    # def test_import_data_create_index(self):
     # create index then insert / import data
+    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat, index.IndexType.FullText])
+    @pytest.mark.parametrize("file_format", ["csv"])
+    def test_create_index_import_data(self, index_type, file_format):
+        # connect
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default")
+        db_obj.drop_table("test_import_data_create_index", if_exists=True)
+        table_obj = db_obj.create_table("test_import_data_create_index", {
+            "c1": "int",
+            "c2": "vector,3,float"}, None)
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c2",
+                                                      index_type,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], None)
+        assert res.error_code == ErrorCode.OK
+
+        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # create index on all data are deleted table.
     # create index on all data are updated.
     # create index on no date are deleted.
