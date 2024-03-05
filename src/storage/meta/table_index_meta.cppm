@@ -66,9 +66,17 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TxnManager *txn_mgr);
 
-    Tuple<TableIndexEntry *, Status> GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    }
 
-    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<TableIndexEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return index_entry_list_.GetEntryNolock(txn_id, begin_ts);
+    }
+
+    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return index_entry_list_.GetEntryReplay(txn_id, begin_ts);
+    }
 
     void DeleteNewEntry(TransactionID txn_id);
 

@@ -40,6 +40,8 @@ import global_block_id;
 import block_index;
 import segment_iter;
 import segment_entry;
+import table_index_entry;
+import table_index_meta;
 import block_entry;
 
 namespace infinity {
@@ -191,19 +193,21 @@ void CompactSegmentsTask::CreateNewIndex(BaseTableRef *new_table_ref) {
     TransactionID txn_id = txn_->TxnID();
     TxnTimeStamp begin_ts = txn_->BeginTS();
 
-    // FIXME: lock here
-    for (auto &[index_name, table_index_meta] : table_entry->index_meta_map()) {
-        auto [table_index_entry, status] = table_index_meta->GetEntry(txn_id, begin_ts);
-        if (!status.ok()) {
-            // Table index entry isn't found
-            RecoverableError(status);
+    {
+        auto map_guard = table_entry->IndexMetaMap();
+        for (auto &[index_name, table_index_meta] : *map_guard) {
+            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            if (!status.ok()) {
+                // Table index entry isn't found
+                RecoverableError(status);
+            }
+            table_index_entry->CreateIndexPrepare(table_entry,
+                                                  new_table_ref->block_index_.get(),
+                                                  txn_,
+                                                  false,  // prepare
+                                                  false,  // isreplay
+                                                  false); // check_ts
         }
-        table_index_entry->CreateIndexPrepare(table_entry,
-                                              new_table_ref->block_index_.get(),
-                                              txn_,
-                                              false,  // prepare
-                                              false,  // isreplay
-                                              false); // check_ts
     }
 }
 

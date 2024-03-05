@@ -115,7 +115,7 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
         auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-        EXPECT_EQ(ret, 0);
+        EXPECT_EQ(ret, 0u);
         idx += vec_n_ / 2;
 
         for (size_t i = 0; i < buffer_size_ && idx < vec_n_; ++i) {
@@ -143,7 +143,7 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_EQ(ret, 0);
+            EXPECT_EQ(ret, 0u);
 
             lvq_store.Save(*file_handler);
         }
@@ -168,7 +168,7 @@ TEST_F(HnswLVQTest, test1) {
 
             LVQ8Store lvq_store = LVQ8Store::Make(vec_n_, dim_, buffer_size_);
             auto ret = lvq_store.AddVec(data.get(), vec_n_ / 2);
-            EXPECT_EQ(ret, 0);
+            EXPECT_EQ(ret, 0u);
 
             idx += vec_n_ / 2;
 

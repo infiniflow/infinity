@@ -276,7 +276,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
-        int delete_n = 0;
+        SizeT delete_n = 0;
         {
             auto txn3 = txn_mgr->CreateTxn();
             txn3->Begin();
@@ -371,7 +371,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             txn_mgr->CommitTxn(txn);
         }
         Vector<SizeT> segment_sizes{1, 10, 100, 1000, 10000, 100000};
-        int row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
+        SizeT row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
@@ -503,7 +503,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
         this->AddSegments(txn_mgr, table_name, segment_sizes, buffer_manager);
 
-        int delete_n = 0;
+        SizeT delete_n = 0;
         {
             auto txn3 = txn_mgr->CreateTxn();
             txn3->Begin();

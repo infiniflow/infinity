@@ -91,17 +91,17 @@ Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp 
 }
 
 Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys): add conflict_type
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
     if (db_meta == nullptr) {
         return {nullptr, status};
     }
-    return db_meta->GetEntry(txn_id, begin_ts);
+    return db_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-void Catalog::RemoveDBEntry(const String &db_name, TransactionID txn_id) {
-    auto [db_meta, _, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError); // FIXME(sys)
+void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {
+    const auto &db_name = *db_entry->db_meta_->db_name();
     LOG_TRACE(fmt::format("Remove a database entry {}", db_name));
-    db_meta->DeleteNewEntry(txn_id);
+    db_entry->db_meta_->DeleteNewEntry(txn_id);
 }
 
 Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -111,7 +111,7 @@ Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts
     res.reserve(this->db_meta_map().size());
     for (const auto &db_meta_pair : this->db_meta_map()) {
         DBMeta *db_meta = db_meta_pair.second.get();
-        auto [db_entry, status] = db_meta->GetEntry(txn_id, begin_ts);
+        auto [db_entry, status] = db_meta->GetEntryNolock(txn_id, begin_ts);
         if (status.ok()) {
             res.emplace_back(db_entry);
         }
@@ -330,7 +330,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
         Path parent_path = catalog_path.parent_path();
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->db_entry_list().emplace_front(std::move(db_entry));

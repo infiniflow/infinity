@@ -35,34 +35,34 @@ public:
 
 protected:
     void CheckDecode(u32 doc_count, u32 flush_count, SharedPtr<BufferedByteSliceReader> &reader) {
-        u32 doc_id[doc_count];
-        uint16_t payload[doc_count];
+        Vector<u32> doc_id(doc_count);
+        Vector<uint16_t> payload(doc_count);
 
         for (u32 i = 0; i < doc_count; ++i) {
             doc_id[i] = i;
             payload[i] = i * 2;
         }
 
-        u32 doc_id_buffer[doc_count * 2];
-        uint16_t doc_payload_buffer[doc_count * 2];
+        Vector<u32> doc_id_buffer(doc_count * 2);
+        Vector<uint16_t> doc_payload_buffer(doc_count * 2);
 
         size_t decode_len;
         u32 i = 0;
         for (; i < doc_count / flush_count; ++i) {
-            ASSERT_TRUE(reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
+            ASSERT_TRUE(reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)flush_count);
-            ASSERT_TRUE(reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
+            ASSERT_TRUE(reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)flush_count);
         }
 
         if (doc_count % flush_count > 0) {
-            ASSERT_TRUE(reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
+            ASSERT_TRUE(reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)doc_count % flush_count);
-            ASSERT_TRUE(reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
+            ASSERT_TRUE(reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
             ASSERT_EQ(decode_len, (size_t)doc_count % flush_count);
         }
-        ASSERT_TRUE(!reader->Decode(doc_id_buffer + i * flush_count, flush_count, decode_len));
-        ASSERT_TRUE(!reader->Decode(doc_payload_buffer + i * flush_count, flush_count, decode_len));
+        ASSERT_TRUE(!reader->Decode(doc_id_buffer.data() + i * flush_count, flush_count, decode_len));
+        ASSERT_TRUE(!reader->Decode(doc_payload_buffer.data() + i * flush_count, flush_count, decode_len));
 
         for (u32 i = 0; i < doc_count; ++i) {
             ASSERT_EQ(doc_id_buffer[i], doc_id[i]);
@@ -97,15 +97,15 @@ protected:
     }
 
     SharedPtr<BufferedByteSliceReader> CreateReader(u32 doc_count, u32 flush_count) {
-        u32 doc_id[doc_count];
-        uint16_t payload[doc_count];
+        Vector<u32> doc_id(doc_count);
+        Vector<uint16_t> payload(doc_count);
 
         for (u32 i = 0; i < doc_count; ++i) {
             doc_id[i] = i;
             payload[i] = i * 2;
         }
 
-        return CreateReader(doc_id, payload, doc_count, flush_count);
+        return CreateReader(doc_id.data(), payload.data(), doc_count, flush_count);
     }
 
     MemoryPool *byte_slice_pool_;

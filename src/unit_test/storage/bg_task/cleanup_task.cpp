@@ -336,11 +336,11 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, false);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
-            int row_count = -1;
+            SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
                 auto *column_vector = column_vectors[i].get();
                 auto column_block_entry = block_entry->GetColumnBlockEntry(i);
-                if (row_count == -1) {
+                if (row_count == std::numeric_limits<SizeT>::max()) {
                     row_count = column_vector->Size();
                 } else {
                     EXPECT_EQ(row_count, column_vector->Size());
@@ -437,11 +437,11 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
             auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, false);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
-            int row_count = -1;
+            SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
                 auto *column_vector = column_vectors[i].get();
                 auto column_block_entry = block_entry->GetColumnBlockEntry(i);
-                if (row_count == -1) {
+                if (row_count == std::numeric_limits<SizeT>::max()) {
                     row_count = column_vector->Size();
                 } else {
                     EXPECT_EQ(row_count, column_vector->Size());

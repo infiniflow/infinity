@@ -124,9 +124,9 @@ protected:
     void TestDecode(const uint32_t doc_count, bool need_flush = false, bool need_tf = false) {
         InMemDocListDecoder *decoder = CreateDecoder(doc_count, need_flush, need_tf);
 
-        docid_t doc_buffer[doc_count];
-        docpayload_t doc_payload[doc_count];
-        tf_t tf_buffer[doc_count];
+        Vector<docid_t> doc_buffer(doc_count);
+        Vector<docpayload_t> doc_payload(doc_count);
+        Vector<tf_t> tf_buffer(doc_count);
 
         docid_t first_doc_id = 0;
         docid_t last_doc_id = 0;
@@ -134,29 +134,29 @@ protected:
 
         uint32_t i = 0;
         for (; i < doc_count / MAX_DOC_PER_RECORD; ++i) {
-            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer.data() + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
             ASSERT_EQ((docid_t)(i * MAX_DOC_PER_RECORD), first_doc_id);
             ASSERT_EQ((docid_t)((i + 1) * MAX_DOC_PER_RECORD - 1), last_doc_id);
             ASSERT_EQ(i * MAX_DOC_PER_RECORD, decoder->GetSeekedDocCount());
             ttf_t expect_ttf = need_tf ? 2 * i * MAX_DOC_PER_RECORD : 0;
             ASSERT_EQ(expect_ttf, ttf);
             if (need_tf) {
-                decoder->DecodeCurrentTFBuffer(tf_buffer + i * MAX_DOC_PER_RECORD);
+                decoder->DecodeCurrentTFBuffer(tf_buffer.data() + i * MAX_DOC_PER_RECORD);
             }
-            decoder->DecodeCurrentDocPayloadBuffer(doc_payload + i * MAX_DOC_PER_RECORD);
+            decoder->DecodeCurrentDocPayloadBuffer(doc_payload.data() + i * MAX_DOC_PER_RECORD);
         }
 
         if (doc_count % MAX_DOC_PER_RECORD > 0) {
-            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+            ASSERT_TRUE(decoder->DecodeDocBuffer(i * MAX_DOC_PER_RECORD, doc_buffer.data() + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
             ASSERT_EQ(i * MAX_DOC_PER_RECORD, decoder->GetSeekedDocCount());
             ASSERT_EQ((docid_t)(i * MAX_DOC_PER_RECORD), first_doc_id);
             ASSERT_EQ((docid_t)(doc_count - 1), last_doc_id);
             ttf_t expect_ttf = need_tf ? 2 * i * MAX_DOC_PER_RECORD : 0;
             ASSERT_EQ(expect_ttf, ttf);
             if (need_tf) {
-                decoder->DecodeCurrentTFBuffer(tf_buffer + i * MAX_DOC_PER_RECORD);
+                decoder->DecodeCurrentTFBuffer(tf_buffer.data() + i * MAX_DOC_PER_RECORD);
             }
-            decoder->DecodeCurrentDocPayloadBuffer(doc_payload + i * MAX_DOC_PER_RECORD);
+            decoder->DecodeCurrentDocPayloadBuffer(doc_payload.data() + i * MAX_DOC_PER_RECORD);
         }
 
         docid_t pre_doc_id = 0;
@@ -169,7 +169,7 @@ protected:
             }
         }
 
-        ASSERT_TRUE(!decoder->DecodeDocBuffer(last_doc_id + 1, doc_buffer + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
+        ASSERT_TRUE(!decoder->DecodeDocBuffer(last_doc_id + 1, doc_buffer.data() + i * MAX_DOC_PER_RECORD, first_doc_id, last_doc_id, ttf));
         decoder->~InMemDocListDecoder();
         byte_slice_pool_->Deallocate((void *)decoder, sizeof(InMemDocListDecoder));
     }

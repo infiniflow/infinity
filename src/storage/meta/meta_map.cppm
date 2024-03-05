@@ -41,13 +41,20 @@ class MetaMap {
 public:
     using Map = HashMap<String, UniquePtr<Meta>>;
 
+    struct MapGuard {
+        Map &operator*() { return meta_map_; }
+
+        Map &meta_map_;
+        std::shared_lock<std::shared_mutex> r_lock_;
+    };
+
 public:
     Tuple<Meta *, std::shared_lock<std::shared_mutex>>
     GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> GetExistMeta(const String &name, ConflictType conflict_type);
 
-    void Iterate(std::function<void(Meta *)> func);
+    MapGuard GetMetaMap() { return {meta_map_, std::shared_lock(rw_locker_)}; }
 
     void PickCleanup(CleanupScanner *scanner);
 
@@ -113,14 +120,6 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
         return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg)), std::move(r_lock)};
     } else {
         UnrecoverableError("Unimplemented");
-    }
-}
-
-template <MetaConcept Meta>
-void MetaMap<Meta>::Iterate(std::function<void(Meta *)> func) {
-    std::unique_lock lock(rw_locker_);
-    for (auto &[name, meta] : meta_map_) {
-        func(meta.get());
     }
 }
 

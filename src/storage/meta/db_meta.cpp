@@ -44,7 +44,7 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mut
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr,
                                                 ConflictType conflict_type) {
-    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(false, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts, txn_mgr); };
     return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
@@ -53,17 +53,11 @@ Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex
                                               TxnTimeStamp begin_ts,
                                               TxnManager *txn_mgr,
                                               ConflictType conflict_type) {
-    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(true, this->data_dir_, this->db_name_, txn_id, begin_ts); };
+    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts, txn_mgr); };
     return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> DBMeta::GetEntry(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntry(txn_id, begin_ts); }
-
-Tuple<DBEntry *, Status> DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return db_entry_list_.GetEntryReplay(txn_id, begin_ts);
-}
-
-void DBMeta::DeleteNewEntry(TransactionID txn_id) { db_entry_list_.DeleteEntry(txn_id); }
+void DBMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = db_entry_list_.DeleteEntry(txn_id); }
 
 SharedPtr<String> DBMeta::ToString() {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
@@ -101,7 +95,7 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {
-            res->db_entry_list().emplace_back(DBEntry::Deserialize(db_entry_json, buffer_mgr));
+            res->db_entry_list().emplace_back(DBEntry::Deserialize(db_entry_json, res.get(), buffer_mgr));
         }
     }
     res->db_entry_list().sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });

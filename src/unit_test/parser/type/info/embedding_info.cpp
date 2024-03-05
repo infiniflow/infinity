@@ -37,12 +37,12 @@ TEST_F(EmbeddingInfoTest, embedding_info_A) {
 
     auto embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemBit, 256);
     EXPECT_EQ(embedding_info_ptr->Size(), 32u);
-    EXPECT_EQ(embedding_info_ptr->Dimension(), 256);
+    EXPECT_EQ(embedding_info_ptr->Dimension(), 256u);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemBit);
 
     embedding_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, EMBEDDING_LIMIT);
     EXPECT_EQ(embedding_info_ptr->Size(), SizeT(EMBEDDING_LIMIT * 8));
-    EXPECT_EQ(embedding_info_ptr->Dimension(), EMBEDDING_LIMIT);
+    EXPECT_EQ(embedding_info_ptr->Dimension(), (u64)EMBEDDING_LIMIT);
     EXPECT_EQ(embedding_info_ptr->Type(), EmbeddingDataType::kElemInt64);
 
     nlohmann::json json;

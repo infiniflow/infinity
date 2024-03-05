@@ -67,6 +67,9 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     } else {
         SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
         auto table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
+
+        txn->AddIndexStore(*index_base->index_name_, table_index_entry.get());
+
         TableIndexEntry *table_index_entry_ptr = table_index_entry.get();
 
         {
@@ -114,14 +117,27 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
                                                                      TransactionID txn_id,
                                                                      TxnTimeStamp begin_ts,
                                                                      TxnTimeStamp commit_ts,
-                                                                     bool is_delete) {
+                                                                     bool is_delete) noexcept {
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->deleted_ = is_delete;
     return table_index_entry;
 }
 
-SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
+
+SharedPtr<TableIndexEntry>
+TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+    auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
+    if (txn_mgr) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        auto &index_name = *table_index_meta->index_name();
+        txn->DropIndexStore(index_name, dropped_index_entry.get());
+    }
+    return dropped_index_entry;
+}
+
+SharedPtr<TableIndexEntry>
+TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
     return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
 }
 
@@ -192,7 +208,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = NewDropTableIndexEntry(table_index_meta, txn_id, begin_ts);
+        auto table_index_entry = NewDropReplayTableIndexEntry(table_index_meta, txn_id, begin_ts);
         table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
@@ -262,6 +278,9 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 }
 
 void TableIndexEntry::Cleanup() {
+    if (this->deleted_) {
+        return;
+    }
     for (auto &[column_id, column_index_entry] : column_index_map_) {
         column_index_entry->Cleanup();
     }
