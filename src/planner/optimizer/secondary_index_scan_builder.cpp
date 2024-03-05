@@ -42,7 +42,8 @@ import catalog;
 import cast_expression;
 import column_expression;
 import secondary_index_scan_execute_expression;
-import column_index_entry;
+import index_base;
+import table_index_entry;
 import create_index_info;
 import table_index_meta;
 
@@ -62,11 +63,11 @@ class FilterExpressionPushDown {
 private:
     QueryContext *query_context_ = nullptr;
     const BaseTableRef &base_table_ref_;
-    HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> candidate_column_index_map_;
+    HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
     Vector<SharedPtr<BaseExpression>> flatten_and_subexpressions_;
     Vector<SharedPtr<BaseExpression>> index_filter_candidates_;
     Vector<SharedPtr<BaseExpression>> index_filter_leftover_;
-    HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_;
+    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
     SharedPtr<BaseExpression> index_filter_qualified_;
     SharedPtr<BaseExpression> extra_leftover_filter;
     Vector<FilterExecuteElem> filter_execute_command;
@@ -133,15 +134,16 @@ private:
                     // Table index entry isn't found
                     RecoverableError(status);
                 }
-                auto &index_map = table_index_entry->column_index_map();
-                for (auto &[column_id, column_index_entry] : index_map) {
-                    if (column_index_entry->index_base_ptr()->index_type_ == IndexType::kSecondary) {
-                        if (candidate_column_index_map_.contains(column_id)) {
-                            LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
-                        } else {
-                            candidate_column_index_map_.emplace(column_id, column_index_entry);
-                        }
-                    }
+                const IndexBase *index_base = table_index_entry->index_base();
+                if (index_base->index_type_ != IndexType::kSecondary) {
+                    continue;
+                }
+                String column_name = index_base->column_name();
+                u64 column_id = table_entry->GetColumnIdByName(column_name);
+                if (candidate_column_index_map_.contains(column_id)) {
+                    LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
+                } else {
+                    candidate_column_index_map_.emplace(column_id, table_index_entry);
                 }
             }
         }

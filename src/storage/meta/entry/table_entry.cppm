@@ -148,6 +148,8 @@ public:
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
+    inline const ColumnDef *GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)].get(); }
+
     inline SizeT ColumnCount() const { return columns_.size(); }
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }

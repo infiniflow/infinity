@@ -30,13 +30,13 @@ struct FulltextIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
 class DataBlock;
-class SegmentColumnIndexEntry;
+class SegmentIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
 
 struct TxnSegmentIndexStore {
-    HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> index_entry_map_{};
+    HashMap<u32, SharedPtr<SegmentIndexEntry>> index_entry_map_{};
 };
 
 export struct TxnIndexStore {
@@ -46,11 +46,9 @@ public:
 
     TableIndexEntry *const table_index_entry_{};
 
-    //    Vector<ColumnIndexEntry*> column_index_entry_{};
-    //
     FulltextIndexEntry *fulltext_index_entry_{};
 
-    HashMap<u64, HashMap<u32, SharedPtr<SegmentColumnIndexEntry>>> index_entry_map_{}; // column_id -> segment_id -> segment_column_index_entry
+    HashMap<u32, SharedPtr<SegmentIndexEntry>> index_entry_map_{}; // segment_id -> segment_index_entry
 };
 
 export struct TxnCompactStore {
@@ -67,8 +65,7 @@ public:
 
     Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
 
-    Tuple<UniquePtr<String>, Status>
-    CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index);
+    Tuple<UniquePtr<String>, Status> CreateIndexFile(TableIndexEntry *table_index_entry, u32 segment_id, SharedPtr<SegmentIndexEntry> index);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
