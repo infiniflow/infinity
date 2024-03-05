@@ -1,7 +1,8 @@
 
 <div align="center">
-  <img width="187" src="https://user-images.githubusercontent.com/93570324/234292265-889228a8-7a68-4e2d-b891-f75262410af1.png"/>
+  <img width="187" src="https://github.com/infiniflow/infinity/assets/7248/015e1f02-1f7f-4b09-a0c2-9d261cd4858b"/>
 </div>
+
 
 <p align="center">
     <b>The AI-native database built for LLM applications, providing incredibly fast full-text and vector search</b>
