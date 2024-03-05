@@ -110,7 +110,7 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
         LOG_TRACE(fmt::format("Ignore drop a non-exist meta: {}", name));
         return {nullptr, Status::OK(), std::move(r_lock)};
     }
-    auto err_msg = MakeUnique<String>(fmt::format("Attempt to drop non-exist entry {}", name));
+    auto err_msg = MakeUnique<String>(fmt::format("Not exist entry {}", name));
     LOG_ERROR(*err_msg);
     if constexpr (std::is_same_v<Meta, TableMeta>) {
         return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg)), std::move(r_lock)};
