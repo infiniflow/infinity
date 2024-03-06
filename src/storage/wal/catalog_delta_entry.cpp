@@ -737,7 +737,7 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
 
 // called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    // LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
+    LOG_INFO(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
     this->commit_ts_ = commit_ts;
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {

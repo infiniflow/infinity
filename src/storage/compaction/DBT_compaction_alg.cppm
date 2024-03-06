@@ -73,8 +73,8 @@ private:
 
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
-    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, void *table_entry)
-        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry) {}
+    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity)
+        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)) {}
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
@@ -104,7 +104,6 @@ private:
 private:
     const DBTConfig config_;
     const int max_layer_;
-    void *table_entry_;
 
     std::mutex mtx_;
     Vector<SegmentLayer> segment_layers_;

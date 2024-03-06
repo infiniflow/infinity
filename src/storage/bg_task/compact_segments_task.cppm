@@ -121,8 +121,8 @@ public:
 private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
 
-public: // TMP: test
-    const CompactSegmentsTaskType task_type_;
+private:
+    CompactSegmentsTaskType task_type_;
     TableEntry *table_entry_;
     Vector<SegmentEntry *> segments_;
 
