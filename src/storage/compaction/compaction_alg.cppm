@@ -22,6 +22,12 @@ import txn;
 
 namespace infinity {
 
+export enum class CompactionStatus : u8 {
+    kDisable,
+    kEnable,
+    kRunning,
+};
+
 /*
     This is the algorithm to select segments to compact.
     When booting the system, call init to construct the algorithm structure
@@ -36,6 +42,9 @@ namespace infinity {
 */
 
 export class CompactionAlg {
+public:
+    CompactionAlg() : status_(CompactionStatus::kDisable) {}
+
 public:
     virtual ~CompactionAlg() = default;
 
@@ -59,6 +68,11 @@ public:
 
     // Used by replay, merely add the segment without checking
     virtual void AddSegmentNoCheck(SegmentEntry *new_segment) = 0;
+
+    CompactionStatus status() const { return status_; }
+
+protected:
+    CompactionStatus status_;
 };
 
 } // namespace infinity
