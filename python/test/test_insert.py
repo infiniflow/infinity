@@ -540,8 +540,6 @@ class TestInsert:
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.complex
-    # @pytest.mark.skip(reason="complex")
-    # @pytest.mark.tag(ct.CaseLabel.L0)
     @pytest.mark.skip(reason="TODO")
     def test_insert_and_shutdown_output(self):
 

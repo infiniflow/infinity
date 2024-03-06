@@ -372,8 +372,6 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    # @pytest.mark.skip(reason="Cast error.")
-    @pytest.mark.skip(reason="When use type = varchar type-example = list, core dumped.")
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value(self, types, types_example):
@@ -384,9 +382,10 @@ class TestUpdate:
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
 
         # update
-        table_obj.update("c1 = 1", [{"c2": types_example}])
-        update_res = table_obj.output(["*"]).to_df()
-        print(update_res)
+        with pytest.raises(Exception, match="Invalid constant expression"):
+            table_obj.update("c1 = 1", [{"c2": types_example}])
+            update_res = table_obj.output(["*"]).to_df()
+            print(update_res)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -419,8 +418,8 @@ class TestUpdate:
         "c1 > 0.1 and c2 < 1.0",
         "c1 < 0.1 and c2 < 1.0",
         "c1 < 0.1 and c1 > 1.0",
-        # FIXME pytest.param("c1", marks=pytest.mark.xfail),
         "c1 = 0",
+        pytest.param("c1", marks=pytest.mark.xfail),
         pytest.param("_row_id", marks=pytest.mark.xfail),
         pytest.param("*", marks=pytest.mark.xfail),
         pytest.param("#@$%@#f", marks=pytest.mark.xfail),
