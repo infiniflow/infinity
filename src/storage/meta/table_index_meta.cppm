@@ -87,8 +87,6 @@ private:
 
     static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
-    void MergeFrom(TableIndexMeta &other);
-
 public:
     const SharedPtr<String> &index_name() const { return index_name_; }
 

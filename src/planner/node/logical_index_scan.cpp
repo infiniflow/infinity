@@ -37,12 +37,14 @@ namespace infinity {
 LogicalIndexScan::LogicalIndexScan(u64 node_id,
                                    SharedPtr<BaseTableRef> &&base_table_ref,
                                    SharedPtr<BaseExpression> &&index_filter_qualified,
-                                   HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &&column_index_map,
+                                   HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                    Vector<FilterExecuteElem> &&filter_execute_command,
+                                   UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                    bool add_row_id)
     : LogicalNode(node_id, LogicalNodeType::kIndexScan), base_table_ref_(std::move(base_table_ref)),
       index_filter_qualified_(std::move(index_filter_qualified)), column_index_map_(std::move(column_index_map)),
-      filter_execute_command_(std::move(filter_execute_command)), add_row_id_(add_row_id) {}
+      filter_execute_command_(std::move(filter_execute_command)), fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)),
+      add_row_id_(add_row_id) {}
 
 Vector<ColumnBinding> LogicalIndexScan::GetColumnBindings() const {
     Vector<ColumnBinding> result;

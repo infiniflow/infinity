@@ -96,27 +96,29 @@ export namespace std {
     using std::shared_lock;
     using std::shared_mutex;
     using std::unique_lock;
+    using std::scoped_lock;
 
-    using std::forward_list;
-    using std::isalpha;
-    using std::isalnum;
-    using std::pow;
-    using std::log2;
-    using std::sqrt;
-    using std::floor;
-    using std::nearbyint;
-    using std::isnan;
-    using std::isinf;
-    using std::fmod;
+    using std::binary_search;
     using std::fabs;
     using std::fill_n;
-    using std::transform;
-    using std::sort;
-    using std::make_heap;
-    using std::pop_heap;
-    using std::reverse;
-    using std::remove_if;
     using std::find;
+    using std::floor;
+    using std::fmod;
+    using std::forward_list;
+    using std::isalnum;
+    using std::isalpha;
+    using std::isinf;
+    using std::isnan;
+    using std::log2;
+    using std::make_heap;
+    using std::nearbyint;
+    using std::pop_heap;
+    using std::pow;
+    using std::remove_if;
+    using std::reverse;
+    using std::sort;
+    using std::sqrt;
+    using std::transform;
 
     namespace ranges {
 
@@ -188,6 +190,7 @@ export namespace std {
     using std::streamsize;
 
     using std::variant;
+    using std::variant_size_v;
     using std::holds_alternative;
     using std::get;
     using std::visit;
@@ -195,6 +198,7 @@ export namespace std {
     using std::is_integral_v;
     using std::is_floating_point_v;
     using std::common_type_t;
+    using std::underlying_type_t;
 
     using std::function;
     using std::monostate;

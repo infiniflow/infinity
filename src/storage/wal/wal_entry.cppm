@@ -47,6 +47,12 @@ export enum class WalCommandType : i8 {
     IMPORT = 20,
     APPEND = 21,
     DELETE = 22,
+
+    // -----------------------------
+    // SEGMENT STATUS
+    // -----------------------------
+    SET_SEGMENT_SEALED = 31,
+
     // -----------------------------
     // Flush
     // -----------------------------
@@ -54,12 +60,16 @@ export enum class WalCommandType : i8 {
     COMPACT = 100,
 };
 
+// used in import / compact, create a sealed segment
 export struct WalSegmentInfo {
     String segment_dir_{};
     SegmentID segment_id_{};
     u16 block_entries_size_{};
     u32 block_capacity_{};
     u16 last_block_row_count_{};
+    u8 have_rough_filter_{};
+    String segment_filter_binary_data_{};
+    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -219,6 +229,32 @@ export struct WalCmdDelete : public WalCmd {
     String db_name_{};
     String table_name_{};
     Vector<RowID> row_ids_{};
+};
+
+export struct WalCmdSetSegmentSealed : public WalCmd {
+    WalCmdSetSegmentSealed(String &&db_name,
+                           String &&table_name,
+                           SegmentID segment_id,
+                           String &&segment_filter_binary_data,
+                           Vector<Pair<BlockID, String>> &&block_filter_binary_data)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+
+    WalCommandType GetType() override { return WalCommandType::SET_SEGMENT_SEALED; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdSetSegmentSealed ReadBufferAdv(char *&ptr);
+
+    const String db_name_{};
+    const String table_name_{};
+    const SegmentID segment_id_{};
+    const String segment_filter_binary_data_{};
+    const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
 export struct WalCmdCheckpoint : public WalCmd {

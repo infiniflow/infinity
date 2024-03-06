@@ -83,6 +83,7 @@ private:
 
     void WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdSetSegmentSealedReplay(const WalCmdSetSegmentSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:

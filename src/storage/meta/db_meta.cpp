@@ -102,17 +102,6 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, Buffer
     return res;
 }
 
-void DBMeta::MergeFrom(DBMeta &other) {
-    // No locking here since only the load stage needs MergeFrom.
-    if (!IsEqual(*this->db_name_, *other.db_name_)) {
-        UnrecoverableError("DBMeta::MergeFrom requires db_name_ match");
-    }
-    if (!IsEqual(*this->data_dir_, *other.data_dir_)) {
-        UnrecoverableError("DBMeta::MergeFrom requires db_dir_ match");
-    }
-    this->db_entry_list_.MergeWith(db_entry_list_);
-}
-
 void DBMeta::Cleanup() { db_entry_list_.Cleanup(); }
 
 bool DBMeta::PickCleanup(CleanupScanner *scanner) { return db_entry_list_.PickCleanup(scanner); }
