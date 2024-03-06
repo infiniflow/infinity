@@ -37,36 +37,6 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def python_sdk_test(python_test_dir: str, pytest_mark: str):
-    print("python test path is {}".format(python_test_dir))
-    # os.system(f"cd {python_test_dir}/test")
-    # check if infinity_sdk is installed
-    # uninstall first
-    os.system("pip uninstall infinity-sdk -y")
-    # install
-    os.system("cd python && python setup.py install")
-    # run test
-    print("start pysdk test...")
-    process = subprocess.Popen(
-        ["python", "-m", "pytest", '-m', pytest_mark, f'{python_test_dir}/test'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
-
-    def reader(pipe, func):
-        for line in iter(pipe.readline, ""):
-            func(line.strip())
-
-    threading.Thread(target=reader, args=[process.stdout, print]).start()
-    threading.Thread(target=reader, args=[process.stderr, print]).start()
-    process.wait()
-    if process.returncode != 0:
-        raise Exception(f"An error occurred: {process.stderr}")
-
-    print("pysdk test finished.")
-
-
 def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
     print("slt_dir path is {}".format(slt_dir))
@@ -103,9 +73,10 @@ def copy_all(data_dir, copy_dir):
         os.makedirs(copy_dir)
     for dirpath, dirnames, filenames in os.walk(data_dir):
         for filename in filenames:
-            src_path = os.path.join(dirpath, filename)
-            dest_path = os.path.join(copy_dir, filename)
-            copyfile(src_path, dest_path)
+            if not os.path.exists(os.path.join(copy_dir, filename)):
+                src_path = os.path.join(dirpath, filename)
+                dest_path = os.path.join(copy_dir, filename)
+                copyfile(src_path, dest_path)
     print("Finished copying all files.")
 
 
@@ -118,7 +89,6 @@ if __name__ == "__main__":
     test_dir = current_path + "/test/sql"
     data_dir = current_path + "/test/data"
     copy_dir = "/tmp/infinity/test_data"
-    python_test_dir = current_path + "/python"
 
     parser = argparse.ArgumentParser(description="SQL Logic Test For Infinity")
 
@@ -151,13 +121,6 @@ if __name__ == "__main__":
         type=str,
         default=data_dir,
         dest="data",
-    )
-    parser.add_argument(
-        "-m",
-        "--pytest_mark",
-        type=str,
-        default='not complex and not slow',
-        dest="pytest_mark",
     )
     parser.add_argument(
         "-c",
@@ -199,7 +162,6 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            python_sdk_test(python_test_dir, args.pytest_mark)
             test_process(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)
