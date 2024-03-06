@@ -25,11 +25,11 @@ namespace infinity {
 
 export class SecondaryIndexScanBuilder final : public OptimizerRule {
 public:
-    ~SecondaryIndexScanBuilder() override final = default;
+    ~SecondaryIndexScanBuilder() final = default;
 
-    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) override final;
+    void ApplyToPlan(QueryContext *query_context_ptr, SharedPtr<LogicalNode> &logical_plan) final;
 
-    String name() const override final { return "Build SecondaryIndexScan"; }
+    String name() const final { return "Build SecondaryIndexScan"; }
 };
 
 } // namespace infinity

@@ -112,6 +112,8 @@ public:
 
     void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
 
+    void SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments);
+
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);

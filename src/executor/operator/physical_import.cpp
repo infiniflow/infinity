@@ -57,6 +57,8 @@ import column_def;
 import wal_entry;
 
 import catalog;
+import catalog_delta_entry;
+import build_fast_rough_filter_task;
 
 namespace infinity {
 
@@ -143,7 +145,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
 
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn(), true);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
     BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
     SizeT row_idx = 0;
@@ -172,7 +174,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
                 SaveSegmentData(txn_store, segment_entry);
 
                 segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn(), true);
+                segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
             }
 
             block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
@@ -199,7 +201,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         Txn *txn = query_context->GetTxn();
         auto *buffer_mgr = txn->GetBufferMgr();
         u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
+        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry_, segment_id, txn);
         UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
         Vector<ColumnVector> column_vectors;
         int column_count = table_entry_->ColumnCount();
@@ -272,7 +274,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     Txn *txn = query_context->GetTxn();
     TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
 
     SizeT start_pos = 0;
@@ -306,7 +308,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 LOG_INFO(fmt::format("Segment {} saved", segment_entry->segment_id()));
                 SaveSegmentData(txn_store, segment_entry);
                 u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn, true);
+                segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry_, segment_id, txn);
             }
 
             block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
@@ -395,7 +397,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (segment_entry->Room() <= 0) {
             SaveSegmentData(txn_store, segment_entry);
             u64 segment_id = Catalog::GetNextSegmentID(parser_context->table_entry_);
-            segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn, true);
+            segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn);
             parser_context->segment_entry_ = segment_entry;
         }
 
@@ -504,19 +506,35 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry) {
-    TxnTimeStamp flush_ts = txn_store->txn_->BeginTS();
+    Txn *txn = txn_store->txn_;
+    TxnTimeStamp flush_ts = txn->BeginTS();
     segment_entry->FlushNewData(flush_ts);
+    // build filter (segment sealing task)
+    BuildFastRoughFilterTask::Execute(segment_entry.get(), txn->buffer_manager(), flush_ts, SegmentStatus::kSealed);
+    // now have bloom filter and minmax filter
+    // serialize filter
+    String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
+    Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
     const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
-
     const String &db_name = *txn_store->table_entry_->GetDBName();
     const String &table_name = *txn_store->table_entry_->GetTableName();
-    txn_store->txn_->AddWalCmd(MakeShared<WalCmdImport>(db_name,
-                                                        table_name,
-                                                        WalSegmentInfo{*segment_entry->segment_dir(),
-                                                                       segment_entry->segment_id(),
-                                                                       static_cast<u16>(block_cnt),
-                                                                       DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
-                                                                       last_block_row_count}));
+    // build WalCmd
+    txn->AddWalCmd(MakeShared<WalCmdImport>(db_name,
+                                            table_name,
+                                            WalSegmentInfo{*segment_entry->segment_dir(),
+                                                           segment_entry->segment_id(),
+                                                           static_cast<u16>(block_cnt),
+                                                           DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
+                                                           last_block_row_count,
+                                                           u8(1), // have_rough_filter_: true
+                                                           segment_filter_binary_data,
+                                                           block_filter_binary_data}));
+    // build delta catalog operation
+    auto catalog_delta_op = MakeUnique<SetSegmentStatusSealedOp>(segment_entry.get(),
+                                                                 std::move(segment_filter_binary_data),
+                                                                 std::move(block_filter_binary_data),
+                                                                 SegmentStatus::kSealed);
+    txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
 
     txn_store->Import(segment_entry);
 }
