@@ -50,6 +50,10 @@ public:
         return std::make_pair(ret, offset_++);
     }
 
+    const void *data() const { return column_vector_->data(); }
+
+    const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
+
 private:
     const BlockEntry *const block_entry_;
     const SharedPtr<ColumnVector> column_vector_;
@@ -74,6 +78,10 @@ public:
         auto ret = column_vector_->data() + offset_ * ele_size_;
         return std::make_pair(ret, offset_++);
     }
+
+    const void *data() const { return column_vector_->data(); }
+
+    const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
 
 private:
     const BlockEntry *const block_entry_;

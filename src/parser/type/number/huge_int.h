@@ -22,7 +22,7 @@ struct HugeInt {
 public:
     HugeInt() = default;
 
-    explicit HugeInt(int64_t upper, int64_t lower) : upper(upper), lower(lower) {}
+    explicit constexpr HugeInt(int64_t upper, int64_t lower) : upper(upper), lower(lower) {}
 
     inline bool operator==(const HugeInt &other) const {
         if (this == &other)
@@ -57,6 +57,8 @@ public:
 
 public:
     [[nodiscard]] inline std::string ToString() const;
+
+    [[nodiscard]] uint64_t GetHash() const { return std::hash<int64_t>{}(upper) ^ std::hash<int64_t>{}(lower); }
 
     inline void Reset() {
         upper = 0;

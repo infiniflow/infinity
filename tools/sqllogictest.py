@@ -19,6 +19,7 @@ from generate_compact import generate as generate8
 from generate_hnsw_with_delete import generate as generate9
 from generate_index_scan import generate as generate10
 from generate_many_import import generate as generate11
+from generate_big_point_query_test_fastroughfilter import generate as generate12
 
 
 class SpinnerThread(threading.Thread):
@@ -150,7 +151,8 @@ if __name__ == "__main__":
     generate9(args.generate_if_exists, args.copy)
     generate10(args.generate_if_exists, args.copy)
     generate11(args.generate_if_exists, args.copy)
-    print("Generate file finished.")
+    generate12(args.generate_if_exists, args.copy)
+    print("Generate file finshed.")
 
     print("Start copying data...")
     if args.just_copy_all_data is True:
