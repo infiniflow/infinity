@@ -522,61 +522,6 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
     return MakeShared<String>(fmt::format("{}/seg_{}", parent_dir, std::to_string(seg_id)));
 }
 
-void SegmentEntry::MergeFrom(BaseEntry &other) {
-    auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
-    if (segment_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    if (*this->segment_dir_ != *segment_entry2->segment_dir_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires segment_dir_ match");
-    }
-    if (this->segment_id_ != segment_entry2->segment_id_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires segment_id_ match");
-    }
-    if (this->column_count_ != segment_entry2->column_count_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires column_count_ match");
-    }
-    if (this->row_capacity_ != segment_entry2->row_capacity_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires row_capacity_ match");
-    }
-    if (this->min_row_ts_ != segment_entry2->min_row_ts_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires min_row_ts_ match");
-    }
-    if (this->block_entries_.size() > segment_entry2->block_entries_.size()) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
-    }
-
-    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
-
-    SizeT block_count = this->block_entries_.size();
-    SizeT idx = 0;
-    for (; idx < block_count; ++idx) {
-        auto &block_entry1 = this->block_entries_[idx];
-        auto &block_entry2 = segment_entry2->block_entries_[idx];
-        if (block_entry1.get() == nullptr) {
-            block_entry1 = block_entry2;
-        } else if (block_entry2.get() != nullptr) {
-            block_entry1->MergeFrom(*block_entry2);
-        }
-    }
-
-    SizeT segment2_block_count = segment_entry2->block_entries_.size();
-    for (; idx < segment2_block_count; ++idx) {
-        this->block_entries_.emplace_back(segment_entry2->block_entries_[idx]);
-    }
-
-    // TODO: maybe cannot merge fast_rough_filter_, need to rebuild
-
-    // for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
-    //     if (this->index_entry_map_.find(index_name) == this->index_entry_map_.end()) {
-    //         this->index_entry_map_.emplace(index_name, index_entry);
-    //     } else {
-    //         this->index_entry_map_[index_name]->MergeFrom(*index_entry);
-    //     }
-    // }
-}
-
 void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();

@@ -746,18 +746,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
     }
 }
 
-void Catalog::MergeFrom(Catalog &other) {
-    // Merge databases.
-    for (auto &[db_name, db_meta2] : other.db_meta_map()) {
-        auto it = this->db_meta_map().find(db_name);
-        if (it == this->db_meta_map().end()) {
-            this->db_meta_map().emplace(db_name, std::move(db_meta2));
-        } else {
-            it->second->MergeFrom(*db_meta2.get());
-        }
-    }
-}
-
 UniquePtr<Catalog> Catalog::LoadFromFile(const String &catalog_path, BufferManager *buffer_mgr) {
     UniquePtr<Catalog> catalog = nullptr;
     LocalFileSystem fs;

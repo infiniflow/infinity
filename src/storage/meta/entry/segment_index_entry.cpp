@@ -504,17 +504,4 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     return segment_index_entry;
 }
 
-void SegmentIndexEntry::MergeFrom(BaseEntry &other) {
-    auto &other_index_entry = dynamic_cast<SegmentIndexEntry &>(other);
-    if (other_index_entry.min_ts_ < min_ts_) {
-        min_ts_ = other_index_entry.min_ts_;
-    }
-    if (other_index_entry.max_ts_ > max_ts_) {
-        max_ts_ = other_index_entry.max_ts_;
-    }
-    if (other_index_entry.checkpoint_ts_ > checkpoint_ts_) {
-        checkpoint_ts_ = other_index_entry.checkpoint_ts_;
-    }
-}
-
 } // namespace infinity

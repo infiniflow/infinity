@@ -74,8 +74,6 @@ public:
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
 
-    void MergeFrom(BaseEntry &other) final;
-
     [[nodiscard]] const String &db_name() const { return *db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
