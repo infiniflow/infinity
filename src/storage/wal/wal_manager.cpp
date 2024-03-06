@@ -590,6 +590,9 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             case WalCommandType::DELETE:
                 WalCmdDeleteReplay(*dynamic_cast<const WalCmdDelete *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
+            case WalCommandType::SET_SEGMENT_SEALED:
+                WalCmdSetSegmentSealedReplay(*dynamic_cast<const WalCmdSetSegmentSealed *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
             case WalCommandType::CHECKPOINT:
                 break;
             case WalCommandType::COMPACT:
@@ -690,6 +693,10 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
+    if (!segment_info.have_rough_filter_) {
+        UnrecoverableError("ReplaySegment for import and compact: sealed segment need filter data");
+    }
+    segment_entry->WalLoadFilterBinaryData(segment_info.segment_filter_binary_data_, segment_info.block_filter_binary_data_);
 
     Catalog::AddSegment(table_entry, segment_entry);
 }
@@ -756,6 +763,18 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     fake_txn->FakeCommit(commit_ts);
     Catalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
     Catalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
+}
+
+void WalManager::WalCmdSetSegmentSealedReplay(const WalCmdSetSegmentSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
+    if (!table_status.ok()) {
+        UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
+    }
+    auto *segment_entry = table_entry->GetSegmentByID(cmd.segment_id_, commit_ts);
+    if (!segment_entry) {
+        UnrecoverableError("Wal Replay: Get segment failed");
+    }
+    segment_entry->WalLoadFilterBinaryData(cmd.segment_filter_binary_data_, cmd.block_filter_binary_data_);
 }
 
 } // namespace infinity

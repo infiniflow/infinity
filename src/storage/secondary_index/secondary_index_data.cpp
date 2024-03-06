@@ -76,13 +76,10 @@ public:
         sorted_key_offset_pair_ = MakeUniqueForOverwrite<KeyOffsetPair[]>(full_data_num_);
     }
 
-    ~SecondaryIndexDataBuilder() override final = default;
+    ~SecondaryIndexDataBuilder() final = default;
 
-    void LoadSegmentData(const SegmentEntry *segment_entry,
-                         BufferManager *buffer_mgr,
-                         ColumnID column_id,
-                         TxnTimeStamp begin_ts,
-                         bool check_ts) override final {
+    void
+    LoadSegmentData(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp begin_ts, bool check_ts) final {
         static_assert(std::is_same_v<OffsetType, SegmentOffset>, "OffsetType != SegmentOffset, need to fix");
         if (check_ts) {
             OneColumnIterator<RawValueType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
@@ -93,7 +90,7 @@ public:
         }
     }
 
-    void StartOutput() override final {
+    void StartOutput() final {
         output_row_progress_ = 0;
         output_part_progress_ = 0;
         // initialize sorted_keys_
@@ -101,7 +98,7 @@ public:
         LOG_TRACE(fmt::format("StartOutput(), output_row_progress_: {}, data_num_: {}.", output_row_progress_, data_num_));
     }
 
-    void EndOutput() override final {
+    void EndOutput() final {
         if (output_row_progress_ != data_num_) {
             UnrecoverableError("EndOutput(): output is not complete: output_row_progress_ != data_num_.");
         }
@@ -113,7 +110,7 @@ public:
         LOG_TRACE(fmt::format("EndOutput(), output_row_progress_: {}, data_num_: {}.", output_row_progress_, data_num_));
     }
 
-    void OutputToHeader(SecondaryIndexDataHead *index_head) override final {
+    void OutputToHeader(SecondaryIndexDataHead *index_head) final {
         if (output_part_progress_ != output_part_num_) {
             UnrecoverableError(
                 "OutputToHeader(): error: output_part_progress_ != output_part_num_, need to call OutputToHeader() after OutputToPart().");
@@ -154,7 +151,7 @@ public:
         LOG_TRACE(fmt::format("OutputToHeader(), output_row_progress_: {}, data_num_: {}.", output_row_progress_, data_num_));
     }
 
-    void OutputToPart(SecondaryIndexDataPart *index_part) override final {
+    void OutputToPart(SecondaryIndexDataPart *index_part) final {
         if (output_part_progress_ != index_part->part_id_) {
             UnrecoverableError("OutputToPart(): error: unexpected index_part->part_id_ value");
         }

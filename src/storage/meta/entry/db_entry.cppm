@@ -106,6 +106,7 @@ private:
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
     }
 
+    friend void RecreateSegmentSealingTasksInStorageInit(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp system_start_ts);
 public:
     DBMeta *const db_meta_;
 

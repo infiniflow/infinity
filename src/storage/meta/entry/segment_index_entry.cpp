@@ -16,7 +16,7 @@ module;
 
 #include <vector>
 
-module segment_column_index_entry;
+module segment_index_entry;
 
 import stl;
 import buffer_manager;
@@ -47,95 +47,93 @@ import column_def;
 import block_column_entry;
 import default_values;
 import segment_iter;
+import annivfflat_index_file_worker;
+import hnsw_file_worker;
+import secondary_index_file_worker;
 
 namespace infinity {
 
-SegmentColumnIndexEntry::SegmentColumnIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
-    : BaseEntry(EntryType::kSegmentColumnIndex), column_index_entry_(column_index_entry), segment_id_(segment_id),
-      vector_buffer_(std::move(vector_buffer)){};
+SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer)
+    : BaseEntry(EntryType::kSegmentIndex), table_index_entry_(table_index_entry), segment_id_(segment_id), vector_buffer_(std::move(vector_buffer)){};
 
-SharedPtr<SegmentColumnIndexEntry>
-SegmentColumnIndexEntry::NewIndexEntry(ColumnIndexEntry *column_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
+SharedPtr<SegmentIndexEntry>
+SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
     auto *buffer_mgr = txn->GetBufferMgr();
 
     // FIXME: estimate index size.
-    auto vector_file_worker = column_index_entry->CreateFileWorker(param, segment_id);
+    auto vector_file_worker = table_index_entry->CreateFileWorker(param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_mgr->Allocate(std::move(vector_file_worker[i]));
     };
-    auto segment_column_index_entry =
-        SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
+    auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     auto begin_ts = txn->BeginTS();
-    segment_column_index_entry->min_ts_ = begin_ts;
-    segment_column_index_entry->max_ts_ = begin_ts;
-    segment_column_index_entry->begin_ts_ = begin_ts;
+    segment_index_entry->min_ts_ = begin_ts;
+    segment_index_entry->max_ts_ = begin_ts;
+    segment_index_entry->begin_ts_ = begin_ts;
 
     {
         if (txn != nullptr) {
-            auto operation = MakeUnique<AddSegmentColumnIndexEntryOp>(segment_column_index_entry);
+            auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
             txn->AddCatalogDeltaOperation(std::move(operation));
         }
     }
-    return segment_column_index_entry;
+    return segment_index_entry;
 }
 
-SharedPtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::NewReplaySegmentIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                                                       TableEntry *table_entry,
-                                                                                       SegmentID segment_id,
-                                                                                       BufferManager *buffer_manager,
-                                                                                       TxnTimeStamp min_ts,
-                                                                                       TxnTimeStamp max_ts,
-                                                                                       TransactionID txn_id,
-                                                                                       TxnTimeStamp begin_ts,
-                                                                                       TxnTimeStamp commit_ts,
-                                                                                       bool is_delete) {
+SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(TableIndexEntry *table_index_entry,
+                                                                           TableEntry *table_entry,
+                                                                           SegmentID segment_id,
+                                                                           BufferManager *buffer_manager,
+                                                                           TxnTimeStamp min_ts,
+                                                                           TxnTimeStamp max_ts,
+                                                                           TransactionID txn_id,
+                                                                           TxnTimeStamp begin_ts,
+                                                                           TxnTimeStamp commit_ts,
+                                                                           bool is_delete) {
 
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    ColumnID column_id = column_index_entry->column_id();
-    auto create_index_param = column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
-    auto vector_file_worker = column_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
+    String column_name = table_index_entry->index_base()->column_name();
+    auto create_index_param =
+        SegmentIndexEntry::GetCreateIndexParam(table_index_entry->index_base(), segment_row_count, table_entry->GetColumnDefByName(column_name));
+    auto vector_file_worker = table_index_entry->CreateFileWorker(create_index_param.get(), segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
     };
-    auto segment_column_index_entry =
-        SharedPtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
-    if (segment_column_index_entry.get() == nullptr) {
+    auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
+    if (segment_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");
     }
-    segment_column_index_entry->min_ts_ = min_ts;
-    segment_column_index_entry->max_ts_ = max_ts;
-    segment_column_index_entry->commit_ts_.store(commit_ts);
-    return segment_column_index_entry;
+    segment_index_entry->min_ts_ = min_ts;
+    segment_index_entry->max_ts_ = max_ts;
+    segment_index_entry->commit_ts_.store(commit_ts);
+    return segment_index_entry;
 }
 
-UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::LoadIndexEntry(ColumnIndexEntry *column_index_entry,
-                                                                           u32 segment_id,
-                                                                           BufferManager *buffer_manager,
-                                                                           CreateIndexParam *param) {
-    auto vector_file_worker = column_index_entry->CreateFileWorker(param, segment_id);
+UniquePtr<SegmentIndexEntry>
+SegmentIndexEntry::LoadIndexEntry(TableIndexEntry *table_index_entry, u32 segment_id, BufferManager *buffer_manager, CreateIndexParam *param) {
+    auto vector_file_worker = table_index_entry->CreateFileWorker(param, segment_id);
     Vector<BufferObj *> vector_buffer(vector_file_worker.size());
     for (u32 i = 0; i < vector_file_worker.size(); ++i) {
         vector_buffer[i] = buffer_manager->Get(std::move(vector_file_worker[i]));
     }
-    return UniquePtr<SegmentColumnIndexEntry>(new SegmentColumnIndexEntry(column_index_entry, segment_id, std::move(vector_buffer)));
+    return UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
 }
 
-BufferHandle SegmentColumnIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndex() { return vector_buffer_[0]->Load(); }
 
-BufferHandle SegmentColumnIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
+BufferHandle SegmentIndexEntry::GetIndexPartAt(u32 idx) { return vector_buffer_[idx + 1]->Load(); }
 
-Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
-                                                   ColumnID column_id,
-                                                   const ColumnDef *column_def,
-                                                   const SegmentEntry *segment_entry,
-                                                   Txn *txn,
-                                                   bool prepare,
-                                                   bool check_ts) {
+Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
+                                             const ColumnDef *column_def,
+                                             const SegmentEntry *segment_entry,
+                                             Txn *txn,
+                                             bool prepare,
+                                             bool check_ts) {
     TxnTimeStamp begin_ts = txn->BeginTS();
 
     auto *buffer_mgr = txn->GetBufferMgr();
@@ -154,11 +152,11 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     auto annivfflat_index = reinterpret_cast<AnnIVFFlatIndexData<f32> *>(buffer_handle.GetDataMut());
                     // TODO: How to select training data?
                     if (check_ts) {
-                        OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
                         annivfflat_index->BuildIndex(iter, dimension, full_row_count);
                     } else {
                         // Not check ts in uncommitted segment when compact segment
-                        OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
                         annivfflat_index->BuildIndex(iter, dimension, full_row_count);
                     }
                     break;
@@ -190,11 +188,11 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                     }
                 };
                 if (check_ts) {
-                    OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
                     InsertHnswInner(iter);
                 } else {
                     // Not check ts in uncommitted segment when compact segment
-                    OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
                     InsertHnswInner(iter);
                 }
             };
@@ -276,7 +274,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
             // fetch the row_count from segment_entry
             auto secondary_index_builder = GetSecondaryIndexDataBuilder(data_type, segment_entry->row_count(), part_capacity);
-            secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_id, begin_ts, check_ts);
+            secondary_index_builder->LoadSegmentData(segment_entry, buffer_mgr, column_def->id(), begin_ts, check_ts);
             secondary_index_builder->StartOutput();
             // 2. output into SecondaryIndexDataPart
             {
@@ -306,7 +304,7 @@ Status SegmentColumnIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
     return Status::OK();
 }
 
-Status SegmentColumnIndexEntry::CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
+Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx) {
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
             auto InsertHnswDo = [&](auto *hnsw_index, atomic_u64 &create_index_idx) {
@@ -399,10 +397,10 @@ Status SegmentColumnIndexEntry::CreateIndexDo(const IndexBase *index_base, const
     return Status::OK();
 }
 
-void SegmentColumnIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
+void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
 
-bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
-    String &index_name = *this->column_index_entry_->col_index_dir();
+bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
+    String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
     if (this->max_ts_ <= this->checkpoint_ts_ || this->min_ts_ > checkpoint_ts) {
         LOG_TRACE(fmt::format("Segment: {}, Index: {} has been flushed at some previous checkpoint, or is not visible at current checkpoint.",
@@ -416,7 +414,7 @@ bool SegmentColumnIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return true;
 }
 
-void SegmentColumnIndexEntry::Cleanup() {
+void SegmentIndexEntry::Cleanup() {
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {
             UnrecoverableError("vector_buffer should not has nullptr.");
@@ -425,10 +423,36 @@ void SegmentColumnIndexEntry::Cleanup() {
     }
 }
 
-void SegmentColumnIndexEntry::PickCleanup(CleanupScanner *scanner) {}
+void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
-void SegmentColumnIndexEntry::SaveIndexFile() {
-    String &index_name = *this->column_index_entry_->col_index_dir();
+UniquePtr<CreateIndexParam> SegmentIndexEntry::GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def) {
+    switch (index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
+        }
+        case IndexType::kHnsw: {
+            SizeT max_element = seg_row_count;
+            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
+        }
+        case IndexType::kFullText: {
+            return MakeUnique<CreateFullTextParam>(index_base, column_def);
+        }
+        case IndexType::kSecondary: {
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+    return nullptr;
+}
+
+void SegmentIndexEntry::SaveIndexFile() {
+    String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
     LOG_TRACE(fmt::format("Segment: {}, Index: {} is being flushing", segment_id, index_name));
     for (auto &buffer_ptr : vector_buffer_) {
@@ -439,7 +463,7 @@ void SegmentColumnIndexEntry::SaveIndexFile() {
     }
 }
 
-nlohmann::json SegmentColumnIndexEntry::Serialize() {
+nlohmann::json SegmentIndexEntry::Serialize() {
     if (this->deleted_) {
         UnrecoverableError("Segment Column index entry can't be deleted.");
     }
@@ -456,10 +480,10 @@ nlohmann::json SegmentColumnIndexEntry::Serialize() {
     return index_entry_json;
 }
 
-UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nlohmann::json &index_entry_json,
-                                                                        ColumnIndexEntry *column_index_entry,
-                                                                        BufferManager *buffer_mgr,
-                                                                        TableEntry *table_entry) {
+UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json &index_entry_json,
+                                                            TableIndexEntry *table_index_entry,
+                                                            BufferManager *buffer_mgr,
+                                                            TableEntry *table_entry) {
     u32 segment_id = index_entry_json["segment_id"];
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
@@ -467,23 +491,21 @@ UniquePtr<SegmentColumnIndexEntry> SegmentColumnIndexEntry::Deserialize(const nl
         UnrecoverableError(status.message());
         return nullptr;
     }
-    u64 column_id = column_index_entry->column_id();
+    String column_name = table_index_entry->index_base()->column_name();
     UniquePtr<CreateIndexParam> create_index_param =
-        column_index_entry->GetCreateIndexParam(segment_row_count, table_entry->GetColumnDefByID(column_id));
-    // TODO: need to get create index param;
-    //    UniquePtr<CreateIndexParam> create_index_param = SegmentEntry::GetCreateIndexParam(segment_entry, index_base, column_def.get());
-    auto segment_column_index_entry = LoadIndexEntry(column_index_entry, segment_id, buffer_mgr, create_index_param.get());
-    if (segment_column_index_entry.get() == nullptr) {
+        GetCreateIndexParam(table_index_entry->index_base(), segment_row_count, table_entry->GetColumnDefByName(column_name));
+    auto segment_index_entry = LoadIndexEntry(table_index_entry, segment_id, buffer_mgr, create_index_param.get());
+    if (segment_index_entry.get() == nullptr) {
         UnrecoverableError("Failed to load index entry");
     }
-    segment_column_index_entry->min_ts_ = index_entry_json["min_ts"];
-    segment_column_index_entry->max_ts_ = index_entry_json["max_ts"];
-    segment_column_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
-    return segment_column_index_entry;
+    segment_index_entry->min_ts_ = index_entry_json["min_ts"];
+    segment_index_entry->max_ts_ = index_entry_json["max_ts"];
+    segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
+    return segment_index_entry;
 }
 
-void SegmentColumnIndexEntry::MergeFrom(BaseEntry &other) {
-    auto &other_index_entry = dynamic_cast<SegmentColumnIndexEntry &>(other);
+void SegmentIndexEntry::MergeFrom(BaseEntry &other) {
+    auto &other_index_entry = dynamic_cast<SegmentIndexEntry &>(other);
     if (other_index_entry.min_ts_ < min_ts_) {
         min_ts_ = other_index_entry.min_ts_;
     }

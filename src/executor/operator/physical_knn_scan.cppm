@@ -27,13 +27,14 @@ import global_block_id;
 import base_table_ref;
 import table_entry;
 import block_column_entry;
-import segment_column_index_entry;
+import segment_index_entry;
 import block_index;
 import load_meta;
 import knn_expression;
 import infinity_exception;
 import internal_types;
 import data_type;
+import fast_rough_filter;
 
 namespace infinity {
 
@@ -43,12 +44,14 @@ public:
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<KnnExpression> knn_expression,
                              SharedPtr<BaseExpression> filter_expression,
+                             UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                              SharedPtr<Vector<String>> output_names,
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
-          knn_expression_(std::move(knn_expression)), filter_expression_(std::move(filter_expression)), output_names_(std::move(output_names)),
+          knn_expression_(std::move(knn_expression)), filter_expression_(std::move(filter_expression)),
+          fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
@@ -73,13 +76,9 @@ public:
 
     void PlanWithIndex(QueryContext *query_context);
 
-    inline SizeT TaskCount() const {
-        return block_column_entries_->size() + index_entries_->size();
-    }
+    inline SizeT TaskCount() const { return block_column_entries_->size() + index_entries_->size(); }
 
-    SizeT TaskletCount() override {
-        return block_column_entries_->size() + index_entries_->size();
-    }
+    SizeT TaskletCount() override { return block_column_entries_->size() + index_entries_->size(); }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -92,12 +91,14 @@ public:
 
     SharedPtr<BaseExpression> filter_expression_{};
 
+    UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
+
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     u64 knn_table_index_{};
 
     UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
+    UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
 private:
     template <typename DataType, template <typename, typename> typename C>

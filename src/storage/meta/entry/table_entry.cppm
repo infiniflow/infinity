@@ -112,6 +112,8 @@ public:
 
     void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
 
+    void SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments);
+
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
@@ -147,6 +149,8 @@ public:
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
+
+    inline const ColumnDef *GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)].get(); }
 
     inline SizeT ColumnCount() const { return columns_.size(); }
 

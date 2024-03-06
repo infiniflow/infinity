@@ -144,16 +144,16 @@ class SecondaryPGMIndexTemplate final : public SecondaryPGMIndex {
 public:
     SecondaryPGMIndexTemplate() = default;
 
-    ~SecondaryPGMIndexTemplate() override final = default;
+    ~SecondaryPGMIndexTemplate() final = default;
 
-    void SaveIndex(FileHandler &file_handler) const override final {
+    void SaveIndex(FileHandler &file_handler) const final {
         if (!initialized_) {
             UnrecoverableError("Not initialized yet.");
         }
         pgm_index_->Save(file_handler);
     }
 
-    void LoadIndex(FileHandler &file_handler) override final {
+    void LoadIndex(FileHandler &file_handler) final {
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
@@ -162,7 +162,7 @@ public:
         initialized_ = true;
     }
 
-    void BuildIndex(SizeT data_cnt, const void *data_ptr) override final {
+    void BuildIndex(SizeT data_cnt, const void *data_ptr) final {
         if (initialized_) {
             UnrecoverableError("Already initialized.");
         }
@@ -171,7 +171,7 @@ public:
         initialized_ = true;
     }
 
-    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const override final {
+    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const final {
         if (!initialized_) {
             UnrecoverableError("Not initialized yet.");
         }

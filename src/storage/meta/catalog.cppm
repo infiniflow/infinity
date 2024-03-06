@@ -26,8 +26,7 @@ export module catalog;
 // export import :block_column_entry;
 // export import :table_index_meta;
 // export import :table_index_entry;
-// export import :column_index_entry;
-// export import :segment_column_index_entry;
+// export import :segment_index_entry;
 // export import :fulltext_index_entry;
 // export import :base_entry;
 

@@ -21,9 +21,8 @@
 namespace infinity {
 struct TimestampType : public DateTimeType {
     TimestampType() = default;
-    explicit TimestampType(int32_t date_value, int32_t time_value) : DateTimeType(date_value, time_value){};
-    explicit TimestampType(int64_t epoch_time) : DateTimeType(epoch_time){};
-    ~TimestampType() = default;
+    explicit constexpr TimestampType(int32_t date_value, int32_t time_value) : DateTimeType(date_value, time_value){};
+    explicit constexpr TimestampType(int64_t epoch_time) : DateTimeType(epoch_time){};
 };
 /*
 struct TimestampType {

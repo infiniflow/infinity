@@ -100,6 +100,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             String segment_dir = ReadBufAdv<String>(ptr);
+            SegmentStatus segment_status = ReadBufAdv<SegmentStatus>(ptr);
             u64 column_count = ReadBufAdv<u64>(ptr);
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
             SizeT actual_row_count = ReadBufAdv<SizeT>(ptr);
@@ -114,6 +115,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                       std::move(table_name),
                                                       segment_id,
                                                       segment_dir,
+                                                      segment_status,
                                                       column_count,
                                                       row_count,
                                                       actual_row_count,
@@ -210,46 +212,59 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                             index_dir);
             break;
         }
-        case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
+        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
-            String col_index_dir = ReadBufAdv<String>(ptr);
-            ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
-
-            SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            operation = MakeUnique<AddColumnIndexEntryOp>(begin_ts,
-                                                          is_delete,
-                                                          txn_id,
-                                                          commit_ts,
-                                                          std::move(db_name),
-                                                          std::move(table_name),
-                                                          std::move(index_name),
-                                                          col_index_dir,
-                                                          column_id,
-                                                          index_base);
-            break;
-        }
-        case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             TxnTimeStamp min_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            operation = MakeUnique<AddSegmentColumnIndexEntryOp>(begin_ts,
-                                                                 is_delete,
-                                                                 txn_id,
-                                                                 commit_ts,
-                                                                 std::move(db_name),
-                                                                 std::move(table_name),
-                                                                 std::move(index_name),
-                                                                 column_id,
-                                                                 segment_id,
-                                                                 min_ts,
-                                                                 max_ts);
+            operation = MakeUnique<AddSegmentIndexEntryOp>(begin_ts,
+                                                           is_delete,
+                                                           txn_id,
+                                                           commit_ts,
+                                                           std::move(db_name),
+                                                           std::move(table_name),
+                                                           std::move(index_name),
+                                                           segment_id,
+                                                           min_ts,
+                                                           max_ts);
             break;
+        }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            i32 cnt = ReadBufAdv<i32>(ptr);
+            Vector<SegmentID> set_sealing_segments(cnt);
+            for (i32 i = 0; i < cnt; i++) {
+                set_sealing_segments[i] = ReadBufAdv<SegmentID>(ptr);
+            }
+            operation = MakeUnique<SetSegmentStatusSealingOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, std::move(set_sealing_segments));
+            break;
+        }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
+            Vector<Pair<BlockID, String>> block_filter_binary_data;
+            i32 block_filter_binary_vector_size = ReadBufAdv<i32>(ptr);
+            for (i32 i = 0; i < block_filter_binary_vector_size; i++) {
+                BlockID block_id = ReadBufAdv<BlockID>(ptr);
+                String block_filter_binary = ReadBufAdv<String>(ptr);
+                block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
+            }
+            SegmentStatus prev_status = ReadBufAdv<SegmentStatus>(ptr);
+            operation = MakeUnique<SetSegmentStatusSealedOp>(begin_ts,
+                                                             is_delete,
+                                                             txn_id,
+                                                             commit_ts,
+                                                             db_name,
+                                                             table_name,
+                                                             segment_id,
+                                                             std::move(segment_filter_binary_data),
+                                                             std::move(block_filter_binary_data),
+                                                             prev_status);
         }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
@@ -311,7 +326,7 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->segment_dir_);
-
+    WriteBufAdv(buf, this->status_);
     WriteBufAdv(buf, this->column_count_);
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->actual_row_count_);
@@ -371,27 +386,40 @@ void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->index_dir_);
 }
 
-void AddColumnIndexEntryOp::WriteAdv(char *&buf) const {
+void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
-    WriteBufAdv(buf, this->col_index_dir_);
-    WriteBufAdv(buf, this->column_id_);
-    if (!is_delete()) {
-        index_base_->WriteAdv(buf);
-    }
-}
-
-void AddSegmentColumnIndexEntryOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, *this->index_name_);
-    WriteBufAdv(buf, this->column_id_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->min_ts_);
     WriteBufAdv(buf, this->max_ts_);
+}
+
+void SetSegmentStatusSealingOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    i32 cnt = this->set_sealing_segments_.size();
+    WriteBufAdv(buf, cnt);
+    for (i32 i = 0; i < cnt; i++) {
+        WriteBufAdv(buf, this->set_sealing_segments_[i]);
+    }
+}
+
+void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->segment_filter_binary_data_);
+    i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
+    WriteBufAdv(buf, block_filter_binary_vector_size);
+    for (const auto &block_filter : block_filter_binary_data_) {
+        WriteBufAdv(buf, block_filter.first);
+        WriteBufAdv(buf, block_filter.second);
+    }
+    WriteBufAdv(buf, this->prev_status_);
 }
 
 void AddDBMetaOp::SaveState() {
@@ -484,21 +512,25 @@ void AddFulltextIndexEntryOp::SaveState() {
     is_saved_sate_ = true;
 }
 
-void AddColumnIndexEntryOp::SaveState() {
-    this->is_delete_ = column_index_entry_->deleted_;
-    this->begin_ts_ = column_index_entry_->begin_ts_;
-    this->col_index_dir_ = *this->column_index_entry_->col_index_dir();
-    this->column_id_ = this->column_index_entry_->column_id();
-    this->index_base_ = this->column_index_entry_->index_base();
+void AddSegmentIndexEntryOp::SaveState() {
+    this->is_delete_ = segment_index_entry_->deleted_;
+    this->begin_ts_ = segment_index_entry_->begin_ts_;
+    this->segment_id_ = this->segment_index_entry_->segment_id();
+    this->min_ts_ = this->segment_index_entry_->min_ts();
+    this->max_ts_ = this->segment_index_entry_->max_ts();
     is_saved_sate_ = true;
 }
 
-void AddSegmentColumnIndexEntryOp::SaveState() {
-    this->is_delete_ = segment_column_index_entry_->deleted_;
-    this->begin_ts_ = segment_column_index_entry_->begin_ts_;
-    this->segment_id_ = this->segment_column_index_entry_->segment_id();
-    this->min_ts_ = this->segment_column_index_entry_->min_ts();
-    this->max_ts_ = this->segment_column_index_entry_->max_ts();
+void SetSegmentStatusSealingOp::SaveState() {
+    is_saved_sate_ = true;
+}
+
+void SetSegmentStatusSealedOp::SaveState() {
+    if (this->segment_filter_binary_data_.size() == 0 or this->block_filter_binary_data_.size() == 0) {
+        UnrecoverableError("segment_filter_binary_data_ or block_filter_binary_data_ is empty");
+    }
+    // change segment status to sealed here, in the CommitBottom
+    this->segment_entry_->FinishTaskSetSegmentStatusSealed(this->prev_status_);
     is_saved_sate_ = true;
 }
 
@@ -591,25 +623,22 @@ const String AddFulltextIndexEntryOp::ToString() const {
                        index_dir_);
 }
 
-const String AddColumnIndexEntryOp::ToString() const {
-    return fmt::format("AddColumnIndexEntryOp db_name: {} table_name: {} index_name: {} col_index_dir: {} column_id: {} index_base: {}",
+const String AddSegmentIndexEntryOp::ToString() const {
+    return fmt::format("AddSegmentIndexEntryOp db_name: {} table_name: {} index_name: {} segment_id: {} min_ts: {} max_ts: {}",
                        *db_name_,
                        *table_name_,
                        *index_name_,
-                       col_index_dir_,
-                       column_id_,
-                       index_base_->ToString());
-}
-
-const String AddSegmentColumnIndexEntryOp::ToString() const {
-    return fmt::format("AddSegmentColumnIndexEntryOp db_name: {} table_name: {} index_name: {} column_id: {} segment_id: {} min_ts: {} max_ts: {}",
-                       *db_name_,
-                       *table_name_,
-                       *index_name_,
-                       column_id_,
                        segment_id_,
                        min_ts_,
                        max_ts_);
+}
+
+const String SetSegmentStatusSealingOp::ToString() const {
+    return fmt::format("SetSegmentStatusSealingOp db_name: {} table_name: {}", db_name_, table_name_);
+}
+
+const String SetSegmentStatusSealedOp::ToString() const {
+    return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
 }
 
 void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
@@ -618,7 +647,7 @@ void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full
     this->segment_entry_->TrySetDeprecated();
 }
 
-void AddSegmentColumnIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_column_index_entry_->Flush(max_commit_ts); }
+void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_index_entry_->Flush(max_commit_ts); }
 
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
