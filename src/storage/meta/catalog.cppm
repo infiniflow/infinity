@@ -203,9 +203,6 @@ public:
 
     static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
-    // This not add row count
-    static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
-
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);

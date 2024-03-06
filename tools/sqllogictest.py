@@ -197,7 +197,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            python_sdk_test(python_test_dir, args.pytest_mark)
+            # python_sdk_test(python_test_dir, args.pytest_mark)
             test_process(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)

@@ -43,6 +43,7 @@ import segment_entry;
 import table_index_entry;
 import table_index_meta;
 import block_entry;
+import compaction_alg;
 
 namespace infinity {
 
@@ -103,11 +104,16 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
-    return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
+    auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
+    table_entry->CheckCompaction(CompactionStatus::kRunning);
+    LOG_INFO(fmt::format("Compact create picked, tablename: {}", *table_entry->GetTableName()));
+    return ret;
 }
 
 SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
+    table_entry->CheckCompaction(CompactionStatus::kDisable);
+    LOG_INFO(fmt::format("Compact create whole, tablename: {}", *table_entry->GetTableName()));
     return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
 
@@ -116,9 +122,9 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<Segment
 
 void CompactSegmentsTask::Execute() {
     auto state = CompactSegments();
-    CreateNewIndex(state.new_table_ref_.get());
     SaveSegmentsData(std::move(state.segment_data_));
     ApplyDeletes(state.remapper_, state.old_segments_);
+    CreateNewIndex(state.new_table_ref_.get());
 }
 
 // generate new_table_ref_ to compact
@@ -130,17 +136,21 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
         if (to_compact_segments.empty()) {
             return;
         }
+
+        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
+        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         {
             String ss;
             ss += "Compacting segments: ";
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_TRACE(fmt::format("Compacting segments: {}", ss));
+            LOG_INFO(fmt::format("Table {}, type: {}, compacting segments: {}, into {}",
+                                 *table_entry_->GetTableName(),
+                                 (u8)task_type_,
+                                 ss,
+                                 new_segment->segment_id()));
         }
-
-        auto new_segment = CompactSegmentsToOne(state.remapper_, to_compact_segments);
-        block_index->Insert(new_segment.get(), UNCOMMIT_TS, false);
         state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
         state.old_segments_.insert(state.old_segments_.end(), to_compact_segments.begin(), to_compact_segments.end());
     };

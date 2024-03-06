@@ -217,6 +217,8 @@ private:
 
     int RandomLevel() {
         int new_level = 1;
+        // Why not use (rand() & 1 == 0)
+        // 0.5 is the probability
         while (static_cast<double>(rand() / RAND_MAX) < 0.5 && new_level < MAX_LEVEL) {
             new_level++;
         }

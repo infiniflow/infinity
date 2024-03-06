@@ -71,16 +71,10 @@ private:
     MultiHashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
 };
 
-export enum class DBTStatus : u8 {
-    kDisable,
-    kEnable,
-    kRunning,
-};
-
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity)
-        : config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), status_(DBTStatus::kDisable) {}
+        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)) {}
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
@@ -95,13 +89,17 @@ public:
 
     virtual void Disable() override;
 
+    virtual void AddSegmentNoCheck(SegmentEntry *new_segment) override;
+
 private:
     // return layer
-    int AddSegmentNoCheck(SegmentEntry *new_segment);
+    int AddSegmentNoCheckInner(SegmentEntry *new_segment);
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
     Pair<SegmentEntry *, int> FindSegmentAndLayer(SegmentID segment_id);
+
+    void SetRunning(std::unique_lock<std::mutex> &lock);
 
 private:
     const DBTConfig config_;
@@ -111,7 +109,6 @@ private:
     Vector<SegmentLayer> segment_layers_;
 
     std::condition_variable cv_;
-    DBTStatus status_;
 };
 
 } // namespace infinity

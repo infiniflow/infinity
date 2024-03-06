@@ -260,12 +260,6 @@ Status Catalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, Sh
 
 SegmentID Catalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
 
-void Catalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry) {
-    table_entry->segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
-    // ATTENTION: focusing on the segment id
-    table_entry->next_segment_id_++;
-}
-
 SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);
@@ -487,7 +481,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                 begin_ts,
                                                                                 txn_id);
 
-                table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
+                table_entry->DeltaReplaySegment(std::move(segment_entry));
                 break;
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
