@@ -57,6 +57,9 @@ export struct TxnCompactStore {
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
 
     CompactSegmentsTaskType task_type_;
+
+    TxnCompactStore();
+    TxnCompactStore(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&, CompactSegmentsTaskType);
 };
 
 export class TxnTableStore {
@@ -91,8 +94,11 @@ public:
     HashMap<String, TxnIndexStore> txn_indexes_store_{};
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
-    TxnCompactStore compact_state_{};
 
+private:
+    TxnCompactStore compact_state_;
+
+public:
     SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
