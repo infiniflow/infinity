@@ -99,6 +99,8 @@ private:
 
     Pair<SegmentEntry *, int> FindSegmentAndLayer(SegmentID segment_id);
 
+    void SetRunning(std::unique_lock<std::mutex> &lock);
+
 private:
     const DBTConfig config_;
     const int max_layer_;

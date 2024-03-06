@@ -80,7 +80,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
     if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
         return None;
     }
-    status_ = CompactionStatus::kRunning; // Do have compaction
+    this->SetRunning(lock); // Do have compaction
 
     Txn *txn = generate_txn();
     TransactionID txn_id = txn->TxnID();
@@ -110,7 +110,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     if (old_layer == new_layer) {
         return None;
     }
-    status_ = CompactionStatus::kRunning; // Do have compaction
+    this->SetRunning(lock); // Do have compaction
 
     if (new_layer >= old_layer) {
         UnrecoverableError("Shrink segment should has less rows than before");
@@ -212,6 +212,7 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
     status_ = CompactionStatus::kEnable;
+    cv_.notify_one();
 }
 
 void DBTCompactionAlg::Disable() {
@@ -225,6 +226,11 @@ void DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
         UnrecoverableError(fmt::format("Called when compaction not enable, {}", (u8)status_));
     }
     AddSegmentNoCheckInner(new_segment);
+}
+
+void DBTCompactionAlg::SetRunning(std::unique_lock<std::mutex> &lock) {
+    cv_.wait(lock, [this]() { return status_ == CompactionStatus::kEnable; });
+    status_ = CompactionStatus::kRunning;
 }
 
 } // namespace infinity
