@@ -601,45 +601,6 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     return it->second;
 }
 
-void TableEntry::MergeFrom(BaseEntry &other) {
-    auto table_entry2 = dynamic_cast<TableEntry *>(&other);
-    if (table_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    // // No locking here since only the load stage needs MergeFrom.
-    if (*this->table_name_ != *table_entry2->table_name_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_name_ match");
-    }
-    if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-    if (this->table_entry_type_ != table_entry2->table_entry_type_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-
-    this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
-    this->row_count_.store(std::max(this->row_count_, table_entry2->row_count_));
-
-    for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
-        auto it = this->segment_map_.find(seg_id);
-        if (it == this->segment_map_.end()) {
-            sgement_entry2->table_entry_ = this;
-            this->segment_map_.emplace(seg_id, sgement_entry2);
-        } else {
-            it->second->MergeFrom(*sgement_entry2.get());
-        }
-    }
-
-    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map()) {
-        auto it = this->index_meta_map().find(index_name);
-        if (it == this->index_meta_map().end()) {
-            this->index_meta_map().emplace(index_name, std::move(table_index_meta));
-        } else {
-            it->second->MergeFrom(*table_index_meta.get());
-        }
-    }
-}
-
 bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id) {
     HashMap<SegmentID, Vector<SegmentOffset>> delete_row_map;
     for (const auto row_id : delete_row_ids) {

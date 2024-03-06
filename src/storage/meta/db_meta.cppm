@@ -55,8 +55,6 @@ public:
 
     static UniquePtr<DBMeta> Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr);
 
-    void MergeFrom(DBMeta &other);
-
     SharedPtr<String> db_name() const { return db_name_; }
 
     SharedPtr<String> data_dir() const { return data_dir_; }

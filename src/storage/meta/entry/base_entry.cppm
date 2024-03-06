@@ -46,7 +46,6 @@ export struct BaseEntry {
     }
 
     virtual ~BaseEntry() = default;
-    virtual void MergeFrom(BaseEntry &) {}
 
     static inline void Commit(BaseEntry *base_entry, TxnTimeStamp commit_ts) { base_entry->commit_ts_.store(commit_ts); }
 

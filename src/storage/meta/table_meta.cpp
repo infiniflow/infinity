@@ -158,14 +158,6 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     return res;
 }
 
-void TableMeta::MergeFrom(TableMeta &other) {
-    // No locking here since only the load stage needs MergeFrom.
-    if (!IsEqual(*this->table_name_, *other.table_name_) || !IsEqual(*this->db_entry_dir_, *other.db_entry_dir_)) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_name_ and db_entry_dir_ match");
-    }
-    this->table_entry_list_.MergeWith(other.table_entry_list_);
-}
-
 void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }
 
 bool TableMeta::PickCleanup(CleanupScanner *scanner) { return table_entry_list_.PickCleanup(scanner); }
