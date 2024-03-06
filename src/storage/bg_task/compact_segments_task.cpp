@@ -43,7 +43,7 @@ import segment_entry;
 import table_index_entry;
 import table_index_meta;
 import block_entry;
-import compact_task_type;
+import compaction_alg;
 
 namespace infinity {
 
@@ -104,11 +104,16 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
-    return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
+    auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
+    table_entry->CheckCompaction(CompactionStatus::kRunning);
+    LOG_INFO(fmt::format("Compact create picked, tablename: {}", *table_entry->GetTableName()));
+    return ret;
 }
 
 SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
+    table_entry->CheckCompaction(CompactionStatus::kDisable);
+    LOG_INFO(fmt::format("Compact create whole, tablename: {}", *table_entry->GetTableName()));
     return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
 
@@ -140,7 +145,11 @@ CompactSegmentsTaskState CompactSegmentsTask::CompactSegments() {
             for (auto *segment : to_compact_segments) {
                 ss += std::to_string(segment->segment_id()) + " ";
             }
-            LOG_INFO(fmt::format("Table {}, compacting segments: {}, into {}", *table_entry_->GetTableName(), ss, new_segment->segment_id()));
+            LOG_INFO(fmt::format("Table {}, type: {}, compacting segments: {}, into {}",
+                                 *table_entry_->GetTableName(),
+                                 (u8)task_type_,
+                                 ss,
+                                 new_segment->segment_id()));
         }
         state.segment_data_.emplace_back(new_segment, std::move(to_compact_segments));
         state.old_segments_.insert(state.old_segments_.end(), to_compact_segments.begin(), to_compact_segments.end());

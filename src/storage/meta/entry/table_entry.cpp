@@ -46,7 +46,6 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
-import compact_task_type;
 
 namespace infinity {
 
@@ -337,10 +336,12 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
             compaction_alg_->CommitCompact(new_segments, txn_id);
+            LOG_INFO(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
+            LOG_INFO(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
             compaction_alg_->Enable(new_segments);
             break;
         }

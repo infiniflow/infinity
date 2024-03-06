@@ -24,12 +24,17 @@ import txn;
 import global_block_id;
 import base_table_ref;
 import internal_types;
-import compact_task_type;
 
 namespace infinity {
 
 class TableEntry;
 class SegmentEntry;
+
+export enum class CompactSegmentsTaskType : i8 {
+    kCompactTable,
+    kCompactPickedSegments,
+    kInvalid,
+};
 
 class RowIDRemapper {
 private:
