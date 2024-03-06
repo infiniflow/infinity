@@ -95,8 +95,6 @@ public:
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
-    void MergeFrom(infinity::BaseEntry &other) override;
-
 public:
     // will only be called in TableEntry::Append
     // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay

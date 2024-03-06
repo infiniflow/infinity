@@ -17,7 +17,6 @@ module;
 export module cleanup_scanner;
 
 import stl;
-// import meta_entry_interface;
 
 namespace infinity {
 

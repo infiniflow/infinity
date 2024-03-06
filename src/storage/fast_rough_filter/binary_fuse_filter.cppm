@@ -24,7 +24,7 @@ namespace infinity {
 
 export class BinaryFuse {
 private:
-    binary_fuse8_t filter = {.Fingerprints = nullptr};
+    binary_fuse8_t filter{};
 
 public:
     BinaryFuse() = default;

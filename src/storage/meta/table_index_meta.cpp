@@ -130,13 +130,6 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
     return res;
 }
 
-void TableIndexMeta::MergeFrom(TableIndexMeta &other) {
-    if (!IsEqual(*this->index_name_, *other.index_name_)) {
-        UnrecoverableError("TableIndexMeta::MergeFrom requires index_name_ match");
-    }
-    this->index_entry_list_.MergeWith(other.index_entry_list_);
-}
-
 void TableIndexMeta::Cleanup() { index_entry_list_.Cleanup(); }
 
 bool TableIndexMeta::PickCleanup(CleanupScanner *scanner) { return index_entry_list_.PickCleanup(scanner); }

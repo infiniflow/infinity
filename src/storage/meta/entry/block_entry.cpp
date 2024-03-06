@@ -405,49 +405,6 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     return base_dir;
 }
 
-void BlockEntry::MergeFrom(BaseEntry &other) {
-    auto block_entry2 = dynamic_cast<BlockEntry *>(&other);
-    if (block_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    // // No locking here since only the load stage needs MergeFrom.
-    if (*this->block_dir_ != *block_entry2->block_dir_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires base_dir_ match");
-    }
-    if (this->block_id_ != block_entry2->block_id_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires block_id_ match");
-    }
-    if (this->row_capacity_ != block_entry2->row_capacity_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires row_capacity_ match");
-    }
-    if (this->min_row_ts_ != block_entry2->min_row_ts_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires min_row_ts_ match");
-    }
-    if (this->row_count_ > block_entry2->row_count_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
-    }
-    if (this->checkpoint_ts_ > block_entry2->checkpoint_ts_) {
-        UnrecoverableError(
-            "BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
-    }
-    if (this->checkpoint_row_count_ > block_entry2->checkpoint_row_count_) {
-        UnrecoverableError(
-            "BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
-    }
-    if (columns_.size() > block_entry2->columns_.size()) {
-        UnrecoverableError("BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
-    }
-
-    if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
-        return;
-    this->row_count_ = block_entry2->row_count_;
-    this->columns_.swap(block_entry2->columns_);
-    *this->block_version_ = *block_entry2->block_version_;
-    this->max_row_ts_ = block_entry2->max_row_ts_;
-    this->checkpoint_ts_ = block_entry2->checkpoint_ts_;
-    this->checkpoint_row_count_ = block_entry2->checkpoint_row_count_;
-}
-
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
     if (read_size + row_count_ > row_capacity_) {
         UnrecoverableError("BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_");
