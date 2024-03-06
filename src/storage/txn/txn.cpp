@@ -112,6 +112,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
         return status;
     }
     if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
+        LOG_WARN(fmt::format("Rollback delete in table {} due to conflict.", table_name));
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
