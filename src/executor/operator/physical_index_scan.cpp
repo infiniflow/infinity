@@ -30,7 +30,8 @@ import txn;
 import data_block;
 import secondary_index_scan_execute_expression;
 import logical_type;
-import segment_column_index_entry;
+import table_index_entry;
+import segment_index_entry;
 import segment_entry;
 // TODO:use bitset
 import bitmask;
@@ -40,7 +41,7 @@ namespace infinity {
 PhysicalIndexScan::PhysicalIndexScan(u64 id,
                                      SharedPtr<BaseTableRef> base_table_ref,
                                      SharedPtr<BaseExpression> index_filter_qualified,
-                                     HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &&column_index_map,
+                                     HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                      Vector<FilterExecuteElem> &&filter_execute_command,
                                      SharedPtr<Vector<LoadMeta>> load_metas,
                                      bool add_row_id)
@@ -224,7 +225,7 @@ public:
 
     template <typename ColumnValueType>
     inline void
-    ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentColumnIndexEntry &index_entry, SegmentID segment_id) {
+    ExecuteSingleRangeT(const FilterIntervalRangeT<ColumnValueType> &interval_range, SegmentIndexEntry &index_entry, SegmentID segment_id) {
         using T = FilterIntervalRangeT<ColumnValueType>::T;
         BufferHandle index_handle_head = index_entry.GetIndex();
         auto index = static_cast<const SecondaryIndexDataHead *>(index_handle_head.GetData());
@@ -409,17 +410,17 @@ public:
         }
     }
 
-    inline void ExecuteSingleRange(const HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &column_index_map,
+    inline void ExecuteSingleRange(const HashMap<ColumnID, TableIndexEntry *> &column_index_map,
                                    const FilterExecuteSingleRange &single_range,
                                    SegmentID segment_id) {
         // step 1. check if range is empty
         if (single_range.IsEmpty()) {
             return SetEmptyResult();
         }
-        // step 2. get ColumnID and prepare SegmentColumnIndexEntry
+        // step 2. get ColumnID and prepare SegmentIndexEntry
         ColumnID column_id = single_range.GetColumnID();
         auto const &index_by_segment = column_index_map.at(column_id)->index_by_segment();
-        SegmentColumnIndexEntry &index_entry = *(index_by_segment.at(segment_id));
+        SegmentIndexEntry &index_entry = *(index_by_segment.at(segment_id));
         // step 3. search index
         auto &interval_range_variant = single_range.GetIntervalRange();
         std::visit(Overload{[&]<typename ColumnValueType>(const FilterIntervalRangeT<ColumnValueType> &interval_range) {

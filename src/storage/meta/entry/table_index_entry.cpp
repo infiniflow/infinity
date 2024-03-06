@@ -33,6 +33,12 @@ import create_index_info;
 import base_entry;
 import logger;
 
+import index_file_worker;
+import annivfflat_index_file_worker;
+import hnsw_file_worker;
+import secondary_index_file_worker;
+import embedding_info;
+
 namespace infinity {
 
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
@@ -81,7 +87,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         if (index_base->column_names_.size() != 1) {
             RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
         }
-        ColumnID column_id = table_index_meta->GetTableEntry()->GetColumnIdByName(index_base->column_names_[0]);
         if (index_base->index_type_ == IndexType::kFullText) {
             SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
             if (index_fulltext->homebrewed_) {
@@ -90,12 +95,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
                 table_index_entry->fulltext_index_entry_ =
                     FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
             }
-        } else {
-            SharedPtr<String> column_index_dir =
-                MakeShared<String>(fmt::format("{}/{}", *table_index_entry->index_dir_, index_base->column_names_[0]));
-            SharedPtr<ColumnIndexEntry> column_index_entry =
-                ColumnIndexEntry::NewColumnIndexEntry(index_base, column_id, table_index_entry.get(), txn, txn_id, column_index_dir, begin_ts);
-            table_index_entry->column_index_map_[column_id] = std::move(column_index_entry);
         }
 
         return table_index_entry;
@@ -140,19 +139,15 @@ TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, 
     return MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
 }
 
-// For segment_column_index_entry
-void TableIndexEntry::CommitCreateIndex(u64 column_id,
-                                        u32 segment_id,
-                                        SharedPtr<SegmentColumnIndexEntry> segment_column_index_entry,
-                                        bool is_replay) {
+// For segment_index_entry
+void TableIndexEntry::CommitCreateIndex(u32 segment_id, SharedPtr<SegmentIndexEntry> segment_index_entry, bool is_replay) {
     if (!is_replay) {
         // Save index file.
-        segment_column_index_entry->SaveIndexFile();
+        segment_index_entry->SaveIndexFile();
     }
     {
         std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
-        ColumnIndexEntry *column_index_entry = this->column_index_map_[column_id].get();
-        column_index_entry->index_by_segment_.emplace(segment_id, segment_column_index_entry);
+        index_by_segment_.emplace(segment_id, segment_index_entry);
     }
 }
 
@@ -164,7 +159,7 @@ void TableIndexEntry::CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &ful
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
-    Vector<ColumnIndexEntry *> column_index_entry_candidates;
+    Vector<SegmentIndexEntry *> segment_index_entry_candidates;
     FulltextIndexEntry *fulltext_index_entry_candidate_{};
     {
         std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
@@ -179,15 +174,15 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json["index_dir"] = *this->index_dir_;
         json["index_base"] = this->index_base_->Serialize();
 
-        for (const auto &[index_name, column_index_entry] : this->column_index_map_) {
-            column_index_entry_candidates.emplace_back((ColumnIndexEntry *)column_index_entry.get());
+        for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
+            segment_index_entry_candidates.emplace_back((SegmentIndexEntry *)index_entry.get());
         }
 
         fulltext_index_entry_candidate_ = this->fulltext_index_entry_.get();
     }
 
-    for (const auto &column_index_entry : column_index_entry_candidates) {
-        json["column_indexes"].emplace_back(column_index_entry->Serialize(max_commit_ts));
+    for (const auto &segment_index_entry : segment_index_entry_candidates) {
+        json["segment_indexes"].emplace_back(segment_index_entry->Serialize());
     }
 
     if (fulltext_index_entry_candidate_ != nullptr) {
@@ -221,12 +216,11 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 
-    if (index_def_entry_json.contains("column_indexes")) {
-        for (const auto &column_index_entry_json : index_def_entry_json["column_indexes"]) {
-            SharedPtr<ColumnIndexEntry> column_index_entry =
-                ColumnIndexEntry::Deserialize(column_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
-            u64 column_id = column_index_entry->column_id_;
-            table_index_entry->column_index_map_.emplace(column_id, std::move(column_index_entry));
+    if (index_def_entry_json.contains("segment_indexes")) {
+        for (const auto &segment_index_entry_json : index_def_entry_json["segment_indexes"]) {
+            SharedPtr<SegmentIndexEntry> segment_index_entry =
+                SegmentIndexEntry::Deserialize(segment_index_entry_json, table_index_entry.get(), buffer_mgr, table_entry);
+            table_index_entry->index_by_segment_.emplace(segment_index_entry->segment_id(), std::move(segment_index_entry));
         }
     }
 
@@ -258,32 +252,151 @@ Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *
                 fulltext_index_entry->indexer_->Dump();
             }
         }
+        return Status::OK();
     }
-    for (const auto &[column_id, column_index_entry] : column_index_map_) {
-        column_index_entry->CreateIndexPrepare(table_entry, block_index, column_id, txn, prepare, is_replay, check_ts);
+    const String &column_name = this->index_base()->column_name();
+    const auto *column_def = table_entry->GetColumnDefByName(column_name);
+    auto *txn_store = txn->GetTxnTableStore(table_entry);
+    for (const auto *segment_entry : block_index->segments_) {
+        auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def);
+        SegmentID segment_id = segment_entry->segment_id();
+        SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn, create_index_param.get());
+        if (!is_replay) {
+            segment_index_entry->CreateIndexPrepare(index_base_.get(), column_def, segment_entry, txn, prepare, check_ts);
+        }
+        txn_store->CreateIndexFile(this, segment_id, segment_index_entry);
+        index_by_segment_.emplace(segment_id, segment_index_entry);
     }
     return Status::OK();
 }
 
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    if (column_index_map_.size() != 1) {
+    if (this->index_base_->column_names_.size() != 1) {
         // TODO
         UnrecoverableError("Not implemented");
     }
-    const auto &[column_id, column_index_entry] = *column_index_map_.begin();
+    const String &column_name = this->index_base_->column_name();
+    const auto *column_def = table_entry->GetColumnDefByName(column_name);
+    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
+        auto status = segment_index_entry->CreateIndexDo(index_base_.get(), column_def, create_index_idx);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
 
-    const auto *column_def = table_entry->GetColumnDefByID(column_id);
-    return column_index_entry->CreateIndexDo(column_def, create_index_idxes);
+Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
+    Vector<UniquePtr<IndexFileWorker>> vector_file_worker(1);
+    // reference file_worker will be invalidated when vector_file_worker is resized
+    auto &file_worker = vector_file_worker[0];
+    const auto *index_base = param->index_base_;
+    const auto *column_def = param->column_def_;
+    auto file_name = MakeShared<String>(IndexFileName(segment_id));
+    switch (index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
+            auto elem_type = ((EmbeddingInfo *)(column_def->type()->type_info().get()))->Type();
+            switch (elem_type) {
+                case kElemFloat: {
+                    file_worker = MakeUnique<AnnIVFFlatIndexFileWorker<f32>>(this->index_dir(),
+                                                                             file_name,
+                                                                             index_base,
+                                                                             column_def,
+                                                                             create_annivfflat_param->row_count_);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Create IVF Flat index: Unsupported element type.");
+                }
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto create_hnsw_param = static_cast<CreateHnswParam *>(param);
+            file_worker = MakeUnique<HnswFileWorker>(this->index_dir(), file_name, index_base, column_def, create_hnsw_param->max_element_);
+            break;
+        }
+        case IndexType::kFullText: {
+            //            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+            break;
+        }
+        case IndexType::kSecondary: {
+            auto create_secondary_param = static_cast<CreateSecondaryIndexParam *>(param);
+            auto const row_count = create_secondary_param->row_count_;
+            auto const part_capacity = create_secondary_param->part_capacity_;
+            // now we can only use row_count to calculate the part_num
+            // because the actual_row_count will reduce when we delete rows
+            // consider the timestamp, actual_row_count may be less than, equal to or greater than rows we can actually read
+            u32 part_num = (row_count + part_capacity - 1) / part_capacity;
+            vector_file_worker.resize(part_num + 1);
+            // cannot use invalid file_worker
+            vector_file_worker[0] =
+                MakeUnique<SecondaryIndexFileWorker>(this->index_dir(), file_name, index_base, column_def, 0, row_count, part_capacity);
+            for (u32 i = 1; i <= part_num; ++i) {
+                auto part_file_name = MakeShared<String>(fmt::format("{}_part{}", *file_name, i));
+                vector_file_worker[i] =
+                    MakeUnique<SecondaryIndexFileWorker>(this->index_dir(), part_file_name, index_base, column_def, i, row_count, part_capacity);
+            }
+            break;
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+    // cannot use invalid file_worker
+    if (vector_file_worker[0].get() == nullptr) {
+        UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
+        LOG_ERROR(*err_msg);
+        UnrecoverableError(*err_msg);
+    }
+    return vector_file_worker;
+}
+
+UniquePtr<CreateIndexParam> TableIndexEntry::GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def) {
+    switch (index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            return MakeUnique<CreateAnnIVFFlatParam>(index_base, column_def, seg_row_count);
+        }
+        case IndexType::kHnsw: {
+            SizeT max_element = seg_row_count;
+            return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
+        }
+        case IndexType::kFullText: {
+            return MakeUnique<CreateFullTextParam>(index_base, column_def);
+        }
+        case IndexType::kSecondary: {
+            u32 part_capacity = DEFAULT_BLOCK_CAPACITY;
+            return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count, part_capacity);
+        }
+        default: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_ERROR(*err_msg);
+            UnrecoverableError(*err_msg);
+        }
+    }
+    return nullptr;
 }
 
 void TableIndexEntry::Cleanup() {
     if (this->deleted_) {
         return;
     }
-    for (auto &[column_id, column_index_entry] : column_index_map_) {
-        column_index_entry->Cleanup();
+    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        segment_index_entry->Cleanup();
     }
-    fulltext_index_entry_->Cleanup();
+    if (this->fulltext_index_entry_.get() != nullptr) {
+        fulltext_index_entry_->Cleanup();
+    }
 
     LOG_INFO(fmt::format("Cleanup dir: {}", *index_dir_));
     LocalFileSystem fs;
@@ -293,8 +406,14 @@ void TableIndexEntry::Cleanup() {
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {}
 
 void TableIndexEntry::PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner) {
-    for (auto &[column_id, column_index_entry] : column_index_map_) {
-        column_index_entry->PickCleanupBySegments(sorted_segment_ids, scanner);
+    for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
+        auto &[segment_id, segment_index_entry] = *iter;
+        if (std::binary_search(sorted_segment_ids.begin(), sorted_segment_ids.end(), segment_id)) {
+            scanner->AddEntry(std::move(segment_index_entry));
+            iter = index_by_segment_.erase(iter);
+        } else {
+            ++iter;
+        }
     }
 }
 

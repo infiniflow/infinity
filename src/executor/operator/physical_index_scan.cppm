@@ -32,7 +32,8 @@ import value;
 import knn_filter;
 import secondary_index_data;
 import secondary_index_scan_execute_expression;
-import column_index_entry;
+import table_index_entry;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -47,7 +48,7 @@ public:
     explicit PhysicalIndexScan(u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
                                SharedPtr<BaseExpression> index_filter_qualified,
-                               HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &&column_index_map,
+                               HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                Vector<FilterExecuteElem> &&filter_execute_command,
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                bool add_row_id = true);
@@ -91,7 +92,7 @@ private:
     SharedPtr<BaseTableRef> base_table_ref_;
     // input from optimizer
     SharedPtr<BaseExpression> index_filter_qualified_;
-    HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_;
+    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
     // Commands used in ExecuteInternal()
     Vector<FilterExecuteElem> filter_execute_command_;
 

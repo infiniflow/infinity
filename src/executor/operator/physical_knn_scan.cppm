@@ -27,7 +27,7 @@ import global_block_id;
 import base_table_ref;
 import table_entry;
 import block_column_entry;
-import segment_column_index_entry;
+import segment_index_entry;
 import block_index;
 import load_meta;
 import knn_expression;
@@ -73,13 +73,9 @@ public:
 
     void PlanWithIndex(QueryContext *query_context);
 
-    inline SizeT TaskCount() const {
-        return block_column_entries_->size() + index_entries_->size();
-    }
+    inline SizeT TaskCount() const { return block_column_entries_->size() + index_entries_->size(); }
 
-    SizeT TaskletCount() override {
-        return block_column_entries_->size() + index_entries_->size();
-    }
+    SizeT TaskletCount() override { return block_column_entries_->size() + index_entries_->size(); }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -97,7 +93,7 @@ public:
     u64 knn_table_index_{};
 
     UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
-    UniquePtr<Vector<SegmentColumnIndexEntry *>> index_entries_{};
+    UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
 private:
     template <typename DataType, template <typename, typename> typename C>

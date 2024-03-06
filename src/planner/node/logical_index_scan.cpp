@@ -37,7 +37,7 @@ namespace infinity {
 LogicalIndexScan::LogicalIndexScan(u64 node_id,
                                    SharedPtr<BaseTableRef> &&base_table_ref,
                                    SharedPtr<BaseExpression> &&index_filter_qualified,
-                                   HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &&column_index_map,
+                                   HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                                    Vector<FilterExecuteElem> &&filter_execute_command,
                                    bool add_row_id)
     : LogicalNode(node_id, LogicalNodeType::kIndexScan), base_table_ref_(std::move(base_table_ref)),

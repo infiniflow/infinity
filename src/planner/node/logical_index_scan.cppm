@@ -21,12 +21,13 @@ import logical_node_type;
 import logical_node;
 import column_binding;
 import base_table_ref;
-import column_index_entry;
+import segment_index_entry;
 import base_expression;
 import default_values;
 import secondary_index_scan_execute_expression;
 import data_type;
 import table_entry;
+import table_index_entry;
 
 namespace infinity {
 
@@ -35,7 +36,7 @@ public:
     explicit LogicalIndexScan(u64 node_id,
                               SharedPtr<BaseTableRef> &&base_table_ref,
                               SharedPtr<BaseExpression> &&index_filter_qualified,
-                              HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> &&column_index_map,
+                              HashMap<ColumnID, TableIndexEntry *> &&column_index_map,
                               Vector<FilterExecuteElem> &&filter_execute_command,
                               bool add_row_id = true);
 
@@ -59,7 +60,7 @@ public:
 
     // filter expression is constructed with fundamental expression "[cast] x compare (value expression)" and conjunction "and", "or" and "not"
     SharedPtr<BaseExpression> index_filter_qualified_;
-    HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_;
+    HashMap<ColumnID, TableIndexEntry *> column_index_map_;
     // Commands used in PhysicalIndexScan::ExecuteInternal()
     Vector<FilterExecuteElem> filter_execute_command_;
 
