@@ -206,7 +206,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
             if (!this->unsealed_segment_ || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                if (unsealed_segment_ != nullptr) {
+                if (unsealed_segment_) {
                     // in wal replay, txn->txn_mgr() will return nullptr, and the sealing task will be skipped
                     // after wal replay, the missing sealing tasks will be created
                     // this function will not change unsealed to sealed (will be changed in CommitAppend)
@@ -216,16 +216,14 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewAppendSegmentEntry(this, new_segment_id, txn);
 
-                // FIXME: here sharedptr will be freed
-                this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
+                this->unsealed_segment_ = SegmentEntry::NewAppendSegmentEntry(this, new_segment_id, txn);
                 this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        auto operation = MakeUnique<AddSegmentEntryOp>(unsealed_segment_);
+        auto operation = MakeUnique<AddSegmentEntryOp>(this->unsealed_segment_, this->unsealed_segment_->status());
         txn->AddCatalogDeltaOperation(std::move(operation));
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
@@ -267,7 +265,7 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry);
+        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry, segment_entry->status());
         txn->AddCatalogDeltaOperation(std::move(operation));
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
     }

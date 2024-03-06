@@ -63,7 +63,7 @@ SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(const TableEntry *tab
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
                                                                      status);
-    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), status);
+    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry, status);
     // have no effect in fake txn in wal replay
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();

@@ -336,7 +336,7 @@ public:
           actual_row_count_(actual_row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
 
 
-    explicit AddSegmentEntryOp(SharedPtr<SegmentEntry> segment_entry)
+    explicit AddSegmentEntryOp(SharedPtr<SegmentEntry> segment_entry, SegmentStatus status)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry),
           db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()), status_(status) {}
 
