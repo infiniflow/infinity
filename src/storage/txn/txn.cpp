@@ -496,9 +496,6 @@ void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
-    // Clean catalog delta operation
-    local_catalog_delta_ops_entry_->operations().clear();
-
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);

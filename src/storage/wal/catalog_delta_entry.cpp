@@ -265,6 +265,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                              std::move(segment_filter_binary_data),
                                                              std::move(block_filter_binary_data),
                                                              prev_status);
+            break;
         }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
