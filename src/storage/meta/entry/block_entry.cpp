@@ -317,7 +317,6 @@ void BlockEntry::Cleanup() {
 
 // TODO: introduce BlockColumnMeta
 nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
-    Flush(max_commit_ts);
     nlohmann::json json_res;
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 

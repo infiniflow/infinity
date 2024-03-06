@@ -89,7 +89,7 @@ public:
 
     void SetNoDelete();
 
-    void SetUnFlush(TxnTimeStamp deprecate_ts);
+    void SetForbidCleanup(TxnTimeStamp deprecate_ts);
 
     void TrySetDeprecated();
 

@@ -131,7 +131,7 @@ void SegmentEntry::SetNoDelete() {
     compact_task_ = nullptr;
 }
 
-void SegmentEntry::SetUnFlush(TxnTimeStamp deprecate_ts) {
+void SegmentEntry::SetForbidCleanup(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
         UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");

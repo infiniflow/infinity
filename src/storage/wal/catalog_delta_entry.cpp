@@ -612,6 +612,7 @@ const String AddSegmentColumnIndexEntryOp::ToString() const {
 
 void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+    LOG_TRACE("Segment has flushed to disk, now try set to deprecated if it was compacted before");
     this->segment_entry_->TrySetDeprecated();
 }
 
