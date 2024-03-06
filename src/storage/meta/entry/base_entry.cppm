@@ -30,7 +30,7 @@ export enum class EntryType : i8 {
     kTableIndex,
     kColumnIndex,
     kIRSIndex,
-    kSegmentColumnIndex,
+    kSegmentIndex,
     kView,
     kColumn,
     kSegment,

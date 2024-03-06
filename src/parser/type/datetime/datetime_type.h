@@ -26,10 +26,19 @@ struct DateTimeType {
 
     // time_value: seconds since 00:00:00
     // date_value: days since 1970-01-01
-    explicit DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value){};
+    explicit constexpr DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value){};
 
     // epoch_time: seconds since 1970-01-01 00:00:00
-    explicit DateTimeType(int64_t epoch_time);
+    explicit constexpr DateTimeType(int64_t epoch_time) {
+        constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
+        auto seconds = static_cast<int32_t>(epoch_time % TotalSecondsInDay);
+        if (seconds < 0) {
+            seconds += TotalSecondsInDay;
+        }
+        auto days = static_cast<int32_t>((epoch_time - seconds) / TotalSecondsInDay);
+        date = DateType(days);
+        time = TimeType(seconds);
+    }
 
     inline void Reset() {
         date = {};

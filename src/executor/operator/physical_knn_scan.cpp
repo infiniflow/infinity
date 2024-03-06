@@ -66,7 +66,7 @@ import create_index_info;
 import knn_expr;
 
 import block_entry;
-import column_index_entry;
+import segment_index_entry;
 import segment_entry;
 
 namespace infinity {
@@ -191,10 +191,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     SizeT knn_column_id = column_expr->binding().column_idx;
 
     block_column_entries_ = MakeUnique<Vector<BlockColumnEntry *>>();
-    index_entries_ = MakeUnique<Vector<SegmentColumnIndexEntry *>>();
+    index_entries_ = MakeUnique<Vector<SegmentIndexEntry *>>();
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    HashMap<u32, Vector<SegmentColumnIndexEntry *>> index_entry_map;
+    HashMap<u32, Vector<SegmentIndexEntry *>> index_entry_map;
 
     {
         auto map_guard = table_entry->IndexMetaMap();
@@ -205,25 +205,24 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 RecoverableError(status);
             }
 
-            auto &index_map = table_index_entry->column_index_map();
-            auto column_index_iter = index_map.find(knn_column_id);
-            if (column_index_iter == index_map.end()) {
+            const String column_name = table_index_entry->index_base()->column_name();
+            SizeT column_id = table_entry->GetColumnIdByName(column_name);
+            if (column_id != knn_column_id) {
                 // knn_column_id isn't in this table index
                 continue;
             }
-
-            // Fill the segment with index
-            ColumnIndexEntry *column_index_entry = index_map[knn_column_id].get();
             // check index type
-            if (auto index_type = column_index_entry->index_base_ptr()->index_type_;
+            if (auto index_type = table_index_entry->index_base()->index_type_;
                 index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
                 LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
                 continue;
             }
-            const HashMap<u32, SharedPtr<SegmentColumnIndexEntry>> &index_by_segment = column_index_entry->index_by_segment();
+
+            // Fill the segment with index
+            const HashMap<u32, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
             index_entry_map.reserve(index_by_segment.size());
-            for (auto &[segment_id, segment_column_index] : index_by_segment) {
-                index_entry_map[segment_id].emplace_back(segment_column_index.get());
+            for (auto &[segment_id, segment_index] : index_by_segment) {
+                index_entry_map[segment_id].emplace_back(segment_index.get());
             }
         }
     }
@@ -265,6 +264,19 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         // brute force
         BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
         const BlockEntry *block_entry = block_column_entry->block_entry();
+        // check FastRoughFilter
+        const auto &fast_rough_filter = *block_entry->GetFastRoughFilter();
+        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
+            // skip this block
+            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} skipped after FastRoughFilter",
+                                  knn_scan_function_data->task_id_,
+                                  block_column_idx + 1,
+                                  brute_task_n));
+        } else [[likely]] {
+        LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after FastRoughFilter",
+                              knn_scan_function_data->task_id_,
+                              block_column_idx + 1,
+                              brute_task_n));
         const auto row_count = block_entry->row_count();
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
@@ -299,13 +311,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                            block_entry->segment_id(),
                            block_entry->block_id(),
                            bitmask);
+        }
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index
-        SegmentColumnIndexEntry *segment_column_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
+        SegmentIndexEntry *segment_index_entry = knn_scan_shared_data->index_entries_->at(index_idx);
         BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
 
-        auto segment_id = segment_column_index_entry->segment_id();
+        auto segment_id = segment_index_entry->segment_id();
         SegmentEntry *segment_entry = nullptr;
         auto &segment_index_hashmap = base_table_ref_->block_index_->segment_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
@@ -313,6 +326,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         } else {
             segment_entry = iter->second;
         }
+        // check FastRoughFilter
+        const auto &fast_rough_filter = *segment_entry->GetFastRoughFilter();
+        if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) [[unlikely]] {
+            // skip this segment
+            LOG_TRACE(
+                fmt::format("KnnScan: {} index {}/{} skipped after FastRoughFilter", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
+        } else [[likely]] {
+        LOG_TRACE(fmt::format("KnnScan: {} index {}/{} not skipped after FastRoughFilter",
+                              knn_scan_function_data->task_id_,
+                              index_idx + 1,
+                              index_task_n));
         auto segment_row_count = segment_entry->row_count();
         Bitmask bitmask;
         if (filter_expression_) {
@@ -346,9 +370,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         }
         bool use_bitmask = !bitmask.IsAllTrue();
 
-        switch (segment_column_index_entry->column_index_entry()->index_base_ptr()->index_type_) {
+        switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
             case IndexType::kIVFFlat: {
-                BufferHandle index_handle = segment_column_index_entry->GetIndex();
+                BufferHandle index_handle = segment_index_entry->GetIndex();
                 auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                 i32 n_probes = 1;
                 auto IVFFlatScanTemplate = [&]<typename AnnIVFFlatType, typename... OptionalFilter>(OptionalFilter &&...filter) {
@@ -403,8 +427,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 break;
             }
             case IndexType::kHnsw: {
-                BufferHandle index_handle = segment_column_index_entry->GetIndex();
-                auto index_hnsw = static_cast<const IndexHnsw *>(segment_column_index_entry->column_index_entry()->index_base_ptr());
+                BufferHandle index_handle = segment_index_entry->GetIndex();
+                auto index_hnsw = static_cast<const IndexHnsw *>(segment_index_entry->table_index_entry()->index_base());
                 auto KnnScan = [&](auto *index) {
                     for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                         if (opt_param.param_name_ == "ef") {
@@ -521,6 +545,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             default: {
                 UnrecoverableError("Not implemented");
             }
+        }
         }
     }
     if (knn_scan_shared_data->current_index_idx_ >= index_task_n && knn_scan_shared_data->current_block_idx_ >= brute_task_n) {

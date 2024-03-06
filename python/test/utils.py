@@ -3,8 +3,15 @@ import os
 import subprocess
 import time
 import traceback
-
+from shutil import copyfile
 import numpy as np
+import pytest
+
+from common import common_values
+
+current_path = os.getcwd()
+data_dir = current_path + common_values.TEST_DATA_DIR
+copy_dir = common_values.TEST_TMP_DIR
 
 
 # catch the expected exception
@@ -30,8 +37,25 @@ def read_fvecs_file(filename):
 
 
 def start_infinity_service_in_subporcess():
-    shell = "/home/fann/infinity/build/src/infinity"
+    shell = os.getcwd() + "/build/src/infinity"
     with open("./tmp.txt", "w") as f:
         infinity = subprocess.Popen(shell, stdout=f)
     time.sleep(1)
     return infinity
+
+
+@pytest.fixture(scope="class")
+def check_data(request):
+    dir_name = request.param["dir_name"]
+    file_name = request.param["file_name"]
+    data_dir = request.param["data_dir"]
+    # path not exists
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    if not os.path.exists(data_dir + file_name):
+        for dirpath, dirnames, filenames in os.walk(dir_name):
+            for filename in filenames:
+                if filename == file_name:
+                    src_path = os.path.join(dirpath, filename)
+                    dest_path = os.path.join(copy_dir, filename)
+                    copyfile(src_path, dest_path)

@@ -87,6 +87,22 @@ public:
         GlobalResourceUsage::IncrObjectCount();
     }
 
+    // used in BatchInvertTask::BatchInvertTask, keep ObjectCount correct
+    ColumnVector(const ColumnVector &right)
+        : data_type_size_(right.data_type_size_), buffer_(right.buffer_), nulls_ptr_(right.nulls_ptr_), initialized(right.initialized),
+          vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
+          tail_index_(right.tail_index_) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
+    // used in BlockColumnIter, keep ObjectCount correct
+    ColumnVector(ColumnVector &&right)
+        : data_type_size_(right.data_type_size_), buffer_(std::move(right.buffer_)), nulls_ptr_(std::move(right.nulls_ptr_)),
+          initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
+          capacity_(right.capacity_), tail_index_(right.tail_index_) {
+        GlobalResourceUsage::IncrObjectCount();
+    }
+
     ~ColumnVector() {
         // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
         GlobalResourceUsage::DecrObjectCount();

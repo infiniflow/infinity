@@ -50,8 +50,7 @@ import base_entry;
 import block_entry;
 import block_column_entry;
 import fulltext_index_entry;
-import column_index_entry;
-import segment_column_index_entry;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -457,6 +456,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto table_name = add_segment_entry_op->table_name();
                 auto segment_id = add_segment_entry_op->segment_id();
                 auto segment_dir = add_segment_entry_op->segment_dir();
+                auto segment_status = add_segment_entry_op->status();
                 auto column_count = add_segment_entry_op->column_count();
                 auto row_count = add_segment_entry_op->row_count();
                 auto actual_row_count = add_segment_entry_op->actual_row_count();
@@ -477,6 +477,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
                                                                                 segment_id,
                                                                                 MakeUnique<String>(segment_dir),
+                                                                                segment_status,
                                                                                 column_count,
                                                                                 row_count,
                                                                                 actual_row_count,
@@ -632,51 +633,14 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 table_index_entry->fulltext_index_entry() = std::move(fulltext_index_entry);
                 break;
             }
-            case CatalogDeltaOpType::ADD_COLUMN_INDEX_ENTRY: {
-                auto add_column_index_entry_op = static_cast<AddColumnIndexEntryOp *>(op.get());
-                auto db_name = add_column_index_entry_op->db_name();
-                auto table_name = add_column_index_entry_op->table_name();
-                auto index_name = add_column_index_entry_op->index_name();
-                auto column_id = add_column_index_entry_op->column_id();
-                auto index_base = add_column_index_entry_op->index_base();
-                auto column_index_dir = add_column_index_entry_op->col_index_dir();
-
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!index_status.ok()) {
-                    UnrecoverableError(index_status.message());
-                }
-                auto column_index_entry = ColumnIndexEntry::NewReplayColumnIndexEntry(table_index_entry,
-                                                                                      index_base,
-                                                                                      column_id,
-                                                                                      MakeUnique<String>(column_index_dir),
-                                                                                      txn_id,
-                                                                                      begin_ts,
-                                                                                      commit_ts,
-                                                                                      is_delete);
-                table_index_entry->column_index_map().insert({column_id, std::move(column_index_entry)});
-                break;
-            }
-
-            case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
-                auto add_segment_column_index_entry_op = static_cast<AddSegmentColumnIndexEntryOp *>(op.get());
-                auto db_name = add_segment_column_index_entry_op->db_name();
-                auto table_name = add_segment_column_index_entry_op->table_name();
-                auto index_name = add_segment_column_index_entry_op->index_name();
-                auto segment_id = add_segment_column_index_entry_op->segment_id();
-                auto min_ts = add_segment_column_index_entry_op->min_ts();
-                auto max_ts = add_segment_column_index_entry_op->max_ts();
-                auto column_id = add_segment_column_index_entry_op->column_id();
+            case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+                auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
+                auto db_name = add_segment_index_entry_op->db_name();
+                auto table_name = add_segment_index_entry_op->table_name();
+                auto index_name = add_segment_index_entry_op->index_name();
+                auto segment_id = add_segment_index_entry_op->segment_id();
+                auto min_ts = add_segment_index_entry_op->min_ts();
+                auto max_ts = add_segment_index_entry_op->max_ts();
 
                 auto *db_meta = catalog->db_meta_map().at(db_name).get();
                 LOG_TRACE(fmt::format("at db {}", db_name));
@@ -694,18 +658,60 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
-                auto *column_index_entry = table_index_entry->column_index_map().at(column_id).get();
-                auto segment_column_index_entry = SegmentColumnIndexEntry::NewReplaySegmentIndexEntry(column_index_entry,
-                                                                                                      table_entry,
-                                                                                                      segment_id,
-                                                                                                      buffer_mgr,
-                                                                                                      min_ts,
-                                                                                                      max_ts,
-                                                                                                      txn_id,
-                                                                                                      begin_ts,
-                                                                                                      commit_ts,
-                                                                                                      is_delete);
-                column_index_entry->index_by_segment().insert({segment_id, std::move(segment_column_index_entry)});
+                auto segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                                         table_entry,
+                                                                                         segment_id,
+                                                                                         buffer_mgr,
+                                                                                         min_ts,
+                                                                                         max_ts,
+                                                                                         txn_id,
+                                                                                         begin_ts,
+                                                                                         commit_ts,
+                                                                                         is_delete);
+                table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)});
+                break;
+            }
+            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING: {
+                auto *set_segment_status_sealing_op = static_cast<SetSegmentStatusSealingOp *>(op.get());
+                auto &db_name = set_segment_status_sealing_op->db_name();
+                auto &table_name = set_segment_status_sealing_op->table_name();
+                auto &set_sealing_segments = set_segment_status_sealing_op->set_sealing_segments();
+
+                auto *db_meta = catalog->db_meta_map().at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError(db_status.message());
+                }
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError(tb_status.message());
+                }
+                table_entry->SetSegmentSealingForAppend(set_sealing_segments);
+                break;
+            }
+            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+                auto set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
+                auto db_name = set_segment_status_sealed_op->db_name();
+                auto table_name = set_segment_status_sealed_op->table_name();
+                auto segment_id = set_segment_status_sealed_op->segment_id();
+                auto const &segment_filter_binary = set_segment_status_sealed_op->segment_filter_binary_data();
+                auto const &block_filter_binary = set_segment_status_sealed_op->block_filter_binary_data();
+                auto const prev_status = set_segment_status_sealed_op->prev_status();
+
+                auto *db_meta = catalog->db_meta_map().at(db_name).get();
+                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!db_status.ok()) {
+                    UnrecoverableError(db_status.message());
+                }
+                auto table_meta = db_entry->table_meta_map().at(table_name).get();
+                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
+                if (!tb_status.ok()) {
+                    UnrecoverableError(tb_status.message());
+                }
+                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
+                segment_entry->FinishTaskSetSegmentStatusSealed(prev_status);
+                segment_entry->WalLoadFilterBinaryData(segment_filter_binary, block_filter_binary);
                 break;
             }
             default:
@@ -813,10 +819,10 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
                 add_segment_entry_op->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
                 break;
             }
-            case CatalogDeltaOpType::ADD_SEGMENT_COLUMN_INDEX_ENTRY: {
-                auto add_segment_column_index_entry_op = static_cast<AddSegmentColumnIndexEntryOp *>(op.get());
-                LOG_TRACE(fmt::format("Flush segment index entry: {}", add_segment_column_index_entry_op->ToString()));
-                add_segment_column_index_entry_op->Flush(max_commit_ts);
+            case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+                auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
+                LOG_TRACE(fmt::format("Flush segment index entry: {}", add_segment_index_entry_op->ToString()));
+                add_segment_index_entry_op->Flush(max_commit_ts);
                 break;
             }
             default:

@@ -15,6 +15,7 @@
 module;
 
 #include <fstream>
+#include <vector>
 
 module wal_entry;
 
@@ -34,10 +35,25 @@ namespace infinity {
 
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
     return segment_dir_ == other.segment_dir_ && segment_id_ == other.segment_id_ && block_entries_size_ == other.block_entries_size_ &&
-           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_;
+           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_ &&
+           have_rough_filter_ == other.have_rough_filter_ && segment_filter_binary_data_ == other.segment_filter_binary_data_ &&
+           block_filter_binary_data_ == other.block_filter_binary_data_;
 }
 
-i32 WalSegmentInfo::GetSizeInBytes() const { return sizeof(i32) + segment_dir_.size() + sizeof(SegmentID) + sizeof(u16) + sizeof(u32) + sizeof(u16); }
+i32 WalSegmentInfo::GetSizeInBytes() const {
+    i32 sz = sizeof(i32) + segment_dir_.size() + sizeof(SegmentID) + sizeof(u16) + sizeof(u32) + sizeof(u16);
+    sz += sizeof(have_rough_filter_);
+    if (have_rough_filter_) {
+        sz += ::infinity::GetSizeInBytes(segment_filter_binary_data_);
+        i32 block_filter_string_data_size = block_filter_binary_data_.size();
+        sz += sizeof(block_filter_string_data_size);
+        for (i32 i = 0; i < block_filter_string_data_size; ++i) {
+            const Pair<BlockID, String> &data = block_filter_binary_data_[i];
+            sz += ::infinity::GetSizeInBytes(data.first) + ::infinity::GetSizeInBytes(data.second);
+        }
+    }
+    return sz;
+}
 
 void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, segment_dir_);
@@ -45,6 +61,17 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, block_entries_size_);
     WriteBufAdv(buf, block_capacity_);
     WriteBufAdv(buf, last_block_row_count_);
+    WriteBufAdv(buf, have_rough_filter_);
+    if (have_rough_filter_) {
+        WriteBufAdv(buf, segment_filter_binary_data_);
+        i32 block_filter_string_data_size = block_filter_binary_data_.size();
+        WriteBufAdv(buf, block_filter_string_data_size);
+        for (i32 i = 0; i < block_filter_string_data_size; ++i) {
+            const Pair<BlockID, String> &data = block_filter_binary_data_[i];
+            WriteBufAdv(buf, data.first);
+            WriteBufAdv(buf, data.second);
+        }
+    }
 }
 
 WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
@@ -53,7 +80,26 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
     u16 block_entries_size = ReadBufAdv<u16>(ptr);
     u32 block_capacity = ReadBufAdv<u32>(ptr);
     u16 last_block_row_count = ReadBufAdv<u16>(ptr);
-    return WalSegmentInfo(std::move(segment_dir), segment_id, block_entries_size, block_capacity, last_block_row_count);
+    u8 have_rough_filter = ReadBufAdv<u8>(ptr);
+    String segment_filter_binary_data;
+    Vector<Pair<BlockID, String>> block_filter_binary_data;
+    if (have_rough_filter) {
+        segment_filter_binary_data = ReadBufAdv<String>(ptr);
+        i32 count = ReadBufAdv<i32>(ptr);
+        block_filter_binary_data.resize(count);
+        for (auto &data : block_filter_binary_data) {
+            data.first = ReadBufAdv<BlockID>(ptr);
+            data.second = ReadBufAdv<String>(ptr);
+        }
+    }
+    return {std::move(segment_dir),
+            segment_id,
+            block_entries_size,
+            block_capacity,
+            last_block_row_count,
+            have_rough_filter,
+            std::move(segment_filter_binary_data),
+            std::move(block_filter_binary_data)};
 }
 
 SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
@@ -107,6 +153,24 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 row_ids.push_back(row_id);
             }
             cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+            break;
+        }
+        case WalCommandType::SET_SEGMENT_SEALED: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
+            i32 count = ReadBufAdv<i32>(ptr);
+            Vector<Pair<BlockID, String>> block_filter_binary_data(count);
+            for (auto &data : block_filter_binary_data) {
+                data.first = ReadBufAdv<BlockID>(ptr);
+                data.second = ReadBufAdv<String>(ptr);
+            }
+            cmd = MakeShared<WalCmdSetSegmentSealed>(std::move(db_name),
+                                                     std::move(table_name),
+                                                     segment_id,
+                                                     std::move(segment_filter_binary_data),
+                                                     std::move(block_filter_binary_data));
             break;
         }
         case WalCommandType::CHECKPOINT: {
@@ -206,6 +270,18 @@ bool WalCmdDelete::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdSetSegmentSealed::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdSetSegmentSealed *>(&other);
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
+        segment_id_ != other_cmd->segment_id_ || !IsEqual(segment_filter_binary_data_, other_cmd->segment_filter_binary_data_)) {
+        return false;
+    }
+    if (block_filter_binary_data_ != other_cmd->block_filter_binary_data_) {
+        return false;
+    }
+    return true;
+}
+
 bool WalCmdCheckpoint::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCheckpoint *>(&other);
     return other_cmd != nullptr && max_commit_ts_ == other_cmd->max_commit_ts_ && is_full_checkpoint_ == other_cmd->is_full_checkpoint_;
@@ -258,6 +334,16 @@ i32 WalCmdAppend::GetSizeInBytes() const {
 i32 WalCmdDelete::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
            row_ids_.size() * sizeof(RowID);
+}
+
+i32 WalCmdSetSegmentSealed::GetSizeInBytes() const {
+    i32 sz = sizeof(WalCommandType) + ::infinity::GetSizeInBytes(db_name_) + ::infinity::GetSizeInBytes(table_name_) +
+             ::infinity::GetSizeInBytes(segment_id_) + ::infinity::GetSizeInBytes(segment_filter_binary_data_);
+    sz += +sizeof(i32); // count of vector
+    for (const auto &data : block_filter_binary_data_) {
+        sz += sizeof(data.first) + ::infinity::GetSizeInBytes(data.second);
+    }
+    return sz;
 }
 
 i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
@@ -330,6 +416,20 @@ void WalCmdDelete::WriteAdv(char *&buf) const {
     for (SizeT idx = 0; idx < row_count; ++idx) {
         const auto &row_id = this->row_ids_[idx];
         WriteBufAdv(buf, row_id);
+    }
+}
+
+void WalCmdSetSegmentSealed::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::SET_SEGMENT_SEALED);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->segment_filter_binary_data_);
+    i32 count = static_cast<i32>(this->block_filter_binary_data_.size());
+    WriteBufAdv(buf, count);
+    for (const auto &data : block_filter_binary_data_) {
+        WriteBufAdv(buf, data.first);
+        WriteBufAdv(buf, data.second);
     }
 }
 
@@ -520,6 +620,11 @@ String WalEntry::ToString() const {
                 ss << row_id.ToString() << " ";
             }
             ss << std::endl;
+        } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_SEALED) {
+            auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentSealed *>(cmd.get());
+            ss << "db name: " << set_sealed_cmd->db_name_ << std::endl;
+            ss << "table name: " << set_sealed_cmd->table_name_ << std::endl;
+            ss << "segment id: " << set_sealed_cmd->segment_id_ << std::endl;
         } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
             auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
             ss << "db name: " << create_index_cmd->db_name_ << std::endl;
@@ -561,6 +666,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::DELETE:
             command = "DELETE";
+            break;
+        case WalCommandType::SET_SEGMENT_SEALED:
+            command = "SET_SEGMENT_SEALED";
             break;
         case WalCommandType::CHECKPOINT:
             command = "CHECKPOINT";
