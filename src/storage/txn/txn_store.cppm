@@ -95,14 +95,13 @@ public:
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 
-private:
-    TxnCompactStore compact_state_;
-
-public:
     SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
     Txn *txn_{};
+
+private:
+    TxnCompactStore compact_state_;
 };
 
 } // namespace infinity

@@ -71,6 +71,7 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kCompactSegments: {
                 auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
+                LOG_INFO("Reach here 4");
                 task->BeginTxn();
                 task->Execute();
                 task->CommitTxn();

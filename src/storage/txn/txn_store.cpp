@@ -130,6 +130,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
     if (!compact_state_.segment_data_.empty()) {
         UnrecoverableError("Attempt to compact table store twice");
     }
+    LOG_INFO("Reach here 3");
     compact_state_ = TxnCompactStore(std::move(segment_data), type);
     return {nullptr, Status::OK()};
 }
@@ -163,7 +164,7 @@ void TxnTableStore::PrepareCommit() {
         Catalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
     }
     // Attention: "compact" needs to be ahead of "delete"
-    if (!compact_state_.segment_data_.empty()) {
+    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         LOG_INFO(fmt::format("TMPTMPTMPTMP: commit compact, tablename: {}", *table_entry_->GetTableName()));
         Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     }
