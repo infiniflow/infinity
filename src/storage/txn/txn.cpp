@@ -496,6 +496,9 @@ void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
+    // Clean catalog delta operation
+    local_catalog_delta_ops_entry_->operations().clear();
+
     for (const auto &[index_name, table_index_entry] : txn_indexes_) {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);
@@ -574,7 +577,9 @@ void Txn::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entr
 void Txn::DropTableStore(TableEntry *dropped_table_entry) {
     if (txn_tables_.contains(dropped_table_entry)) {
         txn_tables_.erase(dropped_table_entry);
-        dropped_table_entry->Cleanup();
+        if (catalog_->CheckAllowCleanup(dropped_table_entry)) {
+            dropped_table_entry->Cleanup();
+        }
     } else {
         txn_tables_.insert(dropped_table_entry);
     }

@@ -206,6 +206,9 @@ public:
     // This not add row count
     static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
 
+    // Check if allow drop table
+    bool CheckAllowCleanup(TableEntry *dropped_table_entry);
+
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);

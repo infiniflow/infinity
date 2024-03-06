@@ -266,6 +266,17 @@ void Catalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segme
     table_entry->next_segment_id_++;
 }
 
+bool Catalog::CheckAllowCleanup(TableEntry *dropped_table_entry) {
+    std::shared_lock<std::shared_mutex> lock(rw_locker());
+    for (auto &operation : global_catalog_delta_entry_->operations()) {
+        AddSegmentEntryOp *add_segment_entry_op = dynamic_cast<AddSegmentEntryOp *>(operation.get());
+        if (add_segment_entry_op != nullptr && add_segment_entry_op->segment_entry_->GetTableEntry() == dropped_table_entry) {
+            return false;
+        }
+    }
+    return true;
+}
+
 SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String function_name) {
     // Transfer the function to upper case.
     StringToLower(function_name);

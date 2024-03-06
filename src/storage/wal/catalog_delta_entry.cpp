@@ -522,7 +522,9 @@ const String AddTableEntryOp::ToString() const {
 
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
+    sstream << fmt::format("AddSegmentEntryOp begin_ts: {}, commit_ts: {}, db_name: {} table_name: {} segment_id: {} segment_dir: {}\n",
+                           begin_ts_,
+                           commit_ts_,
                            *db_name_,
                            *table_name_,
                            segment_id_,
