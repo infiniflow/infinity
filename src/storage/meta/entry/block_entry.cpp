@@ -29,6 +29,7 @@ import catalog_delta_entry;
 import internal_types;
 import infinity_exception;
 import data_type;
+import segment_entry;
 
 import column_vector;
 import bitmask;
@@ -112,7 +113,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayCatalogBlockEntry(const SegmentEntry 
 
 Pair<BlockOffset, BlockOffset> BlockEntry::GetVisibleRange(TxnTimeStamp begin_ts, u16 block_offset_begin) const {
     std::shared_lock lock(rw_locker_);
-
+    begin_ts = std::min(begin_ts, this->max_row_ts_);
     auto &block_version = this->block_version_;
     auto &deleted = block_version->deleted_;
     BlockOffset block_offset_end = block_version->GetRowCount(begin_ts);
@@ -334,6 +335,14 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
     json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
     json_res["txn_id"] = TransactionID(this->txn_id_);
+
+    if (segment_entry_->FinishedSealingTask()) {
+        // reduce log
+        // LOG_TRACE(fmt::format("BlockEntry::Serialize: Begin try to save FastRoughFilter to json file"));
+        this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+        // LOG_TRACE(fmt::format("BlockEntry::Serialize: End try to save FastRoughFilter to json file"));
+    }
+
     return json_res;
 }
 
@@ -370,6 +379,16 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
 
+    if (segment_entry->FinishedSealingTask()) {
+        // Load FastRoughFilter from json file
+        // reduce log
+        if (block_entry->GetFastRoughFilter()->LoadFromJsonFile(block_entry_json)) {
+            // LOG_TRACE("BlockEntry::Deserialize: Finish load FastRoughFilter from json file");
+        } else {
+            UnrecoverableError("BlockEntry::Deserialize: Cannot load FastRoughFilter from json file");
+        }
+    }
+
     return block_entry;
 }
 
@@ -384,49 +403,6 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
     base_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
     fs.CreateDirectoryNoExp(*base_dir);
     return base_dir;
-}
-
-void BlockEntry::MergeFrom(BaseEntry &other) {
-    auto block_entry2 = dynamic_cast<BlockEntry *>(&other);
-    if (block_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    // // No locking here since only the load stage needs MergeFrom.
-    if (*this->block_dir_ != *block_entry2->block_dir_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires base_dir_ match");
-    }
-    if (this->block_id_ != block_entry2->block_id_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires block_id_ match");
-    }
-    if (this->row_capacity_ != block_entry2->row_capacity_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires row_capacity_ match");
-    }
-    if (this->min_row_ts_ != block_entry2->min_row_ts_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires min_row_ts_ match");
-    }
-    if (this->row_count_ > block_entry2->row_count_) {
-        UnrecoverableError("BlockEntry::MergeFrom requires source block entry rows not more than target block entry rows");
-    }
-    if (this->checkpoint_ts_ > block_entry2->checkpoint_ts_) {
-        UnrecoverableError(
-            "BlockEntry::MergeFrom requires source block entry checkpoint timestamp not more than target block entry checkpoint timestamp");
-    }
-    if (this->checkpoint_row_count_ > block_entry2->checkpoint_row_count_) {
-        UnrecoverableError(
-            "BlockEntry::MergeFrom requires source block entry checkpoint row count not more than target block entry checkpoint row count");
-    }
-    if (columns_.size() > block_entry2->columns_.size()) {
-        UnrecoverableError("BlockEntry::MergeFrom: Attempt to merge two block entries with difference column count.");
-    }
-
-    if (this->checkpoint_ts_ >= block_entry2->checkpoint_ts_)
-        return;
-    this->row_count_ = block_entry2->row_count_;
-    this->columns_.swap(block_entry2->columns_);
-    *this->block_version_ = *block_entry2->block_version_;
-    this->max_row_ts_ = block_entry2->max_row_ts_;
-    this->checkpoint_ts_ = block_entry2->checkpoint_ts_;
-    this->checkpoint_row_count_ = block_entry2->checkpoint_row_count_;
 }
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {

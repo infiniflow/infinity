@@ -51,17 +51,17 @@ public:
                                       u32 part_capacity)
         : IndexFileWorker(file_dir, file_name, index_base, column_def), worker_id_(worker_id), row_count_(row_count), part_capacity_(part_capacity) {}
 
-    virtual ~SecondaryIndexFileWorker() override final;
+    ~SecondaryIndexFileWorker() final;
 
 public:
-    void AllocateInMemory() override final;
+    void AllocateInMemory() final;
 
-    void FreeInMemory() override final;
+    void FreeInMemory() final;
 
 protected:
-    void WriteToFileImpl(bool &prepare_success) override final;
+    void WriteToFileImpl(bool &prepare_success) final;
 
-    void ReadFromFileImpl() override final;
+    void ReadFromFileImpl() final;
 
     const u32 worker_id_{};
     const u32 row_count_{};

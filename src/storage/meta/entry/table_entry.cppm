@@ -112,6 +112,8 @@ public:
 
     void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
 
+    void SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments);
+
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
@@ -148,6 +150,8 @@ public:
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
+    inline const ColumnDef *GetColumnDefByName(const String &column_name) const { return columns_[GetColumnIdByName(column_name)].get(); }
+
     inline SizeT ColumnCount() const { return columns_.size(); }
 
     const SharedPtr<String> &TableEntryDir() const { return table_entry_dir_; }
@@ -169,8 +173,6 @@ public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<TableEntry> Deserialize(const nlohmann::json &table_entry_json, TableMeta *table_meta, BufferManager *buffer_mgr);
-
-    void MergeFrom(BaseEntry &other) final;
 
     bool CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id);
 

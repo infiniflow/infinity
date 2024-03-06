@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pytest
 
+from utils import check_data
 from common import common_values
 import infinity
 
@@ -23,7 +25,10 @@ class TestKnn:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_knn(self):
+    @pytest.mark.parametrize("check_data", [{"dir_name": os.getcwd() + common_values.TEST_DATA_DIR,
+                                             "file_name": "tmp_20240116.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_knn(self, check_data):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         # assert infinity_obj
         #

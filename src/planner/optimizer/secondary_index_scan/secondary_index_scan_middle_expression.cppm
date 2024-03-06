@@ -20,12 +20,12 @@ import stl;
 import base_expression;
 import expression_type;
 import value;
+import filter_expression_push_down_helper;
 
 namespace infinity {
 
 // TODO: now do not support "NOT" expression and "!=" compare function in index scan
 
-export enum class FilterCompareType : i8 { kEqual, kLess, kLessEqual, kGreater, kGreaterEqual, kAlwaysFalse, kAlwaysTrue, kInvalid };
 export enum class BooleanCombineType : i8 { kAnd, kOr, kInvalid };
 
 export using FilterEvaluatorElem = std::variant<ColumnID, Value, FilterCompareType, BooleanCombineType>;

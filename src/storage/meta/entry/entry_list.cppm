@@ -75,8 +75,6 @@ public:
 
     void Cleanup();
 
-    void MergeWith(EntryList<Entry> &other);
-
     void Iterate(std::function<void(Entry *)> func, TxnTimeStamp visible_ts);
 
     bool Empty() {
@@ -417,36 +415,6 @@ void EntryList<Entry>::Cleanup() {
         SharedPtr<Entry> &entry = *iter;
         entry->Cleanup();
     }
-}
-
-template <EntryConcept Entry>
-void EntryList<Entry>::MergeWith(EntryList<Entry> &other) {
-    auto &other_list = other.entry_list_;
-    auto it1 = entry_list_.begin();
-    auto it2 = other_list.begin();
-
-    while (it1 != entry_list_.end() && it2 != other_list.end()) {
-        if (!(*it1)->Committed() || !(*it2)->Committed()) {
-            UnrecoverableError("MergeLists requires entries be committed");
-        }
-        if ((*it1)->commit_ts_ > (*it2)->commit_ts_) {
-            ++it1;
-        } else if ((*it1)->commit_ts_ < (*it2)->commit_ts_) {
-            entry_list_.insert(it1, std::move(*it2));
-            ++it2;
-        } else {
-            (*it1)->MergeFrom(**it2);
-            ++it1;
-            ++it2;
-        }
-    }
-
-    while (it2 != other_list.end()) {
-        entry_list_.insert(it1, std::move(*it2));
-        ++it2;
-    }
-
-    other_list.clear();
 }
 
 template <EntryConcept Entry>
