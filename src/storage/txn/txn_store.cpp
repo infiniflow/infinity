@@ -143,7 +143,7 @@ void TxnTableStore::Rollback() {
         Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
-    LOG_INFO("Reach here2");
+    LOG_INFO("Reach here0");
     Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
 }
@@ -193,7 +193,8 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         }
         auto &[to_compacts, txn] = *ret;
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
-        LOG_INFO(fmt::format("Reach here 11: {}, task ptr: {}", *table_entry_->GetTableName(), (u64)compact_task.get()));
+        LOG_INFO(
+            fmt::format("Reach here 11: {}, task ptr: {}, table ptr{}", *table_entry_->GetTableName(), (u64)compact_task.get(), (u64)table_entry_));
         bg_task_processor->Submit(std::move(compact_task));
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
@@ -203,7 +204,8 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         }
         auto &[to_compacts, txn] = *ret;
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
-        LOG_INFO(fmt::format("Reach here 1: {}, task ptr: {}", *table_entry_->GetTableName(), (u64)compact_task.get()));
+        LOG_INFO(
+            fmt::format("Reach here 12: {}, task ptr: {}, table ptr{}", *table_entry_->GetTableName(), (u64)compact_task.get(), (u64)table_entry_));
         bg_task_processor->Submit(std::move(compact_task));
     }
 }
