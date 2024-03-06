@@ -144,7 +144,7 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
-    SegmentEntry *GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
+    SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
@@ -199,7 +199,7 @@ private:
     // From data table
     Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
-    SegmentEntry *unsealed_segment_{};
+    SharedPtr<SegmentEntry> unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
 public:

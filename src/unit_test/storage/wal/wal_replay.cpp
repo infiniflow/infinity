@@ -629,7 +629,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             Vector<ColumnID> column_ids{0, 1, 2};
             auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
-            auto *segment_entry = table_entry->GetSegmentByID(0, begin_ts);
+            auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto *block_entry = segment_entry->GetBlockEntryByID(0);
@@ -771,11 +771,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             for (u64 i = 0; i < test_segment_n; ++i) {
-                auto *segment = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment, nullptr);
                 EXPECT_EQ(segment->status(), SegmentStatus::kDeprecated);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
             EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);

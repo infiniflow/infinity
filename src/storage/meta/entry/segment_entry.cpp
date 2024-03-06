@@ -60,7 +60,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_en
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
                                                                      sealed ? SegmentStatus::kSealed : SegmentStatus::kUnsealed);
-    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
+    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry);
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
 

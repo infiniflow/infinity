@@ -330,7 +330,7 @@ public:
           segment_dir_(std::move(segment_dir)), column_count_(column_count), row_count_(row_count), actual_row_count_(actual_row_count),
           row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
 
-    explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
+    explicit AddSegmentEntryOp(SharedPtr<SegmentEntry> segment_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY), segment_entry_(segment_entry),
           db_name_(segment_entry->GetTableEntry()->GetDBName()), table_name_(segment_entry->GetTableEntry()->GetTableName()) {}
 
@@ -371,7 +371,7 @@ public:
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
 
 public:
-    SegmentEntry *segment_entry_{};
+    SharedPtr<SegmentEntry> segment_entry_{};
 
 private:
     const SharedPtr<String> db_name_{};

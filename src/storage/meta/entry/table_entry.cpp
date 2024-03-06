@@ -203,18 +203,17 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
     while (!append_state_ptr->Finished()) {
         {
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
-            if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
+            if (!this->unsealed_segment_ || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
-                if (unsealed_segment_ != nullptr) {
+                if (unsealed_segment_) {
                     unsealed_segment_->SetSealed();
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
 
                 // FIXME: here sharedptr will be freed
-                this->unsealed_segment_ = new_segment.get();
-                this->segment_map_.emplace(new_segment_id, new_segment);
+                this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
+                this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
@@ -245,8 +244,8 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
     Txn *txn = txn_store_ptr->txn_;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         SegmentID segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment_entry = GetSegmentByID(segment_id, commit_ts);
-        if (segment_entry == nullptr) {
+        SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, commit_ts);
+        if (!segment_entry) {
             UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Going to delete data in non-exist segment: {}", segment_id));
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
@@ -283,8 +282,8 @@ void TableEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, cons
     SizeT row_count = 0;
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         u32 segment_id = to_delete_seg_rows.first;
-        SegmentEntry *segment = GetSegmentByID(segment_id, commit_ts);
-        if (segment == nullptr) {
+        SharedPtr<SegmentEntry> segment = GetSegmentByID(segment_id, commit_ts);
+        if (!segment) {
             UnrecoverableError(fmt::format("Going to commit delete data in non-exist segment: {}", segment_id));
         }
         const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
@@ -410,10 +409,10 @@ Status TableEntry::CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry>
     return Status::OK();
 }
 
-SegmentEntry *TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
+SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {
     try {
         std::shared_lock lock(this->rw_locker());
-        auto *segment = segment_map_.at(segment_id).get();
+        auto segment = segment_map_.at(segment_id);
         if ( // TODO: read deprecate segment is allowed
              // segment->deprecate_ts() < ts ||
             segment->min_row_ts() > ts) {
