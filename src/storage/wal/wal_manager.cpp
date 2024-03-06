@@ -457,7 +457,7 @@ i64 WalManager::ReplayWalFile() {
                     }
                     LOG_TRACE(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
                     LOG_TRACE(fmt::format("Find catalog path: {}", catalog_path));
-                    break; // why here break
+                    break;
                 } else {
                     // delta checkpoint
                     auto [current_max_commit_ts, current_catalog_path] = wal_entry->GetCheckpointInfo();

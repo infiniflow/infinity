@@ -395,6 +395,7 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                            compact_store.segment_data_.end(),
                            std::back_inserter(new_segments),
                            [](const auto &pair) { return pair.first.get(); });
+            LOG_INFO("Reach here1");
             compaction_alg_->Enable(new_segments);
             break;
         }

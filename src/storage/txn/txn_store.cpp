@@ -40,6 +40,11 @@ namespace infinity {
 
 TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
 
+TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
+
+TxnCompactStore::TxnCompactStore(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&data, CompactSegmentsTaskType type)
+    : segment_data_(std::move(data)), task_type_(type) {}
+
 Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
     SizeT column_count = table_entry_->ColumnCount();
     if (input_block->column_count() != column_count) {
@@ -125,7 +130,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
     if (!compact_state_.segment_data_.empty()) {
         UnrecoverableError("Attempt to compact table store twice");
     }
-    compact_state_ = TxnCompactStore{std::move(segment_data), type};
+    compact_state_ = TxnCompactStore(std::move(segment_data), type);
     return {nullptr, Status::OK()};
 }
 
@@ -137,7 +142,7 @@ void TxnTableStore::Rollback() {
         Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
-
+    LOG_INFO("Reach here2");
     Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
 }
@@ -158,6 +163,7 @@ void TxnTableStore::PrepareCommit() {
     }
     // Attention: "compact" needs to be ahead of "delete"
     if (!compact_state_.segment_data_.empty()) {
+        LOG_INFO(fmt::format("TMPTMPTMPTMP: commit compact, tablename: {}", *table_entry_->GetTableName()));
         Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     }
 
