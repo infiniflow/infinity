@@ -79,6 +79,7 @@ export struct CompactSegmentsTaskState {
 export enum class CompactSegmentsTaskType : i8 {
     kCompactTable,
     kCompactPickedSegments,
+    kInvalid,
 };
 
 export class CompactSegmentsTask final : public BGTask {
@@ -120,8 +121,8 @@ public:
 private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(RowIDRemapper &remapper, const Vector<SegmentEntry *> &segments);
 
-private:
-    CompactSegmentsTaskType task_type_;
+public: // TMP: test
+    const CompactSegmentsTaskType task_type_;
     TableEntry *table_entry_;
     Vector<SegmentEntry *> segments_;
 
