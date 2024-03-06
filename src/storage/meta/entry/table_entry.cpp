@@ -304,7 +304,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     }
     {
         {
-            String ss = "Commit compact: ";
+            String ss = "Compact commit: ";
             for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
                 ss += "new segment: " + std::to_string(new_segment->segment_id_) + " old segment: ";
                 for (const auto *old_segment : old_segments) {
