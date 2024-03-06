@@ -693,6 +693,12 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
     return result;
 }
 
+void TableEntry::CheckCompaction(CompactionStatus expect) const {
+    if (compaction_alg_.get() != nullptr && compaction_alg_->status() != expect) {
+        UnrecoverableError(fmt::format("CompactionAlg status is not expected: {}, {}", (u8)expect, (u8)compaction_alg_->status()));
+    }
+}
+
 void TableEntry::PickCleanup(CleanupScanner *scanner) {
     index_meta_map_.PickCleanup(scanner);
     Vector<SegmentID> cleanup_segment_ids;

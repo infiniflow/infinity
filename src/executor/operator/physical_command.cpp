@@ -35,6 +35,7 @@ import config;
 import status;
 import infinity_exception;
 import compact_segments_task;
+import compaction_alg;
 
 namespace infinity {
 
@@ -140,6 +141,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         case CommandType::kCompactTable: {
             auto *txn = query_context->GetTxn();
             auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry_, txn); // copy the table ref shared_ptr here
+            table_entry_->CheckCompaction(CompactionStatus::kDisable);
             compact_task->Execute();
             break;
         }

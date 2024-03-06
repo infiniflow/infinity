@@ -35,6 +35,7 @@ import data_type;
 import background_process;
 import bg_task;
 import compact_segments_task;
+import compaction_alg;
 
 namespace infinity {
 
@@ -187,6 +188,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         }
         auto [to_compacts, txn] = *ret;
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
+        table_entry_->CheckCompaction(CompactionStatus::kRunning);
         bg_task_processor->Submit(compact_task);
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
@@ -194,11 +196,9 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         if (!ret.has_value()) {
             continue;
         }
-        auto [to_compacts, txn] = *ret;
-        if (to_compacts.empty()) {
-            continue; // delete down layer but not trigger compaction
-        }
+        auto &[to_compacts, txn] = *ret;
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
+        table_entry_->CheckCompaction(CompactionStatus::kRunning);
         bg_task_processor->Submit(compact_task);
     }
 }
