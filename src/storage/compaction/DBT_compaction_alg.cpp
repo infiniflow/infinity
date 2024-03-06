@@ -145,7 +145,9 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
     for (auto *new_segment : new_segments) {
         this->AddSegmentNoCheckInner(new_segment);
     }
-    LOG_INFO("TMPTMPTMPTMP: set enable here2");
+    LOG_INFO(fmt::format("TMPTMPTMPTMP: set enable here2, table ptr{}, tablename {}",
+                         (u64)table_entry_,
+                         table_entry_ == nullptr ? "null" : *reinterpret_cast<TableEntry *>(table_entry_)->GetTableName()));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
@@ -159,7 +161,9 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     for (auto &segment_layer : segment_layers_) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
-    LOG_INFO("TMPTMPTMPTMP: set enable here3");
+    LOG_INFO(fmt::format("TMPTMPTMPTMP: set enable here3, table ptr{}, tablename {}",
+                         (u64)table_entry_,
+                         table_entry_ == nullptr ? "null" : *reinterpret_cast<TableEntry *>(table_entry_)->GetTableName()));
     status_ = CompactionStatus::kEnable;
 }
 
@@ -214,11 +218,9 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
-    if (!segment_entries.empty()) {
-        LOG_INFO(fmt::format("TMPTMPTMPTMP: set enable here1", *segment_entries[0]->GetTableEntry()->GetTableName()));
-    } else {
-        LOG_INFO("TMPTMPTMPTMP: set enable here1");
-    }
+    LOG_INFO(fmt::format("TMPTMPTMPTMP: set enable here1, table ptr{}, tablename {}",
+                         (u64)table_entry_,
+                         table_entry_ == nullptr ? "null" : *reinterpret_cast<TableEntry *>(table_entry_)->GetTableName()));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
