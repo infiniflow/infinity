@@ -70,7 +70,7 @@ jobs:
 
       - name: pysdk & sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 -m pytest -m "not complex and not slow" python/test && python3 tools/sqllogictest.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pytest -m "not complex and not slow" python/test && python3 tools/sqllogictest.py"
 
       - name: Stop infinity debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
