@@ -26,6 +26,7 @@ import txn;
 import compaction_alg;
 import third_party;
 import logger;
+import table_entry;
 
 namespace infinity {
 
@@ -213,7 +214,11 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
-    LOG_INFO("TMPTMPTMPTMP: set enable here1");
+    if (!segment_entries.empty()) {
+        LOG_INFO(fmt::format("TMPTMPTMPTMP: set enable here1", *segment_entries[0]->GetTableEntry()->GetTableName()));
+    } else {
+        LOG_INFO("TMPTMPTMPTMP: set enable here1");
+    }
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }

@@ -30,12 +30,6 @@ namespace infinity {
 class TableEntry;
 class SegmentEntry;
 
-export enum class CompactSegmentsTaskType : i8 {
-    kCompactTable,
-    kCompactPickedSegments,
-    kInvalid,
-};
-
 class RowIDRemapper {
 private:
     using RowIDMap = HashMap<GlobalBlockID, Vector<Pair<BlockOffset, RowID>>, GlobalBlockIDHash>;
@@ -80,6 +74,12 @@ export struct CompactSegmentsTaskState {
     Vector<SegmentEntry *> old_segments_;
 
     UniquePtr<BaseTableRef> new_table_ref_ = nullptr;
+};
+
+export enum class CompactSegmentsTaskType : i8 {
+    kCompactTable,
+    kCompactPickedSegments,
+    kInvalid,
 };
 
 export class CompactSegmentsTask final : public BGTask {
