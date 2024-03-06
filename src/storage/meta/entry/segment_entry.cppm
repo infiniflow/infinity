@@ -171,6 +171,7 @@ public:
                 UnrecoverableError("Unexpected segment status");
             }
         }
+        return false;
     }
 
 
