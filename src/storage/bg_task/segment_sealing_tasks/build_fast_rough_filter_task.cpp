@@ -135,8 +135,12 @@ inline void Advance(TotalRowCount &total_row_count_handler) {
     }
 }
 
-template <IsOnlyProbabilisticFilterAcceptedTypes ValueType, bool CheckTS>
-void BuildFastRoughFilterTask::BuildOnlyProbabilisticDataFilter(BuildFastRoughFilterArg &arg) {
+template <CanBuildBloomFilter ValueType, bool CheckTS>
+void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg) {
+    if (!arg.distinct_keys_) {
+        arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
+        arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
+    }
     auto iter = BlockEntryIter(arg.segment_entry_);
     Vector<u64> input_data; // for reuse
     for (auto *block_entry = iter.Next(); block_entry != nullptr; block_entry = iter.Next()) {
@@ -181,21 +185,25 @@ void BuildFastRoughFilterTask::BuildOnlyProbabilisticDataFilter(BuildFastRoughFi
                 BooleanT true_val(true);
                 input_data.push_back(ConvertValueToU64(true_val));
             }
-        } else if constexpr (std::is_same_v<ValueType, DecimalT>) {
+        } else {
             for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
                 Advance(arg.total_row_count_handler_);
-                auto &[ptr, _] = next_pair.value(); // unnecessary offset here
-                auto v_ptr = static_cast<const ValueType *>(ptr);
-                input_data.push_back(ConvertValueToU64(*v_ptr));
+                auto &[ptr, offset] = next_pair.value();
+                if constexpr (std::is_same_v<ValueType, VarcharT>) {
+                    Value val = column_iter.column_vector()->GetValue(offset);
+                    const String &str = val.GetVarchar();
+                    input_data.push_back(ConvertValueToU64(str));
+                } else {
+                    const auto &val = *static_cast<const ValueType *>(ptr);
+                    input_data.push_back(ConvertValueToU64(val));
+                }
             }
-        } else {
-            static_assert(false, "BUG: BuildOnlyProbabilisticDataFilter: unsupported data type");
         }
         // step 3. sort data and remove duplicate
         std::sort(input_data.begin(), input_data.end());
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter for block
-        block_entry->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.column_id_, input_data.data(), input_distinct_count);
+        block_entry->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.begin_ts_, arg.column_id_, input_data.data(), input_distinct_count);
         // step 5. merge u64 distinct key array
         arg.distinct_count_ = std::set_union(arg.distinct_keys_backup_.get(),
                                              arg.distinct_keys_backup_.get() + arg.distinct_count_,
@@ -205,14 +213,16 @@ void BuildFastRoughFilterTask::BuildOnlyProbabilisticDataFilter(BuildFastRoughFi
                               arg.distinct_keys_.get();
     }
     // finally, build probabilistic_data_filter for segment
-    arg.segment_entry_->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.column_id_, arg.distinct_keys_.get(), arg.distinct_count_);
+    arg.segment_entry_->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.begin_ts_,
+                                                                           arg.column_id_,
+                                                                           arg.distinct_keys_.get(),
+                                                                           arg.distinct_count_);
 }
 
-template <IsOnlyMinMaxFilterAcceptedTypes ValueType, bool CheckTS>
-void BuildFastRoughFilterTask::BuildOnlyMinMaxDataFilter(BuildFastRoughFilterArg &arg) {
+template <CanBuildMinMaxFilter ValueType, bool CheckTS>
+void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg) {
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
-    static_assert(std::is_same_v<ValueType, MinMaxInnerValueType>, "BUG: BuildOnlyMinMaxDataFilter: ValueType != MinMaxInnerValueType");
     // step 0. prepare min and max value
     MinMaxInnerValueType segment_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
     MinMaxInnerValueType segment_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
@@ -231,10 +241,17 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxDataFilter(BuildFastRoughFilterArg
         BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
         for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
             Advance(arg.total_row_count_handler_);
-            auto &[ptr, _] = next_pair.value();
-            const auto &val = *static_cast<const ValueType *>(ptr);
-            UpdateMin(block_min_value, val);
-            UpdateMax(block_max_value, val);
+            auto &[ptr, offset] = next_pair.value();
+            if constexpr (std::is_same_v<ValueType, VarcharT>) {
+                Value val = column_iter.column_vector()->GetValue(offset);
+                const String &str = val.GetVarchar();
+                UpdateMin(block_min_value, str);
+                UpdateMax(block_max_value, str);
+            } else {
+                const auto &val = *static_cast<const ValueType *>(ptr);
+                UpdateMin(block_min_value, val);
+                UpdateMax(block_max_value, val);
+            }
         }
         // step 2. merge min, max for segment
         UpdateMin(segment_min_value, block_min_value);
@@ -248,10 +265,14 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxDataFilter(BuildFastRoughFilterArg
                                                                                std::move(segment_max_value));
 }
 
-template <IsProbabilisticAndMinMaxFilterAcceptedTypes ValueType, bool CheckTS>
-void BuildFastRoughFilterTask::BuildProbabilisticAndMinMaxDataFilter(BuildFastRoughFilterArg &arg) {
+template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
+void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg &arg) {
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
+    if (!arg.distinct_keys_) {
+        arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
+        arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
+    }
     // step 0. prepare min and max value
     MinMaxInnerValueType segment_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
     MinMaxInnerValueType segment_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
@@ -277,7 +298,6 @@ void BuildFastRoughFilterTask::BuildProbabilisticAndMinMaxDataFilter(BuildFastRo
         for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
             Advance(arg.total_row_count_handler_);
             auto &[ptr, offset] = next_pair.value();
-            const auto &val = *static_cast<const ValueType *>(ptr);
             if constexpr (std::is_same_v<ValueType, VarcharT>) {
                 Value val = column_iter.column_vector()->GetValue(offset);
                 const String &str = val.GetVarchar();
@@ -285,6 +305,7 @@ void BuildFastRoughFilterTask::BuildProbabilisticAndMinMaxDataFilter(BuildFastRo
                 UpdateMax(block_max_value, str);
                 input_data.push_back(ConvertValueToU64(str));
             } else {
+                const auto &val = *static_cast<const ValueType *>(ptr);
                 UpdateMin(block_min_value, val);
                 UpdateMax(block_max_value, val);
                 input_data.push_back(ConvertValueToU64(val));
@@ -296,7 +317,7 @@ void BuildFastRoughFilterTask::BuildProbabilisticAndMinMaxDataFilter(BuildFastRo
         std::sort(input_data.begin(), input_data.end());
         u32 input_distinct_count = std::unique(input_data.begin(), input_data.end()) - input_data.begin();
         // step 4. build probabilistic_data_filter and min_max_data_filter for block
-        block_entry->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.column_id_, input_data.data(), input_distinct_count);
+        block_entry->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.begin_ts_, arg.column_id_, input_data.data(), input_distinct_count);
         block_entry->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_, std::move(block_min_value), std::move(block_max_value));
         // step 5. merge u64 distinct key array
         arg.distinct_count_ = std::set_union(arg.distinct_keys_backup_.get(),
@@ -307,7 +328,10 @@ void BuildFastRoughFilterTask::BuildProbabilisticAndMinMaxDataFilter(BuildFastRo
                               arg.distinct_keys_.get();
     }
     // finally, build probabilistic_data_filter for segment
-    arg.segment_entry_->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.column_id_, arg.distinct_keys_.get(), arg.distinct_count_);
+    arg.segment_entry_->GetFastRoughFilter()->BuildProbabilisticDataFilter(arg.begin_ts_,
+                                                                           arg.column_id_,
+                                                                           arg.distinct_keys_.get(),
+                                                                           arg.distinct_count_);
     // finally, build min_max_data_filter for segment
     arg.segment_entry_->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_,
                                                                                std::move(segment_min_value),
@@ -324,139 +348,160 @@ void ApplyToAllFastRoughFilterInSegment(SegmentEntry *segment_entry, std::invoca
     func(segment_entry->GetFastRoughFilter());
 }
 
-void BuildFastRoughFilterTask::CheckAndSetSegmentHaveStartedBuildTask(SegmentEntry *segment, TxnTimeStamp begin_ts) {
-    ApplyToAllFastRoughFilterInSegment(segment, [begin_ts](FastRoughFilter *filter) { filter->SetHaveStartedBuildTask(begin_ts); });
+void BuildFastRoughFilterTask::CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(SegmentEntry *segment, TxnTimeStamp begin_ts) {
+    ApplyToAllFastRoughFilterInSegment(segment, [begin_ts](FastRoughFilter *filter) { filter->SetHaveStartedMinMaxFilterBuildTask(begin_ts); });
 }
 
-void BuildFastRoughFilterTask::SetSegmentBeginBuildFastRoughFilterTask(SegmentEntry *segment, u32 column_count) {
-    ApplyToAllFastRoughFilterInSegment(segment, [column_count](FastRoughFilter *filter) { filter->BeginBuildFastRoughFilterTask(column_count); });
+void BuildFastRoughFilterTask::SetSegmentBeginBuildMinMaxFilterTask(SegmentEntry *segment, u32 column_count) {
+    ApplyToAllFastRoughFilterInSegment(segment, [column_count](FastRoughFilter *filter) { filter->BeginBuildMinMaxFilterTask(column_count); });
 }
 
-void BuildFastRoughFilterTask::SetSegmentFinishBuildFastRoughFilterTask(SegmentEntry *segment) {
-    ApplyToAllFastRoughFilterInSegment(segment, [](FastRoughFilter *filter) { filter->FinishBuildFastRoughFilterTask(); });
+void BuildFastRoughFilterTask::SetSegmentFinishBuildMinMaxFilterTask(SegmentEntry *segment) {
+    ApplyToAllFastRoughFilterInSegment(segment, [](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
 }
 
-void BuildFastRoughFilterTask::Execute(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts, SegmentStatus status) {
+void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts) {
+    bool use_block_version = false;
+    switch (auto status = segment_entry->status(); status) {
+        case SegmentStatus::kUnsealed: {
+            // segment is set full by append, use block version
+            use_block_version = true;
+            LOG_TRACE(fmt::format("BuildFastRoughFilterTask: segment {} status {} is unsealed, full because of append",
+                                  segment_entry->segment_id(),
+                                  static_cast<std::underlying_type_t<SegmentStatus>>(status)));
+            break;
+        }
+        case SegmentStatus::kSealed: {
+            // segment is created by import / compact, does not have block version
+            use_block_version = false;
+            LOG_TRACE(fmt::format("BuildFastRoughFilterTask: segment {} status {} may be created by import / compact",
+                                  segment_entry->segment_id(),
+                                  static_cast<std::underlying_type_t<SegmentStatus>>(status)));
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("BuildFastRoughFilterTask: segment {} status {} cannot build filter",
+                                           segment_entry->segment_id(),
+                                           static_cast<std::underlying_type_t<SegmentStatus>>(status)));
+            return;
+        }
+    }
     LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job begin.", segment_entry->segment_id()));
-    // set task status
-    CheckAndSetSegmentHaveStartedBuildTask(segment_entry, begin_ts);
-    // the fast_rough_filter will only be built once here
-    if (segment_entry->status() != status) {
-        UnrecoverableError("BUG: BuildFastRoughFilterTask: segment status error");
+    // step 1. when build minmax, set timestamp
+    CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(segment_entry, begin_ts);
+    // step2. when build minmax, init filters to size of column_count
+    const u32 column_count = segment_entry->column_count();
+    SetSegmentBeginBuildMinMaxFilterTask(segment_entry, column_count);
+    // step 3. build filter
+    if (use_block_version) {
+        ExecuteInner<true>(segment_entry, buffer_manager, begin_ts);
+    } else {
+        ExecuteInner<false>(segment_entry, buffer_manager, begin_ts);
     }
-    switch (status) {
-        case SegmentStatus::kSealing:
-            ExecuteInner<true>(segment_entry, buffer_manager, begin_ts);
-            break;
-        case SegmentStatus::kSealed:
-            ExecuteInner<false>(segment_entry, buffer_manager, begin_ts);
-            break;
-        default:
-            UnrecoverableError("BUG: BuildFastRoughFilterTask: segment status error");
-            break;
-    }
+    // step 4. set finish build MinMax atomic flag
+    SetSegmentFinishBuildMinMaxFilterTask(segment_entry);
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job end.", segment_entry->segment_id()));
 }
 
+void BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts) {}
+
+// will check every column
 template <bool CheckTS>
 void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts) {
     const u32 column_count = segment_entry->column_count();
     const u32 segment_row_count = segment_entry->row_count();
     // total_row_count_in_segment may be greater than rows actually read,
     // because there may be deleted rows
-    // step 1. begin build FastRoughFilter
-    SetSegmentBeginBuildFastRoughFilterTask(segment_entry, column_count);
-    // step 2. add data: for each qualified column, from blocks to segment
-    {
-        // TODO: now cannot get actual_row_count of a specific timestamp
-        auto distinct_keys = MakeUniqueForOverwrite<u64[]>(segment_row_count);
-        auto distinct_keys_backup = MakeUniqueForOverwrite<u64[]>(segment_row_count);
-        const auto *table_entry = segment_entry->GetTableEntry();
-        for (u32 column_id = 0; column_id < column_count; ++column_id) {
-            // step 2.1. check data type
-            auto &data_type_ptr = table_entry->GetColumnDefByID(column_id)->type();
-            bool can_build_min_max_data_filter = data_type_ptr->SupportMinMaxFilter();
-            bool can_build_probabilistic_data_filter = data_type_ptr->SupportBloomFilter();
-            bool no_skip = can_build_min_max_data_filter or can_build_probabilistic_data_filter;
-            if (!no_skip) {
-                // skip non-support data type
-                continue;
+    UniquePtr<u64[]> distinct_keys = nullptr;
+    UniquePtr<u64[]> distinct_keys_backup = nullptr;
+    const auto *table_entry = segment_entry->GetTableEntry();
+    for (u32 column_id = 0; column_id < column_count; ++column_id) {
+        // step 2.1. check data type
+        auto &data_type_ptr = table_entry->GetColumnDefByID(column_id)->type();
+        bool can_build_min_max_data_filter = data_type_ptr->SupportMinMaxFilter();
+        bool can_build_probabilistic_data_filter = data_type_ptr->SupportBloomFilter();
+        bool build_min_max_filter = can_build_min_max_data_filter;
+        // FIXME: add properties support for table to decide whether to build bloom filter for this column
+        bool build_bloom_filter = false and can_build_probabilistic_data_filter;
+        bool no_skip = build_min_max_filter or build_bloom_filter;
+        if (!no_skip) {
+            // skip non-support data type
+            continue;
+        }
+        // step 2.2. collect distinct data from blocks and build probabilistic_data_filter for blocks and segment
+        BuildFastRoughFilterArg arg(segment_entry, column_id, distinct_keys, distinct_keys_backup, buffer_manager, begin_ts, segment_row_count);
+        switch (data_type_ptr->type()) {
+            case kBoolean: {
+                BuildFilter<BooleanT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
             }
-            // step 2.2. collect distinct data from blocks and build probabilistic_data_filter for blocks and segment
-            BuildFastRoughFilterArg arg(segment_entry, column_id, distinct_keys, distinct_keys_backup, buffer_manager, begin_ts, segment_row_count);
-            switch (data_type_ptr->type()) {
-                case kBoolean: {
-                    BuildOnlyProbabilisticDataFilter<BooleanT, CheckTS>(arg);
-                    break;
-                }
-                case kDecimal: {
-                    // TODO: DecimalT only support "==", cannot support MinMaxDataFilter
-                    BuildOnlyProbabilisticDataFilter<DecimalT, CheckTS>(arg);
-                    break;
-                }
-                case kFloat: {
-                    BuildOnlyMinMaxDataFilter<FloatT, CheckTS>(arg);
-                    break;
-                }
-                case kDouble: {
-                    BuildOnlyMinMaxDataFilter<DoubleT, CheckTS>(arg);
-                    break;
-                }
-                case kTinyInt: {
-                    BuildProbabilisticAndMinMaxDataFilter<TinyIntT, CheckTS>(arg);
-                    break;
-                }
-                case kSmallInt: {
-                    BuildProbabilisticAndMinMaxDataFilter<SmallIntT, CheckTS>(arg);
-                    break;
-                }
-                case kInteger: {
-                    BuildProbabilisticAndMinMaxDataFilter<IntegerT, CheckTS>(arg);
-                    break;
-                }
-                case kBigInt: {
-                    BuildProbabilisticAndMinMaxDataFilter<BigIntT, CheckTS>(arg);
-                    break;
-                }
-                case kHugeInt: {
-                    BuildProbabilisticAndMinMaxDataFilter<HugeIntT, CheckTS>(arg);
-                    break;
-                }
-                case kVarchar: {
-                    BuildProbabilisticAndMinMaxDataFilter<VarcharT, CheckTS>(arg);
-                    break;
-                }
-                case kDate: {
-                    BuildProbabilisticAndMinMaxDataFilter<DateT, CheckTS>(arg);
-                    break;
-                }
-                case kTime: {
-                    BuildProbabilisticAndMinMaxDataFilter<TimeT, CheckTS>(arg);
-                    break;
-                }
-                case kDateTime: {
-                    BuildProbabilisticAndMinMaxDataFilter<DateTimeT, CheckTS>(arg);
-                    break;
-                }
-                case kTimestamp: {
-                    BuildProbabilisticAndMinMaxDataFilter<TimestampT, CheckTS>(arg);
-                    break;
-                }
-                default: {
-                    UnrecoverableError("BUG: BuildFastRoughFilterTask: unsupported data type");
-                }
+            case kDecimal: {
+                // TODO: DecimalT only support "==", cannot support MinMaxDataFilter
+                BuildFilter<DecimalT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
             }
-            // step 2.3. check total_row_count
-            if (!arg.total_row_count_handler_.IsAtEnd()) {
-                LOG_TRACE(fmt::format("BuildFastRoughFilterTask: read row count ({}) < segment_row_count ({}), maybe some rows are deleted",
-                                      arg.total_row_count_handler_.total_row_count_read_,
-                                      segment_row_count));
+            case kFloat: {
+                BuildFilter<FloatT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kDouble: {
+                BuildFilter<DoubleT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kTinyInt: {
+                BuildFilter<TinyIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kSmallInt: {
+                BuildFilter<SmallIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kInteger: {
+                BuildFilter<IntegerT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kBigInt: {
+                BuildFilter<BigIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kHugeInt: {
+                BuildFilter<HugeIntT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kVarchar: {
+                BuildFilter<VarcharT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kDate: {
+                BuildFilter<DateT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kTime: {
+                BuildFilter<TimeT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kDateTime: {
+                BuildFilter<DateTimeT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            case kTimestamp: {
+                BuildFilter<TimestampT, CheckTS>(arg, build_min_max_filter, build_bloom_filter);
+                break;
+            }
+            default: {
+                UnrecoverableError("BUG: BuildFastRoughFilterTask: unsupported data type");
+            }
+        }
+        // step 2.3. check total_row_count
+        if (!arg.total_row_count_handler_.IsAtEnd()) {
+            LOG_TRACE(fmt::format("BuildFastRoughFilterTask: read row count ({}) < segment_row_count ({}), maybe some rows are deleted",
+                                  arg.total_row_count_handler_.total_row_count_read_,
+                                  segment_row_count));
+            if (arg.total_row_count_handler_.total_row_count_read_ == 0 and segment_row_count != 0) {
+                LOG_TRACE(fmt::format("BuildFastRoughFilterTask: read row count is 0, but segment is not empty!"));
             }
         }
     }
-    // step 3. finish build FastRoughFilter
-    SetSegmentFinishBuildFastRoughFilterTask(segment_entry);
-    // step 4. save FastRoughFilter to block / segment json file in future checkpoint
-    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: build fast rough filter for segment {}, job end.", segment_entry->segment_id()));
 }
 
 } // namespace infinity

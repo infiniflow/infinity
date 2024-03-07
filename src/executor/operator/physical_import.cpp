@@ -509,9 +509,9 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
     Txn *txn = txn_store->txn_;
     TxnTimeStamp flush_ts = txn->BeginTS();
     segment_entry->FlushNewData(flush_ts);
-    // build filter (segment sealing task)
-    BuildFastRoughFilterTask::Execute(segment_entry.get(), txn->buffer_manager(), flush_ts, SegmentStatus::kSealed);
-    // now have bloom filter and minmax filter
+    // build minmax filter
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry.get(), txn->buffer_manager(), flush_ts);
+    // now have minmax filter and optional bloom filter
     // serialize filter
     String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
     Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
@@ -530,10 +530,8 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
                                                            segment_filter_binary_data,
                                                            block_filter_binary_data}));
     // build delta catalog operation
-    auto catalog_delta_op = MakeUnique<SetSegmentStatusSealedOp>(segment_entry.get(),
-                                                                 std::move(segment_filter_binary_data),
-                                                                 std::move(block_filter_binary_data),
-                                                                 SegmentStatus::kSealed);
+    auto catalog_delta_op =
+        MakeUnique<SetSegmentStatusSealedOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
     txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
 
     txn_store->Import(segment_entry);

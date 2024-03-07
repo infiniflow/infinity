@@ -26,14 +26,12 @@ import infinity_exception;
 
 namespace infinity {
 
-void ProbabilisticDataFilter::Build(ColumnID column_id, u64 *data, u32 count) {
+void ProbabilisticDataFilter::Build(TxnTimeStamp begin_ts, ColumnID column_id, u64 *data, u32 count) {
     auto &binary_fuse_filter = binary_fuse_filters_[column_id];
-    if (binary_fuse_filter) {
-        UnrecoverableError(fmt::format("BUG: ProbabilisticDataFilter for column_id: {} already exists.", column_id));
+    if (!binary_fuse_filter) {
+        UnrecoverableError(fmt::format("BUG: ProbabilisticDataFilter for column_id: {} is nullptr.", column_id));
     }
-    binary_fuse_filter = MakeUnique<BinaryFuse>();
-    binary_fuse_filter->Allocate(count);
-    binary_fuse_filter->AddAll(data, count);
+    binary_fuse_filter->Build(begin_ts, data, count);
 }
 
 u32 ProbabilisticDataFilter::GetSerializeSizeInBytes() const {

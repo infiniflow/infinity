@@ -336,12 +336,9 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
     json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
     json_res["txn_id"] = TransactionID(this->txn_id_);
 
-    if (segment_entry_->FinishedSealingTask()) {
-        // reduce log
-        // LOG_TRACE(fmt::format("BlockEntry::Serialize: Begin try to save FastRoughFilter to json file"));
-        this->GetFastRoughFilter()->SaveToJsonFile(json_res);
-        // LOG_TRACE(fmt::format("BlockEntry::Serialize: End try to save FastRoughFilter to json file"));
-    }
+    // LOG_TRACE(fmt::format("BlockEntry::Serialize: Begin try to save FastRoughFilter to json file"));
+    this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+    // LOG_TRACE(fmt::format("BlockEntry::Serialize: End try to save FastRoughFilter to json file"));
 
     return json_res;
 }
@@ -379,14 +376,12 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
 
-    if (segment_entry->FinishedSealingTask()) {
-        // Load FastRoughFilter from json file
-        // reduce log
-        if (block_entry->GetFastRoughFilter()->LoadFromJsonFile(block_entry_json)) {
-            // LOG_TRACE("BlockEntry::Deserialize: Finish load FastRoughFilter from json file");
-        } else {
-            UnrecoverableError("BlockEntry::Deserialize: Cannot load FastRoughFilter from json file");
-        }
+    // Load FastRoughFilter from json file
+    // reduce log
+    if (block_entry->GetFastRoughFilter()->LoadFromJsonFile(block_entry_json)) {
+        // LOG_TRACE("BlockEntry::Deserialize: Finish load FastRoughFilter from json file");
+    } else {
+        // LOG_TRACE("BlockEntry::Deserialize: Cannot load FastRoughFilter from json file");
     }
 
     return block_entry;
