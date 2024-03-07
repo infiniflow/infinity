@@ -145,9 +145,8 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
     for (auto *new_segment : new_segments) {
         this->AddSegmentNoCheckInner(new_segment);
     }
-    LOG_INFO(fmt::format("@@@@@@, set enable 1, table ptr: {}, table dir: {}",
-                         table_entry_,
-                         table_entry_ == nullptr ? "none" : *(reinterpret_cast<TableEntry *>(table_entry_)->TableEntryDir())));
+    String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
+    LOG_INFO(fmt::format("TMPTMP, set enable 1, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
@@ -161,9 +160,8 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     for (auto &segment_layer : segment_layers_) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
-    LOG_INFO(fmt::format("@@@@@@, set enable 2, table ptr: {}, table dir: {}",
-                         table_entry_,
-                         table_entry_ == nullptr ? "none" : *(reinterpret_cast<TableEntry *>(table_entry_)->TableEntryDir())));
+    String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
+    LOG_INFO(fmt::format("TMPTMP, set enable 2, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
     status_ = CompactionStatus::kEnable;
 }
 
@@ -218,9 +216,8 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
-    LOG_INFO(fmt::format("@@@@@@, set enable 3, table ptr: {}, table dir: {}",
-                         table_entry_,
-                         table_entry_ == nullptr ? "none" : *(reinterpret_cast<TableEntry *>(table_entry_)->TableEntryDir())));
+    String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
+    LOG_INFO(fmt::format("TMPTMP, set enable 3, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
