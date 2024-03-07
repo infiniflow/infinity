@@ -109,9 +109,10 @@ public:
 
     void SetNoDelete();
 
+    // TODO: Remove after refactor catalog delta operations log
     void SetForbidCleanup(TxnTimeStamp deprecate_ts);
 
-    void TrySetDeprecated();
+    void TrySetDeprecated(TxnTimeStamp deprecate_ts);
 
     void RollbackCompact();
 

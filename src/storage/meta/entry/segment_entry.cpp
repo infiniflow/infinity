@@ -63,7 +63,7 @@ SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(const TableEntry *tab
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
                                                                      status);
-    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry, status);
+    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), status);
     // have no effect in fake txn in wal replay
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
@@ -193,11 +193,18 @@ void SegmentEntry::SetForbidCleanup(TxnTimeStamp deprecate_ts) {
     deprecate_ts_ = deprecate_ts;
 }
 
-void SegmentEntry::TrySetDeprecated() {
+void SegmentEntry::TrySetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kForbidCleanup) {
         status_ = SegmentStatus::kDeprecated;
     }
+    // std::unique_lock lock(rw_locker_);
+    // if (status_ != SegmentStatus::kNoDelete) {
+    //     UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");
+    // }
+
+    // status_ = SegmentStatus::kDeprecated;
+    // deprecate_ts_ = deprecate_ts;
 }
 
 void SegmentEntry::RollbackCompact() {

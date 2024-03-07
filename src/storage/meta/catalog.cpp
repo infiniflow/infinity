@@ -245,8 +245,8 @@ Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, De
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
-    return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
+Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+    return table_entry->CommitCompact(txn_id, txn_store, commit_ts, compact_store);
 }
 
 Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
@@ -512,6 +512,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 if (!tb_status.ok()) {
                     UnrecoverableError(tb_status.message());
                 }
+
+                LOG_INFO(fmt::format("Add segment entry: {} {}", segment_id, (int)segment_status));
+                if (segment_status == SegmentStatus::kForbidCleanup) {
+                    segment_status = SegmentStatus::kDeprecated;
+                }
+
                 auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
                                                                                 segment_id,
                                                                                 MakeUnique<String>(segment_dir),

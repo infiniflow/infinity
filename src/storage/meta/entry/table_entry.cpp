@@ -223,7 +223,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             }
         }
         // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        auto operation = MakeUnique<AddSegmentEntryOp>(this->unsealed_segment_, this->unsealed_segment_->status());
+        auto operation = MakeUnique<AddSegmentEntryOp>(this->unsealed_segment_.get(), this->unsealed_segment_->status());
         txn->AddCatalogDeltaOperation(std::move(operation));
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
@@ -265,7 +265,7 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry, segment_entry->status());
+        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), segment_entry->status());
         txn->AddCatalogDeltaOperation(std::move(operation));
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
     }
@@ -315,7 +315,7 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
     return Status::OK();
 }
 
-Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+Status TableEntry::CommitCompact(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     if (compact_store.segment_data_.empty()) {
         return Status::OK();
     }
@@ -327,11 +327,18 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         }
     }
     {
+        TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
+        Txn *txn = txn_store_ptr->txn_;
+
         std::unique_lock lock(this->rw_locker());
         for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
             this->segment_map_.emplace(new_segment->segment_id_, new_segment);
             for (const auto &old_segment : old_segments) {
+                // old_segment->TrySetDeprecated(commit_ts);
                 old_segment->SetForbidCleanup(commit_ts);
+                LOG_INFO(fmt::format("Set ForbidCleanup: {}", old_segment->segment_id_));
+                auto operation = MakeUnique<AddSegmentEntryOp>(old_segment, old_segment->status());
+                txn->AddCatalogDeltaOperation(std::move(operation));
             }
         }
     }
