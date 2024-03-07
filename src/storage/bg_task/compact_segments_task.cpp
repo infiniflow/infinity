@@ -44,6 +44,7 @@ import table_index_entry;
 import table_index_meta;
 import block_entry;
 import compaction_alg;
+import status;
 import build_fast_rough_filter_task;
 import catalog_delta_entry;
 
@@ -210,8 +211,11 @@ void CompactSegmentsTask::CreateNewIndex(BaseTableRef *new_table_ref) {
         for (auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
-                // Table index entry isn't found
-                RecoverableError(status);
+                if (status.code() == ErrorCode::kIndexNotExist) {
+                    continue; // the index entry is not committed.
+                } else {
+                    UnrecoverableError("Get index entry failed");
+                }
             }
             table_index_entry->CreateIndexPrepare(table_entry,
                                                   new_table_ref->block_index_.get(),
