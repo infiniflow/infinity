@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [ main, libcxx, fix_bug ]
+    branches: [ main, libcxx ]
     paths-ignore:
       - 'docs/**'
       - '*.md'
@@ -117,6 +117,10 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
+      - name: Unit test release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && cmake-build-release/src/test_main"
+
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
@@ -138,3 +142,23 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat release.log 2>/dev/null || true
+
+      - name: Prepare sift dataset
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark/sift1M test/data/benchmark/sift_1m
+
+      - name: Generate config file
+        if: ${{ !cancelled() && !failure() }}
+        run: mkdir -p $PWD/db_tmp && cat conf/infinity_conf.toml | sed -e "s|/var/infinity|$PWD/db_tmp|g" > $PWD/db_tmp/infinity_conf.toml
+
+      - name: Import sift dataset
+        if: ${{ !cancelled() && !failure() }}
+        run: ./cmake-build-release/benchmark/local_infinity/knn_import_benchmark sift $PWD/test/data $PWD/db_tmp
+
+      - name: Benchmark sift search 1 thread repeat 50 times
+        if: ${{ !cancelled() && !failure() }}
+        run: truncate --size 0 $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; cat $HOME/benchmark/benchmark_sift_1_thread_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_1_thread.log ; ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
+
+      - name: Benchmark sift search 8 threads repeat 50 times
+        if: ${{ !cancelled() && !failure() }}
+        run: truncate --size 0 $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; cat $HOME/benchmark/benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 $HOME/benchmark/benchmark_sift_8_threads.log

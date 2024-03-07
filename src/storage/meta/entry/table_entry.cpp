@@ -70,8 +70,7 @@ TableEntry::TableEntry(bool is_delete,
     txn_id_ = txn_id;
 
     // SetCompactionAlg(nullptr);
-    this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
-    LOG_INFO(fmt::format("Reach here2, {}", *this->GetTableName()));
+    this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
     compaction_alg_->Enable({});
 }
 
@@ -395,7 +394,6 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                            compact_store.segment_data_.end(),
                            std::back_inserter(new_segments),
                            [](const auto &pair) { return pair.first.get(); });
-            LOG_INFO("Reach here1");
             compaction_alg_->Enable(new_segments);
             break;
         }
@@ -672,12 +670,6 @@ Vector<SegmentEntry *> TableEntry::PickCompactSegments() const {
         }
     }
     return result;
-}
-
-void TableEntry::CheckCompaction(CompactionStatus expect) const {
-    if (compaction_alg_.get() != nullptr && compaction_alg_->status() != expect) {
-        UnrecoverableError(fmt::format("CompactionAlg status is not expected: {}, {}", (u8)expect, (u8)compaction_alg_->status()));
-    }
 }
 
 void TableEntry::PickCleanup(CleanupScanner *scanner) {

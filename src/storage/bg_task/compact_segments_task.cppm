@@ -123,7 +123,7 @@ public:
 private:
     SharedPtr<SegmentEntry> CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments);
 
-public: // TMP: test
+private:
     const CompactSegmentsTaskType task_type_;
     SharedPtr<String> db_name_;
     SharedPtr<String> table_name_;

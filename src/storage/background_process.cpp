@@ -72,7 +72,6 @@ void BGTaskProcessor::Process() {
             }
             case BGTaskType::kCompactSegments: {
                 auto *task = static_cast<CompactSegmentsTask *>(bg_task.get());
-                LOG_INFO(fmt::format("Reach here 4, task ptr: {}, table name: {}", (u64)task, *task->table_name_));
                 task->BeginTxn();
                 task->Execute();
                 task->CommitTxn();
