@@ -15,9 +15,10 @@
 import os
 import pytest
 
-from utils import check_data
 from common import common_values
 import infinity
+
+from utils import copy_data
 
 
 class TestKnn:
@@ -25,8 +26,7 @@ class TestKnn:
     def test_version(self):
         print(infinity.__version__)
 
-    @pytest.mark.parametrize("check_data", [{"dir_name": os.getcwd() + common_values.TEST_DATA_DIR,
-                                             "file_name": "tmp_20240116.csv",
+    @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_knn(self, check_data):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
@@ -51,6 +51,8 @@ class TestKnn:
         }, None)
 
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
+        if not check_data:
+            copy_data("tmp_20240116.csv")
         print("import:", test_csv_dir, " start!")
         table_obj.import_data(test_csv_dir, None)
 

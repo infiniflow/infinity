@@ -20,7 +20,8 @@ from common import common_values
 import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
-from utils import check_data
+from utils import copy_data
+
 
 class TestSelect:
 
@@ -288,8 +289,7 @@ class TestSelect:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
 
-    @pytest.mark.parametrize("check_data", [{"dir_name": os.getcwd() + common_values.TEST_DATA_DIR,
-                                             "file_name": "embedding_float_dim4.csv",
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_select_embedding_float(self, check_data):
         """
@@ -319,6 +319,8 @@ class TestSelect:
 
         test_dir = "/tmp/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_float_dim4.csv"
+        if not check_data:
+            copy_data("embedding_float_dim4.csv")
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
