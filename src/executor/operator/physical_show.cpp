@@ -83,9 +83,9 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("table");
             output_names_->emplace_back("type");
             output_names_->emplace_back("column_count");
-            output_names_->emplace_back("row_count");
-            output_names_->emplace_back("segment_count");
             output_names_->emplace_back("block_count");
+            output_names_->emplace_back("block_capacity");
+            output_names_->emplace_back("segment_count");
             output_names_->emplace_back("segment_capacity");
 
             output_types_->emplace_back(varchar_type);
@@ -399,17 +399,11 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            // Append row count the 4 column
+            // Append block count the 4 column
             switch (table_type) {
-                case TableEntryType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.row_count_));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
+                case TableEntryType::kTableEntry:
                 case TableEntryType::kCollectionEntry: {
-                    // TODO: row count need to be given for collection.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
@@ -422,21 +416,32 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            // Append segment count the 5 column
+            // Append block capacity the 5 column
             switch (table_type) {
+                case TableEntryType::kCollectionEntry:
+                case TableEntryType::kTableEntry: {
+                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_capacity_));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid table type");
+                }
+            }
+        }
+
+        ++column_id;
+        {
+            // Append segment count the 6 column
+            switch (table_type) {
+                case TableEntryType::kCollectionEntry:
                 case TableEntryType::kTableEntry: {
                     Value value = Value::MakeBigInt(static_cast<i64>(table_detail.segment_count_));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
-                case TableEntryType::kCollectionEntry: {
-                    // TODO: segment count need to be given for collection.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
                 default: {
                     UnrecoverableError("Invalid table type");
                 }
@@ -445,30 +450,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            // Append segment count the 5 column
-            switch (table_type) {
-                case TableEntryType::kTableEntry: {
-                    Value value = Value::MakeBigInt(static_cast<i64>(table_detail.block_count_));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                case TableEntryType::kCollectionEntry: {
-                    // TODO: segment count need to be given for collection.
-                    Value value = Value::MakeBigInt(static_cast<i64>(0));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-                    break;
-                }
-                default: {
-                    UnrecoverableError("Invalid table type");
-                }
-            }
-        }
-
-        ++column_id;
-        {
-            // Append block limit the 6 column
+            // Append segment capacity the 7 column
             SizeT default_row_size = table_detail.segment_capacity_;
             Value value = Value::MakeBigInt(default_row_size);
             ValueExpression value_expr(value);
