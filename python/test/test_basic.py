@@ -20,10 +20,8 @@ from numpy import dtype
 from common import common_values
 import infinity
 import infinity.index as index
-
 from infinity.errors import ErrorCode
-
-from utils import check_data
+from utils import copy_data
 
 test_csv_file = "embedding_int_dim3.csv"
 
@@ -60,8 +58,7 @@ class TestCase:
 
         assert infinity_obj.disconnect()
 
-    @pytest.mark.parametrize("check_data", [{"dir_name": os.getcwd() + common_values.TEST_DATA_DIR,
-                                             "file_name": "embedding_int_dim3.csv",
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):
         """
@@ -167,6 +164,9 @@ class TestCase:
             assert table_obj is not None
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
+
+            if not check_data:
+                copy_data(test_csv_file)
 
             assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
 
