@@ -76,8 +76,6 @@ export class DBTCompactionAlg final : public CompactionAlg {
 public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, TableEntry *table_entry = nullptr)
         : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
-        static int next_id = 0;
-        test_id_ = next_id++;
     }
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
@@ -113,7 +111,6 @@ private:
 
     std::condition_variable cv_;
 
-    int test_id_;
     int running_task_n_;
 };
 

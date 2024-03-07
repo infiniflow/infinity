@@ -72,7 +72,6 @@ TableEntry::TableEntry(bool is_delete,
     // SetCompactionAlg(nullptr);
     if (!is_delete) {
         this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
-        LOG_INFO(fmt::format("Reach here2, {}", *this->GetTableName()));
         compaction_alg_->Enable({});
     }
 }
@@ -682,13 +681,16 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         std::unique_lock lock(this->rw_locker());
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-            SharedPtr<SegmentEntry> &segment = iter->second;
+            SegmentEntry *segment = iter->second.get();
+            if (segment == unsealed_segment_) {
+                continue;
+            }
             // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.
             if (segment->CheckDeprecate(visible_ts)) {
                 cleanup_segment_ids.push_back(iter->first);
-                scanner->AddEntry(std::move(segment));
+                scanner->AddEntry(std::move(iter->second));
                 iter = segment_map_.erase(iter);
             } else {
                 ++iter;

@@ -465,7 +465,7 @@ void Txn::CommitBottom() noexcept {
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
     }
 
-    // LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
+    LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);

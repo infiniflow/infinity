@@ -125,6 +125,7 @@ CompactSegmentsTask::CompactSegmentsTask(TableEntry *table_entry, Vector<Segment
 void CompactSegmentsTask::Execute() {
     auto [table_entry, status] = txn_->GetTableByName(*db_name_, *table_name_);
     if (!status.ok()) {
+        // the table is dropped before the background task is executed.
         if (status.code() == ErrorCode::kTableNotExist) {
             LOG_INFO(fmt::format("Table {} not exist, skip compact", *table_name_));
             return;
