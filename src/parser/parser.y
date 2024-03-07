@@ -363,7 +363,7 @@ struct SQL_LTYPE {
 /* SQL keywords */
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT COMPACT
-%token EXCEPT FLUSH USE OPTIMIZE
+%token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
@@ -440,7 +440,7 @@ struct SQL_LTYPE {
 
 %type <index_param_t> index_param
 %type <index_param_list_t> index_param_list
-%type <with_index_param_list_t> with_index_param_list
+%type <with_index_param_list_t> with_index_param_list optional_table_properties_list
 
 %type <index_info_list_t> index_info_list
 
@@ -549,7 +549,8 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 }
 
 /* CREATE TABLE table_name ( column list ); */
-| CREATE TABLE if_not_exists table_name '(' table_element_array ')' {
+/* CREATE TABLE table_name ( column list ) PROPERTIES ("p1"="111", "p2"="xxx", ...); */
+| CREATE TABLE if_not_exists table_name '(' table_element_array ')' optional_table_properties_list {
     $$ = new infinity::CreateStatement();
     std::shared_ptr<infinity::CreateTableInfo> create_table_info = std::make_shared<infinity::CreateTableInfo>();
     if($4->schema_name_ptr_ != nullptr) {
@@ -568,6 +569,11 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
         }
     }
     delete $6;
+
+    if ($8 != nullptr) {
+        create_table_info->properties_ = std::move(*$8);
+        delete $8;
+    }
 
     $$->create_info_ = create_table_info;
     $$->create_info_->conflict_type_ = $3 ? infinity::ConflictType::kIgnore : infinity::ConflictType::kError;
@@ -2655,6 +2661,13 @@ with_index_param_list : WITH '(' index_param_list ')' {
 }
 | {
     $$ = new std::vector<infinity::InitParameter*>();
+}
+
+optional_table_properties_list : PROPERTIES '(' index_param_list ')' {
+    $$ = $3;
+}
+| {
+    $$ = nullptr;
 }
 
 index_param_list : index_param {
