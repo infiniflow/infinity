@@ -688,6 +688,9 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
             SharedPtr<SegmentEntry> &segment = iter->second;
+            // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
+            // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
+            // So the used segment will not be cleaned up.
             if (segment->CheckDeprecate(visible_ts)) {
                 cleanup_segment_ids.push_back(iter->first);
                 scanner->AddEntry(std::move(segment));
