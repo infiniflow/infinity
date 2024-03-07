@@ -105,8 +105,8 @@ class TestTable:
             res = db.show_tables()
             print(res)
             # check the polars dataframe
-            assert res.columns == ["database", "table", "type", "column_count", "row_count", "segment_count",
-                                   "block_count", "segment_capacity"]
+            assert res.columns == ["database", "table", "type", "column_count", "block_count", "block_capacity",
+                                   "segment_count", "segment_capacity"]
 
     def test_create_varchar_table(self):
         """
@@ -774,7 +774,7 @@ class TestTable:
         db_obj.drop_table("test_same_column_name")
 
         db_obj.create_table("test_same_column_name", {"c1": "int",
-                                                      "c1":"int"}, None)
+                                                      "c1": "int"}, None)
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -795,4 +795,3 @@ class TestTable:
 
         values = {"c" + str(i): types for i in range(pow(2, 63) - 1)}
         db_obj.create_table("test_column_numbers", values, None)
-
