@@ -14,6 +14,8 @@
 
 module;
 
+#include <cstdio>
+
 export module column_inverter;
 
 import stl;
@@ -62,6 +64,8 @@ public:
             return term_pos_ < rhs.term_pos_;
         }
     };
+
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count);
 
 private:
     using TermBuffer = Vector<char, PoolAllocator<char>>;
