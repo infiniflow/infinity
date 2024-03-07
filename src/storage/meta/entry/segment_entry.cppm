@@ -94,6 +94,7 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
+    void SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
@@ -180,8 +181,6 @@ public:
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
-    void SetSealed();
-
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected: // protected for unit test

@@ -82,11 +82,22 @@ void ProbabilisticDataFilter::DeserializeFromStringStream(IStringStream &is) {
     u32 column_count;
     is.read(reinterpret_cast<char *>(&column_count), sizeof(column_count));
     // step 1. load binary_fuse_filters_
-    binary_fuse_filters_.clear();
-    binary_fuse_filters_.resize(column_count);
+    if (binary_fuse_filters_.empty()) {
+        binary_fuse_filters_.resize(column_count);
+        LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): begin with empty filter array");
+    } else if (binary_fuse_filters_.size() == column_count) {
+        LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): begin with existing filter array");
+    } else {
+        UnrecoverableError("ProbabilisticDataFilter::DeserializeFromStringStream(): column_count mismatch");
+    }
     for (char binary_fuse_filter_exist; auto &filter : binary_fuse_filters_) {
         is.read(reinterpret_cast<char *>(&binary_fuse_filter_exist), sizeof(binary_fuse_filter_exist));
         if (binary_fuse_filter_exist) {
+            if (filter) {
+                LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): overwrite existing filter");
+            } else {
+                LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): load new filter");
+            }
             filter = MakeUnique<BinaryFuse>();
             filter->LoadFromIStringStream(is);
         }

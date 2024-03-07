@@ -666,6 +666,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 break;
             }
             case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+                // case: unsealed segment become full in append operation
                 auto set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
                 auto db_name = set_segment_status_sealed_op->db_name();
                 auto table_name = set_segment_status_sealed_op->table_name();
@@ -684,6 +685,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                     UnrecoverableError(tb_status.message());
                 }
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
+                segment_entry->SetSealed();
                 segment_entry->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
                 break;
             }

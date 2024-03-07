@@ -53,10 +53,7 @@ String FastRoughFilter::SerializeToString() const {
 }
 
 void FastRoughFilter::DeserializeFromString(const String &str) {
-    if (HaveMinMaxFilter()) [[unlikely]] {
-        UnrecoverableError("BUG: FastRoughFilter::DeserializeFromString(): Already have data.");
-    }
-    // load
+    // load necessary parts
     IStringStream is(str);
     u32 total_binary_bytes;
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
@@ -64,9 +61,13 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
         UnrecoverableError("FastRoughFilter::DeserializeFromString(): load size error");
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
-    probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+    if (!probabilistic_data_filter_) {
+        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+    }
     probabilistic_data_filter_->DeserializeFromStringStream(is);
-    min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+    if (!min_max_data_filter_) {
+        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+    }
     min_max_data_filter_->DeserializeFromStringStream(is);
     // check position
     if (!is or u32(is.tellg()) != is.view().size()) {
@@ -82,7 +83,7 @@ void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
         probabilistic_data_filter_->SaveToJsonFile(entry_json);
         min_max_data_filter_->SaveToJsonFile(entry_json);
     } else {
-        UnrecoverableError("FastRoughFilter::SaveToJsonFile(): No FastRoughFilter data.");
+        LOG_TRACE("FastRoughFilter::SaveToJsonFile(): No MinMax data.");
     }
 }
 
@@ -127,7 +128,7 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
         FinishBuildMinMaxFilterTask();
         // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): successfully load FastRoughFilter data from json.");
     } else {
-        LOG_ERROR("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
+        UnrecoverableError("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
     }
     return load_success;
 }

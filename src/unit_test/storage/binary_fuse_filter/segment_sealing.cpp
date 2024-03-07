@@ -18,7 +18,6 @@
 
 import stl;
 import storage;
-import set_segment_status_sealed_task;
 import global_resource_usage;
 import infinity_context;
 import status;
@@ -44,34 +43,6 @@ import segment_entry;
 import block_entry;
 
 using namespace infinity;
-
-// special case: seal 3, keep 1 unsealed
-auto WaitFinishSealing = [](auto *table_entry) {
-    // wait until all segments finish sealing task
-    while (true) {
-        // 8'192 * 1'024 * 3 + 1
-        int unsealed_cnt = 0, sealing_cnt = 0, sealed_cnt = 0;
-        for (auto &[_, seg] : table_entry->segment_map()) {
-            switch (seg->status()) {
-                case SegmentStatus::kUnsealed:
-                    unsealed_cnt++;
-                    break;
-                case SegmentStatus::kSealing:
-                    sealing_cnt++;
-                    break;
-                case SegmentStatus::kSealed:
-                    sealed_cnt++;
-                    break;
-                default:
-                    UnrecoverableError("Invalid segment status");
-            }
-        }
-        if (unsealed_cnt == 1 and sealing_cnt == 0 and sealed_cnt == 3) {
-            return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
-};
 
 class SealingTaskTest : public BaseTest {
     void SetUp() override { system("rm -rf /tmp/infinity"); }
@@ -144,24 +115,14 @@ TEST_F(SealingTaskTest, set_unsealed_segment_sealing_sealed) {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
             auto [table_entry, status] = txn->GetTableEntry("default", table_name);
-            WaitFinishSealing(table_entry);
-            txn_mgr->CommitTxn(txn);
-        }
-        {
-            auto txn = txn_mgr->CreateTxn();
-            txn->Begin();
-            auto [table_entry, status] = txn->GetTableEntry("default", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1
-            int unsealed_cnt = 0, sealing_cnt = 0, sealed_cnt = 0;
+            int unsealed_cnt = 0, sealed_cnt = 0;
             auto &mp = table_entry->segment_map();
             for (auto &[_, seg] : mp) {
                 switch (seg->status()) {
                     case SegmentStatus::kUnsealed:
                         unsealed_cnt++;
-                        break;
-                    case SegmentStatus::kSealing:
-                        sealing_cnt++;
                         break;
                     case SegmentStatus::kSealed:
                         sealed_cnt++;
@@ -171,7 +132,6 @@ TEST_F(SealingTaskTest, set_unsealed_segment_sealing_sealed) {
                 }
             }
             EXPECT_EQ(unsealed_cnt, 1);
-            EXPECT_EQ(sealing_cnt, 0);
             EXPECT_EQ(sealed_cnt, 3);
             txn_mgr->CommitTxn(txn);
         }

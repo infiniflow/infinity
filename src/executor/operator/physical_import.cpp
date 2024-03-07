@@ -531,7 +531,7 @@ void PhysicalImport::SaveSegmentData(TxnTableStore *txn_store, SharedPtr<Segment
                                                            block_filter_binary_data}));
     // build delta catalog operation
     auto catalog_delta_op =
-        MakeUnique<SetSegmentStatusSealedOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
+        MakeUnique<UpdateSegmentBloomFilterDataOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
     txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
 
     txn_store->Import(segment_entry);
