@@ -521,7 +521,7 @@ i64 WalManager::ReplayWalFile() {
             continue;
         }
         ReplayWalEntry(*replay_entries[replay_count]);
-        LOG_TRACE(replay_entries[replay_count]->ToString());
+        LOG_INFO(replay_entries[replay_count]->ToString());
     }
 
     LOG_TRACE(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
@@ -742,7 +742,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         }
         segment_entry->SetNoDelete();
         segment_entry->SetForbidCleanup(commit_ts);
-        segment_entry->TrySetDeprecated(commit_ts);
+        segment_entry->TrySetDeprecated();
     }
 }
 

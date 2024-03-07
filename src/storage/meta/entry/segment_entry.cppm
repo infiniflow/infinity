@@ -112,7 +112,7 @@ public:
     // TODO: Remove after refactor catalog delta operations log
     void SetForbidCleanup(TxnTimeStamp deprecate_ts);
 
-    void TrySetDeprecated(TxnTimeStamp deprecate_ts);
+    void TrySetDeprecated();
 
     void RollbackCompact();
 

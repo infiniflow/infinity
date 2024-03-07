@@ -193,18 +193,11 @@ void SegmentEntry::SetForbidCleanup(TxnTimeStamp deprecate_ts) {
     deprecate_ts_ = deprecate_ts;
 }
 
-void SegmentEntry::TrySetDeprecated(TxnTimeStamp deprecate_ts) {
+void SegmentEntry::TrySetDeprecated() {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kForbidCleanup) {
         status_ = SegmentStatus::kDeprecated;
     }
-    // std::unique_lock lock(rw_locker_);
-    // if (status_ != SegmentStatus::kNoDelete) {
-    //     UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");
-    // }
-
-    // status_ = SegmentStatus::kDeprecated;
-    // deprecate_ts_ = deprecate_ts;
 }
 
 void SegmentEntry::RollbackCompact() {
