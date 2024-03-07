@@ -70,9 +70,11 @@ TableEntry::TableEntry(bool is_delete,
     txn_id_ = txn_id;
 
     // SetCompactionAlg(nullptr);
-    this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
-    LOG_INFO(fmt::format("Reach here2, {}", *this->GetTableName()));
-    compaction_alg_->Enable({});
+    if (!is_delete) {
+        this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
+        LOG_INFO(fmt::format("Reach here2, {}", *this->GetTableName()));
+        compaction_alg_->Enable({});
+    }
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,

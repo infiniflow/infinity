@@ -75,7 +75,10 @@ private:
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, TableEntry *table_entry = nullptr)
-        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry) {}
+        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
+        static int next_id = 0;
+        test_id_ = next_id++;
+    }
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
@@ -100,8 +103,6 @@ private:
 
     Pair<SegmentEntry *, int> FindSegmentAndLayer(SegmentID segment_id);
 
-    void SetRunning(std::unique_lock<std::mutex> &lock);
-
 private:
     const DBTConfig config_;
     const int max_layer_;
@@ -111,6 +112,9 @@ private:
     Vector<SegmentLayer> segment_layers_;
 
     std::condition_variable cv_;
+
+    int test_id_;
+    int running_task_n_;
 };
 
 } // namespace infinity

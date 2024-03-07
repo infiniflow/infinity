@@ -69,19 +69,25 @@ SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    if (status_ != CompactionStatus::kEnable) {
-        // If is disable, manual compaction is going
-        // new segment will be add after manual compaction is committed/rollback
-        return None;
-    }
-
     int layer = AddSegmentNoCheckInner(new_segment);
     // Now: prohibit the top layer to merge
     // TODO: merge the top layer if possible
     if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
         return None;
     }
-    this->SetRunning(lock); // Do have compaction
+    if (status_ == CompactionStatus::kDisable) {
+        // If is disable, manual compaction is going
+        // new segment will be add after manual compaction is committed/rollback
+        return None;
+    }
+    // trigger compaction
+    if (++running_task_n_ == 1) {
+        LOG_INFO(fmt::format("TMPTMP, set running 1, table ptr: {}, table dir: {}, alg ptr: {}",
+                             (u64)table_entry_,
+                             table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                             test_id_));
+        status_ = CompactionStatus::kRunning;
+    }
 
     Txn *txn = generate_txn();
     TransactionID txn_id = txn->TxnID();
@@ -97,10 +103,6 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    if (status_ != CompactionStatus::kEnable) {
-        // If is disable, manual compaction is going
-        return None;
-    }
 
     auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
     if (shrink_segment == nullptr) {
@@ -111,7 +113,18 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     if (old_layer == new_layer) {
         return None;
     }
-    this->SetRunning(lock); // Do have compaction
+    if (status_ == CompactionStatus::kDisable) {
+        // If is disable, manual compaction is going
+        return None;
+    }
+    // trigger compaction
+    if (++running_task_n_ == 1) {
+        LOG_INFO(fmt::format("TMPTMP, set running 2, table ptr: {}, table dir: {}, alg ptr: {}",
+                             (u64)table_entry_,
+                             table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                             test_id_));
+        status_ = CompactionStatus::kRunning;
+    }
 
     if (new_layer >= old_layer) {
         UnrecoverableError("Shrink segment should has less rows than before");
@@ -146,8 +159,10 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
         this->AddSegmentNoCheckInner(new_segment);
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
-    LOG_INFO(fmt::format("TMPTMP, set enable 1, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
-    status_ = CompactionStatus::kEnable;
+    if (--running_task_n_ == 0) {
+        LOG_INFO(fmt::format("TMPTMP, set enable 1, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
+        status_ = CompactionStatus::kEnable;
+    }
     cv_.notify_one();
 }
 
@@ -161,7 +176,7 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
-    LOG_INFO(fmt::format("TMPTMP, set enable 2, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
+    LOG_INFO(fmt::format("TMPTMP, set enable 2, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
     status_ = CompactionStatus::kEnable;
 }
 
@@ -212,19 +227,29 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     if (status_ != CompactionStatus::kDisable) {
         UnrecoverableError(fmt::format("Enable compaction when compaction not disable, {}", (u8)status_));
     }
-    segment_layers_.clear();
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
-    LOG_INFO(fmt::format("TMPTMP, set enable 3, table ptr: {}, table dir: {}", (u64)table_entry_, table_dir));
+    LOG_INFO(fmt::format("TMPTMP, set enable 3, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
 
 void DBTCompactionAlg::Disable() {
     std::unique_lock lock(mtx_);
-    cv_.wait(lock, [this]() { return status_ == CompactionStatus::kEnable; });
+    cv_.wait(lock, [this]() {
+        bool res = status_ == CompactionStatus::kEnable;
+        if (!res) {
+            LOG_INFO(fmt::format("table {} is auto compacting now. wait", *(table_entry_->TableEntryDir())));
+        }
+        return res;
+    });
+    LOG_INFO(fmt::format("TMPTMP, set disable, table ptr: {}, table dir: {}, alg ptr: {}",
+                         (u64)table_entry_,
+                         table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                         test_id_));
+    segment_layers_.clear();
     status_ = CompactionStatus::kDisable;
 }
 
@@ -233,11 +258,6 @@ void DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
         UnrecoverableError(fmt::format("Called when compaction not enable, {}", (u8)status_));
     }
     AddSegmentNoCheckInner(new_segment);
-}
-
-void DBTCompactionAlg::SetRunning(std::unique_lock<std::mutex> &lock) {
-    cv_.wait(lock, [this]() { return status_ == CompactionStatus::kEnable; });
-    status_ = CompactionStatus::kRunning;
 }
 
 } // namespace infinity

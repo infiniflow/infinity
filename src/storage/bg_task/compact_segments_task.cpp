@@ -109,14 +109,14 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
-    LOG_INFO(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
+    LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
     return ret;
 }
 
 SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
-    LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
+    LOG_INFO(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
 
