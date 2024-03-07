@@ -24,6 +24,7 @@ import segment_entry;
 import infinity_exception;
 import txn;
 import compaction_alg;
+import table_entry;
 
 namespace infinity {
 
@@ -73,7 +74,7 @@ private:
 
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
-    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, void *table_entry = nullptr)
+    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, TableEntry *table_entry = nullptr)
         : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry) {}
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
@@ -104,7 +105,7 @@ private:
 private:
     const DBTConfig config_;
     const int max_layer_;
-    void *table_entry_;
+    TableEntry *table_entry_;
 
     std::mutex mtx_;
     Vector<SegmentLayer> segment_layers_;
