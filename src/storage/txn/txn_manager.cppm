@@ -55,6 +55,8 @@ public:
 
     TxnTimeStamp GetTimestamp(bool prepare_wal = false);
 
+    TxnTimeStamp GetBeginTimestamp(TransactionID txn_id, bool prepare_wal = false);
+
     void Invalidate(TxnTimeStamp commit_ts);
 
     void PutWalEntry(SharedPtr<WalEntry> entry);
@@ -87,7 +89,8 @@ private:
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
     TxnTimeStamp start_ts_{};        // The next txn ts
-    Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
+    // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
+    Map<TxnTimeStamp, TransactionID> ts_map_{};
 
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
