@@ -532,6 +532,15 @@ void SetSegmentStatusSealedOp::SaveState() {
     }
     // change segment status to sealed here, in the CommitBottom
     this->segment_entry_->FinishTaskSetSegmentStatusSealed(this->prev_status_);
+    this->begin_ts_ = segment_entry_->begin_ts_;
+    this->segment_id_ = this->segment_entry_->segment_id();
+    this->segment_dir_ = *this->segment_entry_->segment_dir();
+    this->min_row_ts_ = this->segment_entry_->min_row_ts();
+    this->max_row_ts_ = this->segment_entry_->max_row_ts();
+    this->row_capacity_ = this->segment_entry_->row_capacity();
+    this->row_count_ = this->segment_entry_->row_count();
+    this->actual_row_count_ = this->segment_entry_->actual_row_count();
+    this->column_count_ = this->segment_entry_->column_count();
     is_saved_sate_ = true;
 }
 
