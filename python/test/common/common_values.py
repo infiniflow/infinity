@@ -11,7 +11,7 @@ database_count_limit = 65536
 table_count_limit = 65536
 table_column_count_limit = 65536
 
-TEST_DATA_DIR = "/test/data"
+TEST_DATA_DIR = "/test/data/"
 TEST_TMP_DIR = "/tmp/infinity/test_data/"
 
 types_array = [
