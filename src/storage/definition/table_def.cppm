@@ -20,19 +20,23 @@ import stl;
 import index_base;
 import column_def;
 
-
 namespace infinity {
 
 export class TableDef {
 
 public:
-    static inline SharedPtr<TableDef> Make(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns) {
-        return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(columns));
+    static inline SharedPtr<TableDef>
+    Make(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns, Vector<ColumnID> bloom_filter_columns) {
+        return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(columns), std::move(bloom_filter_columns));
     }
 
 public:
-    explicit TableDef(SharedPtr<String> schema, SharedPtr<String> table_name, Vector<SharedPtr<ColumnDef>> columns)
-            : schema_name_(std::move(schema)), table_name_(std::move(table_name)), columns_(std::move(columns)) {
+    explicit TableDef(SharedPtr<String> schema,
+                      SharedPtr<String> table_name,
+                      Vector<SharedPtr<ColumnDef>> columns,
+                      Vector<ColumnID> bloom_filter_columns)
+        : schema_name_(std::move(schema)), table_name_(std::move(table_name)), columns_(std::move(columns)),
+          bloom_filter_columns_(std::move(bloom_filter_columns)) {
         SizeT column_count = columns_.size();
         for (SizeT idx = 0; idx < column_count; ++idx) {
             column_name2id_[columns_[idx]->name()] = idx;
@@ -77,6 +81,7 @@ private:
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
     Vector<IndexBase> indexes_{};
+    Vector<ColumnID> bloom_filter_columns_{};
 };
 
 } // namespace infinity

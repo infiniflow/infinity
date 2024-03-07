@@ -424,7 +424,9 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+    Vector<ColumnID> bloom_filter_columns;
+    SharedPtr<TableDef> table_def_ptr =
+        TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns, std::move(bloom_filter_columns));
 
     SharedPtr<LogicalNode> logical_create_table_operator = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                                                                     schema_name_ptr,
