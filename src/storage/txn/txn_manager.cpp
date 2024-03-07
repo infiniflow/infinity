@@ -28,6 +28,7 @@ import logger;
 import buffer_manager;
 import background_process;
 import catalog_delta_entry;
+import default_values;
 
 namespace infinity {
 
@@ -61,9 +62,7 @@ Txn *TxnManager::GetTxn(TransactionID txn_id) {
     return res;
 }
 
-TxnState TxnManager::GetTxnState(TransactionID txn_id) {
-    return GetTxn(txn_id)->GetTxnState();
-}
+TxnState TxnManager::GetTxnState(TransactionID txn_id) { return GetTxn(txn_id)->GetTxnState(); }
 
 u64 TxnManager::GetNewTxnID() {
     u64 new_txn_id = ++catalog_->next_txn_id_;
@@ -73,10 +72,16 @@ u64 TxnManager::GetNewTxnID() {
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
     TxnTimeStamp ts = ++start_ts_;
-    ts_queue_.push_back(ts);
     if (prepare_wal && put_wal_entry_ != nullptr) {
         priority_que_[ts] = nullptr;
     }
+    return ts;
+}
+
+TxnTimeStamp TxnManager::GetBeginTimestamp(TransactionID txn_id, bool prepare_wal) {
+    TxnTimeStamp ts = GetTimestamp(prepare_wal);
+    std::lock_guard<std::mutex> guard(mutex_);
+    ts_map_.emplace(ts, txn_id);
     return ts;
 }
 
@@ -160,14 +165,14 @@ void TxnManager::RollBackTxn(Txn *txn) {
 
 TxnTimeStamp TxnManager::GetMinUncommitTs() {
     std::shared_lock r_locker(rw_locker_);
-    while (!ts_queue_.empty()) {
-        TxnTimeStamp front_ts = ts_queue_.front();
-        if (txn_map_.find(front_ts) != txn_map_.end()) {
-            return front_ts;
+    for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
+        auto &[ts, txn_id] = *iter;
+        if (txn_map_.find(txn_id) != txn_map_.end()) {
+            return ts;
         }
-        ts_queue_.pop_front();
+        iter = ts_map_.erase(iter);
     }
-    return start_ts_;
+    return UNCOMMIT_TS;
 }
 
 } // namespace infinity
