@@ -84,7 +84,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
     if (++running_task_n_ == 1) {
         LOG_INFO(fmt::format("TMPTMP, set running 1, table ptr: {}, table dir: {}, alg ptr: {}",
                              (u64)table_entry_,
-                             table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                             (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
                              test_id_));
         status_ = CompactionStatus::kRunning;
     }
@@ -121,7 +121,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     if (++running_task_n_ == 1) {
         LOG_INFO(fmt::format("TMPTMP, set running 2, table ptr: {}, table dir: {}, alg ptr: {}",
                              (u64)table_entry_,
-                             table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                             (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
                              test_id_));
         status_ = CompactionStatus::kRunning;
     }
@@ -160,7 +160,10 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
     if (--running_task_n_ == 0) {
-        LOG_INFO(fmt::format("TMPTMP, set enable 1, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
+        LOG_INFO(fmt::format("TMPTMP, set enable 1, table ptr: {}, table dir: {}, alg ptr: {}",
+                             (u64)table_entry_,
+                             (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
+                             test_id_));
         status_ = CompactionStatus::kEnable;
     }
     cv_.notify_one();
@@ -176,8 +179,13 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
-    LOG_INFO(fmt::format("TMPTMP, set enable 2, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
-    status_ = CompactionStatus::kEnable;
+    if (--running_task_n_ == 0) {
+        LOG_INFO(fmt::format("TMPTMP, set enable 2, table ptr: {}, table dir: {}, alg ptr: {}",
+                             (u64)table_entry_,
+                             (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
+                             test_id_));
+        status_ = CompactionStatus::kEnable;
+    }
 }
 
 int DBTCompactionAlg::AddSegmentNoCheckInner(SegmentEntry *new_segment) {
@@ -231,7 +239,10 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
         this->AddSegmentNoCheckInner(segment_entry);
     }
     String table_dir = table_entry_ == nullptr ? "none" : (table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()));
-    LOG_INFO(fmt::format("TMPTMP, set enable 3, table ptr: {}, table dir: {}, alg ptr: {}", (u64)table_entry_, table_dir, test_id_));
+    LOG_INFO(fmt::format("TMPTMP, set enable 3, table ptr: {}, table dir: {}, alg ptr: {}",
+                         (u64)table_entry_,
+                         (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
+                         test_id_));
     status_ = CompactionStatus::kEnable;
     cv_.notify_one();
 }
@@ -247,7 +258,7 @@ void DBTCompactionAlg::Disable() {
     });
     LOG_INFO(fmt::format("TMPTMP, set disable, table ptr: {}, table dir: {}, alg ptr: {}",
                          (u64)table_entry_,
-                         table_entry_->deleted_ ? "deleted" : *(table_entry_->TableEntryDir()),
+                         (table_entry_ == nullptr || table_entry_->deleted_) ? "null" : *(table_entry_->TableEntryDir()),
                          test_id_));
     segment_layers_.clear();
     status_ = CompactionStatus::kDisable;
