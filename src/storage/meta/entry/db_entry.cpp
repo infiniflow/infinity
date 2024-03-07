@@ -159,6 +159,7 @@ Status DBEntry::GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vec
         table_detail.column_count_ = table_entry->ColumnCount();
         table_detail.row_count_ = table_entry->row_count();
         table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+        table_detail.block_capacity_ = DEFAULT_BLOCK_CAPACITY;
 
         SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
 
