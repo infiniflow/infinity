@@ -44,18 +44,33 @@ def start_infinity_service_in_subporcess():
     return infinity
 
 
-@pytest.fixture(scope="class")
-def check_data(request):
-    dir_name = request.param["dir_name"]
-    file_name = request.param["file_name"]
-    data_dir = request.param["data_dir"]
-    # path not exists
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-    if not os.path.exists(data_dir + file_name):
-        for dirpath, dirnames, filenames in os.walk(dir_name):
-            for filename in filenames:
-                if filename == file_name:
-                    src_path = os.path.join(dirpath, filename)
-                    dest_path = os.path.join(copy_dir, filename)
-                    copyfile(src_path, dest_path)
+def copy_data(file_name):
+    data_dir = os.getcwd() + common_values.TEST_DATA_DIR
+    for dirpath, dirnames, filenames in os.walk(data_dir):
+        for filename in filenames:
+            if filename == file_name:
+                src_path = os.path.join(dirpath, filename)
+                dest_path = os.path.join(common_values.TEST_TMP_DIR, filename)
+                copyfile(src_path, dest_path)
+
+
+def generate_big_int_csv(num, filename):
+    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+        for i in range(num):
+            f.write(str(i) + "," + str(i) + '\n')
+    f.close()
+
+
+def generate_big_rows_csv(num, filename):
+    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+        for i in range(num):
+            f.write(str(i) + ",asdasdlkfjio@!#!@asd #$%$23\n")
+    f.close()
+
+
+def generate_big_columns_csv(num, filename):
+    with open(os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + filename, "w") as f:
+        data = ''.join(str(i) + ',' for i in range(num - 1))
+        data += str(num - 1)
+        f.write(data)
+    f.close()
