@@ -41,6 +41,9 @@ import catalog_delta_entry;
 import status;
 import compact_segments_task;
 import cleanup_scanner;
+import background_process;
+import wal_entry;
+import set_segment_status_sealed_task;
 
 namespace infinity {
 
@@ -53,20 +56,33 @@ SegmentEntry::SegmentEntry(const TableEntry *table_entry,
     : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
       column_count_(column_count), status_(status) {}
 
-SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, bool sealed) {
+SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
                                                                      segment_id,
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
-                                                                     sealed ? SegmentStatus::kSealed : SegmentStatus::kUnsealed);
-    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get());
+                                                                     status);
+    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), status);
+    // have no effect in fake txn in wal replay
     txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
-
     return segment_entry;
 }
 
+SharedPtr<SegmentEntry> SegmentEntry::NewAppendSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kUnsealed);
+}
+
+SharedPtr<SegmentEntry> SegmentEntry::NewImportSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
+}
+
+SharedPtr<SegmentEntry> SegmentEntry::NewCompactSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
+}
+
+// used by import and compact, add a new segment, status:kSealed
 SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *table_entry,
                                                             SegmentID segment_id,
                                                             const SharedPtr<String> &segment_dir,
@@ -80,6 +96,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *ta
 SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
                                                                    SegmentID segment_id,
                                                                    const SharedPtr<String> &segment_dir,
+                                                                   SegmentStatus status,
                                                                    u64 column_count,
                                                                    SizeT row_count,
                                                                    SizeT actual_row_count,
@@ -89,7 +106,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count, SegmentStatus::kSealed);
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count, status);
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->max_row_ts_ = max_row_ts;
     segment_entry->commit_ts_ = commit_ts;
@@ -100,17 +117,52 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
     return segment_entry;
 }
 
-void SegmentEntry::SetSealed() {
+void SegmentEntry::SetSealing() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("SetSealed failed");
+        UnrecoverableError("SetSealing only accept unsealed segment");
     }
-    status_ = SegmentStatus::kSealed;
+    status_ = SegmentStatus::kSealing;
+}
+
+// will only be called in TableEntry::Append
+// txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
+// task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
+//       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
+void SegmentEntry::CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr) {
+    if (status() != SegmentStatus::kUnsealed) {
+        UnrecoverableError("CreateTaskSetSegmentStatusSealed only accept segment of kUnsealed status");
+    }
+    // wal replay case
+    if (!txn_mgr) {
+        LOG_TRACE("SegmentEntry::CreateTaskSetSegmentStatusSealed: in wal, skip create task for new sealing segment created by append");
+        return;
+    }
+    SetSegmentStatusSealedTask::CreateAndSubmitTask(this, table_entry, txn_mgr);
+}
+
+void SegmentEntry::FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status) {
+    switch (prev_status) {
+        case SegmentStatus::kSealing: {
+            std::unique_lock lock(rw_locker_);
+            if (status_ != SegmentStatus::kSealing) {
+                UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status mismatch");
+            }
+            status_ = SegmentStatus::kSealed;
+            break;
+        }
+        case SegmentStatus::kSealed: {
+            break;
+        }
+        default: {
+            UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status unexpected");
+        }
+    }
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock lock(rw_locker_);
-    if (status_ == SegmentStatus::kUnsealed) {
+    if (!FinishedSealingTask()) {
         UnrecoverableError("Assert: Compactable segment should be sealed.");
     }
     if (status_ != SegmentStatus::kSealed) {
@@ -359,7 +411,12 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
         json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
         json_res["txn_id"] = TransactionID(this->txn_id_);
-
+        json_res["status"] = static_cast<std::underlying_type_t<SegmentStatus>>(this->status_);
+        if (FinishedSealingTask()) {
+            LOG_TRACE(fmt::format("SegmentEntry::Serialize: Begin try to save FastRoughFilter to json file"));
+            this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+            LOG_TRACE(fmt::format("SegmentEntry::Serialize: End try to save FastRoughFilter to json file"));
+        }
         for (auto &block_entry : this->block_entries_) {
             json_res["block_entries"].emplace_back(block_entry->Serialize(max_commit_ts));
         }
@@ -368,12 +425,14 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
 }
 
 SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
+    std::underlying_type_t<SegmentStatus> saved_status = segment_entry_json["status"];
+    SegmentStatus segment_status = static_cast<SegmentStatus>(saved_status);
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      MakeShared<String>(segment_entry_json["segment_dir"]),
                                                                      segment_entry_json["segment_id"],
                                                                      segment_entry_json["row_capacity"],
                                                                      segment_entry_json["column_count"],
-                                                                     SegmentStatus::kSealed);
+                                                                     segment_status);
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
     segment_entry->deleted_ = segment_entry_json["deleted"];
@@ -392,6 +451,16 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
             segment_entry->block_entries_[block_entry->block_id()] = std::move(block_entry);
         }
     }
+
+    if (segment_entry->FinishedSealingTask()) {
+        // if segment is sealed, we need to load FastRoughFilter from json file
+        if (segment_entry->GetFastRoughFilter()->LoadFromJsonFile(segment_entry_json)) {
+            LOG_TRACE("SegmentEntry::Deserialize: Finish load FastRoughFilter from json file");
+        } else {
+            UnrecoverableError("SegmentEntry::Deserialize: Cannot load FastRoughFilter from json file");
+        }
+    }
+
     LOG_TRACE(fmt::format("Segment: {}, Block count: {}", segment_entry->segment_id_, segment_entry->block_entries_.size()));
 
     return segment_entry;
@@ -417,59 +486,6 @@ SharedPtr<String> SegmentEntry::DetermineSegmentDir(const String &parent_dir, u3
     return MakeShared<String>(fmt::format("{}/seg_{}", parent_dir, std::to_string(seg_id)));
 }
 
-void SegmentEntry::MergeFrom(BaseEntry &other) {
-    auto segment_entry2 = dynamic_cast<SegmentEntry *>(&other);
-    if (segment_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    if (*this->segment_dir_ != *segment_entry2->segment_dir_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires segment_dir_ match");
-    }
-    if (this->segment_id_ != segment_entry2->segment_id_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires segment_id_ match");
-    }
-    if (this->column_count_ != segment_entry2->column_count_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires column_count_ match");
-    }
-    if (this->row_capacity_ != segment_entry2->row_capacity_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires row_capacity_ match");
-    }
-    if (this->min_row_ts_ != segment_entry2->min_row_ts_) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires min_row_ts_ match");
-    }
-    if (this->block_entries_.size() > segment_entry2->block_entries_.size()) {
-        UnrecoverableError("SegmentEntry::MergeFrom requires source segment entry blocks not more than segment entry blocks");
-    }
-
-    this->row_count_ = std::max(this->row_count_, segment_entry2->row_count_);
-    this->max_row_ts_ = std::max(this->max_row_ts_, segment_entry2->max_row_ts_);
-
-    SizeT block_count = this->block_entries_.size();
-    SizeT idx = 0;
-    for (; idx < block_count; ++idx) {
-        auto &block_entry1 = this->block_entries_[idx];
-        auto &block_entry2 = segment_entry2->block_entries_[idx];
-        if (block_entry1.get() == nullptr) {
-            block_entry1 = block_entry2;
-        } else if (block_entry2.get() != nullptr) {
-            block_entry1->MergeFrom(*block_entry2);
-        }
-    }
-
-    SizeT segment2_block_count = segment_entry2->block_entries_.size();
-    for (; idx < segment2_block_count; ++idx) {
-        this->block_entries_.emplace_back(segment_entry2->block_entries_[idx]);
-    }
-
-    // for (const auto &[index_name, index_entry] : segment_entry2->index_entry_map_) {
-    //     if (this->index_entry_map_.find(index_name) == this->index_entry_map_.end()) {
-    //         this->index_entry_map_.emplace(index_name, index_entry);
-    //     } else {
-    //         this->index_entry_map_[index_name]->MergeFrom(*index_entry);
-    //     }
-    // }
-}
-
 void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
@@ -479,5 +495,25 @@ void SegmentEntry::Cleanup() {
 }
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
+
+Vector<Pair<BlockID, String>> SegmentEntry::GetBlockFilterBinaryDataVector() const {
+    Vector<Pair<BlockID, String>> block_filter_binary_data_vector;
+    block_filter_binary_data_vector.reserve(block_entries_.size());
+    for (const auto &block_entry : block_entries_) {
+        block_filter_binary_data_vector.emplace_back(block_entry->block_id(), block_entry->GetFastRoughFilter()->SerializeToString());
+    }
+    return block_filter_binary_data_vector;
+}
+
+void SegmentEntry::WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
+    std::unique_lock lock(rw_locker_);
+    if (status_ != SegmentStatus::kSealed) {
+        UnrecoverableError("WalLoadFilterBinaryData only accept segment of kSealed status");
+    }
+    fast_rough_filter_.DeserializeFromString(segment_filter_data);
+    for (const auto &[block_id, block_filter] : block_filter_data) {
+        block_entries_[block_id]->GetFastRoughFilter()->DeserializeFromString(block_filter);
+    }
+}
 
 } // namespace infinity

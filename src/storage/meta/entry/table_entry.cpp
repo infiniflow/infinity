@@ -46,6 +46,7 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
+import compact_segments_task;
 
 namespace infinity {
 
@@ -206,11 +207,16 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_ != nullptr) {
-                    unsealed_segment_->SetSealed();
+                    // in wal replay, txn->txn_mgr() will return nullptr, and the sealing task will be skipped
+                    // after wal replay, the missing sealing tasks will be created
+                    // this function will not change unsealed to sealed (will be changed in CommitAppend)
+                    // the background task will skip and put itself into the task queue again if the segment has not been changed to sealing yet
+                    unsealed_segment_->CreateTaskSetSegmentStatusSealed(this, txn->txn_mgr());
+                    append_state_ptr->set_sealing_segments_.push_back(unsealed_segment_->segment_id());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
-                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn, false);
+                SharedPtr<SegmentEntry> new_segment = SegmentEntry::NewAppendSegmentEntry(this, new_segment_id, txn);
 
                 this->segment_map_.emplace(new_segment_id, new_segment);
                 this->unsealed_segment_ = new_segment.get();
@@ -221,15 +227,25 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
     }
+    if (!append_state_ptr->set_sealing_segments_.empty()) {
+        // Add a catalog delta operation to set the segment to sealing
+        auto operation = MakeUnique<SetSegmentStatusSealingOp>(this, append_state_ptr->set_sealing_segments_);
+        txn->AddCatalogDeltaOperation(std::move(operation));
+    }
+}
+
+void TableEntry::SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments) {
+    for (SegmentID segment_id : set_sealing_segments) {
+        SegmentEntry *segment_entry = this->segment_map_[segment_id].get();
+        segment_entry->SetSealing();
+    }
 }
 
 void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
         TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
-        for (auto &[column_id, segment_index_map] : txn_index_store.index_entry_map_) {
-            for (auto &[segment_id, segment_column_index] : segment_index_map) {
-                table_index_entry->CommitCreateIndex(column_id, segment_id, segment_column_index, is_replay);
-            }
+        for (auto &[segment_id, segment_index] : txn_index_store.index_entry_map_) {
+            table_index_entry->CommitCreateIndex(segment_id, segment_index, is_replay);
         }
         if (table_index_entry->fulltext_index_entry().get() != nullptr) {
             table_index_entry->CommitCreateIndex(table_index_entry->fulltext_index_entry());
@@ -264,6 +280,8 @@ void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         row_count += range.row_count_;
     }
     this->row_count_ += row_count;
+    // finally, set the full unsealed segment to sealing
+    SetSegmentSealingForAppend(append_state_ptr->set_sealing_segments_);
 }
 
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
@@ -596,45 +614,6 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
         RecoverableError(Status::ColumnNotExist(column_name));
     }
     return it->second;
-}
-
-void TableEntry::MergeFrom(BaseEntry &other) {
-    auto table_entry2 = dynamic_cast<TableEntry *>(&other);
-    if (table_entry2 == nullptr) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    // // No locking here since only the load stage needs MergeFrom.
-    if (*this->table_name_ != *table_entry2->table_name_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_name_ match");
-    }
-    if (*this->table_entry_dir_ != *table_entry2->table_entry_dir_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-    if (this->table_entry_type_ != table_entry2->table_entry_type_) {
-        UnrecoverableError("DBEntry::MergeFrom requires table_entry_dir_ match");
-    }
-
-    this->next_segment_id_.store(std::max(this->next_segment_id_, table_entry2->next_segment_id_));
-    this->row_count_.store(std::max(this->row_count_, table_entry2->row_count_));
-
-    for (auto &[seg_id, sgement_entry2] : table_entry2->segment_map_) {
-        auto it = this->segment_map_.find(seg_id);
-        if (it == this->segment_map_.end()) {
-            sgement_entry2->table_entry_ = this;
-            this->segment_map_.emplace(seg_id, sgement_entry2);
-        } else {
-            it->second->MergeFrom(*sgement_entry2.get());
-        }
-    }
-
-    for (auto &[index_name, table_index_meta] : table_entry2->index_meta_map()) {
-        auto it = this->index_meta_map().find(index_name);
-        if (it == this->index_meta_map().end()) {
-            this->index_meta_map().emplace(index_name, std::move(table_index_meta));
-        } else {
-            it->second->MergeFrom(*table_index_meta.get());
-        }
-    }
 }
 
 bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, TransactionID txn_id) {

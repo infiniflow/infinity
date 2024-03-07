@@ -68,7 +68,7 @@ void Connection::Run() {
         try {
             HandleRequest();
         } catch (const infinity::RecoverableException &e) {
-            LOG_TRACE("Recoverable exception");
+            LOG_TRACE(fmt::format("Recoverable exception: {}", e.what()));
             return ;
         } catch (const infinity::UnrecoverableException& e) {
             HashMap<PGMessageType, String> error_message_map;

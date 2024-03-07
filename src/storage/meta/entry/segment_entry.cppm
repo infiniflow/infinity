@@ -25,7 +25,9 @@ import block_entry;
 import base_entry;
 import infinity_exception;
 import txn;
-
+import txn_manager;
+import fast_rough_filter;
+import value;
 import meta_entry_interface;
 import cleanup_scanner;
 
@@ -35,9 +37,11 @@ class TxnTableStore;
 struct TableEntry;
 class CompactSegmentsTask;
 class BlockEntryIter;
+struct WalSegmentInfo;
 
 export enum class SegmentStatus : u8 {
     kUnsealed,
+    kSealing,
     kSealed,
     kCompacting,
     kNoDelete,
@@ -57,7 +61,18 @@ public:
                           SizeT column_count,
                           SegmentStatus status);
 
-    static SharedPtr<SegmentEntry> NewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, bool sealed);
+private:
+    static SharedPtr<SegmentEntry> InnerNewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status);
+
+public:
+    // create unsealed entry, write delta catalog
+    static SharedPtr<SegmentEntry> NewAppendSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+
+    // create sealed entry, write delta catalog
+    static SharedPtr<SegmentEntry> NewImportSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+
+    // create sealed entry, write delta catalog
+    static SharedPtr<SegmentEntry> NewCompactSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
@@ -65,6 +80,7 @@ public:
     static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
                                                                 SegmentID segment_id,
                                                                 const SharedPtr<String> &segment_dir,
+                                                                SegmentStatus status,
                                                                 u64 column_count,
                                                                 SizeT row_count,
                                                                 SizeT actual_row_count,
@@ -79,10 +95,14 @@ public:
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
-    void MergeFrom(infinity::BaseEntry &other) override;
-
 public:
-    void SetSealed();
+    // will only be called in TableEntry::Append
+    // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
+    // task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
+    //       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
+    void CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr);
+
+    void FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status);
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
@@ -115,6 +135,35 @@ public:
 
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
+
+    FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
+
+    const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
+
+    Vector<Pair<BlockID, String>> GetBlockFilterBinaryDataVector() const;
+
+    void WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
+
+    // called in lock, in serialize, deserialize job
+    bool FinishedSealingTask() const { return FinishedSealingTask(status_); }
+
+    static bool FinishedSealingTask(SegmentStatus segment_status) {
+        switch (segment_status) {
+            case SegmentStatus::kUnsealed:
+            case SegmentStatus::kSealing: {
+                return false;
+            }
+            case SegmentStatus::kSealed:
+            case SegmentStatus::kCompacting:
+            case SegmentStatus::kNoDelete:
+            case SegmentStatus::kDeprecated: {
+                return true;
+            }
+            default: {
+                UnrecoverableError("Unexpected segment status");
+            }
+        }
+    }
 
 public:
     // Const getter
@@ -161,6 +210,9 @@ public:
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
+    // called by table entry
+    void SetSealing();
+
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected: // protected for unit test
@@ -196,6 +248,9 @@ private:
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // FIXME: need persist to disk
 
     Vector<SharedPtr<BlockEntry>> block_entries_{};
+
+    // check if a value must not exist in the segment
+    FastRoughFilter fast_rough_filter_;
 
     CompactSegmentsTask *compact_task_{};
     SegmentStatus status_;

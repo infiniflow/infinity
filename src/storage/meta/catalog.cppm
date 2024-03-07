@@ -15,21 +15,6 @@
 module;
 
 export module catalog;
-// export import :db_meta;
-// export import :db_entry;
-// export import :table_meta;
-// export import :table_entry;
-// export import :view_meta;
-// export import :view_entry;
-// export import :segment_entry;
-// export import :block_entry;
-// export import :block_column_entry;
-// export import :table_index_meta;
-// export import :table_index_entry;
-// export import :column_index_entry;
-// export import :segment_column_index_entry;
-// export import :fulltext_index_entry;
-// export import :base_entry;
 
 import stl;
 import table_def;
@@ -220,8 +205,6 @@ public:
     void SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts);
 
     bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
-    void MergeFrom(Catalog &other);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 

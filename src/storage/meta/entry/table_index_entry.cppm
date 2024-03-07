@@ -20,8 +20,7 @@ import stl;
 
 import txn_store;
 import fulltext_index_entry;
-import column_index_entry;
-import segment_column_index_entry;
+import segment_index_entry;
 import base_entry;
 import index_base;
 import block_index;
@@ -31,6 +30,8 @@ import random;
 
 import cleanup_scanner;
 import meta_entry_interface;
+import index_file_worker;
+import column_def;
 
 namespace infinity {
 
@@ -90,7 +91,7 @@ public:
     inline const IndexBase *index_base() const { return index_base_.get(); }
     const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
-    HashMap<u64, SharedPtr<ColumnIndexEntry>> &column_index_map() { return column_index_map_; }
+    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     SharedPtr<String> index_dir() { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
 
@@ -98,13 +99,19 @@ public:
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
+    Vector<UniquePtr<IndexFileWorker>> CreateFileWorker(CreateIndexParam *param, u32 segment_id);
+
+    static String IndexFileName(u32 segment_id) { return fmt::format("seg{}.idx", segment_id); }
+
+    static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
+
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
         return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));
     }
 
-    // For SegmentColumnIndexEntry
-    void CommitCreateIndex(u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index_entry, bool is_replay = false);
+    // For SegmentIndexEntry
+    void CommitCreateIndex(u32 segment_id, SharedPtr<SegmentIndexEntry> index_entry, bool is_replay = false);
     // For FulltextIndexEntry
     void CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry);
 
@@ -114,8 +121,7 @@ private:
     const SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
 
-    // TODO yzc: replace column_index_map_ and fulltext_index_entry_ with segment_index_map_
-    HashMap<ColumnID, SharedPtr<ColumnIndexEntry>> column_index_map_{};
+    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
 
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 

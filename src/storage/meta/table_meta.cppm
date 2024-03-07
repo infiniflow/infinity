@@ -59,8 +59,6 @@ public:
 
     static UniquePtr<TableMeta> Deserialize(const nlohmann::json &table_meta_json, DBEntry *db_entry, BufferManager *buffer_mgr);
 
-    void MergeFrom(TableMeta &other);
-
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const;

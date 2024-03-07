@@ -159,6 +159,7 @@ Status DBEntry::GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vec
         table_detail.column_count_ = table_entry->ColumnCount();
         table_detail.row_count_ = table_entry->row_count();
         table_detail.segment_capacity_ = DEFAULT_SEGMENT_CAPACITY;
+        table_detail.block_capacity_ = DEFAULT_BLOCK_CAPACITY;
 
         SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
 
@@ -225,30 +226,6 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     }
 
     return res;
-}
-
-void DBEntry::MergeFrom(BaseEntry &other) {
-    if (other.entry_type_ != EntryType::kDatabase) {
-        UnrecoverableError("MergeFrom requires the same type of BaseEntry");
-    }
-    DBEntry *db_entry2 = static_cast<DBEntry *>(&other);
-
-    // No locking here since only the load stage needs MergeFrom.
-    if (!IsEqual(*this->db_name_, *db_entry2->db_name_)) {
-        UnrecoverableError("DBEntry::MergeFrom requires db_name_ match");
-    }
-    if (!IsEqual(*this->db_entry_dir_, *db_entry2->db_entry_dir_)) {
-        UnrecoverableError("DBEntry::MergeFrom requires db_entry_dir_ match");
-    }
-    for (auto &[table_name, table_meta2] : db_entry2->table_meta_map()) {
-        auto it = this->table_meta_map().find(table_name);
-        if (it == this->table_meta_map().end()) {
-            table_meta2->db_entry_ = this;
-            this->table_meta_map().emplace(table_name, std::move(table_meta2));
-        } else {
-            it->second->MergeFrom(*table_meta2.get());
-        }
-    }
 }
 
 void DBEntry::PickCleanup(CleanupScanner *scanner) { table_meta_map_.PickCleanup(scanner); }

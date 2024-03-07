@@ -27,8 +27,9 @@ export struct TableDetail {
     TableEntryType table_entry_type_;
     i64 column_count_{};
     i64 row_count_{};
-    i64 segment_count_{};
     i64 block_count_{};
+    i64 block_capacity_{};
+    i64 segment_count_{};
     i64 segment_capacity_{};
 };
 

@@ -14,6 +14,7 @@
 import os
 
 import pandas as pd
+import pytest
 from numpy import dtype
 
 from common import common_values
@@ -22,9 +23,12 @@ import infinity.index as index
 
 from infinity.errors import ErrorCode
 
+from utils import check_data
+
+test_csv_file = "embedding_int_dim3.csv"
+
 
 class TestCase:
-
     def test_version(self):
         print(infinity.__version__)
 
@@ -56,7 +60,10 @@ class TestCase:
 
         assert infinity_obj.disconnect()
 
-    def test_basic(self):
+    @pytest.mark.parametrize("check_data", [{"dir_name": os.getcwd() + common_values.TEST_DATA_DIR,
+                                             "file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_basic(self, check_data):
         """
         target: test basic operation
         method:
@@ -161,11 +168,9 @@ class TestCase:
             table_obj = db_obj.get_table("my_table4")
             assert table_obj
 
-            test_dir = "/tmp/infinity/test_data/"
-            test_csv_dir = test_dir + "embedding_int_dim3.csv"
-            assert os.path.exists(test_csv_dir)
+            assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
 
-            res = table_obj.import_data(test_csv_dir, None)
+            res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file, None)
             assert res.error_code == ErrorCode.OK
 
             # search

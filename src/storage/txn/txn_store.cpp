@@ -97,13 +97,13 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Import(const SharedPtr<SegmentEn
 }
 
 Tuple<UniquePtr<String>, Status>
-TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u64 column_id, u32 segment_id, SharedPtr<SegmentColumnIndexEntry> index) {
+TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u32 segment_id, SharedPtr<SegmentIndexEntry> index) {
     const String &index_name = *table_index_entry->index_base()->index_name_;
     if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
-        column_index_iter->second.index_entry_map_[column_id][segment_id] = index;
+        column_index_iter->second.index_entry_map_[segment_id] = index;
     } else {
         TxnIndexStore index_store(table_index_entry);
-        index_store.index_entry_map_[column_id][segment_id] = index;
+        index_store.index_entry_map_[segment_id] = index;
         txn_indexes_store_.emplace(index_name, std::move(index_store));
     }
     return {nullptr, Status::OK()};
@@ -154,8 +154,7 @@ void TxnTableStore::PrepareCommit() {
 
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
-    Txn *txn_ptr = (Txn *)txn_;
-    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_ptr->GetBufferMgr());
+    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->GetBufferMgr());
 
     SizeT segment_count = uncommitted_segments_.size();
     for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
@@ -192,11 +191,11 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         if (!ret.has_value()) {
             continue;
         }
-        auto [to_compacts, txn] = *ret;
+        auto &[to_compacts, txn] = *ret;
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
         LOG_INFO(
             fmt::format("Reach here 11: {}, task ptr: {}, table ptr{}", *table_entry_->GetTableName(), (u64)compact_task.get(), (u64)table_entry_));
-        bg_task_processor->Submit(compact_task);
+        bg_task_processor->Submit(std::move(compact_task));
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
         auto ret = table_entry_->TryCompactDeleteRow(segment_id, generate_txn);
@@ -207,7 +206,7 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
         LOG_INFO(
             fmt::format("Reach here 12: {}, task ptr: {}, table ptr{}", *table_entry_->GetTableName(), (u64)compact_task.get(), (u64)table_entry_));
-        bg_task_processor->Submit(compact_task);
+        bg_task_processor->Submit(std::move(compact_task));
     }
 }
 

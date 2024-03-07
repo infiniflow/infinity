@@ -45,6 +45,10 @@ import table_index_meta;
 import block_entry;
 import compaction_alg;
 import status;
+import compaction_alg;
+import status;
+import build_fast_rough_filter_task;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -105,15 +109,13 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
-    auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
-    table_entry->CheckCompaction(CompactionStatus::kRunning);
     LOG_INFO(fmt::format("Add compact task, whole, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
+    auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
     return ret;
 }
 
 SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithWholeTable(TableEntry *table_entry, Txn *txn) {
     Vector<SegmentEntry *> segments = table_entry->PickCompactSegments(); // wait auto compaction to finish and pick segments
-    table_entry->CheckCompaction(CompactionStatus::kDisable);
     LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     return MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactTable);
 }
@@ -169,7 +171,7 @@ void CompactSegmentsTask::CompactSegments(CompactSegmentsTaskState &state) {
         case CompactSegmentsTaskType::kCompactTable: {
             Vector<SegmentEntry *> to_compact_segments;
             for (auto *segment : segments_) {
-                if (segment->status() != SegmentStatus::kUnsealed && segment->TrySetCompacting(this)) {
+                if (segment->TrySetCompacting(this)) {
                     to_compact_segments.push_back(segment);
                 }
             }
@@ -245,13 +247,27 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
     for (auto &[new_segment, old_segments] : segment_data) {
         if (new_segment->row_count() > 0) {
             new_segment->FlushNewData(flush_ts);
-
+            // build filter (segment sealing task)
+            BuildFastRoughFilterTask::Execute(new_segment.get(), txn_->buffer_manager(), flush_ts, SegmentStatus::kSealed);
+            // now have bloom filter and minmax filter
+            // serialize filter
+            String segment_filter_binary_data = new_segment->GetFastRoughFilter()->SerializeToString();
+            Vector<Pair<BlockID, String>> block_filter_binary_data = new_segment->GetBlockFilterBinaryDataVector();
             const auto [block_cnt, last_block_row_count] = new_segment->GetWalInfo();
             segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
                                                       new_segment->segment_id(),
                                                       static_cast<u16>(block_cnt),
                                                       DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
-                                                      last_block_row_count});
+                                                      last_block_row_count,
+                                                      u8(1), // have_rough_filter_: true
+                                                      segment_filter_binary_data,
+                                                      block_filter_binary_data});
+            // build delta catalog operation
+            auto catalog_delta_op = MakeUnique<SetSegmentStatusSealedOp>(new_segment.get(),
+                                                                         std::move(segment_filter_binary_data),
+                                                                         std::move(block_filter_binary_data),
+                                                                         SegmentStatus::kSealed);
+            txn_->AddCatalogDeltaOperation(std::move(catalog_delta_op));
         }
 
         for (auto *old_segment : old_segments) {
@@ -290,7 +306,7 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, Vector<SegmentOffset
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments) {
     auto *table_entry = state.table_entry_;
     auto &remapper = state.remapper_;
-    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn_, true);
+    auto new_segment = SegmentEntry::NewCompactSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn_);
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry->ColumnCount();

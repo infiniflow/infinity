@@ -41,6 +41,7 @@ import status;
 import bg_task;
 import periodic_trigger_thread;
 import periodic_trigger;
+import recreate_segment_sealing_tasks_in_storage_init;
 
 namespace infinity {
 
@@ -89,6 +90,12 @@ void Storage::Init() {
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
     txn_mgr_->CommitTxn(txn);
+
+    {
+        // recreate sealing tasks for and all unsealed segments and sealing segments
+        // unsealed_segment_ ptr in table entry will be kept to be nullptr, new unsealed segment will be created when new row is inserted
+        RecreateSegmentSealingTasksInStorageInit(catalog(), txn_manager(), system_start_ts);
+    }
 
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
