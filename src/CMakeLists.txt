@@ -12,9 +12,9 @@ add_subdirectory(parser)
 
 ### WARNING: DONT MOVE FOLLOWING COMMAND TO OTHER PLACE.
 
-add_definitions(-march=native)
-add_definitions(-msse4.2 -mfma)
-add_definitions(-mavx2 -mf16c -mpopcnt)
+# add_definitions(-march=native)
+# add_definitions(-msse4.2 -mfma)
+# add_definitions(-mavx2 -mf16c -mpopcnt)
 
 execute_process(COMMAND grep -q avx2 /proc/cpuinfo  
                 RESULT_VARIABLE SUPPORT_AVX2  
@@ -215,9 +215,11 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")
+        add_definitions(-march=native)
         target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
 else()
         message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
         target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
 endif()
 
@@ -396,9 +398,11 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")
+        add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 else()
         message("Compiled by SSE")
+        add_definitions(-msse4.2 -mfma)
         target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
 endif()
 
