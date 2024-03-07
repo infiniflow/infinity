@@ -14,18 +14,14 @@
 
 module;
 
+#include <cstdio>
+
 export module memory_indexer;
 import stl;
 import memory_pool;
-import segment_posting;
-import index_segment_reader;
-import posting_iterator;
 import index_defines;
 import index_config;
-import index_segment_reader;
 import posting_writer;
-import data_block;
-
 import column_vector;
 import analyzer;
 import column_inverter;
@@ -85,6 +81,12 @@ public:
 private:
     void SetAnalyzer();
 
+    void OfflineDump();
+
+    void FinalSpillFile();
+
+    void PrepareSpillFile();
+
 private:
     friend class ColumnIndexer;
 
@@ -105,5 +107,10 @@ private:
 
     std::condition_variable cv_;
     std::mutex mutex_;
+
+    u32 num_runs_{0};                  // For offline index building
+    FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
+    String spill_full_path_;           // Path of spill file
+    u64 tuple_count_{0};               // Number of tuples for external merge sort
 };
 } // namespace infinity
