@@ -39,6 +39,7 @@ import meta_map;
 import meta_entry_interface;
 import cleanup_scanner;
 import random;
+import memory_pool;
 
 namespace infinity {
 
@@ -164,7 +165,7 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
-    void GetFullTextAnalyzers(TransactionID txn_id,
+    void GetFulltextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,
                               SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                               Map<String, String> &column2analyzer);

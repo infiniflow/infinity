@@ -20,7 +20,6 @@ export module memory_indexer;
 import stl;
 import memory_pool;
 import index_defines;
-import index_config;
 import posting_writer;
 import column_vector;
 import analyzer;
@@ -31,7 +30,6 @@ import ring;
 import skiplist;
 
 namespace infinity {
-class ColumnIndexer;
 export class MemoryIndexer {
 public:
     struct KeyComp {
@@ -42,35 +40,34 @@ public:
     using PostingPtr = SharedPtr<PostingWriter>;
     using PostingTable = SkipList<TermKey, PostingPtr, KeyComp>;
 
-    enum IndexMode {
-        NEAR_REAL_TIME,
-        OFFLINE,
-    };
-
-    MemoryIndexer(u64 column_id,
-                  const InvertedIndexConfig &index_config,
-                  SharedPtr<MemoryPool> byte_slice_pool,
-                  SharedPtr<RecyclePool> buffer_pool,
+    MemoryIndexer(const String &index_dir,
+                  const String &base_name,
+                  docid_t base_doc_id,
+                  const String &analyzer,
+                  optionflag_t flag,
+                  MemoryPool &byte_slice_pool,
+                  RecyclePool &buffer_pool,
                   ThreadPool &thread_pool);
 
     ~MemoryIndexer();
 
-    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin);
+    // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
+    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count);
 
+    // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
+    // Other threads can also call this method.
     void Commit();
 
-    void WaitInflightTasks() {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
-    }
+    // Dump is blocking and shall be called only once after inserting all documents.
+    void Dump();
 
-    void SetIndexMode(IndexMode index_mode);
+    docid_t GetBaseDocId() const { return base_doc_id_; }
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
     bool IsJiebaSpecialize() { return jieba_specialize_; }
 
-    MemoryPool *GetPool() { return byte_slice_pool_.get(); }
+    MemoryPool *GetPool() { return &byte_slice_pool_; }
 
     PostingTable *GetPostingTable() { return posting_store_.get(); }
 
@@ -79,7 +76,10 @@ public:
     void Reset();
 
 private:
-    void SetAnalyzer();
+    void WaitInflightTasks() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return inflight_tasks_ == 0; });
+    }
 
     void OfflineDump();
 
@@ -88,18 +88,18 @@ private:
     void PrepareSpillFile();
 
 private:
-    friend class ColumnIndexer;
-
-    IndexMode index_mode_{NEAR_REAL_TIME};
-    u64 column_id_;
-    InvertedIndexConfig index_config_;
-    SharedPtr<MemoryPool> byte_slice_pool_;
-    SharedPtr<RecyclePool> buffer_pool_;
-    UniquePtr<PostingTable> posting_store_;
+    String index_dir_;
+    String base_name_;
+    docid_t base_doc_id_{INVALID_DOCID};
+    optionflag_t flag_;
+    MemoryPool &byte_slice_pool_;
+    RecyclePool &buffer_pool_;
+    ThreadPool &thread_pool_;
     UniquePtr<Analyzer> analyzer_;
     bool jieba_specialize_{false};
+    u32 doc_count_{0};
+    UniquePtr<PostingTable> posting_store_;
 
-    ThreadPool &thread_pool_;
     Ring<SharedPtr<ColumnInverter>> ring_inverted_;
     Ring<SharedPtr<ColumnInverter>> ring_sorted_;
     u64 seq_inserted_{0};

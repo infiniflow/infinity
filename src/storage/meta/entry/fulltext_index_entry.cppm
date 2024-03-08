@@ -20,7 +20,6 @@ import stl;
 import index_base;
 import third_party;
 import base_entry;
-import indexer;
 
 namespace infinity {
 
@@ -39,12 +38,12 @@ public:
     static SharedPtr<FulltextIndexEntry>
     NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
 
-    static SharedPtr<FulltextIndexEntry> NewReplayIrsIndexEntry(TableIndexEntry *table_index_entry,
-                                                                SharedPtr<String> index_dir,
-                                                                TransactionID txn_id,
-                                                                TxnTimeStamp begin_ts,
-                                                                TxnTimeStamp commit_ts,
-                                                                bool is_delete);
+    static SharedPtr<FulltextIndexEntry> NewReplayFulltextIndexEntry(TableIndexEntry *table_index_entry,
+                                                                     SharedPtr<String> index_dir,
+                                                                     TransactionID txn_id,
+                                                                     TxnTimeStamp begin_ts,
+                                                                     TxnTimeStamp commit_ts,
+                                                                     bool is_delete);
 
     void AddColumn(SharedPtr<IndexBase> index_base, ColumnID column_id);
 
@@ -70,6 +69,5 @@ public:
     SharedPtr<String> index_dir_{};
     HashMap<u64, SharedPtr<IndexFullText>> index_info_map_{};
     UniquePtr<IRSDataStore> irs_index_{};
-    UniquePtr<Indexer> indexer_{}; // for homebrewed fulltext index
 };
 } // namespace infinity

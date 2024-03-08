@@ -19,7 +19,6 @@ export module or_iterator;
 import stl;
 import posting_iterator;
 import index_defines;
-import index_config;
 import doc_iterator;
 import multi_query_iterator;
 import priority_queue;

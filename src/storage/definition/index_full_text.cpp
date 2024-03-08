@@ -28,6 +28,7 @@ import infinity_exception;
 import statement_common;
 import base_table_ref;
 import logical_type;
+import index_defines;
 
 namespace infinity {
 
@@ -70,6 +71,7 @@ i32 IndexFullText::GetSizeInBytes() const {
     SizeT size = IndexBase::GetSizeInBytes();
     size += sizeof(int32_t) + analyzer_.length();
     size += sizeof(u8); // for homebrewed_
+    size += sizeof(optionflag_t); // for flag_
     return size;
 }
 
@@ -78,11 +80,7 @@ void IndexFullText::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, analyzer_);
     u8 is_homebrewed = homebrewed_ ? 1 : 0;
     WriteBufAdv(ptr, is_homebrewed);
-}
-
-SharedPtr<IndexBase> IndexFullText::ReadAdv(char *&, int32_t) {
-    UnrecoverableError("Not implemented");
-    return nullptr;
+    WriteBufAdv(ptr, u8(flag_));
 }
 
 String IndexFullText::ToString() const {

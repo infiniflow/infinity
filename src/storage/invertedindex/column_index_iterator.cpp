@@ -11,38 +11,31 @@ import posting_decoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
-import segment;
-import index_config;
 import dict_reader;
 import local_file_system;
 namespace infinity {
 
-ColumnIndexIterator::ColumnIndexIterator(const InvertedIndexConfig &index_config, u64 column_id)
-    : index_config_(index_config), column_id_(column_id) {
-    format_option_ = index_config_.GetPostingFormatOption();
-}
-
-ColumnIndexIterator::~ColumnIndexIterator() {}
-
-void ColumnIndexIterator::Init(segmentid_t segment_id) {
-    String root_dir = index_config_.GetIndexName();
-    Path path = Path(root_dir) / std::to_string(segment_id);
+ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag) {
+    PostingFormatOption format_option(flag);
+    Path path = Path(index_dir) / base_name;
     String dict_file = path.string();
     dict_file.append(DICT_SUFFIX);
-    dict_reader_ = MakeShared<DictionaryReader>(dict_file, index_config_.GetPostingFormatOption());
+    dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
     String posting_file = path.string();
     posting_file.append(POSTING_SUFFIX);
     posting_file_ = MakeShared<FileReader>(fs_, posting_file, 1024);
 
     doc_list_reader_ = MakeShared<ByteSliceReader>();
-    if (format_option_.HasTfBitmap()) {
+    if (format_option.HasTfBitmap()) {
         tf_bitmap_ = MakeShared<Bitmap>();
     }
-    if (format_option_.HasPositionList()) {
+    if (format_option.HasPositionList()) {
         pos_list_reader_ = MakeShared<ByteSliceReader>();
     }
-    posting_decoder_ = MakeShared<PostingDecoder>(format_option_);
+    posting_decoder_ = MakeShared<PostingDecoder>(format_option);
 }
+
+ColumnIndexIterator::~ColumnIndexIterator() {}
 
 bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {
     bool ret = dict_reader_->Next(key, term_meta_);
