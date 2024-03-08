@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <vector>
 
 module segment_index_entry;
@@ -50,6 +51,9 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
+import fulltext_index_entry;
+import index_full_text;
+import index_defines;
 
 namespace infinity {
 
@@ -72,11 +76,9 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
 
-    {
-        if (txn != nullptr) {
-            auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
-            txn->AddCatalogDeltaOperation(std::move(operation));
-        }
+    if (txn != nullptr) {
+        auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
+        txn->AddCatalogDeltaOperation(std::move(operation));
     }
     return segment_index_entry;
 }
@@ -260,10 +262,26 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             break;
         }
         case IndexType::kFullText: {
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
+            const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+            RowID base_row_id(segment_entry->segment_id(), 0);
+            memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
+                                                        std::to_string(segment_entry->segment_id()),
+                                                        ToDocID(base_row_id),
+                                                        index_fulltext->analyzer_,
+                                                        index_fulltext->flag_,
+                                                        table_index_entry_->GetFulltextByteSlicePool(),
+                                                        table_index_entry_->GetFulltextBufferPool(),
+                                                        table_index_entry_->GetFulltextThreadPool());
+            u64 column_id = column_def->id();
+            auto block_entry_iter = BlockEntryIter(segment_entry);
+            for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count());
+            }
+            memory_indexer_->Commit();
+            memory_indexer_->Dump();
+            break;
         }
         case IndexType::kSecondary: {
             auto &data_type = column_def->type();
@@ -400,6 +418,11 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
 void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
+    if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {
+        // Fulltext index doesn't need to be checkpointed.
+        return false;
+    }
+
     String &index_name = *table_index_entry_->index_dir();
     u64 segment_id = this->segment_id_;
     if (this->max_ts_ <= this->checkpoint_ts_ || this->min_ts_ > checkpoint_ts) {

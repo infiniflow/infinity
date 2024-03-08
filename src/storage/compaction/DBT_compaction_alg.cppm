@@ -24,6 +24,7 @@ import segment_entry;
 import infinity_exception;
 import txn;
 import compaction_alg;
+import table_entry;
 
 namespace infinity {
 
@@ -71,16 +72,11 @@ private:
     MultiHashMap<TransactionID, Vector<SegmentEntry *>> compacting_segments_map_;
 };
 
-export enum class DBTStatus : u8 {
-    kDisable,
-    kEnable,
-    kRunning,
-};
-
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
-    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity)
-        : config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), status_(DBTStatus::kDisable) {}
+    DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, TableEntry *table_entry = nullptr)
+        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
+    }
 
     // `new_row_cnt` is the actual_row_cnt of `new_segment` when it is sealed(import or append)
     virtual Optional<Pair<Vector<SegmentEntry *>, Txn *>> AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) override;
@@ -95,9 +91,11 @@ public:
 
     virtual void Disable() override;
 
+    virtual void AddSegmentNoCheck(SegmentEntry *new_segment) override;
+
 private:
     // return layer
-    int AddSegmentNoCheck(SegmentEntry *new_segment);
+    int AddSegmentNoCheckInner(SegmentEntry *new_segment);
 
     void AddSegmentToHigher(Vector<SegmentEntry *> &compact_segments, int layer, TransactionID txn_id);
 
@@ -106,12 +104,14 @@ private:
 private:
     const DBTConfig config_;
     const int max_layer_;
+    TableEntry *table_entry_;
 
     std::mutex mtx_;
     Vector<SegmentLayer> segment_layers_;
 
     std::condition_variable cv_;
-    DBTStatus status_;
+
+    int running_task_n_;
 };
 
 } // namespace infinity

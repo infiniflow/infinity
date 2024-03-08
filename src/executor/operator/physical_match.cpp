@@ -50,6 +50,7 @@ import logical_type;
 import search_options;
 import query_driver;
 import status;
+import index_defines;
 
 namespace infinity {
 
@@ -83,7 +84,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SharedPtr<FulltextIndexEntry> fulltext_index_entry;
     Map<String, String> column2analyzer;
-    base_table_ref_->table_entry_ptr_->GetFullTextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
+    base_table_ref_->table_entry_ptr_->GetFulltextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
     String default_field = search_ops.options_["default_field"];

@@ -272,7 +272,8 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
         checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
-            UnrecoverableError("BlockEntry is empty at checkpoint_ts!");
+            LOG_TRACE(fmt::format("Block entry {} is empty at checkpoint_ts {}", this->block_id_, checkpoint_ts));
+            return;
         }
         const Vector<TxnTimeStamp> &deleted = this->block_version_->deleted_;
         if (checkpoint_row_count <= this->checkpoint_row_count_) {
@@ -301,7 +302,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     FlushData(checkpoint_row_count);
     this->checkpoint_ts_ = checkpoint_ts;
     this->checkpoint_row_count_ = checkpoint_row_count;
-    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed", this->segment_entry_->segment_id(), this->block_id_));
+    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed {} rows", this->segment_entry_->segment_id(), this->block_id_, this->checkpoint_row_count_));
     return;
 }
 
@@ -316,7 +317,7 @@ void BlockEntry::Cleanup() {
 }
 
 // TODO: introduce BlockColumnMeta
-nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
+nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 
@@ -336,12 +337,9 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
     json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
     json_res["txn_id"] = TransactionID(this->txn_id_);
 
-    if (segment_entry_->FinishedSealingTask()) {
-        // reduce log
-        // LOG_TRACE(fmt::format("BlockEntry::Serialize: Begin try to save FastRoughFilter to json file"));
-        this->GetFastRoughFilter()->SaveToJsonFile(json_res);
-        // LOG_TRACE(fmt::format("BlockEntry::Serialize: End try to save FastRoughFilter to json file"));
-    }
+    // LOG_TRACE(fmt::format("BlockEntry::Serialize: Begin try to save FastRoughFilter to json file"));
+    this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+    // LOG_TRACE(fmt::format("BlockEntry::Serialize: End try to save FastRoughFilter to json file"));
 
     return json_res;
 }
@@ -379,14 +377,12 @@ UniquePtr<BlockEntry> BlockEntry::Deserialize(const nlohmann::json &block_entry_
         block_entry->columns_.emplace_back(BlockColumnEntry::Deserialize(block_column_json, block_entry.get(), buffer_mgr));
     }
 
-    if (segment_entry->FinishedSealingTask()) {
-        // Load FastRoughFilter from json file
-        // reduce log
-        if (block_entry->GetFastRoughFilter()->LoadFromJsonFile(block_entry_json)) {
-            // LOG_TRACE("BlockEntry::Deserialize: Finish load FastRoughFilter from json file");
-        } else {
-            UnrecoverableError("BlockEntry::Deserialize: Cannot load FastRoughFilter from json file");
-        }
+    // Load FastRoughFilter from json file
+    // reduce log
+    if (block_entry->GetFastRoughFilter()->LoadFromJsonFile(block_entry_json)) {
+        // LOG_TRACE("BlockEntry::Deserialize: Finish load FastRoughFilter from json file");
+    } else {
+        // LOG_TRACE("BlockEntry::Deserialize: Cannot load FastRoughFilter from json file");
     }
 
     return block_entry;

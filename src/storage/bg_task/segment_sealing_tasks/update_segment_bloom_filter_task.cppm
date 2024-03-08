@@ -14,7 +14,7 @@
 
 module;
 
-export module set_segment_status_sealed_task;
+export module update_segment_bloom_filter_task;
 
 import stl;
 import bg_task;
@@ -25,15 +25,14 @@ import txn_manager;
 
 namespace infinity {
 
-export class SetSegmentStatusSealedTask final : public BGTask {
+export class UpdateSegmentBloomFilterTask final : public BGTask {
 public:
     static void CreateAndSubmitTask(SegmentEntry *segment_entry, TableEntry *table_entry, TxnManager *txn_mgr);
 
-    explicit SetSegmentStatusSealedTask(SegmentEntry *segment, TableEntry *table_entry, TxnManager *txn_mgr, u32 delay_cnt)
-        : BGTask(BGTaskType::kSetSegmentStatusSealed, false), segment_(segment), table_entry_(table_entry), txn_mgr_(txn_mgr), delay_cnt_(delay_cnt) {
-    }
+    explicit UpdateSegmentBloomFilterTask(SegmentEntry *segment, TableEntry *table_entry, TxnManager *txn_mgr)
+        : BGTask(BGTaskType::kUpdateSegmentBloomFilterData, false), segment_(segment), table_entry_(table_entry), txn_mgr_(txn_mgr) {}
 
-    String ToString() const override { return "SetSegmentStatusSealedTask"; }
+    String ToString() const override { return "UpdateSegmentBloomFilterTask"; }
 
     void Execute();
 
@@ -43,7 +42,6 @@ private:
     SegmentEntry *segment_{};
     TableEntry *table_entry_{};
     TxnManager *txn_mgr_{};
-    u32 delay_cnt_{}; // insert back to bg task queue if segment is unsealed yet
 };
 
 } // namespace infinity

@@ -5,15 +5,13 @@ module segment_term_posting;
 import stl;
 import file_writer;
 import index_defines;
-import index_config;
 import posting_decoder;
 import term_meta;
-import segment;
 import column_index_iterator;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(segmentid_t segment_id, docid_t base_doc) : segment_id_(segment_id), base_doc_id_(base_doc) {}
+SegmentTermPosting::SegmentTermPosting(docid_t base_doc_id) : base_doc_id_(base_doc_id) {}
 
 bool SegmentTermPosting::HasNext() {
     if (column_index_iterator_->Next(term_, posting_decoder_)) {
@@ -22,8 +20,20 @@ bool SegmentTermPosting::HasNext() {
     return false;
 }
 
-SegmentTermPostingQueue::SegmentTermPostingQueue(const InvertedIndexConfig &index_config, u64 column_id)
-    : index_config_(index_config), column_id_(column_id) {}
+SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
+                                                 const Vector<String> &base_names,
+                                                 const Vector<docid_t> &base_docids,
+                                                 optionflag_t flag)
+    : index_dir_(index_dir), base_names_(base_names), base_docids_(base_docids) {
+    for (u32 i = 0; i < base_names.size(); ++i) {
+        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(base_docids[i]);
+        segment_term_posting->column_index_iterator_ = CreateIndexIterator(index_dir, base_names[i], flag);
+        if (segment_term_posting->HasNext()) {
+            segment_term_postings_.push(segment_term_posting);
+        } else
+            delete segment_term_posting;
+    }
+}
 
 SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     while (!segment_term_postings_.empty()) {
@@ -36,20 +46,8 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     }
 }
 
-void SegmentTermPostingQueue::Init(const Vector<Segment> &segments) {
-    for (u32 i = 0; i < segments.size(); ++i) {
-        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(segments[i].GetSegmentId(), 0);
-        segment_term_posting->column_index_iterator_ = CreateIndexIterator(segments[i].GetSegmentId());
-        if (segment_term_posting->HasNext()) {
-            segment_term_postings_.push(segment_term_posting);
-        } else
-            delete segment_term_posting;
-    }
-}
-
-SharedPtr<ColumnIndexIterator> SegmentTermPostingQueue::CreateIndexIterator(segmentid_t segment_id) {
-    SharedPtr<ColumnIndexIterator> index_iterator = MakeShared<ColumnIndexIterator>(index_config_, column_id_);
-    index_iterator->Init(segment_id);
+SharedPtr<ColumnIndexIterator> SegmentTermPostingQueue::CreateIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag) {
+    SharedPtr<ColumnIndexIterator> index_iterator = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
     return index_iterator;
 }
 

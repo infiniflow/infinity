@@ -20,8 +20,6 @@ import stl;
 import memory_pool;
 import posting_iterator;
 import index_defines;
-import segment;
-import index_config;
 import match_data;
 namespace infinity {
 export class DocIterator {

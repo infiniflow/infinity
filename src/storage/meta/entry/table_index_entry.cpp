@@ -47,13 +47,14 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts,
                                  bool is_replay)
-    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_base_(index_base), index_dir_(std::move(index_dir)) {
+    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_base_(index_base), index_dir_(std::move(index_dir)),
+      byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
 
 TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta) {
+    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
@@ -123,9 +124,10 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
     return table_index_entry;
 }
 
+
 SharedPtr<TableIndexEntry>
 TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    auto dropped_index_entry = MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
+    auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
     if (txn_mgr) {
         auto *txn = txn_mgr->GetTxn(txn_id);
         auto &index_name = *table_index_meta->index_name();
@@ -136,7 +138,7 @@ TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, Transa
 
 SharedPtr<TableIndexEntry>
 TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
+    return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
 }
 
 // For segment_index_entry
@@ -233,25 +235,13 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
 
 Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
-    if (fulltext_index_entry != nullptr) {
-        if (fulltext_index_entry->irs_index_.get() != nullptr) {
-            auto *buffer_mgr = txn->GetBufferMgr();
-            for (const auto *segment_entry : block_index->segments_) {
-                fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
-            }
-            fulltext_index_entry->irs_index_->Commit();
-            fulltext_index_entry->irs_index_->StopSchedule();
-        } else {
-            auto *buffer_mgr = txn->GetBufferMgr();
-            for (const auto *segment_entry : block_index->segments_) {
-                auto block_entry_iter = BlockEntryIter(segment_entry);
-                for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                    fulltext_index_entry->indexer_->BatchInsert(block_entry, 0, block_entry->row_count(), buffer_mgr);
-                }
-                fulltext_index_entry->indexer_->Commit();
-                fulltext_index_entry->indexer_->Dump();
-            }
+    if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
+        auto *buffer_mgr = txn->GetBufferMgr();
+        for (const auto *segment_entry : block_index->segments_) {
+            fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
         }
+        fulltext_index_entry->irs_index_->Commit();
+        fulltext_index_entry->irs_index_->StopSchedule();
         return Status::OK();
     }
     const String &column_name = this->index_base()->column_name();

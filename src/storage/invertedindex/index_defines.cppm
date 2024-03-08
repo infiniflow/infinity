@@ -74,12 +74,27 @@ export {
 
     constexpr const char *DICT_SUFFIX = "dic";
     constexpr const char *POSTING_SUFFIX = "pos";
+
+    using ScoredId = Pair<float, u32>;
+    using ScoredIds = Vector<ScoredId>;
+    constexpr String DEFAULT_SCORER = "bm25";
+    constexpr String DEFAULT_SCORER_ARG = "";
+    constexpr SizeT DEFAULT_TOPN = 100;
 }
 
-export docid_t RowID2DocID(const RowID &row_id);
+// iresearch doc_id begins with 1
+export u32 RowID2DocID(const RowID &row_id) { return (row_id.segment_id_ << SEGMENT_OFFSET_IN_DOCID) + row_id.segment_offset_ + 1; }
 
-export docid_t RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset);
+export u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
+    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
+    return (segment_id << SEGMENT_OFFSET_IN_DOCID) + segment_offset + 1;
+}
 
-export RowID DocID2RowID(docid_t doc_id);
+export RowID DocID2RowID(u32 doc_id) { return RowID((doc_id - 1) >> SEGMENT_OFFSET_IN_DOCID, (doc_id - 1) & SEGMENT_MASK_IN_DOCID); }
+
+// homebrewed fulltext index stores relative doc_id which begins with 0
+export u32 ToDocID(RowID row_id) { return (row_id.segment_id_ << SEGMENT_OFFSET_IN_DOCID) + row_id.segment_offset_; }
+
+export RowID ToRowID(u32 doc_id) { return RowID(doc_id >> SEGMENT_OFFSET_IN_DOCID, doc_id & SEGMENT_MASK_IN_DOCID); }
 
 } // namespace infinity

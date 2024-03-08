@@ -43,7 +43,6 @@ import compact_segments_task;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
-import set_segment_status_sealed_task;
 
 namespace infinity {
 
@@ -117,52 +116,34 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
     return segment_entry;
 }
 
-void SegmentEntry::SetSealing() {
+void SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
         UnrecoverableError("SetSealing only accept unsealed segment");
     }
-    status_ = SegmentStatus::kSealing;
+    status_ = SegmentStatus::kSealed;
 }
 
-// will only be called in TableEntry::Append
-// txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
-// task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
-//       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
-void SegmentEntry::CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr) {
-    if (status() != SegmentStatus::kUnsealed) {
-        UnrecoverableError("CreateTaskSetSegmentStatusSealed only accept segment of kUnsealed status");
-    }
-    // wal replay case
-    if (!txn_mgr) {
-        LOG_TRACE("SegmentEntry::CreateTaskSetSegmentStatusSealed: in wal, skip create task for new sealing segment created by append");
-        return;
-    }
-    SetSegmentStatusSealedTask::CreateAndSubmitTask(this, table_entry, txn_mgr);
-}
-
-void SegmentEntry::FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status) {
-    switch (prev_status) {
-        case SegmentStatus::kSealing: {
-            std::unique_lock lock(rw_locker_);
-            if (status_ != SegmentStatus::kSealing) {
-                UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status mismatch");
-            }
-            status_ = SegmentStatus::kSealed;
-            break;
-        }
-        case SegmentStatus::kSealed: {
-            break;
-        }
-        default: {
-            UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status unexpected");
-        }
-    }
+void SegmentEntry::UpdateSegmentInfo(SegmentStatus status,
+                                     SizeT row_count,
+                                     TxnTimeStamp min_row_ts,
+                                     TxnTimeStamp max_row_ts,
+                                     TxnTimeStamp commit_ts,
+                                     TxnTimeStamp begin_ts,
+                                     TransactionID txn_id) {
+    std::unique_lock lock(rw_locker_);
+    status_ = status;
+    row_count_ = row_count;
+    min_row_ts_ = min_row_ts;
+    max_row_ts_ = max_row_ts;
+    commit_ts_ = commit_ts;
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock lock(rw_locker_);
-    if (!FinishedSealingTask()) {
+    if (status_ == SegmentStatus::kUnsealed) {
         UnrecoverableError("Assert: Compactable segment should be sealed.");
     }
     if (status_ != SegmentStatus::kSealed) {
@@ -183,13 +164,21 @@ void SegmentEntry::SetNoDelete() {
     compact_task_ = nullptr;
 }
 
-void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
+void SegmentEntry::SetForbidCleanup(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
+        UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");
     }
-    status_ = SegmentStatus::kDeprecated;
+
+    status_ = SegmentStatus::kForbidCleanup;
     deprecate_ts_ = deprecate_ts;
+}
+
+void SegmentEntry::TrySetDeprecated() {
+    std::unique_lock lock(rw_locker_);
+    if (status_ == SegmentStatus::kForbidCleanup) {
+        status_ = SegmentStatus::kDeprecated;
+    }
 }
 
 void SegmentEntry::RollbackCompact() {
@@ -206,7 +195,8 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     Vector<std::shared_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
         locks.emplace_back(segment_entry->rw_locker_);
-        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kNoDelete) {
+        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kForbidCleanup ||
+            segment_entry->status_ == SegmentStatus::kNoDelete) {
             return true;
         }
     }
@@ -233,7 +223,7 @@ bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
 
 bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    return check_ts >= deprecate_ts_;
+    return status_ == SegmentStatus::kDeprecated && check_ts > deprecate_ts_;
 }
 
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
@@ -251,6 +241,15 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);
     IncreaseRowCount(block_entry->row_count());
     block_entries_.emplace_back(std::move(block_entry));
+}
+
+void SegmentEntry::SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry) {
+    std::unique_lock lock(this->rw_locker_);
+    if (index == block_entries_.size()) {
+        block_entries_.emplace_back(std::move(block_entry));
+    } else {
+        block_entries_[index] = std::move(block_entry);
+    }
 }
 
 // One writer
@@ -277,6 +276,12 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
                 this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, new_block_id, 0, this->column_count_, txn));
             }
             BlockEntry *last_block_entry = this->block_entries_.back().get();
+            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(last_block_entry);
+            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
+            for (auto &column_block_entry : last_block_entry->columns()) {
+                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
+                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
+            }
 
             SegmentID range_segment_id = this->segment_id_;
             BlockID range_block_id = last_block_entry->block_id();
@@ -307,12 +312,21 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
 }
 
 // One writer
-void SegmentEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap) {
+void SegmentEntry::DeleteData(TransactionID txn_id,
+                              TxnTimeStamp commit_ts,
+                              const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
+                              Txn *txn) {
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = nullptr;
         {
             std::shared_lock lck(this->rw_locker_);
             block_entry = block_entries_.at(block_id).get();
+            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(block_entry);
+            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
+            for (auto &column_block_entry : block_entry->columns()) {
+                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
+                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
+            }
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);
@@ -412,7 +426,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
         json_res["txn_id"] = TransactionID(this->txn_id_);
         json_res["status"] = static_cast<std::underlying_type_t<SegmentStatus>>(this->status_);
-        if (FinishedSealingTask()) {
+        if (status_ != SegmentStatus::kUnsealed) {
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: Begin try to save FastRoughFilter to json file"));
             this->GetFastRoughFilter()->SaveToJsonFile(json_res);
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: End try to save FastRoughFilter to json file"));
@@ -452,12 +466,11 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
         }
     }
 
-    if (segment_entry->FinishedSealingTask()) {
-        // if segment is sealed, we need to load FastRoughFilter from json file
+    if (segment_entry->status_ != SegmentStatus::kUnsealed) {
         if (segment_entry->GetFastRoughFilter()->LoadFromJsonFile(segment_entry_json)) {
             LOG_TRACE("SegmentEntry::Deserialize: Finish load FastRoughFilter from json file");
         } else {
-            UnrecoverableError("SegmentEntry::Deserialize: Cannot load FastRoughFilter from json file");
+            LOG_TRACE("SegmentEntry::Deserialize: Cannot load FastRoughFilter from json file");
         }
     }
 
@@ -505,10 +518,13 @@ Vector<Pair<BlockID, String>> SegmentEntry::GetBlockFilterBinaryDataVector() con
     return block_filter_binary_data_vector;
 }
 
-void SegmentEntry::WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
+// used in:
+// 1. record minmax filter and optional bloom filter created for sealed segment created by append, import and compact
+// 2. record optional bloom filter created by requirement when the properties of the table is changed ? (maybe will support it in the future)
+void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kSealed) {
-        UnrecoverableError("WalLoadFilterBinaryData only accept segment of kSealed status");
+    if (status_ == SegmentStatus::kUnsealed) {
+        UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
     for (const auto &[block_id, block_filter] : block_filter_data) {

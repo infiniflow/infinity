@@ -22,6 +22,7 @@ module txn_manager;
 import txn;
 import txn_state;
 import stl;
+import third_party;
 
 import infinity_exception;
 import logger;
@@ -39,7 +40,9 @@ TxnManager::TxnManager(Catalog *catalog,
                        TransactionID start_txn_id,
                        TxnTimeStamp start_ts)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
-      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {}
+      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {
+    catalog_->SetTxnMgr(this);
+}
 
 Txn *TxnManager::CreateTxn() {
     // Check if the is_running_ is true
@@ -163,16 +166,31 @@ void TxnManager::RollBackTxn(Txn *txn) {
     rw_locker_.unlock();
 }
 
+void TxnManager::AddWaitFlushTxn(TransactionID txn_id) {
+    std::unique_lock w_lock(rw_locker_);
+    wait_flush_txns_.insert(txn_id);
+}
+
+void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
+    std::unique_lock w_lock(rw_locker_);
+    for (auto txn_id : txn_ids) {
+        if (!wait_flush_txns_.erase(txn_id)) {
+            UnrecoverableError(fmt::format("Txn: {} not found in wait flush set", txn_id));
+        }
+    }
+}
+
 TxnTimeStamp TxnManager::GetMinUncommitTs() {
     std::shared_lock r_locker(rw_locker_);
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
-        if (txn_map_.find(txn_id) != txn_map_.end()) {
+        if (txn_map_.find(txn_id) != txn_map_.end() || wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
             return ts;
         }
         iter = ts_map_.erase(iter);
     }
-    return UNCOMMIT_TS;
+    // no txn is active, return the next ts
+    return start_ts_;
 }
 
 } // namespace infinity

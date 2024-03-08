@@ -73,26 +73,11 @@ BufferObj *BufferManager::Get(UniquePtr<FileWorker> file_worker) {
 }
 
 // return false if buffer_obj is not loaded
-bool BufferManager::Cleanup(const String &file_path) {
-    UniquePtr<BufferObj> buffer_obj = nullptr;
-    {
-        std::unique_lock w_lock(rw_locker_);
-        if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-            buffer_obj = std::move(iter->second);
-            buffer_map_.erase(iter);
-        }
+void BufferManager::Cleanup(const String &file_path) {
+    std::unique_lock w_lock(rw_locker_);
+    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        buffer_map_.erase(iter);
     }
-    if (buffer_obj.get() == nullptr) {
-        // FIXME: is it right?
-        LocalFileSystem fs;
-        if (!fs.Exists(file_path)) {
-            UnrecoverableError(fmt::format("File {} not found.", file_path));
-        }
-        fs.DeleteFile(file_path);
-        return false;
-    }
-    buffer_obj->Cleanup();
-    return true;
 }
 
 void BufferManager::RequestSpace(SizeT need_size, BufferObj *buffer_obj) {

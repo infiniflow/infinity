@@ -96,7 +96,7 @@ void BlockVersion::SaveToFile(const String &version_path) {
     }
     std::ofstream ofs = std::ofstream(version_path, std::ios::trunc | std::ios::binary);
     if (!ofs.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open block_version file: {}", version_path));
+        UnrecoverableError(fmt::format("Failed to open block_version file: {}, {}", version_path, ofs.rdstate()));
     }
     ofs.write(buf.data(), ptr - buf.data());
     ofs.flush();

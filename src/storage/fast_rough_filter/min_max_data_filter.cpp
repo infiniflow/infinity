@@ -92,8 +92,14 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
     u32 column_count;
     is.read(reinterpret_cast<char *>(&column_count), sizeof(column_count));
     // step 1. load min_max_filters_
-    min_max_filters_.clear();
-    min_max_filters_.resize(column_count);
+    if (min_max_filters_.empty()) {
+        min_max_filters_.resize(column_count);
+        LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): begin with empty filter array");
+    } else if (min_max_filters_.size() == column_count) {
+        LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): begin with existing filter array");
+    } else {
+        UnrecoverableError("MinMaxDataFilter::DeserializeFromStringStream(): column_count mismatch");
+    }
     for (auto &filter : min_max_filters_) {
         u8 var_id = 0;
         is.read(reinterpret_cast<char *>(&var_id), sizeof(var_id));
@@ -103,6 +109,15 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         if (var_id >= std::variant_size_v<InnerMinMaxDataFilter>) {
             UnrecoverableError("MinMaxDataFilter::DeserializeFromStringStream(): invalid var_id");
             return;
+        }
+        // have data to load
+        // check if filter is empty
+        if (filter.index() != 0 and filter.index() != var_id) {
+            UnrecoverableError("MinMaxDataFilter::DeserializeFromStringStream(): var_id mismatch");
+        } else if (filter.index() != 0) {
+            LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): overwrite existing filter");
+        } else {
+            LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): load new filter");
         }
         VariantEmplaceFuncs[var_id](&filter);
         std::visit(Overload{[](const std::monostate &empty) -> void {
