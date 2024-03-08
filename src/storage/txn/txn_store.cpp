@@ -194,6 +194,16 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
         bg_task_processor->Submit(std::move(compact_task));
     }
+    for (SegmentID segment_id : append_state_->set_sealed_segments_) {
+        auto *sealed_segment = table_entry_->GetSegmentByID(segment_id, txn_->CommitTS());
+        auto ret = table_entry_->TryCompactAddSegment(sealed_segment, generate_txn);
+        if (!ret.has_value()) {
+            continue;
+        }
+        auto &[to_compacts, txn] = *ret;
+        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
+        bg_task_processor->Submit(std::move(compact_task));
+    }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
         auto ret = table_entry_->TryCompactDeleteRow(segment_id, generate_txn);
         if (!ret.has_value()) {

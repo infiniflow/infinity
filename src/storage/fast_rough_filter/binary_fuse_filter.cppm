@@ -16,54 +16,96 @@ module;
 #include "binaryfusefilter.h"
 export module binary_fuse_filter;
 import stl;
+import default_values;
 import infinity_exception;
 import file_system;
 import third_party;
 
 namespace infinity {
 
+// two visible states for query:
+// 1. finished_build_filter_ is true, filter is ready, have valid build_time and filter
+// 2. finished_build_filter_ is false, skip filter check
 export class BinaryFuse {
 private:
-    binary_fuse8_t filter{};
+    // in build, lock and check timestamp to ensure that filter will only be built once
+    mutable std::mutex mutex_check_task_start_;
+    TxnTimeStamp build_time_{UNCOMMIT_TS};
+
+    // in query, use atomic_flag to check if filter is ready
+    atomic_flag finished_build_filter_;
+    // zero-initialize the filter
+    binary_fuse8_t filter = {};
+
+private:
+    inline bool HaveFilter() const { return finished_build_filter_.test(std::memory_order_acquire); }
 
 public:
     BinaryFuse() = default;
 
     BinaryFuse(const BinaryFuse &o) = delete;
 
-    BinaryFuse(BinaryFuse &&o) noexcept : filter(o.filter) {
-        o.filter.Fingerprints = nullptr; // we take ownership for the data
-    }
+    BinaryFuse(BinaryFuse &&o) = delete;
 
     ~BinaryFuse() { binary_fuse8_free(&filter); }
 
-    bool Allocate(const size_t size) {
+    void Build(TxnTimeStamp begin_ts, uint64_t *data, const size_t size) {
+        {
+            std::lock_guard<std::mutex> lock(mutex_check_task_start_);
+            if (build_time_ != UNCOMMIT_TS) {
+                UnrecoverableError("Already have data, cannot allocate.");
+            }
+            build_time_ = begin_ts;
+        }
         // check old data
         if (filter.Fingerprints) {
             UnrecoverableError("Already have data, cannot allocate.");
         }
-        return binary_fuse8_allocate(size, &filter);
-    }
-
-    // may change input data if input data is not array of unique members
-    // return true: success
-    // return false: run out of memory
-    bool AddAll(uint64_t *data, const size_t cnt) {
+        bool alloc_ret = binary_fuse8_allocate(size, &filter);
+        if (!alloc_ret) {
+            UnrecoverableError("Out of memory.");
+        }
         // check data
         if (!filter.Fingerprints) {
             UnrecoverableError("Need to allocate first.");
         }
-        return binary_fuse8_populate(data, cnt, &filter);
+        bool populate_ret = binary_fuse8_populate(data, size, &filter);
+        if (!populate_ret) {
+            UnrecoverableError("Failed to populate data.");
+        }
+        // set finished_build_filter_ to true
+        finished_build_filter_.test_and_set(std::memory_order_release);
     }
 
-    inline bool Contain(uint64_t &item) const { return binary_fuse8_contain(item, &filter); }
+    inline bool Contain(TxnTimeStamp query_ts, uint64_t &item) const {
+        if (!HaveFilter()) {
+            return true;
+        }
+        if (query_ts > build_time_) [[likely]] {
+            return binary_fuse8_contain(item, &filter);
+        } else {
+            return true;
+        }
+    }
 
     [[nodiscard]] size_t SaveBytes() const {
-        return sizeof(filter.Seed) + sizeof(filter.SegmentLength) + sizeof(filter.SegmentCount) + sizeof(filter.SegmentCountLength) +
-               sizeof(filter.ArrayLength) + filter.ArrayLength * sizeof(uint8_t);
+        size_t header_size = sizeof(u8); // if finished_build_filter_ is true
+        if (HaveFilter()) {
+            size_t filter_size = sizeof(filter.Seed) + sizeof(filter.SegmentLength) + sizeof(filter.SegmentCount) +
+                                 sizeof(filter.SegmentCountLength) + sizeof(filter.ArrayLength) + filter.ArrayLength * sizeof(uint8_t);
+            return header_size + sizeof(build_time_) + filter_size;
+        } else {
+            return header_size;
+        }
     }
 
     void SaveToOStringStream(OStringStream &os) const {
+        u8 finished_build_filter = HaveFilter() ? 1 : 0;
+        os.write(reinterpret_cast<const char *>(&finished_build_filter), sizeof(finished_build_filter));
+        if (!finished_build_filter) {
+            return;
+        }
+        os.write(reinterpret_cast<const char *>(&build_time_), sizeof(build_time_));
         os.write(reinterpret_cast<const char *>(&filter.Seed), sizeof(filter.Seed));
         os.write(reinterpret_cast<const char *>(&filter.SegmentLength), sizeof(filter.SegmentLength));
         os.write(reinterpret_cast<const char *>(&filter.SegmentCount), sizeof(filter.SegmentCount));
@@ -73,6 +115,12 @@ public:
     }
 
     bool LoadFromIStringStream(IStringStream &is) {
+        u8 finished_build_filter = 0;
+        is.read(reinterpret_cast<char *>(&finished_build_filter), sizeof(finished_build_filter));
+        if (!finished_build_filter) {
+            return true;
+        }
+        is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
         is.read(reinterpret_cast<char *>(&filter.Seed), sizeof(filter.Seed));
         is.read(reinterpret_cast<char *>(&filter.SegmentLength), sizeof(filter.SegmentLength));
         filter.SegmentLengthMask = filter.SegmentLength - 1;
@@ -85,6 +133,7 @@ public:
             return false;
         }
         is.read(reinterpret_cast<char *>(filter.Fingerprints), filter.ArrayLength * sizeof(uint8_t));
+        finished_build_filter_.test_and_set(std::memory_order_release);
         return true;
     }
 };

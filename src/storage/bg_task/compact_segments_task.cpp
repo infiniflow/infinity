@@ -246,8 +246,8 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
     for (auto &[new_segment, old_segments] : segment_data) {
         if (new_segment->row_count() > 0) {
             new_segment->FlushNewData(flush_ts);
-            // build filter (segment sealing task)
-            BuildFastRoughFilterTask::Execute(new_segment.get(), txn_->buffer_manager(), flush_ts, SegmentStatus::kSealed);
+            // build minmax filter and optional bloom filter
+            BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(new_segment.get(), txn_->buffer_manager(), flush_ts);
             // now have bloom filter and minmax filter
             // serialize filter
             String segment_filter_binary_data = new_segment->GetFastRoughFilter()->SerializeToString();
@@ -262,10 +262,9 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
                                                       segment_filter_binary_data,
                                                       block_filter_binary_data});
             // build delta catalog operation
-            auto catalog_delta_op = MakeUnique<SetSegmentStatusSealedOp>(new_segment.get(),
-                                                                         std::move(segment_filter_binary_data),
-                                                                         std::move(block_filter_binary_data),
-                                                                         SegmentStatus::kSealed);
+            auto catalog_delta_op = MakeUnique<UpdateSegmentBloomFilterDataOp>(new_segment.get(),
+                                                                               std::move(segment_filter_binary_data),
+                                                                               std::move(block_filter_binary_data));
             txn_->AddCatalogDeltaOperation(std::move(catalog_delta_op));
         }
 

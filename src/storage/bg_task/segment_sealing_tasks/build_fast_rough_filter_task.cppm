@@ -19,6 +19,7 @@ export module build_fast_rough_filter_task;
 import stl;
 import segment_entry;
 import buffer_manager;
+import infinity_exception;
 import filter_value_type_classification;
 
 namespace infinity {
@@ -55,27 +56,65 @@ struct BuildFastRoughFilterArg {
 
 export class BuildFastRoughFilterTask {
 public:
-    static void Execute(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts, SegmentStatus status);
+    static void ExecuteOnNewSealedSegment(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
+
+    static void ExecuteUpdateSegmentBloomFilter(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
 private:
-    static void CheckAndSetSegmentHaveStartedBuildTask(SegmentEntry *segment, TxnTimeStamp begin_ts);
+    static void CheckAndSetSegmentHaveStartedBuildMinMaxFilterTask(SegmentEntry *segment, TxnTimeStamp begin_ts);
 
-    static void SetSegmentBeginBuildFastRoughFilterTask(SegmentEntry *segment, u32 column_count);
+    static void SetSegmentBeginBuildMinMaxFilterTask(SegmentEntry *segment, u32 column_count);
 
-    static void SetSegmentFinishBuildFastRoughFilterTask(SegmentEntry *segment);
+    static void SetSegmentFinishBuildMinMaxFilterTask(SegmentEntry *segment);
 
 private:
     template <bool CheckTS>
     static void ExecuteInner(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts);
 
-    template <IsOnlyProbabilisticFilterAcceptedTypes ValueType, bool CheckTS>
-    static void BuildOnlyProbabilisticDataFilter(BuildFastRoughFilterArg &arg);
+    template <CanBuildBloomFilter ValueType, bool CheckTS>
+    static void BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg);
 
-    template <IsOnlyMinMaxFilterAcceptedTypes ValueType, bool CheckTS>
-    static void BuildOnlyMinMaxDataFilter(BuildFastRoughFilterArg &arg);
+    template <CanBuildMinMaxFilter ValueType, bool CheckTS>
+    static void BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg);
 
-    template <IsProbabilisticAndMinMaxFilterAcceptedTypes ValueType, bool CheckTS>
-    static void BuildProbabilisticAndMinMaxDataFilter(BuildFastRoughFilterArg &arg);
+    template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
+    static void BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg &arg);
+
+    template <typename ValueType, bool CheckTS>
+    static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter);
+
+    template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
+    static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_min_max_filter and build_bloom_filter) {
+            BuildMinMaxAndBloomFilter<ValueType, CheckTS>(arg);
+        } else if (build_min_max_filter) {
+            // TODO: now only use this branch
+            BuildOnlyMinMaxFilter<ValueType, CheckTS>(arg);
+        } else if (build_bloom_filter) {
+            BuildOnlyBloomFilter<ValueType, CheckTS>(arg);
+        }
+    }
+
+    template <CanOnlyBuildMinMaxFilter ValueType, bool CheckTS>
+    static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_bloom_filter) [[unlikely]] {
+            UnrecoverableError("BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter");
+        }
+        if (build_min_max_filter) {
+            // TODO: now only use this branch
+            BuildOnlyMinMaxFilter<ValueType, CheckTS>(arg);
+        }
+    }
+
+    template <CanOnlyBuildBloomFilter ValueType, bool CheckTS>
+    static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
+        if (build_min_max_filter) [[unlikely]] {
+            UnrecoverableError("BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter");
+        }
+        if (build_bloom_filter) {
+            BuildOnlyBloomFilter<ValueType, CheckTS>(arg);
+        }
+    }
 };
 
 } // namespace infinity

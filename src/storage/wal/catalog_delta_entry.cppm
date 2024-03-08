@@ -68,8 +68,8 @@ export enum class CatalogDeltaOpType : i8 {
     // -----------------------------
     // SEGMENT STATUS
     // -----------------------------
-    SET_SEGMENT_STATUS_SEALING = 31,
-    SET_SEGMENT_STATUS_SEALED = 32,
+    SET_SEGMENT_STATUS_SEALED = 31,
+    UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
 };
 
 /// class CatalogDeltaOperation
@@ -786,56 +786,10 @@ private:
     TxnTimeStamp max_ts_{0};
 };
 
-/// class SetSegmentStatusSealingOperation
-// used in append, when unsealed segment is full
-export class SetSegmentStatusSealingOp : public CatalogDeltaOperation {
-public:
-    explicit SetSegmentStatusSealingOp(TxnTimeStamp begin_ts,
-                                       bool is_delete,
-                                       TransactionID txn_id,
-                                       TxnTimeStamp commit_ts,
-                                       String db_name,
-                                       String table_name,
-                                       Vector<SegmentID> set_sealing_segments)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), set_sealing_segments_(std::move(set_sealing_segments)) {}
-    explicit SetSegmentStatusSealingOp(TableEntry *table_entry, Vector<SegmentID> set_sealing_segments)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING), table_entry_(table_entry),
-          set_sealing_segments_(std::move(set_sealing_segments)) {
-        db_name_ = *this->table_entry_->GetDBName();
-        table_name_ = *this->table_entry_->GetTableName();
-    }
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING; }
-    String GetTypeStr() const final { return "SET_SEGMENT_STATUS_SEALING"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += ::infinity::GetSizeInBytes(this->db_name_);
-        total_size += ::infinity::GetSizeInBytes(this->table_name_);
-        i32 cnt = set_sealing_segments_.size();
-        total_size += ::infinity::GetSizeInBytes(cnt);
-        total_size += sizeof(SegmentID) * cnt;
-        return total_size;
-    }
-    void WriteAdv(char *&ptr) const final;
-    void SaveState() final;
-    const String ToString() const final;
-    const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_)); }
-
-public:
-    TableEntry *table_entry_{};
-
-public:
-    const String &db_name() const { return db_name_; }
-    const String &table_name() const { return table_name_; }
-    const Vector<SegmentID> &set_sealing_segments() const { return set_sealing_segments_; }
-
-private:
-    String db_name_{};
-    String table_name_{};
-    Vector<SegmentID> set_sealing_segments_{};
-};
-
 /// class SetSegmentStatusSealedOperation
+// used when append operation cause an unsealed segment to be sealed
+// should always contain minmax filter data
+// maybe also contain bloom filter data for selected columns
 export class SetSegmentStatusSealedOp : public CatalogDeltaOperation {
 public:
     explicit SetSegmentStatusSealedOp(TxnTimeStamp begin_ts,
@@ -846,18 +800,15 @@ public:
                                       String table_name,
                                       SegmentID segment_id,
                                       String segment_filter_binary_data,
-                                      Vector<Pair<BlockID, String>> block_filter_binary_data,
-                                      SegmentStatus prev_status)
+                                      Vector<Pair<BlockID, String>> block_filter_binary_data)
         : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
-          block_filter_binary_data_(std::move(block_filter_binary_data)), prev_status_(prev_status) {}
+          block_filter_binary_data_(std::move(block_filter_binary_data)) {}
     explicit SetSegmentStatusSealedOp(SegmentEntry *segment_entry,
                                       String segment_filter_binary_data,
-                                      Vector<Pair<BlockID, String>> block_filter_binary_data,
-                                      SegmentStatus prev_status = SegmentStatus::kSealing)
+                                      Vector<Pair<BlockID, String>> block_filter_binary_data)
         : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED), segment_entry_(segment_entry),
-          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)),
-          prev_status_(prev_status) {
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {
         db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
         table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
         segment_id_ = this->segment_entry_->segment_id();
@@ -877,7 +828,6 @@ public:
             total_size += ::infinity::GetSizeInBytes(block_filter.first);
             total_size += ::infinity::GetSizeInBytes(block_filter.second);
         }
-        total_size += sizeof(prev_status_);
         return total_size;
     }
     void WriteAdv(char *&ptr) const final;
@@ -896,18 +846,83 @@ public:
     SegmentID segment_id() const { return segment_id_; }
     const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
     const Vector<Pair<BlockID, String>> &block_filter_binary_data() const { return block_filter_binary_data_; }
-    SegmentStatus prev_status() const { return prev_status_; }
 
 private:
     String db_name_{};
     String table_name_{};
     SegmentID segment_id_{};
+    // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
     String segment_filter_binary_data_{};
     Vector<Pair<BlockID, String>> block_filter_binary_data_{};
-    // this op is used in 2 cases:
-    // 1. prev_status: Sealing : unsealed segment is full and turn sealing, create a sealing task to make it sealed, this op will be in a separate txn
-    // 2. prev_status: Sealed : new sealed segment is created by import / compact, and filter is built, this op will be included in the same txn
-    SegmentStatus prev_status_{SegmentStatus::kSealing};
+};
+
+/// class UpdateSegmentBloomFilterDataOperation
+// 1. used when new segments created by import and compact need to update minmax filter data and bloom filter data
+// 2. used when the filter data of an existing segment is updated
+export class UpdateSegmentBloomFilterDataOp : public CatalogDeltaOperation {
+public:
+    explicit UpdateSegmentBloomFilterDataOp(TxnTimeStamp begin_ts,
+                                            bool is_delete,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp commit_ts,
+                                            String db_name,
+                                            String table_name,
+                                            SegmentID segment_id,
+                                            String segment_filter_binary_data,
+                                            Vector<Pair<BlockID, String>> block_filter_binary_data)
+        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+          table_name_(std::move(table_name)), segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
+          block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+    explicit UpdateSegmentBloomFilterDataOp(SegmentEntry *segment_entry,
+                                            String segment_filter_binary_data,
+                                            Vector<Pair<BlockID, String>> block_filter_binary_data)
+        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED), segment_entry_(segment_entry),
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {
+        db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
+        table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();
+        segment_id_ = this->segment_entry_->segment_id();
+    }
+    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA; }
+    String GetTypeStr() const final { return "UPDATE_SEGMENT_BLOOM_FILTER_DATA"; }
+    [[nodiscard]] SizeT GetSizeInBytes() const final {
+        SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
+        total_size += ::infinity::GetSizeInBytes(this->db_name_);
+        total_size += ::infinity::GetSizeInBytes(this->table_name_);
+        total_size += ::infinity::GetSizeInBytes(this->segment_id_);
+        total_size += ::infinity::GetSizeInBytes(this->segment_filter_binary_data_);
+        i32 block_filter_count = block_filter_binary_data_.size();
+        total_size += sizeof(block_filter_count);
+        for (i32 i = 0; i < block_filter_count; ++i) {
+            auto const &block_filter = block_filter_binary_data_[i];
+            total_size += ::infinity::GetSizeInBytes(block_filter.first);
+            total_size += ::infinity::GetSizeInBytes(block_filter.second);
+        }
+        return total_size;
+    }
+    void WriteAdv(char *&ptr) const final;
+    void SaveState() final;
+    const String ToString() const final;
+    const String EncodeIndex() const final {
+        return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, db_name_, table_name_, segment_id_));
+    }
+
+public:
+    SegmentEntry *segment_entry_{};
+
+public:
+    const String &db_name() const { return db_name_; }
+    const String &table_name() const { return table_name_; }
+    SegmentID segment_id() const { return segment_id_; }
+    const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
+    const Vector<Pair<BlockID, String>> &block_filter_binary_data() const { return block_filter_binary_data_; }
+
+private:
+    String db_name_{};
+    String table_name_{};
+    SegmentID segment_id_{};
+    // following data include: 1. extra updated bloom filter for selected columns
+    String segment_filter_binary_data_{};
+    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
 // size of payload, including the header, round to multi
