@@ -245,7 +245,8 @@ Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, De
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+Status
+Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     return table_entry->CommitCompact(txn_id, txn_store, commit_ts, compact_store);
 }
 
@@ -474,6 +475,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 if (!db_status.ok()) {
                     UnrecoverableError(db_status.message());
                 }
+                // LOG_INFO(fmt::format("Add Table entry: {} ", table_name));
                 auto table_meta = db_entry->table_meta_map().at(table_name).get();
                 auto table_entry = TableEntry::NewReplayTableEntry(table_meta,
                                                                    MakeUnique<String>(table_entry_dir),
@@ -513,7 +515,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                     UnrecoverableError(tb_status.message());
                 }
 
-                LOG_INFO(fmt::format("Add segment entry: {} {}", segment_id, (int)segment_status));
                 if (segment_status == SegmentStatus::kForbidCleanup) {
                     segment_status = SegmentStatus::kDeprecated;
                 }
@@ -532,7 +533,14 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                 begin_ts,
                                                                                 txn_id);
 
-                table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
+                if (table_entry->segment_map_.find(segment_id) != table_entry->segment_map_.end()) {
+                    // auto old_segment_entry = table_entry->segment_map_.at(segment_id);
+                    // segment_entry->block_entries() = old_segment_entry->block_entries();
+                    // old_segment_entry->block_entries() = {};
+                    table_entry->segment_map_[segment_id] = std::move(segment_entry);
+                } else {
+                    table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
+                }
                 break;
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
@@ -698,7 +706,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)});
                 break;
             }
-            
+
             // -----------------------------
             // Segment Status
             // -----------------------------
@@ -861,8 +869,6 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     outfile.open(delta_catalog_path, std::ios::binary);
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
-
-    this->global_catalog_delta_entry_ = MakeUnique<GlobalCatalogDeltaEntry>();
 
     LOG_INFO(fmt::format("Flush global catalog delta entry to: {}, size: {}.", delta_catalog_path, act_size));
     return false;

@@ -181,6 +181,7 @@ public:
     SegmentID segment_id() const { return segment_id_; }
     SizeT row_capacity() const { return row_capacity_; }
     SizeT column_count() const { return column_count_; }
+    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
 
     SegmentStatus status() const {
         std::shared_lock lock(rw_locker_);

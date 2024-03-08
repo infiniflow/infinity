@@ -265,11 +265,8 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
 void SegmentEntry::SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);
     if (index == block_entries_.size()) {
-        IncreaseRowCount(block_entry->row_count());
         block_entries_.emplace_back(std::move(block_entry));
     } else {
-        SizeT increased_row_count = block_entry->row_count() - block_entries_[index]->row_count();
-        IncreaseRowCount(increased_row_count);
         block_entries_[index] = std::move(block_entry);
     }
 }

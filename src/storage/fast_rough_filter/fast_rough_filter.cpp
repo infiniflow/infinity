@@ -95,7 +95,7 @@ void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
         probabilistic_data_filter_->SaveToJsonFile(entry_json);
         min_max_data_filter_->SaveToJsonFile(entry_json);
     } else {
-        UnrecoverableError("FastRoughFilter::SaveToJsonFile(): No FastRoughFilter data.");
+        // UnrecoverableError("FastRoughFilter::SaveToJsonFile(): No FastRoughFilter data.");
     }
 }
 
