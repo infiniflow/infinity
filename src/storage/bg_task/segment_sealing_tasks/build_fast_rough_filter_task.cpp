@@ -137,6 +137,7 @@ inline void Advance(TotalRowCount &total_row_count_handler) {
 
 template <CanBuildBloomFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg) {
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job begin for column: {}", arg.column_id_));
     if (!arg.distinct_keys_) {
         arg.distinct_keys_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
         arg.distinct_keys_backup_ = MakeUniqueForOverwrite<u64[]>(arg.total_row_count_in_segment_);
@@ -217,10 +218,12 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg
                                                                            arg.column_id_,
                                                                            arg.distinct_keys_.get(),
                                                                            arg.distinct_count_);
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyBloomFilter job end for column: {}", arg.column_id_));
 }
 
 template <CanBuildMinMaxFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &arg) {
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job begin for column: {}", arg.column_id_));
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     // step 0. prepare min and max value
@@ -263,10 +266,12 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &ar
     arg.segment_entry_->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_,
                                                                                std::move(segment_min_value),
                                                                                std::move(segment_max_value));
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildOnlyMinMaxFilter job end for column: {}", arg.column_id_));
 }
 
 template <CanBuildMinMaxFilterAndBloomFilter ValueType, bool CheckTS>
 void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg &arg) {
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildMinMaxAndBloomFilter job begin for column: {}", arg.column_id_));
     using MinMaxHelper = InnerMinMaxDataFilterInfo<ValueType>;
     using MinMaxInnerValueType = MinMaxHelper::InnerValueType;
     if (!arg.distinct_keys_) {
@@ -336,6 +341,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg
     arg.segment_entry_->GetFastRoughFilter()->BuildMinMaxDataFilter<ValueType>(arg.column_id_,
                                                                                std::move(segment_min_value),
                                                                                std::move(segment_max_value));
+    LOG_TRACE(fmt::format("BuildFastRoughFilterTask: BuildMinMaxAndBloomFilter job end for column: {}", arg.column_id_));
 }
 
 void ApplyToAllFastRoughFilterInSegment(SegmentEntry *segment_entry, std::invocable<FastRoughFilter *> auto func) {
@@ -417,12 +423,13 @@ void BuildFastRoughFilterTask::ExecuteInner(SegmentEntry *segment_entry, BufferM
     const auto *table_entry = segment_entry->GetTableEntry();
     for (u32 column_id = 0; column_id < column_count; ++column_id) {
         // step 2.1. check data type
-        auto &data_type_ptr = table_entry->GetColumnDefByID(column_id)->type();
+        auto *column_def = table_entry->GetColumnDefByID(column_id);
+        auto &data_type_ptr = column_def->type();
         bool can_build_min_max_data_filter = data_type_ptr->SupportMinMaxFilter();
         bool can_build_probabilistic_data_filter = data_type_ptr->SupportBloomFilter();
         bool build_min_max_filter = can_build_min_max_data_filter;
-        // FIXME: add properties support for table to decide whether to build bloom filter for this column
-        bool build_bloom_filter = false and can_build_probabilistic_data_filter;
+        // check column def
+        bool build_bloom_filter = can_build_probabilistic_data_filter and column_def->build_bloom_filter_;
         bool no_skip = build_min_max_filter or build_bloom_filter;
         if (!no_skip) {
             // skip non-support data type

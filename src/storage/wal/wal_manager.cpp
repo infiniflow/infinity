@@ -778,6 +778,7 @@ void WalManager::WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatus
     if (!segment_entry) {
         UnrecoverableError("Wal Replay: Get segment failed");
     }
+    segment_entry->SetSealed();
     segment_entry->LoadFilterBinaryData(cmd.segment_filter_binary_data_, cmd.block_filter_binary_data_);
 }
 

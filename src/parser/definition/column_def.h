@@ -93,5 +93,6 @@ public:
     const std::shared_ptr<DataType> column_type_{};
     std::string name_{};
     std::unordered_set<ConstraintType> constraints_{};
+    bool build_bloom_filter_{};
 };
 } // namespace infinity
