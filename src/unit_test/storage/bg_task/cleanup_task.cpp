@@ -74,7 +74,7 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
         txn_mgr->CommitTxn(txn);
     }
     {
-        TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake visible ts here, get next ts
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }
@@ -131,7 +131,7 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         {
-            TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+            TxnTimeStamp visible_ts = txn->BeginTS(); // Fake
             auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
             cleanup_task->Execute();
         }
@@ -186,7 +186,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
     }
 
     {
-        TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }
@@ -263,7 +263,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         {
-            TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+            TxnTimeStamp visible_ts = txn->BeginTS(); // Fake
             auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
             cleanup_task->Execute();
         }
@@ -370,7 +370,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     }
 
     {
-        TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }
@@ -489,7 +489,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
     }
 
     {
-        TxnTimeStamp visible_ts = txn_mgr->GetMinUncommitTs();
+        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
         auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
         cleanup_task->Execute();
     }

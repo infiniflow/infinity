@@ -874,11 +874,11 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     LOG_INFO(fmt::format("Flush global catalog delta entry to: {}, size: {}.", delta_catalog_path, act_size));
 
     if (!is_full_checkpoint) {
-        Vector<TransactionID> flushed_txn_ids;
+        HashSet<TransactionID> flushed_txn_ids;
         for (auto &op : flush_delta_entry->operations()) {
-            flushed_txn_ids.push_back(op->txn_id());
+            flushed_txn_ids.insert(op->txn_id());
         }
-        txn_mgr_->RemoveWaitFlushTxns(flushed_txn_ids);
+        txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_txn_ids.begin(), flushed_txn_ids.end()));
     }
 
     return false;
