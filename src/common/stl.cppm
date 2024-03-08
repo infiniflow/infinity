@@ -117,6 +117,7 @@ export namespace std {
     using std::remove_if;
     using std::reverse;
     using std::sort;
+    using std::unique;
     using std::sqrt;
     using std::transform;
 

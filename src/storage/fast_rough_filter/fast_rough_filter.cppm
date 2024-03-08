@@ -32,33 +32,33 @@ class BuildFastRoughFilterTask;
 export class FastRoughFilterEvaluator;
 
 // used in block_entry and segment_entry
-// status: empty -> (when segment change from Unsealed to Sealing) set is_in_bg_task_queue_ ->
-//         (in Sealing task) set build_time_ -> set have_started_bg_task_ -> build -> set finished_build_filter_
-// query: 1. check finished_build_filter_ 2. check query_ts 3. recursive check inner filters
+// sealed segment will have minmax filter
+// some columns may have bloom filter
 export class FastRoughFilter {
 private:
     friend class BuildFastRoughFilterTask;
     friend class FastRoughFilterEvaluator;
     static constexpr std::string_view JsonTagBuildTime = "fast_rough_filter_build_time";
 
-    // in build task, first set build_time_ to be the begin_ts of the task txn
+    // in minmax build task, first set build_time_ to be the begin_ts of the task txn
     // if set to valid time, we know one job has started
     mutable std::mutex mutex_check_task_start_;
-    TxnTimeStamp build_time_{UNCOMMIT_TS};
-
-    // in build task, after finish build probabilistic_data_filter_ and min_max_data_filter_, set finished_build_filter_ to be true
-    atomic_flag finished_build_filter_; // will be properly initialized since C++20
-    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_;
+    TxnTimeStamp build_time_{UNCOMMIT_TS};     // for minmax filter
+    atomic_flag finished_build_minmax_filter_; // for minmax filter
     UniquePtr<MinMaxDataFilter> min_max_data_filter_;
 
-public:
-    inline bool MayContain(ColumnID column_id, const Value &value) const { return probabilistic_data_filter_->MayContain(column_id, value); }
+    UniquePtr<ProbabilisticDataFilter> probabilistic_data_filter_;
 
+public:
+    // bloom filter test
+    inline bool MayContain(TxnTimeStamp query_ts, ColumnID column_id, const Value &value) const {
+        return probabilistic_data_filter_->MayContain(query_ts, column_id, value);
+    }
+
+    // minmax filter test
     inline bool MayInRange(ColumnID column_id, const Value &value, FilterCompareType compare_type) const {
         return min_max_data_filter_->MayInRange(column_id, value, compare_type);
     }
-
-    inline bool HaveFilter() const { return finished_build_filter_.test(std::memory_order_acquire); }
 
     String SerializeToString() const;
 
@@ -69,21 +69,34 @@ public:
     bool LoadFromJsonFile(const nlohmann::json &entry_json);
 
 private:
-    // call after check finished_build_filter_, thus no need to lock
-    inline TxnTimeStamp GetBuildTime() const { return build_time_; }
+    inline bool HaveMinMaxFilter() const { return finished_build_minmax_filter_.test(std::memory_order_acquire); }
 
-    void SetHaveStartedBuildTask(TxnTimeStamp begin_ts);
+    // call after check finished_build_minmax_filter_, thus no need to lock
+    inline TxnTimeStamp GetMinMaxBuildTime() const { return build_time_; }
 
-    bool HaveStartedBuildTask() const;
+    void SetHaveStartedMinMaxFilterBuildTask(TxnTimeStamp begin_ts) {
+        std::lock_guard lock(mutex_check_task_start_);
+        if (build_time_ != UNCOMMIT_TS) {
+            UnrecoverableError("FastRoughFilter::SetHaveStartedBuildTask(): Job already started.");
+        }
+        build_time_ = begin_ts;
+    }
 
-    void BeginBuildFastRoughFilterTask(u32 column_count) {
+    bool HaveStartedMinMaxFilterBuildTask() const {
+        std::lock_guard lock(mutex_check_task_start_);
+        return build_time_ != UNCOMMIT_TS;
+    }
+
+    void BeginBuildMinMaxFilterTask(u32 column_count) {
         probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>(column_count);
         min_max_data_filter_ = MakeUnique<MinMaxDataFilter>(column_count);
     }
 
-    void FinishBuildFastRoughFilterTask() { finished_build_filter_.test_and_set(std::memory_order_release); }
+    void FinishBuildMinMaxFilterTask() { finished_build_minmax_filter_.test_and_set(std::memory_order_release); }
 
-    void BuildProbabilisticDataFilter(ColumnID column_id, u64 *data, u32 count) { probabilistic_data_filter_->Build(column_id, data, count); }
+    void BuildProbabilisticDataFilter(TxnTimeStamp begin_ts, ColumnID column_id, u64 *data, u32 count) {
+        probabilistic_data_filter_->Build(begin_ts, column_id, data, count);
+    }
 
     // used in build_fast_rough_filter_task
     template <typename OriginalValueType, typename MinMaxInnerValT>
@@ -98,18 +111,18 @@ public:
 
     inline bool Evaluate(TxnTimeStamp query_ts, const FastRoughFilter &filter) const {
         // check filter and query_ts here
-        if (!filter.HaveFilter()) {
+        if (!filter.HaveMinMaxFilter()) {
             LOG_TRACE("FastRoughFilterEvaluator: filter not finished build, cannot apply, return true.");
             return true;
         }
-        if (query_ts < filter.GetBuildTime()) [[unlikely]] {
+        if (query_ts < filter.GetMinMaxBuildTime()) [[unlikely]] {
             LOG_TRACE("FastRoughFilterEvaluator: query timestamp earlier than filter build timestamp, cannot apply, return true.");
             return true;
         }
-        return EvaluateInner(filter);
+        return EvaluateInner(query_ts, filter);
     }
 
-    virtual bool EvaluateInner(const FastRoughFilter &filter) const = 0;
+    virtual bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const = 0;
 };
 
 } // namespace infinity

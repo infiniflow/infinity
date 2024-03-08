@@ -29,21 +29,8 @@ import filter_expression_push_down_helper;
 
 namespace infinity {
 
-void FastRoughFilter::SetHaveStartedBuildTask(TxnTimeStamp begin_ts) {
-    std::lock_guard lock(mutex_check_task_start_);
-    if (build_time_ != UNCOMMIT_TS) {
-        UnrecoverableError("FastRoughFilter::SetHaveStartedBuildTask(): Job already started.");
-    }
-    build_time_ = begin_ts;
-}
-
-bool FastRoughFilter::HaveStartedBuildTask() const {
-    std::lock_guard lock(mutex_check_task_start_);
-    return build_time_ != UNCOMMIT_TS;
-}
-
 String FastRoughFilter::SerializeToString() const {
-    if (HaveFilter()) {
+    if (HaveMinMaxFilter()) {
         u32 probabilistic_data_filter_binary_bytes = probabilistic_data_filter_->GetSerializeSizeInBytes();
         u32 min_max_data_filter_binary_bytes = min_max_data_filter_->GetSerializeSizeInBytes();
         u32 total_binary_bytes =
@@ -66,10 +53,7 @@ String FastRoughFilter::SerializeToString() const {
 }
 
 void FastRoughFilter::DeserializeFromString(const String &str) {
-    if (HaveFilter()) [[unlikely]] {
-        UnrecoverableError("BUG: FastRoughFilter::DeserializeFromString(): Already have data.");
-    }
-    // load
+    // load necessary parts
     IStringStream is(str);
     u32 total_binary_bytes;
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
@@ -77,32 +61,36 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
         UnrecoverableError("FastRoughFilter::DeserializeFromString(): load size error");
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
-    probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+    if (!probabilistic_data_filter_) {
+        probabilistic_data_filter_ = MakeUnique<ProbabilisticDataFilter>();
+    }
     probabilistic_data_filter_->DeserializeFromStringStream(is);
-    min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+    if (!min_max_data_filter_) {
+        min_max_data_filter_ = MakeUnique<MinMaxDataFilter>();
+    }
     min_max_data_filter_->DeserializeFromStringStream(is);
     // check position
     if (!is or u32(is.tellg()) != is.view().size()) {
         UnrecoverableError("FastRoughFilter::DeserializeFromString(): load size error");
     }
-    FinishBuildFastRoughFilterTask();
+    FinishBuildMinMaxFilterTask();
 }
 
 void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
-    if (HaveFilter()) {
+    if (HaveMinMaxFilter()) {
         //  LOG_TRACE("FastRoughFilter::SaveToJsonFile(): have FastRoughFilter, save now.");
         entry_json[JsonTagBuildTime] = build_time_;
         probabilistic_data_filter_->SaveToJsonFile(entry_json);
         min_max_data_filter_->SaveToJsonFile(entry_json);
     } else {
-        UnrecoverableError("FastRoughFilter::SaveToJsonFile(): No FastRoughFilter data.");
+        LOG_TRACE("FastRoughFilter::SaveToJsonFile(): No MinMax data.");
     }
 }
 
 // will throw in caller function if return false
 // called in deserialize, remove unnecessary lock
 bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
-    if (HaveFilter()) [[unlikely]] {
+    if (HaveMinMaxFilter()) [[unlikely]] {
         UnrecoverableError("BUG: FastRoughFilter::LoadFromJsonFile(): Already have data.");
     }
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
@@ -137,10 +125,10 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
         }
     }
     if (load_success) {
-        FinishBuildFastRoughFilterTask();
+        FinishBuildMinMaxFilterTask();
         // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): successfully load FastRoughFilter data from json.");
     } else {
-        LOG_ERROR("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
+        UnrecoverableError("FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.");
     }
     return load_success;
 }

@@ -706,7 +706,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
 
     if (segment_id_.has_value() && block_id_.has_value()) {
-        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+        if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
             auto *block_entry = segment_entry->GetBlockEntryByID(*block_id_);
             if (block_entry != nullptr) {
                 auto version_path = block_entry->VersionFilePath();
@@ -725,8 +725,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             }
         }
     } else if (segment_id_.has_value()) {
-        if (auto *segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
-            auto block_entry_iter = BlockEntryIter(segment_entry);
+        if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+            auto block_entry_iter = BlockEntryIter(segment_entry.get());
             for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 auto dir_path = block_entry->DirPath();
 

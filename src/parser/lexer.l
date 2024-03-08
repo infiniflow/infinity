@@ -81,7 +81,6 @@ EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
 FLUSH           { return FLUSH; }
-OPTIMIZE        { return OPTIMIZE; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
 FROM            { return FROM; }
@@ -126,6 +125,7 @@ NOT             { return NOT; }
 OFF             { return OFF; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
+OPTIMIZE        { return OPTIMIZE; }
 OR              { return OR; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
@@ -138,6 +138,7 @@ PREPARE         { return PREPARE; }
 PRIMARY         { return PRIMARY; }
 PROFILE         { return PROFILE; }
 PROFILES        { return PROFILES; }
+PROPERTIES      { return PROPERTIES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }

@@ -32,7 +32,6 @@ module memory_indexer;
 import stl;
 import memory_pool;
 import index_defines;
-import index_config;
 import posting_writer;
 import column_vector;
 import analyzer;
@@ -47,6 +46,7 @@ import local_file_system;
 import file_writer;
 import term_meta;
 import fst;
+import posting_list_format;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -56,42 +56,36 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
     return ret < 0;
 }
 
-MemoryIndexer::MemoryIndexer(u64 column_id,
-                             const InvertedIndexConfig &index_config,
-                             SharedPtr<MemoryPool> byte_slice_pool,
-                             SharedPtr<RecyclePool> buffer_pool,
+MemoryIndexer::MemoryIndexer(const String &index_dir,
+                             const String &base_name,
+                             docid_t base_doc_id,
+                             const String &analyzer,
+                             optionflag_t flag,
+                             MemoryPool &byte_slice_pool,
+                             RecyclePool &buffer_pool,
                              ThreadPool &thread_pool)
-    : column_id_(column_id), index_config_(index_config), byte_slice_pool_(byte_slice_pool), buffer_pool_(buffer_pool), thread_pool_(thread_pool),
-      ring_inverted_(10UL), ring_sorted_(10UL) {
-    posting_store_ = MakeUnique<PostingTable>(KeyComp(), byte_slice_pool_.get());
-    SetAnalyzer();
+    : index_dir_(index_dir), base_name_(base_name), base_doc_id_(base_doc_id), flag_(flag), byte_slice_pool_(byte_slice_pool),
+      buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
+    posting_store_ = MakeUnique<PostingTable>(KeyComp(), &byte_slice_pool_);
 
-    // TODO need get base directory from constructor
-    String index_dir = index_config_.GetIndexName();
-    Path path = Path(index_dir) / std::to_string(column_id);
-    spill_full_path_ = path.string() + ".merge";
-}
-
-MemoryIndexer::~MemoryIndexer() { Reset(); }
-
-void MemoryIndexer::SetIndexMode(IndexMode index_mode) { index_mode_ = index_mode; }
-
-void MemoryIndexer::SetAnalyzer() {
-    String analyzer = index_config_.GetAnalyzer(column_id_);
+    Path path = Path(index_dir) / "tmp.merge";
+    spill_full_path_ = path.string();
     analyzer_ = AnalyzerPool::instance().Get(analyzer);
     jieba_specialize_ = analyzer.compare("chinese") == 0 ? true : false;
 }
 
-void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, RowID row_id_begin) {
+MemoryIndexer::~MemoryIndexer() { Reset(); }
+
+void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count) {
     {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_++;
     }
     u64 seq_inserted = seq_inserted_++;
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, row_id_begin);
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count_);
     auto func = [this, &task](int id) {
         auto inverter = MakeShared<ColumnInverter>(*this);
-        inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->row_id_begin_);
+        inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         this->ring_inverted_.Put(task->task_seq_, inverter);
     };
     thread_pool_.push(func);
@@ -118,13 +112,49 @@ void MemoryIndexer::Commit() {
     });
 }
 
+void MemoryIndexer::Dump() {
+    WaitInflightTasks();
+
+    Path path = Path(index_dir_) / base_name_;
+    String index_prefix = path.string();
+    LocalFileSystem fs;
+    String posting_file = index_prefix + POSTING_SUFFIX;
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
+    String dict_file = index_prefix + DICT_SUFFIX;
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
+    MemoryIndexer::PostingTable *posting_table = GetPostingTable();
+    TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
+
+    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
+    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    OstreamWriter wtr(ofs);
+    FstBuilder builder(wtr);
+
+    if (posting_store_.get() != nullptr) {
+        SizeT term_meta_offset = 0;
+        for (auto it = posting_table->Begin(); it != posting_table->End(); ++it) {
+            const MemoryIndexer::PostingPtr posting_writer = it.Value();
+            TermMeta term_meta(posting_writer->GetDF(), posting_writer->GetTotalTF());
+            posting_writer->Dump(posting_file_writer, term_meta);
+            term_meta_dumpler.Dump(dict_file_writer, term_meta);
+            const String &term = it.Key();
+            builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
+            term_meta_offset = dict_file_writer->TotalWrittenBytes();
+        }
+        dict_file_writer->Sync();
+        builder.Finish();
+        fs.AppendFile(dict_file, fst_file);
+        fs.DeleteFile(fst_file);
+    }
+    Reset();
+}
+
 MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
     MemoryIndexer::PostingTable::Iterator iter = posting_store_->Find(term);
     if (iter != posting_store_->End())
         return iter.Value();
     else {
-        MemoryIndexer::PostingPtr posting =
-            MakeShared<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
+        MemoryIndexer::PostingPtr posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
         posting_store_->Insert(term, posting);
         return posting;
     }
@@ -160,7 +190,7 @@ void MemoryIndexer::OfflineDump() {
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX;
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
-    TermMetaDumper term_meta_dumpler(index_config_.GetPostingFormatOption());
+    TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
@@ -190,7 +220,7 @@ void MemoryIndexer::OfflineDump() {
                 builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
                 term_meta_offset = dict_file_writer->TotalWrittenBytes();
             }
-            posting = MakeUnique<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
+            posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
         }
         if (last_doc_id != tuple.doc_id_) {
             last_doc_id = tuple.doc_id_;

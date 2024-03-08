@@ -24,13 +24,12 @@ import doc_iterator;
 import term_queries;
 import column_index_reader;
 import query_visitor;
-import indexer;
 import match_data;
-import index_config;
 
 namespace infinity {
 
-QueryBuilder::QueryBuilder(Indexer *indexer) : indexer_(indexer) {
+QueryBuilder::QueryBuilder() {
+    /*
     const Vector<u64> &column_ids = indexer_->GetColumnIDs();
     for (u32 i = 0; i < column_ids.size(); ++i) {
         UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>(column_ids[i], indexer_);
@@ -40,6 +39,7 @@ QueryBuilder::QueryBuilder(Indexer *indexer) : indexer_(indexer) {
     index_reader_.session_pool_ = MakeShared<MemoryPool>();
     // TODO get num of docs
     scorer_ = MakeUnique<Scorer>(0);
+    */
 }
 
 QueryBuilder::~QueryBuilder() {}

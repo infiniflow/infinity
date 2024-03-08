@@ -24,6 +24,7 @@ import index_base;
 import create_index_info;
 import statement_common;
 import base_table_ref;
+import index_defines;
 
 namespace infinity {
 
@@ -32,8 +33,17 @@ public:
     static SharedPtr<IndexBase>
     Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list);
 
-    IndexFullText(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const String &analyzer, bool homebrewed)
-        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), homebrewed_(homebrewed) {};
+    IndexFullText(SharedPtr<String> index_name,
+                  const String &file_name,
+                  Vector<String> column_names,
+                  const String &analyzer,
+                  bool homebrewed,
+                  optionflag_t flag = OPTION_FLAG_ALL)
+        : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), homebrewed_(homebrewed), flag_(flag) {
+        if (!homebrewed && analyzer.empty()) {
+            analyzer_ = "standard";
+        }
+    };
 
     ~IndexFullText() final = default;
 
@@ -60,6 +70,7 @@ public:
 public:
     String analyzer_{};
     bool homebrewed_{false};
+    optionflag_t flag_{OPTION_FLAG_ALL};
 };
 
 } // namespace infinity

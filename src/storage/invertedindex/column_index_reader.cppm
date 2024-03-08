@@ -21,36 +21,29 @@ import segment_posting;
 import index_segment_reader;
 import posting_iterator;
 import index_defines;
-import index_config;
-import segment;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
 export module column_index_reader;
 
 namespace infinity {
-class Indexer;
 
 export class ColumnIndexReader {
 public:
-    ColumnIndexReader(u64 column_id, Indexer *indexer);
+    ColumnIndexReader();
     virtual ~ColumnIndexReader() = default;
 
-    void Open(const InvertedIndexConfig &index_config);
+    void Open(const String &index_dir, const Vector<String> &base_names, const Vector<docid_t> &base_docids, optionflag_t flag);
 
     PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
 
-    bool GetSegmentPosting(const String &term, docid_t base_doc_id, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
+    bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
 private:
-    SharedPtr<DiskIndexSegmentReader> CreateDiskSegmentReader(const Segment &segment);
-
-    SharedPtr<InMemIndexSegmentReader> CreateInMemSegmentReader(Segment &segment);
+    SharedPtr<DiskIndexSegmentReader>
+    CreateDiskSegmentReader(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag);
 
 private:
-    u64 column_id_;
-    String root_dir_;
-    InvertedIndexConfig index_config_;
-    Indexer *indexer_;
+    optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Vector<docid_t> base_doc_ids_;
 };

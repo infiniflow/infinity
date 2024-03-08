@@ -83,13 +83,19 @@ export template <typename T>
 concept IsVarchar = IsAnyOfList<T, TypeListIsVarchar>;
 
 export template <typename T>
-concept IsProbabilisticAndMinMaxFilterAcceptedTypes = IsAnyOfList<T, TypeListProbabilisticAndMinMaxFilterAcceptedTypes>;
+concept CanBuildMinMaxFilterAndBloomFilter = IsAnyOfList<T, TypeListProbabilisticAndMinMaxFilterAcceptedTypes>;
 
 export template <typename T>
-concept IsOnlyMinMaxFilterAcceptedTypes = IsAnyOfList<T, TypeListOnlyMinMaxFilterAcceptedTypes>;
+concept CanBuildMinMaxFilter = IsAnyOfList<T, TypeListMinMaxFilterAcceptedTypes>;
 
 export template <typename T>
-concept IsOnlyProbabilisticFilterAcceptedTypes = IsAnyOfList<T, TypeListOnlyProbabilisticFilterAcceptedTypes>;
+concept CanOnlyBuildMinMaxFilter = IsAnyOfList<T, TypeListOnlyMinMaxFilterAcceptedTypes>;
+
+export template <typename T>
+concept CanBuildBloomFilter = IsAnyOfList<T, typeListProbabilisticFilterAcceptedTypes>;
+
+export template <typename T>
+concept CanOnlyBuildBloomFilter = IsAnyOfList<T, TypeListOnlyProbabilisticFilterAcceptedTypes>;
 
 export template <typename T>
 concept IsMinMaxInnerValUnchanged = IsAnyOfList<T, TypeListMinMaxInnerValUnchanged>;

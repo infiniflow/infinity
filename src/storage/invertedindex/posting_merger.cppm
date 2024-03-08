@@ -9,7 +9,6 @@ import posting_decoder;
 import posting_list_format;
 import index_defines;
 import term_meta;
-import segment;
 import column_index_iterator;
 import segment_term_posting;
 
@@ -18,7 +17,7 @@ namespace infinity {
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Segment &target_segment);
+    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool);
 
     ~PostingMerger();
 

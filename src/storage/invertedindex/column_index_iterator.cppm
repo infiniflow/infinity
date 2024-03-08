@@ -12,19 +12,15 @@ import posting_list_format;
 import bitmap;
 import index_defines;
 import term_meta;
-import segment;
-import index_config;
 import dict_reader;
 import local_file_system;
 namespace infinity {
 
 export class ColumnIndexIterator {
 public:
-    ColumnIndexIterator(const InvertedIndexConfig &index_config, u64 column_id);
+    ColumnIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag);
 
     ~ColumnIndexIterator();
-
-    void Init(segmentid_t segment_id);
 
     bool Next(String &term, PostingDecoder *&decoder);
 
@@ -34,10 +30,6 @@ private:
     void DecodeTfBitmap();
 
     void DecodePosList();
-
-    InvertedIndexConfig index_config_;
-    PostingFormatOption format_option_;
-    u64 column_id_;
 
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_file_;

@@ -18,7 +18,6 @@ module and_not_iterator;
 
 import stl;
 import index_defines;
-import index_config;
 import multi_query_iterator;
 import doc_iterator;
 

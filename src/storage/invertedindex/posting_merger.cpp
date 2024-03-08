@@ -121,8 +121,7 @@ bool DocMerger::HasNext() {
 
 class PostingDumper {
 public:
-    PostingDumper(MemoryPool *memory_pool, RecyclePool *buffer_pool, const PostingFormatOption &format_option, const Segment &target_segment)
-        : format_option_(format_option), target_segment_(target_segment) {
+    PostingDumper(MemoryPool *memory_pool, RecyclePool *buffer_pool, const PostingFormatOption &format_option) : format_option_(format_option) {
         posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option);
     }
 
@@ -143,7 +142,6 @@ public:
 private:
     PostingFormatOption format_option_;
     SharedPtr<PostingWriter> posting_writer_;
-    Segment target_segment_;
 };
 
 class SortedPosting {
@@ -185,9 +183,8 @@ struct SortedPostingComparator {
 
 using PriorityQueue = Heap<SortedPosting *, SortedPostingComparator>;
 
-PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, const Segment &target_segment)
-    : memory_pool_(memory_pool), buffer_pool_(buffer_pool) {
-    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, target_segment);
+PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool) : memory_pool_(memory_pool), buffer_pool_(buffer_pool) {
+    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_);
 }
 
 PostingMerger::~PostingMerger() {}

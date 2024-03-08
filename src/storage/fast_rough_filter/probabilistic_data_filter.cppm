@@ -32,6 +32,7 @@ export u64 ConvertValueToU64(const Value &value);
 // TODO: add a real-time bloom filter for unsealed segments
 export class ProbabilisticDataFilter {
 private:
+    // should always be resized and initialized when minmax filter is built
     Vector<UniquePtr<BinaryFuse>> binary_fuse_filters_;
 
 public:
@@ -39,21 +40,20 @@ public:
 
     ProbabilisticDataFilter() = default;
 
-    explicit ProbabilisticDataFilter(u32 column_count) : binary_fuse_filters_(column_count) {}
-
-    inline bool MayContain(ColumnID column_id, const Value &value) const {
-        if (auto filter_ptr = binary_fuse_filters_[column_id].get(); filter_ptr) [[likely]] {
-            auto key_val = ConvertValueToU64(value);
-            return filter_ptr->Contain(key_val);
-        } else {
-            UnrecoverableError(fmt::format("BUG: No ProbabilisticDataFilter for column_id: {}", column_id));
-            // No filter, cannot decide if value does not exist.
-            // Always return true.
-            return true;
+    explicit ProbabilisticDataFilter(u32 column_count) : binary_fuse_filters_(column_count) {
+        // fill the vector with valid objects
+        for (u32 i = 0; i < binary_fuse_filters_.size(); ++i) {
+            binary_fuse_filters_[i] = MakeUnique<BinaryFuse>();
         }
     }
 
-    void Build(ColumnID column_id, u64 *data, u32 count);
+    inline bool MayContain(TxnTimeStamp query_ts, ColumnID column_id, const Value &value) const {
+        auto key_val = ConvertValueToU64(value);
+        return binary_fuse_filters_[column_id]->Contain(query_ts, key_val);
+    }
+
+    // finish build in one function
+    void Build(TxnTimeStamp begin_ts, ColumnID column_id, u64 *data, u32 count);
 
     u32 GetSerializeSizeInBytes() const;
 

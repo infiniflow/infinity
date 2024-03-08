@@ -37,14 +37,13 @@ class TxnTableStore;
 struct TableEntry;
 class CompactSegmentsTask;
 class BlockEntryIter;
-struct WalSegmentInfo;
 
 export enum class SegmentStatus : u8 {
     kUnsealed,
-    kSealing,
     kSealed,
     kCompacting,
     kNoDelete,
+    kForbidCleanup,
     kDeprecated,
 };
 
@@ -96,19 +95,25 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    // will only be called in TableEntry::Append
-    // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
-    // task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
-    //       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
-    void CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr);
+    // Used in catalog delta operation replay, we may need to update the info of segment
+    void UpdateSegmentInfo(SegmentStatus status,
+                           SizeT row_count,
+                           TxnTimeStamp min_row_ts,
+                           TxnTimeStamp max_row_ts,
+                           TxnTimeStamp commit_ts,
+                           TxnTimeStamp begin_ts,
+                           TransactionID txn_id);
 
-    void FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status);
+    void SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
     void SetNoDelete();
 
-    void SetDeprecated(TxnTimeStamp deprecate_ts);
+    // TODO: Remove after refactor catalog delta operations log
+    void SetForbidCleanup(TxnTimeStamp deprecate_ts);
+
+    void TrySetDeprecated();
 
     void RollbackCompact();
 
@@ -136,34 +141,16 @@ public:
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
 
+    // used in Catalog::LoadFromEntry when restart
+    void SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry);
+
     FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
 
     const FastRoughFilter *GetFastRoughFilter() const { return &fast_rough_filter_; }
 
     Vector<Pair<BlockID, String>> GetBlockFilterBinaryDataVector() const;
 
-    void WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
-
-    // called in lock, in serialize, deserialize job
-    bool FinishedSealingTask() const { return FinishedSealingTask(status_); }
-
-    static bool FinishedSealingTask(SegmentStatus segment_status) {
-        switch (segment_status) {
-            case SegmentStatus::kUnsealed:
-            case SegmentStatus::kSealing: {
-                return false;
-            }
-            case SegmentStatus::kSealed:
-            case SegmentStatus::kCompacting:
-            case SegmentStatus::kNoDelete:
-            case SegmentStatus::kDeprecated: {
-                return true;
-            }
-            default: {
-                UnrecoverableError("Unexpected segment status");
-            }
-        }
-    }
+    void LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
 
 public:
     // Const getter
@@ -172,6 +159,7 @@ public:
     SegmentID segment_id() const { return segment_id_; }
     SizeT row_capacity() const { return row_capacity_; }
     SizeT column_count() const { return column_count_; }
+    Vector<SharedPtr<BlockEntry>> &block_entries() { return block_entries_; }
 
     SegmentStatus status() const {
         std::shared_lock lock(rw_locker_);
@@ -203,16 +191,13 @@ public:
     // called by wal thread
     u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
-    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap);
+    void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
     void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
 
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
-    // called by table entry
-    void SetSealing();
-
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected: // protected for unit test
