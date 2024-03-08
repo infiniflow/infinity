@@ -103,6 +103,8 @@ export struct Catalog {
 public:
     explicit Catalog(SharedPtr<String> dir);
 
+    void SetTxnMgr(TxnManager *txn_mgr);
+
 public:
     // Database related functions
     Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
@@ -174,13 +176,13 @@ public:
 
     static void RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    static Status Delete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    static Status Delete(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
     static void CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
+    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
@@ -188,6 +190,11 @@ public:
 
     static SegmentID GetNextSegmentID(TableEntry *table_entry);
 
+    // This not add row count
+    static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
+
+    // Check if allow drop table
+    bool CheckAllowCleanup(TableEntry *dropped_table_entry);
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);
@@ -240,6 +247,8 @@ public:
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
+
+    TxnManager *txn_mgr_{nullptr};
 
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }

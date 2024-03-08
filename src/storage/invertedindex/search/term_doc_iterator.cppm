@@ -22,8 +22,6 @@ import posting_iterator;
 import bitmap;
 import index_defines;
 import term_meta;
-import segment;
-import index_config;
 import doc_iterator;
 import match_data;
 namespace infinity {

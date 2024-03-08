@@ -30,23 +30,11 @@ import buffer_manager;
 import default_values;
 import internal_types;
 import match_expr;
+import index_defines;
 
 export module iresearch_datastore;
 
 namespace infinity {
-
-export using ScoredId = Pair<float, u32>;
-export using ScoredIds = Vector<ScoredId>;
-static const String DEFAULT_SCORER("bm25");
-static const String DEFAULT_SCORER_ARG("");
-static const SizeT DEFAULT_TOPN(100);
-
-export u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
-    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + block_offset;
-    return (segment_id << SEGMENT_OFFSET_IN_DOCID) + segment_offset + 1;
-}
-
-export RowID DocID2RowID(u32 doc_id) { return RowID((doc_id - 1) >> SEGMENT_OFFSET_IN_DOCID, (doc_id - 1) & SEGMENT_MASK_IN_DOCID); }
 
 export struct ViewSegment {
     ViewSegment(const IRSSubReader &segment) : segment_(&segment) {}

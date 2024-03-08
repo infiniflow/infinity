@@ -145,13 +145,13 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             size_t row_count = std::accumulate(segment_sizes.begin(), segment_sizes.end(), 0);
 
             for (size_t i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
             EXPECT_EQ(compact_segment->actual_row_count(), row_count);
 
             txn_mgr->CommitTxn(txn5);
@@ -220,15 +220,15 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             int test_segment_n = segment_sizes.size();
 
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
             int cnt = 0;
             for (int i = test_segment_n; i < test_segment_n + 2; ++i) {
-                auto *compact_segment = table_entry->GetSegmentByID(i, begin_ts);
+                auto compact_segment = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
                 cnt += compact_segment->actual_row_count();
             }
             EXPECT_EQ(cnt, row_count);
@@ -322,13 +322,13 @@ TEST_F(CompactTaskTest, compact_with_delete) {
 
             int test_segment_n = segment_sizes.size();
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -449,13 +449,13 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
             int test_segment_n = segment_sizes.size();
             for (int i = 0; i < test_segment_n; ++i) {
-                auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                 EXPECT_NE(segment_entry, nullptr);
-                EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
+                EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
             }
-            auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+            auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
-            EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
+            EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
             EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
@@ -615,13 +615,13 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
                 int test_segment_n = segment_sizes.size();
                 for (int i = 0; i < test_segment_n; ++i) {
-                    auto *segment_entry = table_entry->GetSegmentByID(i, begin_ts);
+                    auto segment_entry = table_entry->GetSegmentByID(i, begin_ts);
                     EXPECT_NE(segment_entry, nullptr);
-                    EXPECT_EQ(segment_entry->status(), SegmentStatus::kDeprecated);
+                    EXPECT_EQ(segment_entry->status(), SegmentStatus::kForbidCleanup);
                 }
-                auto *compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
+                auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
                 EXPECT_NE(compact_segment, nullptr);
-                EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
+                EXPECT_NE(compact_segment->status(), SegmentStatus::kForbidCleanup);
 
                 EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 

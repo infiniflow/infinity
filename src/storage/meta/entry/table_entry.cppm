@@ -39,6 +39,7 @@ import meta_map;
 import meta_entry_interface;
 import cleanup_scanner;
 import random;
+import memory_pool;
 
 namespace infinity {
 
@@ -118,13 +119,13 @@ public:
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
-    Status Delete(TransactionID txn_id, TxnTimeStamp commit_ts, DeleteState &delete_state);
+    Status Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
 
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    Status CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_state);
+    Status CommitCompact(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_state);
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
@@ -146,7 +147,7 @@ public:
 
     inline const SharedPtr<String> &GetTableName() const { return table_name_; }
 
-    SegmentEntry *GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
+    SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     inline const ColumnDef *GetColumnDefByID(ColumnID column_id) const { return columns_[column_id].get(); }
 
@@ -164,7 +165,7 @@ public:
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
 
-    void GetFullTextAnalyzers(TransactionID txn_id,
+    void GetFulltextAnalyzers(TransactionID txn_id,
                               TxnTimeStamp begin_ts,
                               SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                               Map<String, String> &column2analyzer);
@@ -206,7 +207,7 @@ private:
     // From data table
     Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
-    SegmentEntry *unsealed_segment_{};
+    SharedPtr<SegmentEntry> unsealed_segment_{};
     atomic_u32 next_segment_id_{};
 
 public:

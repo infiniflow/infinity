@@ -29,6 +29,7 @@ import third_party;
 
 import infinity_exception;
 import create_index_info;
+import index_defines;
 
 namespace infinity {
 
@@ -90,7 +91,7 @@ void IndexBase::WriteAdv(char *&ptr) const {
 }
 
 SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
-//    char *const ptr_end = ptr + maxbytes;
+    char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
@@ -122,7 +123,8 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
         case IndexType::kFullText: {
             String analyzer = ReadBufAdv<String>(ptr);
             u8 is_homebrewed = ReadBufAdv<u8>(ptr);
-            res = MakeShared<IndexFullText>(index_name, file_name, column_names, analyzer, bool(is_homebrewed));
+            u8 flag = ReadBufAdv<u8>(ptr);
+            res = MakeShared<IndexFullText>(index_name, file_name, column_names, analyzer, bool(is_homebrewed), optionflag_t(flag));
             break;
         }
         case IndexType::kSecondary: {
@@ -136,7 +138,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             UnrecoverableError("Not implemented");
         }
     }
-    if (maxbytes < 0) {
+    if (ptr_end < ptr) {
         UnrecoverableError("ptr goes out of range when reading IndexBase");
     }
     return res;

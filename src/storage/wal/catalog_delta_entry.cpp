@@ -185,7 +185,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             String table_name = ReadBufAdv<String>(ptr);
             String index_name = ReadBufAdv<String>(ptr);
             String index_dir = ReadBufAdv<String>(ptr);
-            SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
+            SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
                                                          is_delete,
                                                          txn_id,
@@ -252,6 +252,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                              segment_id,
                                                              std::move(segment_filter_binary_data),
                                                              std::move(block_filter_binary_data));
+            break;
         }
         case CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA: {
             String db_name = ReadBufAdv<String>(ptr);
@@ -274,6 +275,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                                    segment_id,
                                                                    std::move(segment_filter_binary_data),
                                                                    std::move(block_filter_binary_data));
+           break;
         }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
@@ -382,7 +384,9 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
     WriteBufAdv(buf, this->index_dir_);
-    index_base_->WriteAdv(buf);
+    if (!is_delete()) {
+        index_base_->WriteAdv(buf);
+    }
 }
 
 void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
@@ -532,10 +536,15 @@ void AddSegmentIndexEntryOp::SaveState() {
 
 void SetSegmentStatusSealedOp::SaveState() {
     is_saved_sate_ = true;
+    this->begin_ts_ = segment_entry_->begin_ts_;
+    this->segment_id_ = this->segment_entry_->segment_id();
 }
 
 void UpdateSegmentBloomFilterDataOp::SaveState() {
+
     is_saved_sate_ = true;
+    this->begin_ts_ = segment_entry_->begin_ts_;
+    this->segment_id_ = this->segment_entry_->segment_id();
 }
 
 const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
@@ -558,7 +567,9 @@ const String AddTableEntryOp::ToString() const {
 
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddSegmentEntryOp db_name: {} table_name: {} segment_id: {} segment_dir: {}",
+    sstream << fmt::format("AddSegmentEntryOp begin_ts: {}, commit_ts: {}, db_name: {} table_name: {} segment_id: {} segment_dir: {}\n",
+                           begin_ts_,
+                           commit_ts_,
                            *db_name_,
                            *table_name_,
                            segment_id_,
@@ -614,7 +625,7 @@ const String AddTableIndexEntryOp::ToString() const {
                        *table_name_,
                        *index_name_,
                        index_dir_,
-                       index_base_->ToString());
+                       index_base_ ? index_base_->ToString() : "nullptr");
 }
 
 const String AddFulltextIndexEntryOp::ToString() const {
@@ -645,6 +656,8 @@ const String UpdateSegmentBloomFilterDataOp::ToString() const {
 
 void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+    LOG_TRACE("Segment has flushed to disk, now try set to deprecated if it was compacted before");
+    this->segment_entry_->TrySetDeprecated();
 }
 
 void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_index_entry_->Flush(max_commit_ts); }
@@ -769,7 +782,7 @@ UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_
     for (auto &op : operations_) {
         TxnTimeStamp op_commit_ts = op->commit_ts();
         if (op_commit_ts <= max_commit_ts) {
-            flush_delta_entry->operations_.push_back(std::move(op));
+            flush_delta_entry->operations_.emplace_back(std::move(op));
         } else {
             break; // commit_ts is in ascending order
         }
