@@ -22,7 +22,7 @@ public:
     ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool);
     ~ColumnIndexMerger();
 
-    void Merge(const Vector<String> &base_names, const Vector<docid_t> &base_docids, const String &target_base_name);
+    void Merge(const Vector<String> &base_names, const Vector<docid_t> &base_docids, const String &dst_base_name);
 
 private:
     SharedPtr<PostingMerger> CreatePostingMerger();
