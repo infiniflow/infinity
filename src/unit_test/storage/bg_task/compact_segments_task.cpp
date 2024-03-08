@@ -408,7 +408,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn4);
-                auto state = compact_task->CompactSegments();
+                CompactSegmentsTaskState state(table_entry);
+                compact_task->CompactSegments(state);
 
                 {
                     auto txn5 = txn_mgr->CreateTxn();
@@ -433,8 +434,8 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
                     txn_mgr->CommitTxn(txn5);
                 }
 
-                compact_task->SaveSegmentsData(std::move(state.segment_data_));
-                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
+                compact_task->SaveSegmentsData(state);
+                compact_task->ApplyDeletes(state);
             }
 
             txn_mgr->CommitTxn(txn4);
@@ -538,7 +539,8 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             {
                 auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, compact_txn);
 
-                auto state = compact_task->CompactSegments();
+                CompactSegmentsTaskState state(table_entry);
+                compact_task->CompactSegments(state);
 
                 Vector<RowID> delete_row_ids;
 
@@ -580,7 +582,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     delete_n += delete_row_n1;
                 }
 
-                compact_task->SaveSegmentsData(std::move(state.segment_data_));
+                compact_task->SaveSegmentsData(state);
                 {
                     Thread t([&]() {
                         // std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -589,7 +591,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                     });
                     t.join();
                 }
-                compact_task->ApplyDeletes(state.remapper_, state.old_segments_);
+                compact_task->ApplyDeletes(state);
             }
             txn_mgr->CommitTxn(compact_txn);
             {

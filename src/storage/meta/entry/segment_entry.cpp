@@ -242,7 +242,7 @@ bool SegmentEntry::CheckVisible(TxnTimeStamp check_ts) const {
 
 bool SegmentEntry::CheckDeprecate(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    return status_ == SegmentStatus::kDeprecated && check_ts >= deprecate_ts_;
+    return status_ == SegmentStatus::kDeprecated && check_ts > deprecate_ts_;
 }
 
 bool SegmentEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {

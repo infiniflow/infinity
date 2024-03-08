@@ -193,7 +193,6 @@ public:
 
     // Check if allow drop table
     bool CheckAllowCleanup(TableEntry *dropped_table_entry);
-
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);
