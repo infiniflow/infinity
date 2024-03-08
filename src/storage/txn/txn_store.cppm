@@ -87,7 +87,7 @@ public:
 
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
-    Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{};
+    Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{}; // Only used for IMPORT and COMPACT
     HashMap<String, TxnIndexStore> txn_indexes_store_{};
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
