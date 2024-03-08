@@ -15,6 +15,7 @@
 module;
 
 #include <arpa/inet.h>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -75,8 +76,8 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
     if (positions_.empty()) {
         for (auto &doc_terms : terms_per_doc_) {
             u32 doc_id = doc_terms.first;
-            auto &terms_once_ = doc_terms.second;
-            for (auto it = terms_once_->begin(); it != terms_once_->end(); ++it) {
+            auto &terms_once = doc_terms.second;
+            for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
                 StringRef term(it->text_);
                 u32 term_ref = AddTerm(term);
                 positions_.emplace_back(term_ref, doc_id, it->word_offset_);
@@ -86,8 +87,8 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
     }
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;
-        auto &terms_once_ = doc_terms.second;
-        for (auto it = terms_once_->begin(); it != terms_once_->end(); ++it) {
+        auto &terms_once = doc_terms.second;
+        for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
             StringRef term(it->text_);
             u32 term_ref = AddTerm(term);
             positions_.emplace_back(term_ref, doc_id, it->word_offset_);
@@ -153,7 +154,7 @@ void ColumnInverter::Sort() {
 void ColumnInverter::GeneratePosting() {
     u32 last_term_num = 0;
     u32 last_term_pos = 0;
-    u32 last_doc_id = 0;
+    u32 last_doc_id = INVALID_DOCID;
     StringRef term;
     MemoryIndexer::PostingPtr posting = nullptr;
     for (auto &i : positions_) {
@@ -164,7 +165,7 @@ void ColumnInverter::GeneratePosting() {
                 posting = memory_indexer_.GetOrAddPosting(String(term.data()));
             }
             last_doc_id = i.doc_id_;
-            if (last_doc_id != 0) {
+            if (last_doc_id != INVALID_DOCID) {
                 posting->EndDocument(last_doc_id, 0);
             }
         }
@@ -173,6 +174,60 @@ void ColumnInverter::GeneratePosting() {
             posting->AddPosition(last_term_pos);
         }
     }
+}
+
+/// Layout of the input of external sort file
+//    +-----------++----------------++--------------------++--------------------------++-------------------------------------------------------+
+//    |           ||                ||                    ||                          ||                                                       |
+//    |   Count   ||  Size of A Run ||   Num of records   ||   Position of Next Run   ||             Data of a Run                             |
+//    |           ||                ||   within a Run     ||                          ||                                                       |
+//    +-----------++----------------++--------------------++--------------------------++-------------------------------------------------------+
+//                 ----------------------------------------------------------------------------------------------------------------------------+
+//                                                            Data within each group
+void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count) {
+    // spill sort results for external merge sort
+    u32 data_size = 0;
+    u32 data_size_pos = ftell(spill_file);
+    fwrite(&data_size, sizeof(u32), 1, spill_file);
+    // number of tuples
+    u32 num_of_tuples = positions_.size();
+    tuple_count += num_of_tuples;
+    fwrite(&num_of_tuples, sizeof(u32), 1, spill_file);
+
+    // start offset for next spill
+    u64 next_start_offset = 0;
+    u64 next_start_offset_pos = ftell(spill_file);
+    fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
+
+    u32 data_start_offset = ftell(spill_file);
+    // sorted data
+    u32 last_term_num = 0;
+    StringRef term;
+    u16 record_length = 0;
+    char str_null = '\0';
+    for (auto &i : positions_) {
+        if (last_term_num != i.term_num_) {
+            last_term_num = i.term_num_;
+            term = GetTermFromNum(last_term_num);
+        }
+        record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
+        fwrite(&record_length, sizeof(u16), 1, spill_file);
+        fwrite(term.data(), term.size(), 1, spill_file);
+        fwrite(&str_null, sizeof(char), 1, spill_file);
+        fwrite(&i.doc_id_, sizeof(docid_t), 1, spill_file);
+        fwrite(&i.term_pos_, sizeof(u32), 1, spill_file);
+    }
+
+    // update data size
+    next_start_offset = ftell(spill_file);
+    data_size = next_start_offset - data_start_offset;
+    fseek(spill_file, data_size_pos, SEEK_SET);
+    fwrite(&data_size, sizeof(u32), 1, spill_file);
+
+    // update offset for next spill
+    fseek(spill_file, next_start_offset_pos, SEEK_SET);
+    fwrite(&next_start_offset, sizeof(u64), 1, spill_file);
+    fseek(spill_file, next_start_offset, SEEK_SET);
 }
 
 } // namespace infinity
