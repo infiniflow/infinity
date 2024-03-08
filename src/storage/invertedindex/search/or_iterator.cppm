@@ -52,9 +52,8 @@ public:
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
 
-    void AdjustDown() {
+    void AdjustDown(u32 idx) {
         DocIteratorEntry *heap = iterator_heap_.data();
-        u32 idx = 1;
         u32 min = idx;
         do {
             idx = min;
