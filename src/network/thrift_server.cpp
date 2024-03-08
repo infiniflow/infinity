@@ -206,6 +206,11 @@ public:
             return;
         }
 
+        if (request.fields.empty()) {
+            ProcessStatus(response, Status::InsertWithoutValues());
+            return;
+        }
+
         auto columns = new Vector<String>();
         columns->reserve(request.column_names.size());
         for (auto &column : request.column_names) {
@@ -213,11 +218,6 @@ public:
         }
 
         Status constant_status;
-
-        if(request.fields.empty()) {
-            ProcessStatus(response, Status::InsertWithoutValues());
-            return;
-        }
 
         Vector<Vector<ParsedExpr *> *> *values = new Vector<Vector<ParsedExpr *> *>();
         values->reserve(request.fields.size());
@@ -227,6 +227,34 @@ public:
             for (auto &expr : value.parse_exprs) {
                 auto parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
                 if (!constant_status.ok()) {
+                    // Free values memory
+                    if (values != nullptr) {
+                        for (auto &value_array : *values) {
+                            for (auto &value_ptr : *value_array) {
+                                delete value_ptr;
+                                value_ptr = nullptr;
+                            }
+                            delete value_array;
+                            value_array = nullptr;
+                        }
+                        delete values;
+                        values = nullptr;
+                    }
+                    // Free current value list memory
+                    if(value_list != nullptr) {
+                        for (auto &value_ptr : *value_list) {
+                            delete value_ptr;
+                            value_ptr = nullptr;
+                        }
+                        delete value_list;
+                        value_list = nullptr;
+                    }
+
+                    if(parsed_expr != nullptr) {
+                        delete parsed_expr;
+                        parsed_expr = nullptr;
+                    }
+
                     ProcessStatus(response, constant_status);
                     return;
                 }
@@ -371,6 +399,20 @@ public:
         for (auto &expr : request.select_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
             if (!parsed_expr_status.ok()) {
+
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+
+                if(parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+
                 ProcessStatus(response, parsed_expr_status);
                 return;
             }
@@ -391,6 +433,28 @@ public:
             for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
                 ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
                 if (!knn_expr_status.ok()) {
+
+                    if (output_columns != nullptr) {
+                        for (auto &expr_ptr : *output_columns) {
+                            delete expr_ptr;
+                        }
+                        delete output_columns;
+                        output_columns = nullptr;
+                    }
+
+                    if (search_expr_list != nullptr) {
+                        for (auto &expr_ptr : *search_expr_list) {
+                            delete expr_ptr;
+                        }
+                        delete search_expr_list;
+                        search_expr_list = nullptr;
+                    }
+
+                    if(knn_expr != nullptr) {
+                        delete knn_expr;
+                        knn_expr = nullptr;
+                    }
+
                     ProcessStatus(response, knn_expr_status);
                     return;
                 }
@@ -415,6 +479,25 @@ public:
         if (request.__isset.where_expr == true) {
             filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
             if (!parsed_expr_status.ok()) {
+
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+
+                if (search_expr != nullptr) {
+                    delete search_expr;
+                    search_expr = nullptr;
+                }
+
+                if (filter != nullptr) {
+                    delete filter;
+                    filter = nullptr;
+                }
+
                 ProcessStatus(response, parsed_expr_status);
                 return;
             }
@@ -506,6 +589,20 @@ public:
         for (auto &expr : request.select_list) {
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
             if (!parsed_expr_status.ok()) {
+
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+
+                if (parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+
                 ProcessStatus(response, parsed_expr_status);
                 return;
             }
@@ -526,6 +623,28 @@ public:
             for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
                 ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
                 if (!knn_expr_status.ok()) {
+
+                    if (output_columns != nullptr) {
+                        for (auto &expr_ptr : *output_columns) {
+                            delete expr_ptr;
+                        }
+                        delete output_columns;
+                        output_columns = nullptr;
+                    }
+
+                    if (search_expr_list != nullptr) {
+                        for (auto &expr_ptr : *search_expr_list) {
+                            delete expr_ptr;
+                        }
+                        delete search_expr_list;
+                        search_expr_list = nullptr;
+                    }
+
+                    if (knn_expr != nullptr) {
+                        delete knn_expr;
+                        knn_expr = nullptr;
+                    }
+
                     ProcessStatus(response, knn_expr_status);
                     return;
                 }
@@ -550,6 +669,25 @@ public:
         if (request.__isset.where_expr == true) {
             filter = GetParsedExprFromProto(parsed_expr_status, request.where_expr);
             if (!parsed_expr_status.ok()) {
+
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+
+                if (search_expr != nullptr) {
+                    delete search_expr;
+                    search_expr = nullptr;
+                }
+
+                if (filter != nullptr) {
+                    delete filter;
+                    filter = nullptr;
+                }
+
                 ProcessStatus(response, parsed_expr_status);
                 return;
             }
@@ -566,7 +704,7 @@ public:
         //        }
 
         // Explain type
-        auto explain_type = GetExplainTypeTypeFromProto(request.explain_type);
+        auto explain_type = GetExplainTypeFromProto(request.explain_type);
         const QueryResult result = table->Explain(explain_type, search_expr, filter, output_columns);
 
         if (result.IsOk()) {
@@ -657,21 +795,36 @@ public:
             }
         }
 
-        std::vector<UpdateExpr *> *update_expr_array_{nullptr};
+        std::vector<UpdateExpr *> *update_expr_array{nullptr};
         if (request.__isset.update_expr_array == true) {
-            update_expr_array_ = new std::vector<UpdateExpr *>();
-            update_expr_array_->reserve(request.update_expr_array.size());
+            update_expr_array = new std::vector<UpdateExpr *>();
+            update_expr_array->reserve(request.update_expr_array.size());
             for (auto &update_expr : request.update_expr_array) {
                 auto [parsed_expr, update_expr_status] = GetUpdateExprFromProto(update_expr);
                 if (!update_expr_status.ok()) {
+
+                    if (update_expr_array != nullptr) {
+                        for (auto update_expr : *update_expr_array) {
+                            delete update_expr;
+                        }
+
+                        delete update_expr_array;
+                        update_expr_array = nullptr;
+                    }
+
+                    if (parsed_expr != nullptr) {
+                        delete parsed_expr;
+                        parsed_expr = nullptr;
+                    }
+
                     ProcessStatus(response, update_expr_status);
                     return;
                 }
-                update_expr_array_->emplace_back(parsed_expr);
+                update_expr_array->emplace_back(parsed_expr);
             }
         }
 
-        const QueryResult result = table->Update(filter, update_expr_array_);
+        const QueryResult result = table->Update(filter, update_expr_array);
         ProcessQueryResult(response, result);
     }
 
@@ -828,6 +981,19 @@ public:
             auto index_info_to_use = new IndexInfo();
             index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
             if (index_info_to_use->index_type_ == IndexType::kInvalid) {
+
+                if (index_info_list_to_use != nullptr) {
+                    for (auto &index_info : *index_info_list_to_use) {
+                        delete index_info;
+                        index_info = nullptr;
+                    }
+                    delete index_info_list_to_use;
+                    index_info_list_to_use = nullptr;
+                }
+
+                delete index_info_to_use;
+                index_info_to_use = nullptr;
+
                 ProcessStatus(response, Status::InvalidIndexType());
                 return;
             }
@@ -1080,6 +1246,18 @@ private:
         for (auto &args : function_expr.arguments) {
             arguments->emplace_back(GetParsedExprFromProto(status, args));
             if (!status.ok()) {
+                if(parsed_expr != nullptr) {
+                    delete parsed_expr;
+                    parsed_expr = nullptr;
+                }
+                if(arguments != nullptr) {
+                    for (auto &argument : *arguments) {
+                        delete argument;
+                        argument = nullptr;
+                    }
+                    delete arguments;
+                    arguments = nullptr;
+                }
                 return nullptr;
             }
         }
@@ -1094,17 +1272,25 @@ private:
 
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
+            delete knn_expr;
+            knn_expr = nullptr;
             status = Status::InvalidKnnDistanceType();
             return nullptr;
         }
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
         if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
+            delete knn_expr;
+            knn_expr = nullptr;
             status = Status::InvalidEmbeddingDataType();
             return nullptr;
         }
 
         std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(status, expr.embedding_data);
         if (!status.ok()) {
+            if(knn_expr != nullptr) {
+                delete knn_expr;
+                knn_expr = nullptr;
+            }
             return nullptr;
         }
 
@@ -1174,7 +1360,7 @@ private:
         }
     }
 
-    static ExplainType GetExplainTypeTypeFromProto(const infinity_thrift_rpc::ExplainType::type &type) {
+    static ExplainType GetExplainTypeFromProto(const infinity_thrift_rpc::ExplainType::type &type) {
         switch (type) {
             case infinity_thrift_rpc::ExplainType::Analyze:
                 return ExplainType::kAnalyze;
@@ -1316,7 +1502,6 @@ private:
             }
             case LogicalType::kInvalid:
             default: {
-                // necessary cause it was internal error
                 UnrecoverableError("Invalid data type");
             }
         }
@@ -1340,7 +1525,6 @@ private:
             case EmbeddingDataType::kElemDouble:
                 return infinity_thrift_rpc::ElementType::ElementFloat64;
             case EmbeddingDataType::kElemInvalid: {
-                // necessary cause it was internal error
                 UnrecoverableError("Invalid embedding element data type");
             }
         }
