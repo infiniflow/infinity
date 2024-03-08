@@ -618,12 +618,12 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 if (!index_status.ok()) {
                     UnrecoverableError(index_status.message());
                 }
-                auto fulltext_index_entry = FulltextIndexEntry::NewReplayIrsIndexEntry(table_index_entry,
-                                                                                       MakeUnique<String>(index_dir),
-                                                                                       txn_id,
-                                                                                       begin_ts,
-                                                                                       commit_ts,
-                                                                                       is_delete);
+                auto fulltext_index_entry = FulltextIndexEntry::NewReplayFulltextIndexEntry(table_index_entry,
+                                                                                            MakeUnique<String>(index_dir),
+                                                                                            txn_id,
+                                                                                            begin_ts,
+                                                                                            commit_ts,
+                                                                                            is_delete);
                 table_index_entry->fulltext_index_entry() = std::move(fulltext_index_entry);
                 break;
             }

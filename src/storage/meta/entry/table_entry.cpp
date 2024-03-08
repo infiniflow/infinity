@@ -162,7 +162,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteNewEntry(txn_id);
 }
 
-void TableEntry::GetFullTextAnalyzers(TransactionID txn_id,
+void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,
                                       Map<String, String> &column2analyzer) {

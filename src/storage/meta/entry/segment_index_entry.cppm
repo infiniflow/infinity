@@ -27,6 +27,7 @@ import index_base;
 import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
+import memory_indexer;
 
 namespace infinity {
 
@@ -111,6 +112,8 @@ private:
     TxnTimeStamp min_ts_{0}; // Indicate the commit_ts which create this SegmentIndexEntry
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
+
+    UniquePtr<MemoryIndexer> memory_indexer_{};
 };
 
 } // namespace infinity
