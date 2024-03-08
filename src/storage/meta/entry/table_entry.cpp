@@ -349,7 +349,6 @@ Status TableEntry::CommitCompact(TransactionID txn_id, void *txn_store, TxnTimeS
             for (const auto &old_segment : old_segments) {
                 // old_segment->TrySetDeprecated(commit_ts);
                 old_segment->SetForbidCleanup(commit_ts);
-                LOG_INFO(fmt::format("Set ForbidCleanup: {}", old_segment->segment_id_));
                 auto operation = MakeUnique<AddSegmentEntryOp>(old_segment, old_segment->status());
                 txn->AddCatalogDeltaOperation(std::move(operation));
             }

@@ -664,6 +664,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
     }
 }
 
+// FIXME: The test case diverges from the original intent.
 TEST_F(WalReplayTest, WalReplayCompact) {
     u64 test_segment_n = 2;
     {
@@ -747,7 +748,6 @@ TEST_F(WalReplayTest, WalReplayCompact) {
                 compact_task->Execute();
             }
             txn_mgr->CommitTxn(txn4);
-            usleep(2000);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();
@@ -778,7 +778,11 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto compact_segment = table_entry->GetSegmentByID(test_segment_n, begin_ts);
             EXPECT_NE(compact_segment, nullptr);
             EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
-            EXPECT_EQ(compact_segment->actual_row_count(), test_segment_n);
+            EXPECT_EQ(compact_segment->row_count(), test_segment_n);
+
+            auto block_entry = compact_segment->GetBlockEntryByID(0);
+            EXPECT_NE(block_entry, nullptr);
+            EXPECT_EQ(block_entry->row_count(), test_segment_n);
         }
         infinity::InfinityContext::instance().UnInit();
         infinity::GlobalResourceUsage::UnInit();

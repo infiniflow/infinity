@@ -519,26 +519,23 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                     segment_status = SegmentStatus::kDeprecated;
                 }
 
-                auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
-                                                                                segment_id,
-                                                                                MakeUnique<String>(segment_dir),
-                                                                                segment_status,
-                                                                                column_count,
-                                                                                row_count,
-                                                                                actual_row_count,
-                                                                                row_capacity,
-                                                                                min_row_ts,
-                                                                                max_row_ts,
-                                                                                commit_ts,
-                                                                                begin_ts,
-                                                                                txn_id);
-
                 if (table_entry->segment_map_.find(segment_id) != table_entry->segment_map_.end()) {
-                    // auto old_segment_entry = table_entry->segment_map_.at(segment_id);
-                    // segment_entry->block_entries() = old_segment_entry->block_entries();
-                    // old_segment_entry->block_entries() = {};
-                    table_entry->segment_map_[segment_id] = std::move(segment_entry);
+                    auto &old_segment_entry = table_entry->segment_map_.at(segment_id);
+                    old_segment_entry->UpdateSegmentInfo(segment_status, row_count, min_row_ts, max_row_ts, commit_ts, begin_ts, txn_id);
                 } else {
+                    auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
+                                                                                    segment_id,
+                                                                                    MakeUnique<String>(segment_dir),
+                                                                                    segment_status,
+                                                                                    column_count,
+                                                                                    row_count,
+                                                                                    actual_row_count,
+                                                                                    row_capacity,
+                                                                                    min_row_ts,
+                                                                                    max_row_ts,
+                                                                                    commit_ts,
+                                                                                    begin_ts,
+                                                                                    txn_id);
                     table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
                 }
                 break;

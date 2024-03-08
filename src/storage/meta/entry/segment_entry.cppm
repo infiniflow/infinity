@@ -97,6 +97,15 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
+    // Used in catalog delta operation replay, we may need to update the info of segment
+    void UpdateSegmentInfo(SegmentStatus status,
+                           SizeT row_count,
+                           TxnTimeStamp min_row_ts,
+                           TxnTimeStamp max_row_ts,
+                           TxnTimeStamp commit_ts,
+                           TxnTimeStamp begin_ts,
+                           TransactionID txn_id);
+
     // will only be called in TableEntry::Append
     // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
     // task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
@@ -172,7 +181,6 @@ public:
         }
         return false;
     }
-
 
 public:
     // Const getter

@@ -125,6 +125,23 @@ void SegmentEntry::SetSealing() {
     status_ = SegmentStatus::kSealing;
 }
 
+void SegmentEntry::UpdateSegmentInfo(SegmentStatus status,
+                                     SizeT row_count,
+                                     TxnTimeStamp min_row_ts,
+                                     TxnTimeStamp max_row_ts,
+                                     TxnTimeStamp commit_ts,
+                                     TxnTimeStamp begin_ts,
+                                     TransactionID txn_id) {
+    std::unique_lock lock(rw_locker_);
+    status_ = status;
+    row_count_ = row_count;
+    min_row_ts_ = min_row_ts;
+    max_row_ts_ = max_row_ts;
+    commit_ts_ = commit_ts;
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
+}
+
 // will only be called in TableEntry::Append
 // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
 // task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
