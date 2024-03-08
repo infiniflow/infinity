@@ -682,9 +682,6 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
             SegmentEntry *segment = iter->second.get();
-            if (segment == unsealed_segment_) {
-                continue;
-            }
             // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.

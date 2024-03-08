@@ -229,7 +229,7 @@ void DBTCompactionAlg::Disable() {
     cv_.wait(lock, [this]() {
         bool res = (status_ == CompactionStatus::kEnable);
         if (!res) {
-            LOG_INFO(fmt::format("table {} is auto compacting now. wait", *(table_entry_->TableEntryDir())));
+            LOG_WARN(fmt::format("table {} is auto compacting now. wait", *(table_entry_->TableEntryDir())));
         }
         return res;
     });
