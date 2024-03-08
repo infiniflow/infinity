@@ -216,6 +216,7 @@ public:
 
         if(request.fields.empty()) {
             ProcessStatus(response, Status::InsertWithoutValues());
+            delete columns;
             return;
         }
 
@@ -228,6 +229,7 @@ public:
                 auto parsed_expr = GetConstantFromProto(constant_status, *expr.type.constant_expr);
                 if (!constant_status.ok()) {
                     ProcessStatus(response, constant_status);
+                    delete values;
                     return;
                 }
                 value_list->emplace_back(parsed_expr);
@@ -372,6 +374,7 @@ public:
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
             if (!parsed_expr_status.ok()) {
                 ProcessStatus(response, parsed_expr_status);
+                delete output_columns;
                 return;
             }
             output_columns->emplace_back(parsed_expr);
@@ -392,6 +395,7 @@ public:
                 ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
                 if (!knn_expr_status.ok()) {
                     ProcessStatus(response, knn_expr_status);
+                    delete search_expr;
                     return;
                 }
                 search_expr_list->emplace_back(knn_expr);
@@ -507,6 +511,7 @@ public:
             auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
             if (!parsed_expr_status.ok()) {
                 ProcessStatus(response, parsed_expr_status);
+                delete output_columns;
                 return;
             }
             output_columns->emplace_back(parsed_expr);
@@ -527,6 +532,7 @@ public:
                 ParsedExpr *knn_expr = GetKnnExprFromProto(knn_expr_status, request.search_expr.knn_exprs[idx]);
                 if (!knn_expr_status.ok()) {
                     ProcessStatus(response, knn_expr_status);
+                    delete search_expr;
                     return;
                 }
                 search_expr_list->emplace_back(knn_expr);
@@ -657,21 +663,22 @@ public:
             }
         }
 
-        std::vector<UpdateExpr *> *update_expr_array_{nullptr};
+        std::vector<UpdateExpr *> *update_expr_array{nullptr};
         if (request.__isset.update_expr_array == true) {
-            update_expr_array_ = new std::vector<UpdateExpr *>();
-            update_expr_array_->reserve(request.update_expr_array.size());
+            update_expr_array = new std::vector<UpdateExpr *>();
+            update_expr_array->reserve(request.update_expr_array.size());
             for (auto &update_expr : request.update_expr_array) {
                 auto [parsed_expr, update_expr_status] = GetUpdateExprFromProto(update_expr);
                 if (!update_expr_status.ok()) {
                     ProcessStatus(response, update_expr_status);
+                    delete update_expr_array;
                     return;
                 }
-                update_expr_array_->emplace_back(parsed_expr);
+                update_expr_array->emplace_back(parsed_expr);
             }
         }
 
-        const QueryResult result = table->Update(filter, update_expr_array_);
+        const QueryResult result = table->Update(filter, update_expr_array);
         ProcessQueryResult(response, result);
     }
 
@@ -829,6 +836,7 @@ public:
             index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
             if (index_info_to_use->index_type_ == IndexType::kInvalid) {
                 ProcessStatus(response, Status::InvalidIndexType());
+                delete index_info_list_to_use;
                 return;
             }
 
@@ -1080,6 +1088,7 @@ private:
         for (auto &args : function_expr.arguments) {
             arguments->emplace_back(GetParsedExprFromProto(status, args));
             if (!status.ok()) {
+                delete parsed_expr;
                 return nullptr;
             }
         }
@@ -1095,16 +1104,19 @@ private:
         knn_expr->distance_type_ = GetDistanceTypeFormProto(expr.distance_type);
         if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
             status = Status::InvalidKnnDistanceType();
+            delete knn_expr;
             return nullptr;
         }
         knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
         if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
             status = Status::InvalidEmbeddingDataType();
+            delete knn_expr;
             return nullptr;
         }
 
         std::tie(knn_expr->embedding_data_ptr_, knn_expr->dimension_) = GetEmbeddingDataTypeDataPtrFromProto(status, expr.embedding_data);
         if (!status.ok()) {
+            delete knn_expr;
             return nullptr;
         }
 
