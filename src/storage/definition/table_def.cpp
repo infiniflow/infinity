@@ -84,6 +84,9 @@ bool TableDef::operator==(const TableDef &other) const {
             it1++;
             it2++;
         }
+        if (cd1.build_bloom_filter_ != cd2.build_bloom_filter_) {
+            return false;
+        }
     }
     return true;
 }
@@ -102,6 +105,7 @@ i32 TableDef::GetSizeInBytes() const {
         size += sizeof(i32) + cd.name_.length();
         size += sizeof(i32);
         size += cd.constraints_.size() * sizeof(ConstraintType);
+        size += sizeof(u8); // build_bloom_filter_
     }
     return size;
 }
@@ -120,6 +124,8 @@ void TableDef::WriteAdv(char *&ptr) const {
         for (const auto &cons : cd.constraints_) {
             WriteBufAdv(ptr, cons);
         }
+        u8 bf = cd.build_bloom_filter_ ? 1 : 0;
+        WriteBufAdv(ptr, bf);
     }
     return;
 }
@@ -148,6 +154,8 @@ SharedPtr<TableDef> TableDef::ReadAdv(char *&ptr, i32 maxbytes) {
             constraints.insert(ct);
         }
         SharedPtr<ColumnDef> cd = MakeShared<ColumnDef>(id, column_type, column_name, constraints);
+        u8 bf = ReadBufAdv<u8>(ptr);
+        cd->build_bloom_filter_ = bf;
         columns.push_back(cd);
     }
     maxbytes = ptr_end - ptr;

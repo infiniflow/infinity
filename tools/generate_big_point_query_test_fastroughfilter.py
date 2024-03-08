@@ -5,14 +5,14 @@ import random
 
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 10000
-    repeat_n = 500
+    repeat_n = 100
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql"
     csv_name = "/test_big_top.csv"
-    table_name1 = "test_big_point_query_fastroughfilter_miss"
-    table_name2 = "test_big_point_query_fastroughfilter_exist"
-    slt_name1 = "/big_point_query_fastroughfilter_miss.slt"
-    slt_name2 = "/big_point_query_fastroughfilter_exist.slt"
+    table_name1 = "test_big_point_query_bloom_filter_miss"
+    table_name2 = "test_big_point_query_bloom_filter_exist"
+    slt_name1 = "/big_point_query_bloom_filter_miss.slt"
+    slt_name2 = "/big_point_query_bloom_filter_exist.slt"
 
     copy_path = copy_dir + csv_name
     slt_path1 = slt_dir + slt_name1
@@ -28,7 +28,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
         test_slt_file1.write("DROP TABLE IF EXISTS {};\n".format(table_name1))
         test_slt_file1.write("\n")
         test_slt_file1.write("statement ok\n")
-        test_slt_file1.write("CREATE TABLE {} (c1 integer, c2 boolean);\n".format(table_name1))
+        test_slt_file1.write(
+            "CREATE TABLE {} (c1 integer, c2 boolean) PROPERTIES (bloom_filter_columns = \"c1,c2\");\n".format(
+                table_name1))
         test_slt_file1.write("\n")
         test_slt_file1.write("statement ok\n")
         test_slt_file1.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name1, copy_path))
@@ -49,7 +51,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
         test_slt_file2.write("DROP TABLE IF EXISTS {};\n".format(table_name2))
         test_slt_file2.write("\n")
         test_slt_file2.write("statement ok\n")
-        test_slt_file2.write("CREATE TABLE {} (c1 integer, c2 boolean);\n".format(table_name2))
+        test_slt_file2.write(
+            "CREATE TABLE {} (c1 integer, c2 boolean) PROPERTIES (bloom_filter_columns = \"c1,c2\");\n".format(
+                table_name2))
         test_slt_file2.write("\n")
         test_slt_file2.write("statement ok\n")
         test_slt_file2.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name2, copy_path))

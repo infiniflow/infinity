@@ -27,14 +27,12 @@ TEST_F(BinaryFuseFilterTest, test_2000) {
         data[i] = i * NUM;
     }
     BinaryFuse filter;
-    // test allocate
-    EXPECT_EQ(filter.Allocate(NUM), true);
     // test build
-    EXPECT_EQ(filter.AddAll(data.data(), NUM), true);
+    EXPECT_NO_THROW(filter.Build(0, data.data(), NUM));
     // test contain
     for (u64 i = 0; i < NUM; ++i) {
         u64 item = i * NUM;
-        EXPECT_EQ(filter.Contain(item), true);
+        EXPECT_EQ(filter.Contain(1, item), true);
     }
     // test fake contain
     u64 fake_contain = 0;
@@ -42,7 +40,7 @@ TEST_F(BinaryFuseFilterTest, test_2000) {
     for (u64 i = 0; i < NUM * NUM; ++i) {
         if (i % NUM) {
             ++total_cnt;
-            if (filter.Contain(i)) {
+            if (filter.Contain(1, i)) {
                 ++fake_contain;
             }
         }
@@ -55,15 +53,13 @@ TEST_F(BinaryFuseFilterTest, test_bool_all) {
     using namespace infinity;
     std::array<u64, 2> data = {0, 1};
     BinaryFuse filter;
-    // test allocate
-    EXPECT_EQ(filter.Allocate(2), true);
     // test build
-    EXPECT_EQ(filter.AddAll(data.data(), 2), true);
+    EXPECT_NO_THROW(filter.Build(0, data.data(), 2));
     // test contain
     u64 item = 0;
-    EXPECT_EQ(filter.Contain(item), true);
+    EXPECT_EQ(filter.Contain(1, item), true);
     item = 1;
-    EXPECT_EQ(filter.Contain(item), true);
+    EXPECT_EQ(filter.Contain(1, item), true);
 }
 
 TEST_F(BinaryFuseFilterTest, test_bool_true) {
@@ -71,41 +67,35 @@ TEST_F(BinaryFuseFilterTest, test_bool_true) {
     std::array<u64, 1> data = {1};
     BinaryFuse filter;
     // test allocate
-    EXPECT_EQ(filter.Allocate(1), true);
-    // test build
-    EXPECT_EQ(filter.AddAll(data.data(), 1), true);
+    EXPECT_NO_THROW(filter.Build(0, data.data(), 1));
     // test contain
     u64 item = 0;
-    EXPECT_EQ(filter.Contain(item), false);
+    EXPECT_EQ(filter.Contain(1, item), false);
     item = 1;
-    EXPECT_EQ(filter.Contain(item), true);
+    EXPECT_EQ(filter.Contain(1, item), true);
 }
 
 TEST_F(BinaryFuseFilterTest, test_bool_false) {
     using namespace infinity;
     std::array<u64, 1> data = {0};
     BinaryFuse filter;
-    // test allocate
-    EXPECT_EQ(filter.Allocate(1), true);
     // test build
-    EXPECT_EQ(filter.AddAll(data.data(), 1), true);
+    EXPECT_NO_THROW(filter.Build(0, data.data(), 1));
     // test contain
     u64 item = 0;
-    EXPECT_EQ(filter.Contain(item), true);
+    EXPECT_EQ(filter.Contain(1, item), true);
     item = 1;
-    EXPECT_EQ(filter.Contain(item), false);
+    EXPECT_EQ(filter.Contain(1, item), false);
 }
 
 TEST_F(BinaryFuseFilterTest, test_bool_none) {
     using namespace infinity;
     BinaryFuse filter;
-    // test allocate
-    EXPECT_EQ(filter.Allocate(0), true);
     // test build
-    EXPECT_EQ(filter.AddAll(nullptr, 0), true);
+    EXPECT_NO_THROW(filter.Build(0, nullptr, 0));
     // test contain
     u64 item = 0;
-    EXPECT_EQ(filter.Contain(item), false);
+    EXPECT_EQ(filter.Contain(1, item), false);
     item = 1;
-    EXPECT_EQ(filter.Contain(item), false);
+    EXPECT_EQ(filter.Contain(1, item), false);
 }

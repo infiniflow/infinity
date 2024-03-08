@@ -14,6 +14,7 @@
 
 module;
 
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -425,6 +426,45 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
     }
 
     SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default"), MakeShared<String>(create_table_info->table_name_), columns);
+    for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
+        auto &[param_name, param_value] = *property_ptr;
+        if (auto [_, success] = visited_param_names.insert(param_name); !success) {
+            return Status::SyntaxError(fmt::format("Duplicate table property param name: {}", param_name));
+        }
+        if (param_name == "bloom_filter_columns") {
+            Vector<ColumnID> bloom_filter_columns;
+            // spilt the param_value string by ',', find corresponding column id and add to bloom_filter_columns
+            IStringStream column_name_stream(param_value);
+            String column_name;
+            while (std::getline(column_name_stream, column_name, ',')) {
+                // remove leading and trailing spaces
+                if (SizeT start = column_name.find_first_not_of(' '); start != String::npos) {
+                    column_name = column_name.substr(start);
+                }
+                if (SizeT end = column_name.find_last_not_of(' '); end != String::npos) {
+                    column_name = column_name.substr(0, end + 1);
+                }
+                // find column id by column name
+                if (SizeT column_id = table_def_ptr->GetColIdByName(column_name); column_id == static_cast<SizeT>(-1)) {
+                    return Status::SyntaxError(fmt::format("Column {} not found in table {}", column_name, *table_def_ptr->table_name()));
+                } else {
+                    bloom_filter_columns.push_back(column_id);
+                }
+            }
+            // remove duplicate column id
+            std::sort(bloom_filter_columns.begin(), bloom_filter_columns.end());
+            bloom_filter_columns.erase(std::unique(bloom_filter_columns.begin(), bloom_filter_columns.end()), bloom_filter_columns.end());
+            // check if bloom filter can be created for the column
+            for (Vector<SharedPtr<ColumnDef>> &columns = table_def_ptr->columns(); ColumnID column_id : bloom_filter_columns) {
+                if (auto &def = columns[column_id]; def->type()->SupportBloomFilter()) {
+                    def->build_bloom_filter_ = true;
+                } else {
+                    return Status::SyntaxError(
+                        fmt::format("Bloom filter can't be created for {} type column {}", def->type()->ToString(), def->name()));
+                }
+            }
+        }
+    }
 
     SharedPtr<LogicalNode> logical_create_table_operator = LogicalCreateTable::Make(bind_context_ptr->GetNewLogicalNodeId(),
                                                                                     schema_name_ptr,

@@ -37,11 +37,9 @@ class TxnTableStore;
 struct TableEntry;
 class CompactSegmentsTask;
 class BlockEntryIter;
-struct WalSegmentInfo;
 
 export enum class SegmentStatus : u8 {
     kUnsealed,
-    kSealing,
     kSealed,
     kCompacting,
     kNoDelete,
@@ -96,13 +94,7 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    // will only be called in TableEntry::Append
-    // txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
-    // task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
-    //       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
-    void CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr);
-
-    void FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status);
+    void SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
@@ -142,28 +134,7 @@ public:
 
     Vector<Pair<BlockID, String>> GetBlockFilterBinaryDataVector() const;
 
-    void WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
-
-    // called in lock, in serialize, deserialize job
-    bool FinishedSealingTask() const { return FinishedSealingTask(status_); }
-
-    static bool FinishedSealingTask(SegmentStatus segment_status) {
-        switch (segment_status) {
-            case SegmentStatus::kUnsealed:
-            case SegmentStatus::kSealing: {
-                return false;
-            }
-            case SegmentStatus::kSealed:
-            case SegmentStatus::kCompacting:
-            case SegmentStatus::kNoDelete:
-            case SegmentStatus::kDeprecated: {
-                return true;
-            }
-            default: {
-                UnrecoverableError("Unexpected segment status");
-            }
-        }
-    }
+    void LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data);
 
 public:
     // Const getter
@@ -210,9 +181,6 @@ public:
     void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
 
 private:
-    // called by table entry
-    void SetSealing();
-
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
 
 protected: // protected for unit test

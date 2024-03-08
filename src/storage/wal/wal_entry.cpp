@@ -155,7 +155,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             cmd = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
             break;
         }
-        case WalCommandType::SET_SEGMENT_SEALED: {
+        case WalCommandType::SET_SEGMENT_STATUS_SEALED: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
@@ -166,11 +166,29 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 data.first = ReadBufAdv<BlockID>(ptr);
                 data.second = ReadBufAdv<String>(ptr);
             }
-            cmd = MakeShared<WalCmdSetSegmentSealed>(std::move(db_name),
-                                                     std::move(table_name),
-                                                     segment_id,
-                                                     std::move(segment_filter_binary_data),
-                                                     std::move(block_filter_binary_data));
+            cmd = MakeShared<WalCmdSetSegmentStatusSealed>(std::move(db_name),
+                                                           std::move(table_name),
+                                                           segment_id,
+                                                           std::move(segment_filter_binary_data),
+                                                           std::move(block_filter_binary_data));
+            break;
+        }
+        case WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
+            i32 count = ReadBufAdv<i32>(ptr);
+            Vector<Pair<BlockID, String>> block_filter_binary_data(count);
+            for (auto &data : block_filter_binary_data) {
+                data.first = ReadBufAdv<BlockID>(ptr);
+                data.second = ReadBufAdv<String>(ptr);
+            }
+            cmd = MakeShared<WalCmdUpdateSegmentBloomFilterData>(std::move(db_name),
+                                                                 std::move(table_name),
+                                                                 segment_id,
+                                                                 std::move(segment_filter_binary_data),
+                                                                 std::move(block_filter_binary_data));
             break;
         }
         case WalCommandType::CHECKPOINT: {
@@ -270,8 +288,20 @@ bool WalCmdDelete::operator==(const WalCmd &other) const {
     return true;
 }
 
-bool WalCmdSetSegmentSealed::operator==(const WalCmd &other) const {
-    auto other_cmd = dynamic_cast<const WalCmdSetSegmentSealed *>(&other);
+bool WalCmdSetSegmentStatusSealed::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdSetSegmentStatusSealed *>(&other);
+    if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
+        segment_id_ != other_cmd->segment_id_ || !IsEqual(segment_filter_binary_data_, other_cmd->segment_filter_binary_data_)) {
+        return false;
+    }
+    if (block_filter_binary_data_ != other_cmd->block_filter_binary_data_) {
+        return false;
+    }
+    return true;
+}
+
+bool WalCmdUpdateSegmentBloomFilterData::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdUpdateSegmentBloomFilterData *>(&other);
     if (other_cmd == nullptr || !IsEqual(db_name_, other_cmd->db_name_) || !IsEqual(table_name_, other_cmd->table_name_) ||
         segment_id_ != other_cmd->segment_id_ || !IsEqual(segment_filter_binary_data_, other_cmd->segment_filter_binary_data_)) {
         return false;
@@ -336,7 +366,17 @@ i32 WalCmdDelete::GetSizeInBytes() const {
            row_ids_.size() * sizeof(RowID);
 }
 
-i32 WalCmdSetSegmentSealed::GetSizeInBytes() const {
+i32 WalCmdSetSegmentStatusSealed::GetSizeInBytes() const {
+    i32 sz = sizeof(WalCommandType) + ::infinity::GetSizeInBytes(db_name_) + ::infinity::GetSizeInBytes(table_name_) +
+             ::infinity::GetSizeInBytes(segment_id_) + ::infinity::GetSizeInBytes(segment_filter_binary_data_);
+    sz += +sizeof(i32); // count of vector
+    for (const auto &data : block_filter_binary_data_) {
+        sz += sizeof(data.first) + ::infinity::GetSizeInBytes(data.second);
+    }
+    return sz;
+}
+
+i32 WalCmdUpdateSegmentBloomFilterData::GetSizeInBytes() const {
     i32 sz = sizeof(WalCommandType) + ::infinity::GetSizeInBytes(db_name_) + ::infinity::GetSizeInBytes(table_name_) +
              ::infinity::GetSizeInBytes(segment_id_) + ::infinity::GetSizeInBytes(segment_filter_binary_data_);
     sz += +sizeof(i32); // count of vector
@@ -419,8 +459,22 @@ void WalCmdDelete::WriteAdv(char *&buf) const {
     }
 }
 
-void WalCmdSetSegmentSealed::WriteAdv(char *&buf) const {
-    WriteBufAdv(buf, WalCommandType::SET_SEGMENT_SEALED);
+void WalCmdSetSegmentStatusSealed::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::SET_SEGMENT_STATUS_SEALED);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->segment_filter_binary_data_);
+    i32 count = static_cast<i32>(this->block_filter_binary_data_.size());
+    WriteBufAdv(buf, count);
+    for (const auto &data : block_filter_binary_data_) {
+        WriteBufAdv(buf, data.first);
+        WriteBufAdv(buf, data.second);
+    }
+}
+
+void WalCmdUpdateSegmentBloomFilterData::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA);
     WriteBufAdv(buf, this->db_name_);
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
@@ -620,17 +674,22 @@ String WalEntry::ToString() const {
                 ss << row_id.ToString() << " ";
             }
             ss << std::endl;
-        } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_SEALED) {
-            auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentSealed *>(cmd.get());
-            ss << "db name: " << set_sealed_cmd->db_name_ << std::endl;
-            ss << "table name: " << set_sealed_cmd->table_name_ << std::endl;
-            ss << "segment id: " << set_sealed_cmd->segment_id_ << std::endl;
         } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
             auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
             ss << "db name: " << create_index_cmd->db_name_ << std::endl;
             ss << "table name: " << create_index_cmd->table_name_ << std::endl;
             ss << "table index dir: " << create_index_cmd->table_index_dir_ << std::endl;
             ss << "index def: " << create_index_cmd->index_base_->ToString() << std::endl;
+        } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_STATUS_SEALED) {
+            auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get());
+            ss << "db name: " << set_sealed_cmd->db_name_ << std::endl;
+            ss << "table name: " << set_sealed_cmd->table_name_ << std::endl;
+            ss << "segment id: " << set_sealed_cmd->segment_id_ << std::endl;
+        } else if (cmd->GetType() == WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA) {
+            auto update_filter_cmd = dynamic_cast<const WalCmdUpdateSegmentBloomFilterData *>(cmd.get());
+            ss << "db name: " << update_filter_cmd->db_name_ << std::endl;
+            ss << "table name: " << update_filter_cmd->table_name_ << std::endl;
+            ss << "segment id: " << update_filter_cmd->segment_id_ << std::endl;
         }
     }
     ss << "========================" << std::endl;
@@ -667,8 +726,11 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::DELETE:
             command = "DELETE";
             break;
-        case WalCommandType::SET_SEGMENT_SEALED:
-            command = "SET_SEGMENT_SEALED";
+        case WalCommandType::SET_SEGMENT_STATUS_SEALED:
+            command = "SET_SEGMENT_STATUS_SEALED";
+            break;
+        case WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA:
+            command = "UPDATE_SEGMENT_BLOOM_FILTER_DATA";
             break;
         case WalCommandType::CHECKPOINT:
             command = "CHECKPOINT";

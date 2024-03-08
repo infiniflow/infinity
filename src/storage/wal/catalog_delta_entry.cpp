@@ -231,17 +231,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                            max_ts);
             break;
         }
-        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALING: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            i32 cnt = ReadBufAdv<i32>(ptr);
-            Vector<SegmentID> set_sealing_segments(cnt);
-            for (i32 i = 0; i < cnt; i++) {
-                set_sealing_segments[i] = ReadBufAdv<SegmentID>(ptr);
-            }
-            operation = MakeUnique<SetSegmentStatusSealingOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, table_name, std::move(set_sealing_segments));
-            break;
-        }
         case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
@@ -254,7 +243,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                 String block_filter_binary = ReadBufAdv<String>(ptr);
                 block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
             }
-            SegmentStatus prev_status = ReadBufAdv<SegmentStatus>(ptr);
             operation = MakeUnique<SetSegmentStatusSealedOp>(begin_ts,
                                                              is_delete,
                                                              txn_id,
@@ -263,8 +251,29 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                              table_name,
                                                              segment_id,
                                                              std::move(segment_filter_binary_data),
-                                                             std::move(block_filter_binary_data),
-                                                             prev_status);
+                                                             std::move(block_filter_binary_data));
+        }
+        case CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
+            Vector<Pair<BlockID, String>> block_filter_binary_data;
+            i32 block_filter_binary_vector_size = ReadBufAdv<i32>(ptr);
+            for (i32 i = 0; i < block_filter_binary_vector_size; i++) {
+                BlockID block_id = ReadBufAdv<BlockID>(ptr);
+                String block_filter_binary = ReadBufAdv<String>(ptr);
+                block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
+            }
+            operation = MakeUnique<UpdateSegmentBloomFilterDataOp>(begin_ts,
+                                                                   is_delete,
+                                                                   txn_id,
+                                                                   commit_ts,
+                                                                   db_name,
+                                                                   table_name,
+                                                                   segment_id,
+                                                                   std::move(segment_filter_binary_data),
+                                                                   std::move(block_filter_binary_data));
         }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
@@ -394,17 +403,6 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_ts_);
 }
 
-void SetSegmentStatusSealingOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    i32 cnt = this->set_sealing_segments_.size();
-    WriteBufAdv(buf, cnt);
-    for (i32 i = 0; i < cnt; i++) {
-        WriteBufAdv(buf, this->set_sealing_segments_[i]);
-    }
-}
-
 void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, this->db_name_);
@@ -417,7 +415,20 @@ void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
         WriteBufAdv(buf, block_filter.first);
         WriteBufAdv(buf, block_filter.second);
     }
-    WriteBufAdv(buf, this->prev_status_);
+}
+
+void UpdateSegmentBloomFilterDataOp::WriteAdv(char *&buf) const {
+    WriteAdvBase(buf);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, this->segment_filter_binary_data_);
+    i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
+    WriteBufAdv(buf, block_filter_binary_vector_size);
+    for (const auto &block_filter : block_filter_binary_data_) {
+        WriteBufAdv(buf, block_filter.first);
+        WriteBufAdv(buf, block_filter.second);
+    }
 }
 
 void AddDBMetaOp::SaveState() {
@@ -519,16 +530,11 @@ void AddSegmentIndexEntryOp::SaveState() {
     is_saved_sate_ = true;
 }
 
-void SetSegmentStatusSealingOp::SaveState() {
+void SetSegmentStatusSealedOp::SaveState() {
     is_saved_sate_ = true;
 }
 
-void SetSegmentStatusSealedOp::SaveState() {
-    if (this->segment_filter_binary_data_.size() == 0 or this->block_filter_binary_data_.size() == 0) {
-        UnrecoverableError("segment_filter_binary_data_ or block_filter_binary_data_ is empty");
-    }
-    // change segment status to sealed here, in the CommitBottom
-    this->segment_entry_->FinishTaskSetSegmentStatusSealed(this->prev_status_);
+void UpdateSegmentBloomFilterDataOp::SaveState() {
     is_saved_sate_ = true;
 }
 
@@ -629,12 +635,12 @@ const String AddSegmentIndexEntryOp::ToString() const {
                        max_ts_);
 }
 
-const String SetSegmentStatusSealingOp::ToString() const {
-    return fmt::format("SetSegmentStatusSealingOp db_name: {} table_name: {}", db_name_, table_name_);
-}
-
 const String SetSegmentStatusSealedOp::ToString() const {
     return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
+}
+
+const String UpdateSegmentBloomFilterDataOp::ToString() const {
+    return fmt::format("UpdateSegmentBloomFilterDataOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
 }
 
 void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {

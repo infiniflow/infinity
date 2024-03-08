@@ -46,7 +46,7 @@ import default_values;
 import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
-import compact_segments_task;
+import build_fast_rough_filter_task;
 
 namespace infinity {
 
@@ -208,12 +208,20 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
             if (this->unsealed_segment_ == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_ != nullptr) {
-                    // in wal replay, txn->txn_mgr() will return nullptr, and the sealing task will be skipped
-                    // after wal replay, the missing sealing tasks will be created
-                    // this function will not change unsealed to sealed (will be changed in CommitAppend)
-                    // the background task will skip and put itself into the task queue again if the segment has not been changed to sealing yet
-                    unsealed_segment_->CreateTaskSetSegmentStatusSealed(this, txn->txn_mgr());
-                    append_state_ptr->set_sealing_segments_.push_back(unsealed_segment_->segment_id());
+                    append_state_ptr->set_sealed_segments_.push_back(unsealed_segment_->segment_id());
+                    // Add a catalog delta operation to set the unsealed_segment to sealed
+                    // build minmax filter and optional bloom filter
+                    // TODO: skip rebuild in wal?
+                    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(unsealed_segment_, buffer_mgr, txn->BeginTS());
+                    // delta catalog
+                    {
+                        String segment_filter_binary_data = unsealed_segment_->GetFastRoughFilter()->SerializeToString();
+                        Vector<Pair<BlockID, String>> block_filter_binary_data = unsealed_segment_->GetBlockFilterBinaryDataVector();
+                        auto operation = MakeUnique<SetSegmentStatusSealedOp>(unsealed_segment_,
+                                                                              std::move(segment_filter_binary_data),
+                                                                              std::move(block_filter_binary_data));
+                        txn->AddCatalogDeltaOperation(std::move(operation));
+                    }
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
@@ -228,17 +236,12 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, append_state_ptr, buffer_mgr, txn);
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
     }
-    if (!append_state_ptr->set_sealing_segments_.empty()) {
-        // Add a catalog delta operation to set the segment to sealing
-        auto operation = MakeUnique<SetSegmentStatusSealingOp>(this, append_state_ptr->set_sealing_segments_);
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
 }
 
-void TableEntry::SetSegmentSealingForAppend(const Vector<SegmentID> &set_sealing_segments) {
-    for (SegmentID segment_id : set_sealing_segments) {
+void TableEntry::SetSegmentSealedForAppend(const Vector<SegmentID> &set_sealed_segments) {
+    for (SegmentID segment_id : set_sealed_segments) {
         SegmentEntry *segment_entry = this->segment_map_[segment_id].get();
-        segment_entry->SetSealing();
+        segment_entry->SetSealed();
     }
 }
 
@@ -281,8 +284,8 @@ void TableEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, cons
         row_count += range.row_count_;
     }
     this->row_count_ += row_count;
-    // finally, set the full unsealed segment to sealing
-    SetSegmentSealingForAppend(append_state_ptr->set_sealing_segments_);
+    // finally, set the full unsealed segment to sealed
+    SetSegmentSealedForAppend(append_state_ptr->set_sealed_segments_);
 }
 
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {

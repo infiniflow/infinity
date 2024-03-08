@@ -51,7 +51,8 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     // SEGMENT STATUS
     // -----------------------------
-    SET_SEGMENT_SEALED = 31,
+    SET_SEGMENT_STATUS_SEALED = 31,
+    UPDATE_SEGMENT_BLOOM_FILTER_DATA = 32,
 
     // -----------------------------
     // Flush
@@ -231,16 +232,19 @@ export struct WalCmdDelete : public WalCmd {
     Vector<RowID> row_ids_{};
 };
 
-export struct WalCmdSetSegmentSealed : public WalCmd {
-    WalCmdSetSegmentSealed(String &&db_name,
-                           String &&table_name,
-                           SegmentID segment_id,
-                           String &&segment_filter_binary_data,
-                           Vector<Pair<BlockID, String>> &&block_filter_binary_data)
+// used when append op turn an old unsealed segment full and sealed
+// will always have necessary minmax filter
+// may have user-defined bloom filter
+export struct WalCmdSetSegmentStatusSealed : public WalCmd {
+    WalCmdSetSegmentStatusSealed(String db_name,
+                                 String table_name,
+                                 SegmentID segment_id,
+                                 String segment_filter_binary_data,
+                                 Vector<Pair<BlockID, String>> block_filter_binary_data)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
           segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
 
-    WalCommandType GetType() override { return WalCommandType::SET_SEGMENT_SEALED; }
+    WalCommandType GetType() override { return WalCommandType::SET_SEGMENT_STATUS_SEALED; }
 
     bool operator==(const WalCmd &other) const override;
 
@@ -248,7 +252,34 @@ export struct WalCmdSetSegmentSealed : public WalCmd {
 
     void WriteAdv(char *&buf) const override;
 
-    static WalCmdSetSegmentSealed ReadBufferAdv(char *&ptr);
+    static WalCmdSetSegmentStatusSealed ReadBufferAdv(char *&ptr);
+
+    const String db_name_{};
+    const String table_name_{};
+    const SegmentID segment_id_{};
+    const String segment_filter_binary_data_{};
+    const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
+};
+
+// used when user-defined bloom filter need to be updated
+export struct WalCmdUpdateSegmentBloomFilterData : public WalCmd {
+    WalCmdUpdateSegmentBloomFilterData(String db_name,
+                                       String table_name,
+                                       SegmentID segment_id,
+                                       String segment_filter_binary_data,
+                                       Vector<Pair<BlockID, String>> block_filter_binary_data)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
+          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+
+    WalCommandType GetType() override { return WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdUpdateSegmentBloomFilterData ReadBufferAdv(char *&ptr);
 
     const String db_name_{};
     const String table_name_{};
