@@ -20,7 +20,6 @@ import pandas as pd
 import pytest
 from numpy import dtype
 
-from common import common_type as ct
 from common import common_values
 import infinity
 import infinity.index as index

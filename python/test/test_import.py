@@ -18,7 +18,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 
-TEST_DATA_DIR = "/test/data/"
+from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv
 
 
 class TestImport:
@@ -26,7 +26,9 @@ class TestImport:
     def test_version(self):
         print(infinity.__version__)
 
-    def test_import(self):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import(self, check_data):
         """
         target: test import data to remote server
         method: connect server, create table, import data, search, drop table, disconnect
@@ -42,12 +44,13 @@ class TestImport:
         assert db_obj
 
         # import
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
         db_obj.drop_table("test_import", True)
         table_obj = db_obj.create_table(
             "test_import", {"c1": "int", "c2": "vector,3,int"}, None)
 
-        test_dir = "/tmp/infinity/test_data/"
-        test_csv_dir = test_dir + "embedding_int_dim3.csv"
+        test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
 
         res = table_obj.import_data(test_csv_dir, None)
@@ -75,12 +78,12 @@ class TestImport:
             db_obj.drop_table("test_import_different_file_format_data_fvecs")
             table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
                                             {"c1": "vector,128,float"}, None)
-            table_obj.import_data(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+            table_obj.import_data(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
             res = table_obj.output(["*"]).to_df()
             print(res)
 
-        print(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
-        table_obj.import_data(TEST_DATA_DIR + file_format + "/pysdk_test." + file_format, None)
+        print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
+        table_obj.import_data(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format, None)
         res = table_obj.output(["*"]).to_df()
         print(res)
 
@@ -97,7 +100,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_fvecs")
         table_obj = db_obj.create_table("test_import_empty_file_fvecs",
                                         {"c1": "vector,128,float"}, None)
-        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -115,7 +118,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_csv")
         table_obj = db_obj.create_table("test_import_empty_file_csv",
                                         {"c1": "int", "c2": "vector,3,int"}, None)
-        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -133,7 +136,7 @@ class TestImport:
         db_obj.drop_table("test_import_empty_file_jsonl")
         table_obj = db_obj.create_table("test_import_empty_file_jsonl",
                                         {"c1": "int", "c2": "vector,3,int"}, None)
-        table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/test_empty." + file_format)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -143,15 +146,201 @@ class TestImport:
         assert res.error_code == ErrorCode.OK
 
     # import format unrecognized data
+    @pytest.mark.skip(reason="Core dumped.")
+    @pytest.mark.parametrize("file_format", ["json", "txt", "csv"])
+    def test_import_format_unrecognized_data(self, get_infinity_db, file_format):
+        db_obj = get_infinity_db
+
+        db_obj.drop_table("test_import_format_unrecognized_data")
+        table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int"}, None)
+        table_obj.import_data(
+            os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_multi_test." + file_format)
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.skip(reason="Parser error, core dumped.")
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar", "bool",
+        # "vector, 3, float"
+    ])
+    def test_with_blank_space_delimiter_data(self, get_infinity_db, types):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_blank_space_delimiter_data")
+        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, None)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_blankspace.csv")
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.skip(reason="Parser error, core dumped.")
+    @pytest.mark.parametrize("types", [
+        "int", "int8", "int16", "int32", "int64", "integer",
+        "float", "float32", "double", "float64",
+        "varchar", "bool", "vector, 3, float"
+    ])
+    def test_with_semicolons_delimiter_data(self, get_infinity_db, types):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_blank_space_delimiter_data")
+        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, None)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_semicolons.csv")
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
     # import csv with different delimiter
+    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.parametrize("delimiter", ["blankspace", "commas", "semicolons", "tabular"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR},
+                                            {"file_name": "pysdk_test_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR},
+                                            {"file_name": "pysdk_test_semicolons.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR},
+                                            {"file_name": "pysdk_test_tabular.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_csv_with_different_delimiter(self, get_infinity_db, check_data, delimiter):
+        if not check_data:
+            copy_data("pysdk_test_" + delimiter + ".csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_csv_with_different_delimiter")
+        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": "int", "c2": "int"}, None)
+        table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_" + delimiter + ".csv")
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
     # import csv with delimiter more than one charactor
-    # import csv with headers
-    # import csv without headers
+    @pytest.mark.skip(reason="Not support yet.")
+    @pytest.mark.parametrize("delimiter", ["blankspace"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_csv_with_different_delimiter_more_than_one_charactor(self, get_infinity_db, check_data, delimiter):
+        if not check_data:
+            copy_data("pysdk_test_" + delimiter + ".csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_charactor")
+        table_obj = db_obj.create_table("test_csv_with_different_delimiter_more_than_one_charactor",
+                                        {"c1": "int", "c2": "int"}, None)
+        table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter + ".csv",
+                              options={"delimiter": " "})
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    # TODO import csv with headers
+    # TODO import csv without headers
+
     # import fvecs, when table with more columns
-    # import json, json has nested structure
+    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "test.fvecs",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_fvecs_table_with_more_columns(self, get_infinity_db, check_data):
+        if not check_data:
+            copy_data("test.fvecs")
+
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_fvecs_table_with_more_columns")
+        table_obj = db_obj.create_table("test_import_fvecs_table_with_more_columns",
+                                        {"c1": "int", "c2": "vector,128,float"})
+        with pytest.raises(Exception, match="ERROR:3037*"):
+            test_csv_dir = common_values.TEST_TMP_DIR + "test.fvecs"
+            res = table_obj.import_data(test_csv_dir, None)
+            assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    # TODO import json, json has nested structure
+
     # import file into non-existent table, dropped table
+    def test_import_into_non_existent_table(self, get_infinity_db):
+        db_obj = get_infinity_db
+
     # import table with embedding not match with the table definition.
+
     # import table with varchar not match with the table definition.
+
     # import table with 10000 columns.
+    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_int.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_10000_columns(self, get_infinity_db, check_data):
+        if not check_data:
+            generate_big_int_csv(10000, "pysdk_test_big_int.csv")
+            copy_data("pysdk_test_big_int.csv")
+
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_10000_columns")
+        table_obj = db_obj.create_table("test_import_10000_columns", {"c1": "int", "c2": "int"})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_int.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
     # import table with columns isn't matched (more and less)
+    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("columns", [
+        pytest.param({"c1": "int"}, marks=pytest.mark.xfail),
+        pytest.param({"c1": "int", "c2": "int", "c3": "int"}, marks=pytest.mark.xfail)
+    ])
+    def test_table_with_not_matched_columns(self, get_infinity_db, columns, check_data):
+        if not check_data:
+            copy_data("pysdk_test_commas.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_table_with_not_matched_columns")
+        table_obj = db_obj.create_table("test_table_with_not_matched_columns", columns)
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
     # import table with column value exceeding invalid value range
+    @pytest.mark.skip(reason="Core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_exceeding_rows(self, get_infinity_db, check_data):
+        if not check_data:
+            generate_big_rows_csv(1024*8192, "pysdk_test_big_varchar_rows.csv")
+            copy_data("pysdk_test_big_varchar_rows.csv")
+
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_exceeding_rows")
+        table_obj = db_obj.create_table("test_import_exceeding_rows", {"c1": "int", "c2": "varchar"})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_varchar_rows.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+
+    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_exceeding_columns(self, get_infinity_db, check_data):
+        generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
+        if not check_data:
+            copy_data("pysdk_test_big_columns.csv")
+
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_exceeding_columns")
+        columns = {"c" + str(i): "int" for i in range(1024)}
+        table_obj = db_obj.create_table("test_import_exceeding_columns", columns)
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_columns.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
