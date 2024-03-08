@@ -790,7 +790,7 @@ void WalManager::WalCmdUpdateSegmentBloomFilterDataReplay(const WalCmdUpdateSegm
     if (!table_status.ok()) {
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
-    auto *segment_entry = table_entry->GetSegmentByID(cmd.segment_id_, commit_ts);
+    auto segment_entry = table_entry->GetSegmentByID(cmd.segment_id_, commit_ts);
     if (!segment_entry) {
         UnrecoverableError("Wal Replay: Get segment failed");
     }

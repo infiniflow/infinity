@@ -212,12 +212,12 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, BufferManager *bu
                     // Add a catalog delta operation to set the unsealed_segment to sealed
                     // build minmax filter and optional bloom filter
                     // TODO: skip rebuild in wal?
-                    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(unsealed_segment_, buffer_mgr, txn->BeginTS());
+                    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(unsealed_segment_.get(), buffer_mgr, txn->BeginTS());
                     // delta catalog
                     {
                         String segment_filter_binary_data = unsealed_segment_->GetFastRoughFilter()->SerializeToString();
                         Vector<Pair<BlockID, String>> block_filter_binary_data = unsealed_segment_->GetBlockFilterBinaryDataVector();
-                        auto operation = MakeUnique<SetSegmentStatusSealedOp>(unsealed_segment_,
+                        auto operation = MakeUnique<SetSegmentStatusSealedOp>(unsealed_segment_.get(),
                                                                               std::move(segment_filter_binary_data),
                                                                               std::move(block_filter_binary_data));
                         txn->AddCatalogDeltaOperation(std::move(operation));
