@@ -103,6 +103,8 @@ export struct Catalog {
 public:
     explicit Catalog(SharedPtr<String> dir);
 
+    void SetTxnMgr(TxnManager *txn_mgr);
+
 public:
     // Database related functions
     Tuple<DBEntry *, Status> CreateDatabase(const String &db_name,
@@ -245,6 +247,8 @@ public:
     ProfileHistory history{DEFAULT_PROFILER_HISTORY_SIZE};
 
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
+
+    TxnManager *txn_mgr_{nullptr};
 
 private: // TODO: remove this
     std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }

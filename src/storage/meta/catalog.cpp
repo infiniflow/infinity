@@ -57,6 +57,8 @@ namespace infinity {
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)) {}
 
+void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
+
 // do not only use this method to create database
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
@@ -828,6 +830,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
         LOG_INFO("Global catalog delta entry ops is empty. Skip flush.");
         return true;
     }
+    Vector<TransactionID> flushed_txn_ids;
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
@@ -850,6 +853,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
             default:
                 break;
         }
+        flushed_txn_ids.push_back(op->txn_id());
     }
 
     // Save the global catalog delta entry to disk.
@@ -868,6 +872,15 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     outfile.close();
 
     LOG_INFO(fmt::format("Flush global catalog delta entry to: {}, size: {}.", delta_catalog_path, act_size));
+
+    if (!is_full_checkpoint) {
+        Vector<TransactionID> flushed_txn_ids;
+        for (auto &op : flush_delta_entry->operations()) {
+            flushed_txn_ids.push_back(op->txn_id());
+        }
+        txn_mgr_->RemoveWaitFlushTxns(flushed_txn_ids);
+    }
+
     return false;
 }
 

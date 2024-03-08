@@ -463,6 +463,7 @@ void Txn::CommitBottom() noexcept {
         local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
         auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
+        txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
 
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
