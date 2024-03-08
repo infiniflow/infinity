@@ -63,7 +63,7 @@ void SetSegmentStatusSealedTask::Execute() {
     {
         LOG_TRACE("SetSegmentStatusSealedTask: add sealed segment to compact candidate");
         std::function<Txn *()> generate_txn = [txn_mgr_ = this->txn_mgr_]() { return txn_mgr_->CreateTxn(); };
-        auto ret = table_entry_->AddSegment(segment_, generate_txn);
+        auto ret = table_entry_->TryCompactAddSegment(segment_, generate_txn);
         if (ret.has_value()) {
             auto &[to_compacts, txn] = *ret;
             auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);

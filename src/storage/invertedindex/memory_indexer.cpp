@@ -24,32 +24,32 @@ module;
 
 #pragma clang diagnostic pop
 
+#include <filesystem>
 #include <string.h>
 
 module memory_indexer;
 
 import stl;
 import memory_pool;
-import segment_posting;
-import index_segment_reader;
-import posting_iterator;
 import index_defines;
 import index_config;
-import index_segment_reader;
 import posting_writer;
-import data_block;
-
 import column_vector;
 import analyzer;
 import analyzer_pool;
 import term;
 import column_inverter;
 import invert_task;
-import indexer;
 import third_party;
 import ring;
+import external_sort_merger;
+import local_file_system;
+import file_writer;
+import term_meta;
+import fst;
 
 namespace infinity {
+constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
 
 bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) const {
     int ret = strcmp(lhs.c_str(), rhs.c_str());
@@ -65,6 +65,11 @@ MemoryIndexer::MemoryIndexer(u64 column_id,
       ring_inverted_(10UL), ring_sorted_(10UL) {
     posting_store_ = MakeUnique<PostingTable>(KeyComp(), byte_slice_pool_.get());
     SetAnalyzer();
+
+    // TODO need get base directory from constructor
+    String index_dir = index_config_.GetIndexName();
+    Path path = Path(index_dir) / std::to_string(column_id);
+    spill_full_path_ = path.string() + ".merge";
 }
 
 MemoryIndexer::~MemoryIndexer() { Reset(); }
@@ -134,6 +139,94 @@ void MemoryIndexer::Reset() {
     }
     thread_pool_.stop(true);
     cv_.notify_all();
+}
+
+void MemoryIndexer::OfflineDump() {
+    // Steps of offline dump:
+    // 1. External sort merge
+    // 2. Generate posting
+    // 3. Dump disk segment data
+    FinalSpillFile();
+    SortMerger<TermTuple, u16> *merger = new SortMerger<TermTuple, u16>(spill_full_path_.c_str(), num_runs_, 100000000, 2);
+    merger->Run();
+    delete merger;
+    FILE *f = fopen(spill_full_path_.c_str(), "r");
+    u64 count;
+    fread((char *)&count, sizeof(u64), 1, f);
+
+    String index_prefix; /// TODO, to be integrated
+    LocalFileSystem fs;
+    String posting_file = index_prefix + POSTING_SUFFIX;
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
+    String dict_file = index_prefix + DICT_SUFFIX;
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
+    TermMetaDumper term_meta_dumpler(index_config_.GetPostingFormatOption());
+
+    String fst_file = index_prefix + DICT_SUFFIX + ".fst";
+    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    OstreamWriter wtr(ofs);
+    FstBuilder builder(wtr);
+
+    std::string_view last_term;
+    u32 last_term_pos = 0;
+    u32 last_doc_id = INVALID_DOCID;
+    u16 record_length;
+    Deque<String> term_buffer;
+    char buf[MAX_TUPLE_LENGTH];
+    UniquePtr<PostingWriter> posting;
+    SizeT term_meta_offset = 0;
+    for (u64 i = 0; i < count; ++i) {
+        fread(&record_length, sizeof(u16), 1, f);
+        fread(buf, record_length, 1, f);
+        TermTuple tuple(buf, record_length);
+        if (tuple.term_ != last_term) {
+            term_buffer.push_back(String(tuple.term_));
+            std::string_view view(term_buffer.back());
+            last_term.swap(view);
+            if (posting.get()) {
+                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+                posting->Dump(posting_file_writer, term_meta);
+                term_meta_dumpler.Dump(dict_file_writer, term_meta);
+                builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
+                term_meta_offset = dict_file_writer->TotalWrittenBytes();
+            }
+            posting = MakeUnique<PostingWriter>(byte_slice_pool_.get(), buffer_pool_.get(), index_config_.GetPostingFormatOption());
+        }
+        if (last_doc_id != tuple.doc_id_) {
+            last_doc_id = tuple.doc_id_;
+            posting->EndDocument(last_doc_id, 0);
+        }
+        if (tuple.term_pos_ != last_term_pos) {
+            last_term_pos = tuple.term_pos_;
+            posting->AddPosition(last_term_pos);
+        }
+    }
+    if (posting->GetDF() > 0) {
+        TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+        posting->Dump(posting_file_writer, term_meta);
+        term_meta_dumpler.Dump(dict_file_writer, term_meta);
+        builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
+    }
+    dict_file_writer->Sync();
+    builder.Finish();
+    fs.AppendFile(dict_file, fst_file);
+    fs.DeleteFile(fst_file);
+
+    num_runs_ = 0;
+    std::filesystem::remove(spill_full_path_);
+}
+
+void MemoryIndexer::FinalSpillFile() {
+    fseek(spill_file_handle_, 0, SEEK_SET);
+    fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
+    fclose(spill_file_handle_);
+    tuple_count_ = 0;
+    spill_file_handle_ = nullptr;
+}
+
+void MemoryIndexer::PrepareSpillFile() {
+    spill_file_handle_ = fopen(spill_full_path_.c_str(), "w");
+    fwrite(&tuple_count_, sizeof(u64), 1, spill_file_handle_);
 }
 
 } // namespace infinity
