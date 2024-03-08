@@ -24,6 +24,9 @@ import segment_entry;
 import infinity_exception;
 import txn;
 import compaction_alg;
+import third_party;
+import logger;
+import table_entry;
 
 namespace infinity {
 
@@ -66,19 +69,21 @@ SegmentEntry *SegmentLayer::FindSegment(SegmentID segment_id) {
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kEnable) {
-        // If is disable, manual compaction is going
-        // new segment will be add after manual compaction is committed/rollback
-        return None;
-    }
-
-    int layer = AddSegmentNoCheck(new_segment);
+    int layer = AddSegmentNoCheckInner(new_segment);
     // Now: prohibit the top layer to merge
     // TODO: merge the top layer if possible
     if (layer == max_layer_ || segment_layers_[layer].LayerSize() < config_.m_) {
         return None;
     }
-    status_ = DBTStatus::kRunning; // Do have compaction
+    if (status_ == CompactionStatus::kDisable) {
+        // If is disable, manual compaction is going
+        // new segment will be add after manual compaction is committed/rollback
+        return None;
+    }
+    // trigger compaction
+    if (++running_task_n_ == 1) {
+        status_ = CompactionStatus::kRunning;
+    }
 
     Txn *txn = generate_txn();
     TransactionID txn_id = txn->TxnID();
@@ -94,10 +99,6 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::AddSegment(Segme
 
 Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kEnable) {
-        // If is disable, manual compaction is going
-        return None;
-    }
 
     auto [shrink_segment, old_layer] = FindSegmentAndLayer(segment_id);
     if (shrink_segment == nullptr) {
@@ -108,10 +109,17 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     if (old_layer == new_layer) {
         return None;
     }
-    status_ = DBTStatus::kRunning; // Do have compaction
+    if (status_ == CompactionStatus::kDisable) {
+        // If is disable, manual compaction is going
+        return None;
+    }
+    // trigger compaction
+    if (++running_task_n_ == 1) {
+        status_ = CompactionStatus::kRunning;
+    }
 
     if (new_layer >= old_layer) {
-        UnrecoverableError("Shrink segment has less rows than before");
+        UnrecoverableError("Shrink segment should has less rows than before");
     }
 
     Txn *txn = generate_txn();
@@ -124,10 +132,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     AddSegmentToHigher(compact_segments, new_layer, txn_id);
     lock.unlock();
 
-    if (compact_segments.size() == 1) {
-        this->CommitCompact(compact_segments, txn_id);
-        return MakePair(Vector<SegmentEntry *>(), std::move(txn));
-    } else if (compact_segments.empty()) {
+    if (compact_segments.empty()) {
         UnrecoverableError("Algorithm bug.");
     }
     return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
@@ -135,32 +140,37 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
 
 void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Commit compact when compaction not running");
+    if (status_ != CompactionStatus::kRunning) {
+        UnrecoverableError(fmt::format("Wrong status of compaction alg: {}", (u8)status_));
     }
 
     for (auto &segment_layer : segment_layers_) {
         segment_layer.CommitCompact(commit_txn_id);
     }
     for (auto *new_segment : new_segments) {
-        AddSegmentNoCheck(new_segment);
+        this->AddSegmentNoCheckInner(new_segment);
     }
-    status_ = DBTStatus::kEnable;
+    if (--running_task_n_ == 0) {
+        status_ = CompactionStatus::kEnable;
+    }
+    cv_.notify_one();
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kRunning) {
-        UnrecoverableError("Rollback compact when compaction not running");
+    if (status_ != CompactionStatus::kRunning) {
+        UnrecoverableError(fmt::format("Rollback compact when compaction not running, {}", (u8)status_));
     }
 
     for (auto &segment_layer : segment_layers_) {
         segment_layer.RollbackCompact(rollback_txn_id);
     }
-    status_ = DBTStatus::kEnable;
+    if (--running_task_n_ == 0) {
+        status_ = CompactionStatus::kEnable;
+    }
 }
 
-int DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
+int DBTCompactionAlg::AddSegmentNoCheckInner(SegmentEntry *new_segment) {
     SegmentOffset new_row_cnt = new_segment->actual_row_count();
     int layer = config_.CalculateLayer(new_row_cnt);
     if (layer >= (int)segment_layers_.size()) {
@@ -204,20 +214,34 @@ Pair<SegmentEntry *, int> DBTCompactionAlg::FindSegmentAndLayer(SegmentID segmen
 // Must be called when all segments are not compacting
 void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     std::unique_lock lock(mtx_);
-    if (status_ != DBTStatus::kDisable) {
-        UnrecoverableError("Enable compaction when compaction not disable");
+    if (status_ != CompactionStatus::kDisable) {
+        UnrecoverableError(fmt::format("Enable compaction when compaction not disable, {}", (u8)status_));
     }
-    segment_layers_.clear();
     for (auto *segment_entry : segment_entries) {
-        AddSegmentNoCheck(segment_entry);
+        this->AddSegmentNoCheckInner(segment_entry);
     }
-    status_ = DBTStatus::kEnable;
+    status_ = CompactionStatus::kEnable;
+    cv_.notify_one();
 }
 
 void DBTCompactionAlg::Disable() {
     std::unique_lock lock(mtx_);
-    cv_.wait(lock, [this]() { return status_ != DBTStatus::kRunning; });
-    status_ = DBTStatus::kDisable;
+    cv_.wait(lock, [this]() {
+        bool res = (status_ == CompactionStatus::kEnable);
+        if (!res) {
+            LOG_WARN(fmt::format("table {} is auto compacting now. wait", *(table_entry_->TableEntryDir())));
+        }
+        return res;
+    });
+    segment_layers_.clear();
+    status_ = CompactionStatus::kDisable;
+}
+
+void DBTCompactionAlg::AddSegmentNoCheck(SegmentEntry *new_segment) {
+    if (status_ != CompactionStatus::kEnable) {
+        UnrecoverableError(fmt::format("Called when compaction not enable, {}", (u8)status_));
+    }
+    AddSegmentNoCheckInner(new_segment);
 }
 
 } // namespace infinity

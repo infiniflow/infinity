@@ -70,9 +70,10 @@ TableEntry::TableEntry(bool is_delete,
     txn_id_ = txn_id;
 
     // SetCompactionAlg(nullptr);
-    SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY));
-    Vector<SegmentEntry *> segments = this->PickCompactSegments();
-    compaction_alg_->Enable(segments);
+    if (!is_delete) {
+        this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
+        compaction_alg_->Enable({});
+    }
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
@@ -317,14 +318,26 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     for (auto &[new_segment, old_segments] : compact_store.segment_data_) {
         auto status = CommitSegment(commit_ts, new_segment);
         if (!status.ok()) {
-            // TODO: rollback
-            return status;
+            UnrecoverableError(fmt::format("Commit new segment {} failed.", new_segment->segment_id()));
         }
     }
     {
+        {
+            String ss = "Compact commit: " + *this->GetTableName();
+            for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
+                ss += ", new segment: " + std::to_string(new_segment->segment_id_) + ", old segment: ";
+                for (const auto *old_segment : old_segments) {
+                    ss += std::to_string(old_segment->segment_id_) + " ";
+                }
+            }
+            LOG_INFO(ss);
+        }
         std::unique_lock lock(this->rw_locker());
         for (const auto &[new_segment, old_segments] : compact_store.segment_data_) {
-            this->segment_map_.emplace(new_segment->segment_id_, new_segment);
+            auto [_, insert_ok] = this->segment_map_.emplace(new_segment->segment_id_, new_segment);
+            if (!insert_ok) {
+                UnrecoverableError(fmt::format("Insert new segment {} failed.", new_segment->segment_id()));
+            }
             for (const auto &old_segment : old_segments) {
                 old_segment->SetDeprecated(commit_ts);
             }
@@ -342,10 +355,12 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
             compaction_alg_->CommitCompact(new_segments, txn_id);
+            LOG_INFO(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
         case CompactSegmentsTaskType::kCompactTable: {
             //  reinitialize compaction_alg_ with new segments and enable it
+            LOG_INFO(fmt::format("Compact commit whole, tablename: {}", *this->GetTableName()));
             compaction_alg_->Enable(new_segments);
             break;
         }
@@ -615,14 +630,27 @@ bool TableEntry::CheckDeleteConflict(const Vector<RowID> &delete_row_ids, Transa
     return SegmentEntry::CheckDeleteConflict(std::move(check_segments), txn_id);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::AddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
+void TableEntry::WalReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
+    this->DeltaReplaySegment(std::move(segment_entry));
+    // ATTENTION: focusing on the segment id
+    next_segment_id_++;
+}
+
+void TableEntry::DeltaReplaySegment(SharedPtr<SegmentEntry> segment_entry) {
+    if (compaction_alg_.get() != nullptr) {
+        compaction_alg_->AddSegmentNoCheck(segment_entry.get());
+    }
+    segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
+}
+
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactAddSegment(SegmentEntry *new_segment, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
     return compaction_alg_->AddSegment(new_segment, generate_txn);
 }
 
-Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::DeleteInSegment(SegmentID segment_id, std::function<Txn *()> generate_txn) {
+Optional<Pair<Vector<SegmentEntry *>, Txn *>> TableEntry::TryCompactDeleteRow(SegmentID segment_id, std::function<Txn *()> generate_txn) {
     if (compaction_alg_.get() == nullptr) {
         return None;
     }
@@ -653,10 +681,13 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
         std::unique_lock lock(this->rw_locker());
         TxnTimeStamp visible_ts = scanner->visible_ts();
         for (auto iter = segment_map_.begin(); iter != segment_map_.end();) {
-            SharedPtr<SegmentEntry> &segment = iter->second;
+            SegmentEntry *segment = iter->second.get();
+            // If segment is visible by txn, txn.begin_ts < segment.deprecate_ts
+            // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
+            // So the used segment will not be cleaned up.
             if (segment->CheckDeprecate(visible_ts)) {
                 cleanup_segment_ids.push_back(iter->first);
-                scanner->AddEntry(std::move(segment));
+                scanner->AddEntry(std::move(iter->second));
                 iter = segment_map_.erase(iter);
             } else {
                 ++iter;

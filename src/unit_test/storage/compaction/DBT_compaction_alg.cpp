@@ -245,7 +245,18 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         EXPECT_TRUE(ret.has_value());
         auto [segments, txn] = ret.value();
         txn->Begin();
-        EXPECT_EQ(segments.size(), 0u); // the delete trigger layer change but no compaction
+        TransactionID txn_id = txn->TxnID();
+        auto compacted_segments = MockSegmentEntry::MockCompact(segments);
+        EXPECT_EQ(compacted_segments.size(), 1u);
+        segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
+        EXPECT_EQ(compacted_segments[0]->actual_row_count(), 1u);
+        {
+            Vector<SegmentEntry *> tmp;
+            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
+                return segment.get();
+            });
+            DBTCompact.CommitCompact(tmp, txn_id);
+        }
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -402,7 +413,7 @@ TEST_F(DBTCompactionTest, RollbackTest) {
 
     // {1, 2, 2, 3, 5, 3, 6};
     Vector<SharedPtr<SegmentEntry>> segment_entries; // hold lifetime
-    MockSegmentEntry *shrink_segment = nullptr;         // the segment in layer[1]
+    MockSegmentEntry *shrink_segment = nullptr;      // the segment in layer[1]
     {
         auto segment_entry = MockSegmentEntry::Make(1);
         segment_entries.emplace_back(segment_entry);

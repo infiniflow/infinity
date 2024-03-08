@@ -112,6 +112,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
         return status;
     }
     if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
+        LOG_WARN(fmt::format("Rollback delete in table {} due to conflict.", table_name));
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
@@ -126,15 +127,9 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
     return delete_status;
 }
 
-Status Txn::Compact(const String &db_name,
-                    const String &table_name,
-                    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
-                    CompactSegmentsTaskType type) {
-    auto [table_entry, status] = GetTableEntry(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
-
+Status
+Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
+    const String &table_name = *table_entry->GetTableName();
     TxnTableStore *table_store{nullptr};
     if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
         txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
@@ -470,7 +465,7 @@ void Txn::CommitBottom() noexcept {
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
     }
 
-    LOG_INFO(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
+    LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(lock_);

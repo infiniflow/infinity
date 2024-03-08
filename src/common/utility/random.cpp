@@ -42,19 +42,19 @@ String RandomString(SizeT len) {
 
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
     LocalFileSystem fs;
-    SharedPtr<String> result;
-    // int cnt = 0;
+    String result;
+    int cnt = 0;
     static bool initialized = false;
+    if (!initialized) {
+        initialized = true;
+        srand(std::time(nullptr));
+    }
     do {
-        if (!initialized) {
-            initialized = true;
-            srand(std::time(nullptr));
-        }
-        result = MakeShared<String>(fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name));
-        // ++cnt;
-    } while (!fs.CreateDirectoryNoExp(*result));
-    // LOG_WARN(fmt::format("Generate path time: {}", cnt));
-    return result;
+        result = fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name);
+        ++cnt;
+    } while (!fs.CreateDirectoryNoExp(result));
+    LOG_TRACE(fmt::format("Generate path {} time: {}", result, cnt));
+    return MakeShared<String>(std::move(result));
 }
 
 } // namespace infinity

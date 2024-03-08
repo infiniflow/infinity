@@ -56,8 +56,8 @@ void FileWorker::WriteToFile(bool to_spill) {
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
     if (to_spill) {
-        auto local_file_handle_ = static_cast<LocalFileHandler *>(file_handler_.get());
-        LOG_WARN(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle_->fd_));
+        auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
+        LOG_WARN(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
     }
     bool prepare_success = false;
     DeferFn defer_fn([&]() {
