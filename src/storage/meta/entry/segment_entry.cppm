@@ -172,6 +172,7 @@ public:
             case SegmentStatus::kSealed:
             case SegmentStatus::kCompacting:
             case SegmentStatus::kNoDelete:
+            case SegmentStatus::kForbidCleanup:
             case SegmentStatus::kDeprecated: {
                 return true;
             }
