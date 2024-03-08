@@ -171,8 +171,7 @@ public:
     [[nodiscard]] inline bool MayInRange(ColumnID column_id, const Value &value, FilterCompareType compare_type) const {
         return std::visit(Overload{[column_id](const std::monostate &empty) -> bool {
                                        UnrecoverableError(fmt::format("BUG: No InnerMinMaxDataFilter for column_id: {}", column_id));
-                                       // No filter, cannot decide if value does not exist.
-                                       // Always return true.
+                                       // Should always have minmax filter for sealed segment
                                        return true;
                                    },
                                    [&value, compare_type]<typename T>(const InnerMinMaxDataFilterT<T> &filter) -> bool {

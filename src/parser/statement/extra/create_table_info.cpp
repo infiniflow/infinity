@@ -28,6 +28,11 @@ CreateTableInfo::~CreateTableInfo() {
         table_constraint = nullptr;
     }
 
+    for (auto *&property : properties_) {
+        delete property;
+        property = nullptr;
+    }
+
     if (select_ != nullptr) {
         delete select_;
         select_ = nullptr;

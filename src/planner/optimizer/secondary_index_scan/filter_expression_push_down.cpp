@@ -447,14 +447,14 @@ class FastRoughFilterEvaluatorTrue final : public FastRoughFilterEvaluator {
 public:
     FastRoughFilterEvaluatorTrue() = default;
     ~FastRoughFilterEvaluatorTrue() final = default;
-    bool EvaluateInner(const FastRoughFilter &) const final { return true; }
+    bool EvaluateInner(TxnTimeStamp, const FastRoughFilter &) const final { return true; }
 };
 
 class FastRoughFilterEvaluatorFalse final : public FastRoughFilterEvaluator {
 public:
     FastRoughFilterEvaluatorFalse() = default;
     ~FastRoughFilterEvaluatorFalse() final = default;
-    bool EvaluateInner(const FastRoughFilter &) const final { return false; }
+    bool EvaluateInner(TxnTimeStamp, const FastRoughFilter &) const final { return false; }
 };
 
 class FastRoughFilterEvaluatorCombineAnd final : public FastRoughFilterEvaluator {
@@ -465,7 +465,9 @@ public:
     FastRoughFilterEvaluatorCombineAnd(UniquePtr<FastRoughFilterEvaluator> left, UniquePtr<FastRoughFilterEvaluator> right)
         : left_(std::move(left)), right_(std::move(right)) {}
     ~FastRoughFilterEvaluatorCombineAnd() final = default;
-    bool EvaluateInner(const FastRoughFilter &filter) const final { return left_->EvaluateInner(filter) and right_->EvaluateInner(filter); }
+    bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const final {
+        return left_->EvaluateInner(query_ts, filter) and right_->EvaluateInner(query_ts, filter);
+    }
 };
 
 class FastRoughFilterEvaluatorCombineOr final : public FastRoughFilterEvaluator {
@@ -476,7 +478,9 @@ public:
     FastRoughFilterEvaluatorCombineOr(UniquePtr<FastRoughFilterEvaluator> left, UniquePtr<FastRoughFilterEvaluator> right)
         : left_(std::move(left)), right_(std::move(right)) {}
     ~FastRoughFilterEvaluatorCombineOr() final = default;
-    bool EvaluateInner(const FastRoughFilter &filter) const final { return left_->EvaluateInner(filter) or right_->EvaluateInner(filter); }
+    bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const final {
+        return left_->EvaluateInner(query_ts, filter) or right_->EvaluateInner(query_ts, filter);
+    }
 };
 
 // fast "equal" filter
@@ -487,7 +491,7 @@ class FastRoughFilterEvaluatorProbabilisticDataFilter final : public FastRoughFi
 public:
     FastRoughFilterEvaluatorProbabilisticDataFilter(ColumnID column_id, Value value) : column_id_(column_id), value_(std::move(value)) {}
     ~FastRoughFilterEvaluatorProbabilisticDataFilter() final = default;
-    bool EvaluateInner(const FastRoughFilter &filter) const final { return filter.MayContain(column_id_, value_); }
+    bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const final { return filter.MayContain(query_ts, column_id_, value_); }
 };
 
 // fast "range" filter
@@ -500,7 +504,9 @@ public:
     FastRoughFilterEvaluatorMinMaxFilter(ColumnID column_id, Value value, FilterCompareType compare_type)
         : column_id_(column_id), value_(std::move(value)), compare_type_(compare_type) {}
     ~FastRoughFilterEvaluatorMinMaxFilter() final = default;
-    bool EvaluateInner(const FastRoughFilter &filter) const final { return filter.MayInRange(column_id_, value_, compare_type_); }
+    bool EvaluateInner(TxnTimeStamp query_ts, const FastRoughFilter &filter) const final {
+        return filter.MayInRange(column_id_, value_, compare_type_);
+    }
 };
 
 class FastRoughFilterExpressionPushDownMethod {

@@ -43,7 +43,6 @@ import compact_segments_task;
 import cleanup_scanner;
 import background_process;
 import wal_entry;
-import set_segment_status_sealed_task;
 
 namespace infinity {
 
@@ -117,52 +116,17 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
     return segment_entry;
 }
 
-void SegmentEntry::SetSealing() {
+void SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("SetSealing only accept unsealed segment");
+        UnrecoverableError("SetSealed failed");
     }
-    status_ = SegmentStatus::kSealing;
-}
-
-// will only be called in TableEntry::Append
-// txn_mgr: nullptr if in wal replay, need to skip and recover sealing tasks after replay
-// task: step 1. wait for status change from unsealed to sealing in CommitAppend in TxnTableStore::Commit() in Txn::CommitBottom()
-//       step 2. create txn (sealing task), build bloomfilter and minmax filter, set sealed status
-void SegmentEntry::CreateTaskSetSegmentStatusSealed(TableEntry *table_entry, TxnManager *txn_mgr) {
-    if (status() != SegmentStatus::kUnsealed) {
-        UnrecoverableError("CreateTaskSetSegmentStatusSealed only accept segment of kUnsealed status");
-    }
-    // wal replay case
-    if (!txn_mgr) {
-        LOG_TRACE("SegmentEntry::CreateTaskSetSegmentStatusSealed: in wal, skip create task for new sealing segment created by append");
-        return;
-    }
-    SetSegmentStatusSealedTask::CreateAndSubmitTask(this, table_entry, txn_mgr);
-}
-
-void SegmentEntry::FinishTaskSetSegmentStatusSealed(SegmentStatus prev_status) {
-    switch (prev_status) {
-        case SegmentStatus::kSealing: {
-            std::unique_lock lock(rw_locker_);
-            if (status_ != SegmentStatus::kSealing) {
-                UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status mismatch");
-            }
-            status_ = SegmentStatus::kSealed;
-            break;
-        }
-        case SegmentStatus::kSealed: {
-            break;
-        }
-        default: {
-            UnrecoverableError("FinishTaskSetSegmentStatusSealed: segment status unexpected");
-        }
-    }
+    status_ = SegmentStatus::kSealed;
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock lock(rw_locker_);
-    if (!FinishedSealingTask()) {
+    if (status_ == SegmentStatus::kUnsealed) {
         UnrecoverableError("Assert: Compactable segment should be sealed.");
     }
     if (status_ != SegmentStatus::kSealed) {
@@ -412,7 +376,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_
         json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
         json_res["txn_id"] = TransactionID(this->txn_id_);
         json_res["status"] = static_cast<std::underlying_type_t<SegmentStatus>>(this->status_);
-        if (FinishedSealingTask()) {
+        if (status_ != SegmentStatus::kUnsealed) {
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: Begin try to save FastRoughFilter to json file"));
             this->GetFastRoughFilter()->SaveToJsonFile(json_res);
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: End try to save FastRoughFilter to json file"));
@@ -452,12 +416,11 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
         }
     }
 
-    if (segment_entry->FinishedSealingTask()) {
-        // if segment is sealed, we need to load FastRoughFilter from json file
+    if (segment_entry->status_ != SegmentStatus::kUnsealed) {
         if (segment_entry->GetFastRoughFilter()->LoadFromJsonFile(segment_entry_json)) {
             LOG_TRACE("SegmentEntry::Deserialize: Finish load FastRoughFilter from json file");
         } else {
-            UnrecoverableError("SegmentEntry::Deserialize: Cannot load FastRoughFilter from json file");
+            LOG_TRACE("SegmentEntry::Deserialize: Cannot load FastRoughFilter from json file");
         }
     }
 
@@ -505,10 +468,13 @@ Vector<Pair<BlockID, String>> SegmentEntry::GetBlockFilterBinaryDataVector() con
     return block_filter_binary_data_vector;
 }
 
-void SegmentEntry::WalLoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
+// used in:
+// 1. record minmax filter and optional bloom filter created for sealed segment created by append, import and compact
+// 2. record optional bloom filter created by requirement when the properties of the table is changed ? (maybe will support it in the future)
+void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data, const Vector<Pair<BlockID, String>> &block_filter_data) {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kSealed) {
-        UnrecoverableError("WalLoadFilterBinaryData only accept segment of kSealed status");
+    if (status_ == SegmentStatus::kUnsealed) {
+        UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
     for (const auto &[block_id, block_filter] : block_filter_data) {

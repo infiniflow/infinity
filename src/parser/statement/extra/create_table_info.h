@@ -41,6 +41,8 @@ public:
     std::vector<ColumnDef *> column_defs_{};
     std::vector<TableConstraint *> constraints_{};
 
+    std::vector<infinity::InitParameter *> properties_{};
+
     SelectStatement *select_{nullptr};
 };
 

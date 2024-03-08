@@ -17,7 +17,7 @@ module background_process;
 import stl;
 import bg_task;
 import compact_segments_task;
-import set_segment_status_sealed_task;
+import update_segment_bloom_filter_task;
 import cleanup_task;
 import logger;
 import blocking_queue;
@@ -82,8 +82,8 @@ void BGTaskProcessor::Process() {
                 task->Execute();
                 break;
             }
-            case BGTaskType::kSetSegmentStatusSealed: {
-                auto *task = static_cast<SetSegmentStatusSealedTask *>(bg_task.get());
+            case BGTaskType::kUpdateSegmentBloomFilterData: {
+                auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
                 task->Execute();
                 break;
             }
