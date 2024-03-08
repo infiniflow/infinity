@@ -30,6 +30,7 @@ import txn;
 import default_values;
 import table_entry;
 import catalog;
+import catalog_delta_entry;
 import internal_types;
 import data_type;
 import background_process;
@@ -163,10 +164,10 @@ void TxnTableStore::PrepareCommit() {
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), txn_->CommitTS()));
-        Catalog::CommitCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+        Catalog::CommitCompact(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), compact_state_);
     }
 
-    Catalog::Delete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::Delete(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), delete_state_);
     Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
@@ -194,8 +195,8 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         bg_task_processor->Submit(std::move(compact_task));
     }
     for (SegmentID segment_id : append_state_->set_sealed_segments_) {
-        auto *sealed_segment = table_entry_->GetSegmentByID(segment_id, txn_->CommitTS());
-        auto ret = table_entry_->TryCompactAddSegment(sealed_segment, generate_txn);
+        auto sealed_segment = table_entry_->GetSegmentByID(segment_id, txn_->CommitTS());
+        auto ret = table_entry_->TryCompactAddSegment(sealed_segment.get(), generate_txn);
         if (!ret.has_value()) {
             continue;
         }

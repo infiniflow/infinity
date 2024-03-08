@@ -272,7 +272,8 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
 
         checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
-            UnrecoverableError("BlockEntry is empty at checkpoint_ts!");
+            LOG_TRACE(fmt::format("Block entry {} is empty at checkpoint_ts {}", this->block_id_, checkpoint_ts));
+            return;
         }
         const Vector<TxnTimeStamp> &deleted = this->block_version_->deleted_;
         if (checkpoint_row_count <= this->checkpoint_row_count_) {
@@ -301,7 +302,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     FlushData(checkpoint_row_count);
     this->checkpoint_ts_ = checkpoint_ts;
     this->checkpoint_row_count_ = checkpoint_row_count;
-    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed", this->segment_entry_->segment_id(), this->block_id_));
+    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed {} rows", this->segment_entry_->segment_id(), this->block_id_, this->checkpoint_row_count_));
     return;
 }
 
@@ -316,7 +317,7 @@ void BlockEntry::Cleanup() {
 }
 
 // TODO: introduce BlockColumnMeta
-nlohmann::json BlockEntry::Serialize(TxnTimeStamp) {
+nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
 

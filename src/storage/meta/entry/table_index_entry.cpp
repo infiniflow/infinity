@@ -124,9 +124,10 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
     return table_index_entry;
 }
 
+
 SharedPtr<TableIndexEntry>
 TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
-    auto dropped_index_entry = MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
+    auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
     if (txn_mgr) {
         auto *txn = txn_mgr->GetTxn(txn_id);
         auto &index_name = *table_index_meta->index_name();
@@ -137,7 +138,7 @@ TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, Transa
 
 SharedPtr<TableIndexEntry>
 TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return MakeShared<TableIndexEntry>(table_index_meta, txn_id, begin_ts);
+    return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
 }
 
 // For segment_index_entry

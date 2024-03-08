@@ -463,6 +463,7 @@ void Txn::CommitBottom() noexcept {
         local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
         auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
         bg_task_processor_->Submit(catalog_delta_ops_merge_task);
+        txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
 
     LOG_TRACE(fmt::format("Txn: {} is committed. commit ts: {}", txn_id_, commit_ts));
@@ -569,7 +570,9 @@ void Txn::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entr
 void Txn::DropTableStore(TableEntry *dropped_table_entry) {
     if (txn_tables_.contains(dropped_table_entry)) {
         txn_tables_.erase(dropped_table_entry);
-        dropped_table_entry->Cleanup();
+        if (catalog_->CheckAllowCleanup(dropped_table_entry)) {
+            dropped_table_entry->Cleanup();
+        }
     } else {
         txn_tables_.insert(dropped_table_entry);
     }

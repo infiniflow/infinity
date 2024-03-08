@@ -77,6 +77,7 @@ export class CatalogDeltaOperation {
 public:
     CatalogDeltaOperation() = default;
     explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
+    explicit CatalogDeltaOperation(CatalogDeltaOpType type, bool is_delete) : is_delete_(is_delete), type_(type) {}
     explicit CatalogDeltaOperation(CatalogDeltaOpType type, TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts)
         : begin_ts_(begin_ts), txn_id_(txn_id), commit_ts_(commit_ts), is_delete_(is_delete), type_(type) {}
     virtual ~CatalogDeltaOperation() = default;
@@ -108,7 +109,7 @@ public:
     TxnTimeStamp begin_ts() { return begin_ts_; }
     TransactionID txn_id() { return txn_id_; }
     TxnTimeStamp commit_ts() { return commit_ts_; }
-    bool is_delete() { return is_delete_; }
+    bool is_delete() const { return is_delete_; }
 
 public:
     TxnTimeStamp begin_ts_{0};
@@ -202,7 +203,8 @@ public:
     explicit AddDBEntryOp(TxnTimeStamp begin_ts, bool is_delete, TransactionID txn_id, TxnTimeStamp commit_ts, String db_name, String db_entry_dir)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           db_entry_dir_(std::move(db_entry_dir)) {}
-    explicit AddDBEntryOp(SharedPtr<DBEntry> db_entry) : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY), db_entry_(db_entry) {}
+    explicit AddDBEntryOp(SharedPtr<DBEntry> db_entry, bool is_delete)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, is_delete), db_entry_(db_entry) {}
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_DATABASE_ENTRY; }
     String GetTypeStr() const final { return "ADD_DATABASE_ENTRY"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
@@ -256,8 +258,8 @@ public:
           db_name_(MakeShared<String>(std::move(db_name))), table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)),
           column_defs_(column_defs), row_count_(row_count) {}
 
-    explicit AddTableEntryOp(SharedPtr<TableEntry> table_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY), table_entry_(table_entry), db_name_(table_entry->GetDBName()) {}
+    explicit AddTableEntryOp(SharedPtr<TableEntry> table_entry, bool is_delete)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, is_delete), table_entry_(table_entry), db_name_(table_entry->GetDBName()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
     String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
@@ -626,8 +628,8 @@ public:
           db_name_(MakeShared<String>(std::move(db_name))), table_name_(MakeShared<String>(std::move(table_name))),
           index_name_(MakeShared<String>(std::move(index_name))), index_dir_(std::move(index_dir)), index_base_(std::move(index_base)) {}
 
-    explicit AddTableIndexEntryOp(SharedPtr<TableIndexEntry> table_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY), table_index_entry_(table_index_entry),
+    explicit AddTableIndexEntryOp(SharedPtr<TableIndexEntry> table_index_entry, bool is_delete = false)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY, is_delete), table_index_entry_(table_index_entry),
           db_name_(table_index_entry->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(table_index_entry->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(table_index_entry->table_index_meta()->index_name()) {}
@@ -639,7 +641,9 @@ public:
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
         total_size += sizeof(i32) + this->index_dir_.size();
-        total_size += this->index_base_->GetSizeInBytes();
+        if (!is_delete()) {
+            total_size += this->index_base_->GetSizeInBytes();
+        }
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -682,8 +686,8 @@ public:
           db_name_(MakeShared<String>(std::move(db_name))), table_name_(MakeShared<String>(std::move(table_name))),
           index_name_(MakeShared<String>(std::move(index_name))), index_dir_(std::move(index_dir)) {}
 
-    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> fulltext_index_entry)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY), fulltext_index_entry_(fulltext_index_entry),
+    explicit AddFulltextIndexEntryOp(SharedPtr<FulltextIndexEntry> fulltext_index_entry, bool is_delete = false)
+        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY, is_delete), fulltext_index_entry_(fulltext_index_entry),
           db_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetDBName()),
           table_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->GetTableEntry()->GetTableName()),
           index_name_(fulltext_index_entry->table_index_entry()->table_index_meta()->index_name()) {}

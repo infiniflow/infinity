@@ -71,6 +71,10 @@ public:
 
     void RollBackTxn(Txn *txn);
 
+    void AddWaitFlushTxn(TransactionID txn_id);
+
+    void RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids);
+
     TxnTimeStamp GetMinUncommitTs();
 
 private:
@@ -91,6 +95,7 @@ private:
     TxnTimeStamp start_ts_{};        // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
     Map<TxnTimeStamp, TransactionID> ts_map_{};
+    HashSet<TransactionID> wait_flush_txns_{};
 
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
