@@ -212,17 +212,17 @@ class TestImport:
         res = table_obj.output(["*"]).to_df()
         print(res)
 
-    # import csv with delimiter more than one charactor
+    # import csv with delimiter more than one character
     @pytest.mark.skip(reason="Not support yet.")
     @pytest.mark.parametrize("delimiter", ["blankspace"])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_csv_with_different_delimiter_more_than_one_charactor(self, get_infinity_db, check_data, delimiter):
+    def test_csv_with_different_delimiter_more_than_one_character(self, get_infinity_db, check_data, delimiter):
         if not check_data:
             copy_data("pysdk_test_" + delimiter + ".csv")
         db_obj = get_infinity_db
-        db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_charactor")
-        table_obj = db_obj.create_table("test_csv_with_different_delimiter_more_than_one_charactor",
+        db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_character")
+        table_obj = db_obj.create_table("test_csv_with_different_delimiter_more_than_one_character",
                                         {"c1": "int", "c2": "int"}, None)
         table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter + ".csv",
                               options={"delimiter": " "})
