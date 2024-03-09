@@ -15,6 +15,7 @@
 #include "unit_test/base_test.h"
 #include <cstdint>
 #include <random>
+#include "../../../../storage/knn_index/knn_hnsw/header.h"
 
 import dist_func_l2;
 import hnsw_simd_func;
@@ -63,7 +64,8 @@ TEST_F(DistFuncTest, test1) {
     for (size_t i = 0; i < vec_n; ++i) {
         auto v1 = vecs1.get() + i * dim;
         auto v2 = vecs2.get() + i * dim;
-        int32_t res = I8IPAVXResidual(v1, v2, dim);
+
+        int32_t res = I8IPSSEResidual(v1, v2, dim);
         int32_t res2 = I8IPTest(v1, v2, dim);
         EXPECT_EQ(res, res2);
     }
