@@ -115,10 +115,12 @@ def trace_unhandled_exceptions(func):
 def work(query_vec, topk, metric_type, column_name, data_type, table_name="sift_benchmark"):
     conn = ThriftInfinityClient(REMOTE_HOST)
     table = RemoteTable(conn, "default", table_name)
+    # table.knn(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
     query_builder.knn(column_name, query_vec, data_type, metric_type, topk)
     query_builder.to_result()
+    conn.disconnect()
 
 
 def fvecs_read(filename):
