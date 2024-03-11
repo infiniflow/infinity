@@ -28,11 +28,11 @@ ColumnIndexMerger::~ColumnIndexMerger() {}
 
 SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(memory_pool_, buffer_pool_); }
 
-void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<docid_t> &base_docids, const String &target_base_name) {
-    Path path = Path(index_dir_) / target_base_name;
-    String dict_file = path.string();
+void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<docid_t> &base_docids, const String &dst_base_name) {
+    Path path = Path(index_dir_) / dst_base_name;
+    String index_prefix = path.string();
+    String dict_file = index_prefix + DICT_SUFFIX;
     String fst_file = dict_file + DICT_SUFFIX + ".fst";
-    dict_file.append(DICT_SUFFIX);
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, dict_file, 1024);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     String posting_file = path.string();
@@ -56,6 +56,10 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<doc
         term_meta_offset = dict_file_writer->TotalWrittenBytes();
         term_posting_queue.MoveToNextTerm();
     }
+    dict_file_writer->Sync();
+    fst_builder.Finish();
+    fs_.AppendFile(dict_file, fst_file);
+    fs_.DeleteFile(fst_file);
     memory_pool_->Release();
     buffer_pool_->Release();
 }

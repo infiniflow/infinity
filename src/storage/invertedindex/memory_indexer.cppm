@@ -59,9 +59,12 @@ public:
     void Commit();
 
     // Dump is blocking and shall be called only once after inserting all documents.
+    // WARN: Don't reuse MemoryIndexer after calling Dump!
     void Dump();
 
     docid_t GetBaseDocId() const { return base_doc_id_; }
+
+    u32 GetDocCount() const { return doc_count_; }
 
     Analyzer *GetAnalyzer() { return analyzer_.get(); }
 
