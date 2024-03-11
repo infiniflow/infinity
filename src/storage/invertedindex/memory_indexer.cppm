@@ -22,7 +22,6 @@ import memory_pool;
 import index_defines;
 import posting_writer;
 import column_vector;
-import analyzer;
 import column_inverter;
 import third_party;
 import internal_types;
@@ -36,15 +35,14 @@ public:
         bool operator()(const String &lhs, const String &rhs) const;
     };
 
-    using TermKey = String;
     using PostingPtr = SharedPtr<PostingWriter>;
-    using PostingTable = SkipList<TermKey, PostingPtr, KeyComp>;
+    using PostingTable = SkipList<String, PostingPtr, KeyComp>;
 
     MemoryIndexer(const String &index_dir,
                   const String &base_name,
                   docid_t base_doc_id,
-                  const String &analyzer,
                   optionflag_t flag,
+                  const String &analyzer,
                   MemoryPool &byte_slice_pool,
                   RecyclePool &buffer_pool,
                   ThreadPool &thread_pool);
@@ -66,15 +64,11 @@ public:
 
     u32 GetDocCount() const { return doc_count_; }
 
-    Analyzer *GetAnalyzer() { return analyzer_.get(); }
-
-    bool IsJiebaSpecialize() { return jieba_specialize_; }
-
     MemoryPool *GetPool() { return &byte_slice_pool_; }
 
     PostingTable *GetPostingTable() { return posting_store_.get(); }
 
-    PostingPtr GetOrAddPosting(const TermKey &term);
+    SharedPtr<PostingWriter> GetOrAddPosting(const String &term);
 
     void Reset();
 
@@ -95,11 +89,10 @@ private:
     String base_name_;
     docid_t base_doc_id_{INVALID_DOCID};
     optionflag_t flag_;
+    String analyzer_;
     MemoryPool &byte_slice_pool_;
     RecyclePool &buffer_pool_;
     ThreadPool &thread_pool_;
-    UniquePtr<Analyzer> analyzer_;
-    bool jieba_specialize_{false};
     u32 doc_count_{0};
     UniquePtr<PostingTable> posting_store_;
 
