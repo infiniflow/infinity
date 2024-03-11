@@ -209,9 +209,9 @@ public:
     // Serialization and Deserialization
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
-    void SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts);
+    UniquePtr<String> SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
-    bool FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 

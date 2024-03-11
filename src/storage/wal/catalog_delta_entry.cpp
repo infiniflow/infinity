@@ -654,8 +654,8 @@ const String UpdateSegmentBloomFilterDataOp::ToString() const {
     return fmt::format("UpdateSegmentBloomFilterDataOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
 }
 
-void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    this->segment_entry_->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
+    this->segment_entry_->FlushDataToDisk(max_commit_ts);
     LOG_TRACE("Segment has flushed to disk, now try set to deprecated if it was compacted before");
     this->segment_entry_->TrySetDeprecated();
 }

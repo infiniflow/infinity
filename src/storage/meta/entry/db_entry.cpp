@@ -206,11 +206,15 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_check
 UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr) {
     nlohmann::json json_res;
 
-    SharedPtr<String> db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
+    bool deleted = db_entry_json["deleted"];
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
     TransactionID txn_id = db_entry_json["txn_id"];
     u64 begin_ts = db_entry_json["begin_ts"];
-    bool deleted = db_entry_json["deleted"];
+
+    SharedPtr<String> db_entry_dir{};
+    if(!deleted) {
+        db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
+    }
     UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];

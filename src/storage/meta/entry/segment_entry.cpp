@@ -479,7 +479,7 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
     return segment_entry;
 }
 
-void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
+void SegmentEntry::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     auto block_entry_iter = BlockEntryIter(this);
     for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
         block_entry->Flush(max_commit_ts);
