@@ -21,19 +21,30 @@ import index_defines;
 import multi_query_iterator;
 import doc_iterator;
 namespace infinity {
-OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) { children_ = std::move(iterators); }
+OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
+    children_ = std::move(iterators);
+    count_ = children_.size();
+    iterator_heap_.resize(children_.size() + 1);
+    for (u32 i = 0; i < children_.size(); ++i) {
+        iterator_heap_[i + 1].doc_id_ = children_[i]->Doc();
+        iterator_heap_[i + 1].entry_id_ = i;
+    }
+    // Build the heap
+    for (u32 i = children_.size() / 2; i > 0; --i) {
+        AdjustDown(i);
+    }
+    doc_id_ = iterator_heap_[1].doc_id_;
+}
 
 OrIterator::~OrIterator() {}
 
 void OrIterator::DoSeek(docid_t id) {
-    docid_t doc_id = INVALID_DOCID;
-    do {
+    while (id > iterator_heap_[1].doc_id_) {
         DocIterator *top = GetDocIterator(iterator_heap_[1].entry_id_);
         top->Seek(id);
-        doc_id = top->Doc();
-        iterator_heap_[1].doc_id_ = doc_id;
-        AdjustDown();
-    } while (id > iterator_heap_[1].doc_id_);
+        iterator_heap_[1].doc_id_ = top->Doc();
+        AdjustDown(1);
+    }
     doc_id_ = iterator_heap_[1].doc_id_;
 }
 

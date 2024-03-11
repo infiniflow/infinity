@@ -14,6 +14,7 @@
 
 module;
 
+#include <vector>
 module and_iterator;
 
 import stl;
@@ -28,34 +29,25 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
         sorted_iterators_.push_back(children_[i].get());
     }
     std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto lhs, const auto rhs) { return lhs->GetDF() < rhs->GetDF(); });
+    // initialize doc_id_ to first doc
+    DoSeek(0);
 }
 
 AndIterator::~AndIterator() {}
 
 void AndIterator::DoSeek(docid_t doc_id) {
-    DocIterator **first_iter = &sorted_iterators_[0];
-    DocIterator **current_iter = first_iter;
-    DocIterator **end_iter = first_iter + sorted_iterators_.size();
-    docid_t current = doc_id;
-    do {
-        docid_t tmp_id = INVALID_DOCID;
-        tmp_id = doc_id_;
-        if (tmp_id == INVALID_DOCID) {
-            current = tmp_id;
-            break;
-        } else if (tmp_id != current) {
-            current = tmp_id;
-            current_iter = first_iter;
+    auto ib = sorted_iterators_.begin(), ie = sorted_iterators_.end();
+    while (ib != ie) {
+        (*ib)->Seek(doc_id);
+        if (docid_t doc = (*ib)->Doc(); doc != doc_id) {
+            // not match, restart from the first iterator, since first iterator has fewer docs
+            doc_id = doc;
+            ib = sorted_iterators_.begin();
         } else {
-            current_iter++;
-            if (current_iter >= end_iter) {
-                current++;
-                current_iter = first_iter;
-            }
+            ++ib;
         }
-
-    } while (true);
-    doc_id_ = current;
+    }
+    doc_id_ = doc_id;
 }
 
 u32 AndIterator::GetDF() const {
