@@ -18,8 +18,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 
-from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv
-
+from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
 
 class TestImport:
 
@@ -191,8 +190,11 @@ class TestImport:
         print(res)
 
     # import csv with different delimiter
-    @pytest.mark.skip(reason="Import many times, core dumped.")
-    @pytest.mark.parametrize("delimiter", ["blankspace", "commas", "semicolons", "tabular"])
+    @pytest.mark.parametrize("delimiter", [pytest.param("blankspace", marks=pytest.mark.skip(reason="not support")),
+                                           "commas",
+                                           pytest.param("semicolons", marks=pytest.mark.skip(reason="not support")),
+                                           pytest.param("tabular", marks=pytest.mark.skip(reason="not support")),
+                                           ])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR},
                                             {"file_name": "pysdk_test_commas.csv",
@@ -234,19 +236,19 @@ class TestImport:
     # TODO import csv without headers
 
     # import fvecs, when table with more columns
-    @pytest.mark.skip(reason="Import many times, core dumped.")
-    @pytest.mark.parametrize("check_data", [{"file_name": "test.fvecs",
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_fvecs_table_with_more_columns(self, get_infinity_db, check_data):
         if not check_data:
-            copy_data("test.fvecs")
+            generate_fvecs(100, 128, "pysdk_test.fvecs")
+            copy_data("pysdk_test.fvecs")
 
         db_obj = get_infinity_db
         db_obj.drop_table("test_import_fvecs_table_with_more_columns")
         table_obj = db_obj.create_table("test_import_fvecs_table_with_more_columns",
                                         {"c1": "int", "c2": "vector,128,float"})
         with pytest.raises(Exception, match="ERROR:3037*"):
-            test_csv_dir = common_values.TEST_TMP_DIR + "test.fvecs"
+            test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.fvecs"
             res = table_obj.import_data(test_csv_dir, None)
             assert res.error_code == ErrorCode.OK
 
@@ -260,11 +262,50 @@ class TestImport:
         db_obj = get_infinity_db
 
     # import table with embedding not match with the table definition.
+    @pytest.mark.skip(reason="Core dumped.")
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("types", ["vector, 3, int",
+                                       "vector, 128, int",
+                                       pytest.param("vector, 2, int", marks=pytest.mark.xfail),
+                                       "vector, 3, float",
+                                       "vector, 128, float",
+                                       "vector, 3, double",
+                                       pytest.param("vector, 3, bool", marks=pytest.mark.xfail),
+                                       pytest.param("vector, 3, varchar", marks=pytest.mark.xfail)
+                                       ])
+    def test_import_embedding_with_not_match_definition(self, get_infinity_db, check_data, types):
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_embedding_with_not_match_definition")
+        table_obj = db_obj.create_table("test_import_embedding_with_not_match_definition", {"c1": "int", "c2": types})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        print(res)
 
     # import table with varchar not match with the table definition.
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_varchar.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_import_varchar_with_not_match_definition(self, get_infinity_db, check_data):
+        if not check_data:
+            copy_data("pysdk_test_varchar.csv")
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_import_varchar_with_not_match_definition")
+        table_obj = db_obj.create_table("test_import_varchar_with_not_match_definition", {"c1": "int", "c2": "varchar"})
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_varchar.csv"
+        res = table_obj.import_data(test_csv_dir, None)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
 
     # import table with 10000 columns.
-    @pytest.mark.skip(reason="Import many times, core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_int.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_10000_columns(self, get_infinity_db, check_data):
@@ -284,7 +325,7 @@ class TestImport:
         print(res)
 
     # import table with columns isn't matched (more and less)
-    @pytest.mark.skip(reason="Import many times, core dumped.")
+    @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("columns", [
@@ -325,7 +366,6 @@ class TestImport:
         res = table_obj.output(["*"]).to_df()
         print(res)
 
-    @pytest.mark.skip(reason="Import many times, core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_exceeding_columns(self, get_infinity_db, check_data):

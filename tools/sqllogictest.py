@@ -38,7 +38,7 @@ class SpinnerThread(threading.Thread):
         self.stop = True
 
 
-def test_process(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
+def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: str):
     print("sqlllogictest-bin path is {}".format(sqllogictest_bin))
     print("slt_dir path is {}".format(slt_dir))
     print("data_dir path is {}".format(data_dir))
@@ -74,10 +74,9 @@ def copy_all(data_dir, copy_dir):
         os.makedirs(copy_dir)
     for dirpath, dirnames, filenames in os.walk(data_dir):
         for filename in filenames:
-            if not os.path.exists(os.path.join(copy_dir, filename)):
-                src_path = os.path.join(dirpath, filename)
-                dest_path = os.path.join(copy_dir, filename)
-                copyfile(src_path, dest_path)
+            src_path = os.path.join(dirpath, filename)
+            dest_path = os.path.join(copy_dir, filename)
+            copyfile(src_path, dest_path)
     print("Finished copying all files.")
 
 
@@ -164,7 +163,7 @@ if __name__ == "__main__":
         print("Start testing...")
         start = time.time()
         try:
-            test_process(args.path, args.test, args.data, args.copy)
+            process_test(args.path, args.test, args.data, args.copy)
         except Exception as e:
             print(e)
             sys.exit(-1)
