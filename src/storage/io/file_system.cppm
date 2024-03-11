@@ -35,6 +35,8 @@ public:
 
     i64 Write(const void *data, u64 nbytes);
 
+    void Rename(const String& old_name, const String& new_name);
+
     void Sync();
 
     void Close();

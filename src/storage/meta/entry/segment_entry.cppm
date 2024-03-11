@@ -119,7 +119,7 @@ public:
 
     void FlushNewData(TxnTimeStamp flush_ts);
 
-    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 

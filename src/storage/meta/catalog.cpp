@@ -793,36 +793,46 @@ void Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buf
     }
 }
 
-void Catalog::SaveAsFile(const String &catalog_path, TxnTimeStamp max_commit_ts) {
+UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts) {
+    UniquePtr<String> catalog_path_ptr = MakeUnique<String>(fmt::format("{}/META_CATALOG.{}.json", catalog_dir, max_commit_ts));
+    String catalog_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.json", catalog_dir, max_commit_ts));
+
+    // Serialize catalog to string
     nlohmann::json catalog_json = Serialize(max_commit_ts, true);
     String catalog_str = catalog_json.dump();
 
+    // Save catalog to tmp file.
     // FIXME: Temp implementation, will be replaced by async task.
     LocalFileSystem fs;
 
     u8 fileflags = FileFlags::WRITE_FLAG;
-    if (!fs.Exists(catalog_path)) {
+
+    if (!fs.Exists(catalog_tmp_path)) {
         fileflags |= FileFlags::CREATE_FLAG;
     }
 
-    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_path, fileflags, FileLockType::kWriteLock);
+    UniquePtr<FileHandler> catalog_file_handler = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
 
     // TODO: Save as a temp filename, then rename it to the real filename.
     SizeT n_bytes = catalog_file_handler->Write(catalog_str.data(), catalog_str.size());
     if (n_bytes != catalog_str.size()) {
-        LOG_ERROR(fmt::format("Saving catalog file failed: {}", catalog_path));
-        RecoverableError(Status::CatalogCorrupted(catalog_path));
+        LOG_ERROR(fmt::format("Saving catalog file failed: {}", catalog_tmp_path));
+        RecoverableError(Status::CatalogCorrupted(catalog_tmp_path));
     }
     catalog_file_handler->Sync();
     catalog_file_handler->Close();
 
-    LOG_INFO(fmt::format("Saved catalog to: {}", catalog_path));
+    // Rename temp file to regular catalog file
+    catalog_file_handler->Rename(catalog_tmp_path, *catalog_path_ptr);
+
+    LOG_INFO(fmt::format("Saved catalog to: {}", *catalog_path_ptr));
+    return catalog_path_ptr;
 }
 
 // called by bg_task
-bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
-    LOG_INFO("FLUSH GLOBAL DELTA CATALOG ENTRY");
-    LOG_INFO(fmt::format("Global catalog delta entry commit ts:{}, checkpoint max commit ts:{}.",
+bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp max_commit_ts) {
+    LOG_INFO("SAVING DELTA CATALOG");
+    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.",
                          global_catalog_delta_entry_->commit_ts(),
                          max_commit_ts));
 
@@ -830,11 +840,14 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
     if (flush_delta_entry->operations().empty()) {
-        LOG_INFO("Global catalog delta entry ops is empty. Skip flush.");
+        LOG_INFO("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
     Vector<TransactionID> flushed_txn_ids;
+    HashSet<TransactionID> flushed_unique_txn_ids;
     for (auto &op : flush_delta_entry->operations()) {
+        flushed_unique_txn_ids.insert(op->txn_id());
+
         switch (op->GetType()) {
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
@@ -844,7 +857,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
                 auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
                 LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
-                add_segment_entry_op->FlushDataToDisk(max_commit_ts, is_full_checkpoint);
+                add_segment_entry_op->FlushDataToDisk(max_commit_ts);
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
@@ -866,7 +879,7 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     flush_delta_entry->WriteAdv(ptr);
     i32 act_size = ptr - buf.data();
     if (exp_size != act_size) {
-        UnrecoverableError(fmt::format("Flush global catalog delta entry failed, exp_size: {}, act_size: {}", exp_size, act_size));
+        UnrecoverableError(fmt::format("Save delta catalog failed, exp_size: {}, act_size: {}", exp_size, act_size));
     }
 
     std::ofstream outfile;
@@ -874,15 +887,9 @@ bool Catalog::FlushGlobalCatalogDeltaEntry(const String &delta_catalog_path, Txn
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
-    LOG_INFO(fmt::format("Flush global catalog delta entry to: {}, size: {}.", delta_catalog_path, act_size));
+    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
-    if (!is_full_checkpoint) {
-        HashSet<TransactionID> flushed_txn_ids;
-        for (auto &op : flush_delta_entry->operations()) {
-            flushed_txn_ids.insert(op->txn_id());
-        }
-        txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_txn_ids.begin(), flushed_txn_ids.end()));
-    }
+    txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_unique_txn_ids.begin(), flushed_unique_txn_ids.end()));
 
     return false;
 }
