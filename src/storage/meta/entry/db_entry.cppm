@@ -56,8 +56,7 @@ public:
                                          const SharedPtr<String> &data_dir,
                                          const SharedPtr<String> &db_name,
                                          TransactionID txn_id,
-                                         TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr);
+                                         TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> NewReplayDBEntry(DBMeta *db_meta,
                                                const SharedPtr<String> &data_dir,
@@ -105,6 +104,7 @@ private:
     }
 
     friend void RecreateSegmentSealingTasksInStorageInit(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp system_start_ts);
+
 public:
     DBMeta *const db_meta_;
 

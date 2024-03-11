@@ -173,11 +173,12 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
-public:
+private:
     void AddDBStore(DBEntry *db_entry);
 
     void DropDBStore(DBEntry *dropped_db_entry);
 
+public:
     void AddTableStore(TableEntry *table_entry);
 
     void DropTableStore(TableEntry *dropped_table_entry);

@@ -60,17 +60,8 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        const SharedPtr<String> &data_dir,
                                        const SharedPtr<String> &db_name,
                                        TransactionID txn_id,
-                                       TxnTimeStamp begin_ts,
-                                       TxnManager *txn_mgr) {
+                                       TxnTimeStamp begin_ts) {
     auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
-    if (txn_mgr) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        if (is_delete) {
-            txn->DropDBStore(db_entry.get());
-        } else {
-            txn->AddDBStore(db_entry.get());
-        }
-    }
     return db_entry;
 }
 

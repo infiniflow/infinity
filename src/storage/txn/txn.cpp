@@ -153,6 +153,7 @@ TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
 
+// Database OPs
 Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
 
     TxnState txn_state = txn_context_.GetTxnState();
@@ -167,6 +168,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     if (db_entry == nullptr) { // nullptr means some exception happened
         return status;
     }
+    this->AddDBStore(db_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
     return Status::OK();
@@ -183,9 +185,10 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
-    if (!status.ok() || dropped_db_entry == nullptr) {
+    if (dropped_db_entry == nullptr) {
         return status;
     }
+    this->DropDBStore(dropped_db_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
     return Status::OK();
