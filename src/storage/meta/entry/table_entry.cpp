@@ -83,19 +83,10 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
-                                                TxnTimeStamp begin_ts,
-                                                TxnManager *txn_mgr) {
+                                                TxnTimeStamp begin_ts) {
 
     auto table_entry =
         MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
-    if (txn_mgr) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        if (is_delete) {
-            txn->DropTableStore(table_entry.get());
-        } else {
-            txn->AddTableStore(table_entry.get());
-        }
-    }
     return table_entry;
 }
 

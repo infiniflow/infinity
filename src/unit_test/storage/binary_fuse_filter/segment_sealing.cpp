@@ -56,7 +56,7 @@ protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+        auto [table_entry, status] = txn->GetTableByName("default", table_name);
         auto column_count = table_entry->ColumnCount();
         EXPECT_EQ(column_count, u32(1));
         while (row_cnt_input > 0) {
@@ -118,7 +118,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
-            auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1
             int unsealed_cnt = 0, sealed_cnt = 0;

@@ -102,8 +102,6 @@ public:
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
-    Tuple<TableEntry *, Status> GetTableEntry(const String &db_name, const String &table_name);
-
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
@@ -178,11 +176,11 @@ private:
 
     void DropDBStore(DBEntry *dropped_db_entry);
 
-public:
     void AddTableStore(TableEntry *table_entry);
 
     void DropTableStore(TableEntry *dropped_table_entry);
 
+public:
     void AddIndexStore(const String &index_name, TableIndexEntry *index_entry);
 
     void DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry);
@@ -191,6 +189,8 @@ private:
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableEntry *> txn_tables_{};
+    // Key: table name Value: TxnTableStore
+    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
     HashMap<String, TableIndexEntry *> txn_indexes_{};
 
 private:
@@ -202,11 +202,6 @@ private:
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};
-
-    // Only one db can be handled in one transaction.
-    HashMap<String, BaseEntry *> txn_table_entries_{};
-    // Key: table name Value: TxnTableStore
-    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 
     // Handled database
     String db_name_{};

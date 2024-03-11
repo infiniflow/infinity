@@ -62,15 +62,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shar
                                                       TxnManager *txn_mgr,
                                                       ConflictType conflict_type) {
     auto init_table_entry = [&]() {
-        return TableEntry::NewTableEntry(false,
-                                         this->db_entry_dir_,
-                                         table_collection_name_ptr,
-                                         columns,
-                                         table_entry_type,
-                                         this,
-                                         txn_id,
-                                         begin_ts,
-                                         txn_mgr);
+        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
     };
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -90,8 +82,7 @@ Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared
                                          TableEntryType::kTableEntry,
                                          this,
                                          txn_id,
-                                         begin_ts,
-                                         txn_mgr);
+                                         begin_ts);
     };
     return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }

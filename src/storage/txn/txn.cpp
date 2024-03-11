@@ -63,34 +63,8 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
     return txn;
 }
 
-Tuple<TableEntry *, Status> Txn::GetTableEntry(const String &db_name, const String &table_name) {
-    if (db_name_.empty()) {
-        db_name_ = db_name;
-    } else {
-        if (!IsEqual(db_name_, db_name)) {
-            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kInvalidDbName, std::move(err_msg))};
-        }
-    }
-
-    auto table_iter = txn_table_entries_.find(table_name);
-    if (table_iter == txn_table_entries_.end()) {
-        // not found the table in cached entries
-        auto [table_entry, status] = this->GetTableByName(db_name, table_name);
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-
-        txn_table_entries_[table_name] = reinterpret_cast<BaseEntry *>(table_entry);
-        return {table_entry, status};
-    } else {
-        return {(TableEntry *)table_iter->second, Status::OK()};
-    }
-}
-
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    auto [table_entry, status] = GetTableEntry(db_name, table_name);
+    auto [table_entry, status] = GetTableByName(db_name, table_name);
     if (!status.ok()) {
         return status;
     }
@@ -107,7 +81,7 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
 }
 
 Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
-    auto [table_entry, status] = GetTableEntry(db_name, table_name);
+    auto [table_entry, status] = GetTableByName(db_name, table_name);
     if (!status.ok()) {
         return status;
     }
@@ -219,6 +193,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
     return res;
 }
 
+// Table and Collection OPs
 Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
 
     TxnState txn_state = txn_context_.GetTxnState();
@@ -247,6 +222,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         return table_status;
     }
 
+    this->AddTableStore(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
 
     return Status::OK();
@@ -267,6 +243,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
         return table_status;
     }
 
+    this->DropTableStore(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
     return Status::OK();
 }
@@ -355,6 +332,16 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 
     if (txn_state != TxnState::kStarted) {
         UnrecoverableError("Transaction isn't started.");
+    }
+
+    if (db_name_.empty()) {
+        db_name_ = db_name;
+    } else {
+        if (!IsEqual(db_name_, db_name)) {
+            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
+            LOG_ERROR(*err_msg);
+            return {nullptr, Status(ErrorCode::kInvalidDbName, std::move(err_msg))};
+        }
     }
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
@@ -581,6 +568,7 @@ void Txn::DropTableStore(TableEntry *dropped_table_entry) {
         if (catalog_->CheckAllowCleanup(dropped_table_entry)) {
             dropped_table_entry->Cleanup();
         }
+        txn_tables_store_.erase(*dropped_table_entry->GetTableName());
     } else {
         txn_tables_.insert(dropped_table_entry);
     }

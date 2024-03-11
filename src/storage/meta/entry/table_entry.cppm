@@ -74,8 +74,7 @@ public:
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
                                                TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr);
+                                               TxnTimeStamp begin_ts);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
                                                      SharedPtr<String> db_entry_dir,
