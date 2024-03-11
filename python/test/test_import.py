@@ -18,8 +18,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 
-from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv
-
+from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
 
 class TestImport:
 
@@ -237,18 +236,19 @@ class TestImport:
     # TODO import csv without headers
 
     # import fvecs, when table with more columns
-    @pytest.mark.parametrize("check_data", [{"file_name": "test.fvecs",
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_fvecs_table_with_more_columns(self, get_infinity_db, check_data):
         if not check_data:
-            copy_data("test.fvecs")
+            generate_fvecs(100, 128, "pysdk_test.fvecs")
+            copy_data("pysdk_test.fvecs")
 
         db_obj = get_infinity_db
         db_obj.drop_table("test_import_fvecs_table_with_more_columns")
         table_obj = db_obj.create_table("test_import_fvecs_table_with_more_columns",
                                         {"c1": "int", "c2": "vector,128,float"})
         with pytest.raises(Exception, match="ERROR:3037*"):
-            test_csv_dir = common_values.TEST_TMP_DIR + "test.fvecs"
+            test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.fvecs"
             res = table_obj.import_data(test_csv_dir, None)
             assert res.error_code == ErrorCode.OK
 

@@ -83,6 +83,7 @@ test/data/csv/test_sort.csv
 test/data/csv/*big*.csv
 test/data/fvecs/*big*.fvecs
 test/data/fvecs/test.fvecs
+test/data/fvecs/pysdk_test.fvecs
 
 benchmark/toml/toml_config.h
 benchmark/csv/csv_config.h

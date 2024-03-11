@@ -74,3 +74,12 @@ def generate_big_columns_csv(num, filename):
         data += str(num - 1)
         f.write(data)
     f.close()
+
+
+def generate_fvecs(num, dim, filename):
+    with open(os.getcwd() + common_values.TEST_DATA_DIR + "fvecs/" + filename, "wb") as fvecs_file:
+        for _ in range(num):
+            fvecs_file.write((dim).to_bytes(4, byteorder="little"))
+            fvec = np.random.random(dim).astype(np.float32)
+            fvec.tofile(fvecs_file)
+    fvecs_file.close()
