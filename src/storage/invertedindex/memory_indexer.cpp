@@ -128,7 +128,7 @@ void MemoryIndexer::Dump() {
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
-    FstBuilder builder(wtr);
+    FstBuilder fst_builder(wtr);
 
     if (posting_store_.get() != nullptr) {
         SizeT term_meta_offset = 0;
@@ -138,11 +138,11 @@ void MemoryIndexer::Dump() {
             posting_writer->Dump(posting_file_writer, term_meta);
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.Key();
-            builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
+            fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
             term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
         dict_file_writer->Sync();
-        builder.Finish();
+        fst_builder.Finish();
         fs.AppendFile(dict_file, fst_file);
         fs.DeleteFile(fst_file);
     }
@@ -167,8 +167,8 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->Clear();
     }
-    thread_pool_.stop(true);
-    cv_.notify_all();
+    base_doc_id_ = INVALID_DOCID;
+    doc_count_ = 0;
 }
 
 void MemoryIndexer::OfflineDump() {

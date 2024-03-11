@@ -26,25 +26,27 @@ import posting_iterator;
 import index_defines;
 import disk_index_segment_reader;
 import inmem_index_segment_reader;
+import memory_indexer;
 import dict_reader;
 import posting_list_format;
 
 namespace infinity {
 ColumnIndexReader::ColumnIndexReader() {}
 
-void ColumnIndexReader::Open(const String &index_dir, const Vector<String> &base_names, const Vector<docid_t> &base_docids, optionflag_t flag) {
+void ColumnIndexReader::Open(const String &index_dir,
+                             const Vector<String> &base_names,
+                             const Vector<docid_t> &base_docids,
+                             optionflag_t flag,
+                             MemoryIndexer *memory_indexer) {
     flag_ = flag;
     for (SizeT i = 0; i < base_names.size(); i++) {
-        SharedPtr<DiskIndexSegmentReader> segment_reader = CreateDiskSegmentReader(index_dir, base_names[i], base_docids[i], flag);
+        SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir, base_names[i], base_docids[i], flag);
         segment_readers_.push_back(segment_reader);
-        base_doc_ids_.push_back(base_docids[i]);
     }
-    // TODO yzc: In memory segment
-}
-
-SharedPtr<DiskIndexSegmentReader>
-ColumnIndexReader::CreateDiskSegmentReader(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag) {
-    return MakeShared<DiskIndexSegmentReader>(index_dir, base_name, base_doc_id, flag);
+    if (memory_indexer != nullptr && memory_indexer->GetDocCount() != 0) {
+        SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(memory_indexer);
+        segment_readers_.push_back(segment_reader);
+    }
 }
 
 PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {

@@ -11,7 +11,10 @@ import column_index_iterator;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(docid_t base_doc_id) : base_doc_id_(base_doc_id) {}
+SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag)
+    : base_doc_id_(base_doc_id) {
+    column_index_iterator_ = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
+}
 
 bool SegmentTermPosting::HasNext() {
     if (column_index_iterator_->Next(term_, posting_decoder_)) {
@@ -26,8 +29,7 @@ SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
                                                  optionflag_t flag)
     : index_dir_(index_dir), base_names_(base_names), base_docids_(base_docids) {
     for (u32 i = 0; i < base_names.size(); ++i) {
-        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(base_docids[i]);
-        segment_term_posting->column_index_iterator_ = CreateIndexIterator(index_dir, base_names[i], flag);
+        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_docids[i], flag);
         if (segment_term_posting->HasNext()) {
             segment_term_postings_.push(segment_term_posting);
         } else
@@ -44,11 +46,6 @@ SegmentTermPostingQueue::~SegmentTermPostingQueue() {
     for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
         delete merging_term_postings_[i];
     }
-}
-
-SharedPtr<ColumnIndexIterator> SegmentTermPostingQueue::CreateIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag) {
-    SharedPtr<ColumnIndexIterator> index_iterator = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
-    return index_iterator;
 }
 
 const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(String &term) {
@@ -68,7 +65,6 @@ const Vector<SegmentTermPosting *> &SegmentTermPostingQueue::GetCurrentMerging(S
 void SegmentTermPostingQueue::MoveToNextTerm() {
     for (u32 i = 0; i < merging_term_postings_.size(); ++i) {
         SegmentTermPosting *term_posting = merging_term_postings_[i];
-        merging_term_postings_[i] = nullptr;
         if (term_posting->HasNext()) {
             segment_term_postings_.push(term_posting);
         } else {

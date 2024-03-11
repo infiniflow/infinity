@@ -113,6 +113,8 @@ private:
     TxnTimeStamp max_ts_{0}; // Indicate the max commit_ts which update data inside this SegmentIndexEntry
     TxnTimeStamp checkpoint_ts_{0};
 
+    Vector<String> ft_base_names_{};
+    Vector<u64> ft_base_rowids_{};
     UniquePtr<MemoryIndexer> memory_indexer_{};
 };
 
