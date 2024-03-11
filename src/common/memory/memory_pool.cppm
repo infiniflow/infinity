@@ -8,7 +8,7 @@ import stl;
 
 namespace infinity {
 
-export class MemoryPool {
+export class MemoryPool : public EnableSharedFromThis<MemoryPool> {
 public:
     static const SizeT DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024; // 10M
     static const SizeT DEFAULT_ALIGN_SIZE = sizeof(char *);

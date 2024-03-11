@@ -24,17 +24,18 @@ import dict_reader;
 import file_reader;
 import posting_list_format;
 import local_file_system;
+import internal_types;
 
 namespace infinity {
 export class DiskIndexSegmentReader : public IndexSegmentReader {
 public:
-    DiskIndexSegmentReader(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag);
+    DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
     virtual ~DiskIndexSegmentReader();
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) const override;
 
 private:
-    docid_t base_doc_id_{INVALID_DOCID};
+    RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_reader_;
     LocalFileSystem fs_{};

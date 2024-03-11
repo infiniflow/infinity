@@ -284,6 +284,10 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             memory_indexer_->Dump();
             ft_base_names_.push_back(base_name);
             ft_base_rowids_.push_back(base_row_id.ToUint64());
+
+            auto duration = Clock::now().time_since_epoch();
+            u64 ts = ChronoCast<NanoSeconds>(duration).count();
+            table_index_entry_->UpdateFulltextSegmentTs(ts);
             break;
         }
         case IndexType::kSecondary: {

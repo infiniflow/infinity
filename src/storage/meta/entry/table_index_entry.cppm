@@ -112,6 +112,9 @@ public:
     MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
     RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
     ThreadPool &GetFulltextThreadPool() { return thread_pool_; }
+    u64 GetFulltexSegmentUpdateTs() { return segment_update_ts_; }
+
+    void UpdateFulltextSegmentTs(u64 ts) { segment_update_ts_ = ts; }
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
@@ -137,6 +140,7 @@ private:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
     ThreadPool thread_pool_{};
+    u64 segment_update_ts_{0};
 
 public:
     void Cleanup() override;

@@ -34,8 +34,9 @@ public:
 
     // Check if the given doc id is a hit. If it is a hit, the
     // current doc id of this iterator is set to the given id,
-    // If it is not a hit, the current doc id is either unchanged,
-    // or set to the next hit
+    // If it is not a hit, find the first doc id which is not less
+    // than the give doc id. If there is no such a doc id,
+    // INVALID_DOCID will be returned
     bool Seek(docid_t doc_id) {
         if (doc_id > doc_id_)
             DoSeek(doc_id);

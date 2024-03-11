@@ -26,11 +26,12 @@ import dict_reader;
 import term_meta;
 import byte_slice;
 import posting_list_format;
+import internal_types;
 
 namespace infinity {
 
-DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag)
-    : base_doc_id_(base_doc_id) {
+DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
+    : base_row_id_(base_row_id) {
     Path path = Path(index_dir) / base_name;
     String path_str = path.string();
     String dict_file = path_str;
@@ -52,7 +53,8 @@ bool DiskIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPostin
     ByteSlice *slice = ByteSlice::CreateSlice(file_length, session_pool);
     posting_reader_->Read((char *)slice->data_, file_length);
     SharedPtr<ByteSliceList> byte_slice_list = MakeShared<ByteSliceList>(slice, session_pool);
-    seg_posting.Init(byte_slice_list, base_doc_id_, term_meta.doc_freq_, term_meta);
+    docid_t base_doc = base_row_id_.segment_offset_;
+    seg_posting.Init(byte_slice_list, base_doc, term_meta.doc_freq_, term_meta);
     return true;
 }
 

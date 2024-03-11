@@ -22,6 +22,8 @@ import index_segment_reader;
 import posting_iterator;
 import index_defines;
 import memory_indexer;
+import internal_types;
+
 export module column_index_reader;
 
 namespace infinity {
@@ -33,7 +35,7 @@ public:
 
     void Open(const String &index_dir,
               const Vector<String> &base_names,
-              const Vector<docid_t> &base_docids,
+              const Vector<RowID> &base_docids,
               optionflag_t flag,
               MemoryIndexer *memory_indexer);
 

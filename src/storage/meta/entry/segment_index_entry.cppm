@@ -94,6 +94,10 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
 
+    Vector<String> &GetFulltextBaseNames() { return ft_base_names_; }
+    Vector<u64> &GetFulltextBaseRowIDs() { return ft_base_rowids_; }
+    MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
+
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Vector<BufferObj *> vector_buffer);
     void UpdateIndex(TxnTimeStamp commit_ts, FaissIndexPtr *index, BufferManager *buffer_mgr);
