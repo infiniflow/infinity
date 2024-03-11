@@ -82,7 +82,7 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::DropDatabase instead
-Tuple<DBEntry *, Status>
+Tuple<SharedPtr<DBEntry>, Status>
 Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, conflict_type);
     if (db_meta == nullptr) {
@@ -138,12 +138,12 @@ Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
         ->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> Catalog::DropTableByName(const String &db_name,
-                                                     const String &table_name,
-                                                     ConflictType conflict_type,
-                                                     TransactionID txn_id,
-                                                     TxnTimeStamp begin_ts,
-                                                     TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_name,
+                                                              const String &table_name,
+                                                              ConflictType conflict_type,
+                                                              TransactionID txn_id,
+                                                              TxnTimeStamp begin_ts,
+                                                              TxnManager *txn_mgr) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -196,13 +196,13 @@ Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
     return table_entry->CreateIndex(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
-Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
-                                                    const String &table_name,
-                                                    const String &index_name,
-                                                    ConflictType conflict_type,
-                                                    TransactionID txn_id,
-                                                    TxnTimeStamp begin_ts,
-                                                    TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableIndexEntry>, Status> Catalog::DropIndex(const String &db_name,
+                                                             const String &table_name,
+                                                             const String &index_name,
+                                                             ConflictType conflict_type,
+                                                             TransactionID txn_id,
+                                                             TxnTimeStamp begin_ts,
+                                                             TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
         LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));

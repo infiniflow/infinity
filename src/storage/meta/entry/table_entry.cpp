@@ -129,7 +129,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
         ->CreateTableIndexEntry(std::move(r_lock), index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
-Tuple<TableIndexEntry *, Status>
+Tuple<SharedPtr<TableIndexEntry>, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, conflict_type);
     if (index_meta == nullptr) {

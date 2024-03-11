@@ -159,10 +159,10 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
-    if (dropped_db_entry == nullptr) {
+    if (dropped_db_entry.get() == nullptr) {
         return status;
     }
-    this->DropDBStore(dropped_db_entry);
+    this->DropDBStore(dropped_db_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
     return Status::OK();
@@ -239,11 +239,11 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
-    if (table_entry == nullptr) {
+    if (table_entry.get() == nullptr) {
         return table_status;
     }
 
-    this->DropTableStore(table_entry);
+    this->DropTableStore(table_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
     return Status::OK();
 }
@@ -319,7 +319,7 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
         return index_status;
     }
 
-    if (index_status.ok() && table_index_entry == nullptr && conflict_type == ConflictType::kIgnore) {
+    if (index_status.ok() && table_index_entry.get() == nullptr && conflict_type == ConflictType::kIgnore) {
         return index_status;
     }
 

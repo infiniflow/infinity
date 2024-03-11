@@ -88,7 +88,7 @@ private:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type);
 
-    Tuple<TableEntry *, Status>
+    Tuple<SharedPtr<TableEntry>, Status>
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);

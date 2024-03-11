@@ -113,11 +113,11 @@ public:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropDatabase(const String &db_name,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts,
-                                          TxnManager *txn_mgr,
-                                          ConflictType conflict_type = ConflictType::kError);
+    Tuple<SharedPtr<DBEntry>, Status> DropDatabase(const String &db_name,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   ConflictType conflict_type = ConflictType::kError);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -134,12 +134,12 @@ public:
                                             ConflictType conflict_type,
                                             TxnManager *txn_mgr);
 
-    Tuple<TableEntry *, Status> DropTableByName(const String &db_name,
-                                                const String &table_name,
-                                                ConflictType conflict_type,
-                                                TransactionID txn_id,
-                                                TxnTimeStamp begin_ts,
-                                                TxnManager *txn_mgr);
+    Tuple<SharedPtr<TableEntry>, Status> DropTableByName(const String &db_name,
+                                                         const String &table_name,
+                                                         ConflictType conflict_type,
+                                                         TransactionID txn_id,
+                                                         TxnTimeStamp begin_ts,
+                                                         TxnManager *txn_mgr);
 
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -157,13 +157,13 @@ public:
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
-    Tuple<TableIndexEntry *, Status> DropIndex(const String &db_name,
-                                               const String &table_name,
-                                               const String &index_name,
-                                               ConflictType conflict_type,
-                                               TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr);
+    Tuple<SharedPtr<TableIndexEntry>, Status> DropIndex(const String &db_name,
+                                                        const String &table_name,
+                                                        const String &index_name,
+                                                        ConflictType conflict_type,
+                                                        TransactionID txn_id,
+                                                        TxnTimeStamp begin_ts,
+                                                        TxnManager *txn_mgr);
 
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id);
 
@@ -182,7 +182,8 @@ public:
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
+    static Status
+    CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
@@ -195,6 +196,7 @@ public:
 
     // Check if allow drop table
     bool CheckAllowCleanup(TableEntry *dropped_table_entry);
+
 public:
     // Function related methods
     static SharedPtr<FunctionSet> GetFunctionSetByName(Catalog *catalog, String function_name);

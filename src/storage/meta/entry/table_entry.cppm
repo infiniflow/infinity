@@ -96,7 +96,7 @@ public:
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
-    Tuple<TableIndexEntry *, Status>
+    Tuple<SharedPtr<TableIndexEntry>, Status>
     DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
