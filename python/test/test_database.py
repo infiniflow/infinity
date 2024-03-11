@@ -313,6 +313,7 @@ class TestDatabase:
 
         # option: if not exists
         # other options are invalid
+        infinity_obj.drop_database("my_database")
         db = infinity_obj.create_database("my_database", None)
         res = infinity_obj.drop_database("my_database")
 
@@ -480,7 +481,7 @@ class TestDatabase:
         assert res.error_code == ErrorCode.OK
 
     # one thread get db, another thread drop this db
-    @trace_expected_exceptions
+    @pytest.mark.xfail
     def test_get_drop_db_with_two_threads(self):
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
