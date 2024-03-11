@@ -49,4 +49,7 @@ private:
     DocListEncoder *doc_list_encoder_ = nullptr;
     PositionListEncoder *position_list_encoder_ = nullptr;
 };
+
+export using PostingWriterProvider = std::function<SharedPtr<PostingWriter>(const String &)>;
+
 } // namespace infinity

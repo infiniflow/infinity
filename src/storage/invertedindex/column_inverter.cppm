@@ -27,13 +27,13 @@ import pool_allocator;
 import term;
 import string_ref;
 import internal_types;
+import posting_writer;
 
 namespace infinity {
 
-class MemoryIndexer;
 export class ColumnInverter {
 public:
-    ColumnInverter(MemoryIndexer &memory_indexer);
+    ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider);
     ColumnInverter(const ColumnInverter &) = delete;
     ColumnInverter(const ColumnInverter &&) = delete;
     ColumnInverter &operator=(const ColumnInverter &) = delete;
@@ -100,13 +100,12 @@ private:
 
     void SortTerms();
 
-    MemoryIndexer &memory_indexer_;
-    Analyzer *analyzer_{nullptr};
-    bool jieba_specialize_{false};
+    UniquePtr<Analyzer> analyzer_{nullptr};
     PoolAllocator<char> alloc_;
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;
     Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
+    PostingWriterProvider posting_writer_provider_{};
 };
 } // namespace infinity
