@@ -263,9 +263,10 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
         }
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
+            String base_name = std::to_string(segment_entry->segment_id());
             RowID base_row_id(segment_entry->segment_id(), 0);
             memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
-                                                        std::to_string(segment_entry->segment_id()),
+                                                        base_name,
                                                         ToDocID(base_row_id),
                                                         index_fulltext->analyzer_,
                                                         index_fulltext->flag_,
@@ -281,6 +282,8 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             }
             memory_indexer_->Commit();
             memory_indexer_->Dump();
+            ft_base_names_.push_back(base_name);
+            ft_base_rowids_.push_back(base_row_id.ToUint64());
             break;
         }
         case IndexType::kSecondary: {
@@ -498,6 +501,8 @@ nlohmann::json SegmentIndexEntry::Serialize() {
         index_entry_json["min_ts"] = this->min_ts_;
         index_entry_json["max_ts"] = this->max_ts_;
         index_entry_json["checkpoint_ts"] = this->checkpoint_ts_; // TODO shenyushi:: use fields in BaseEntry
+        index_entry_json["ft_base_names"] = this->ft_base_names_;
+        index_entry_json["ft_base_rowids"] = this->ft_base_rowids_;
     }
 
     return index_entry_json;
@@ -524,6 +529,8 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];
     segment_index_entry->max_ts_ = index_entry_json["max_ts"];
     segment_index_entry->checkpoint_ts_ = index_entry_json["checkpoint_ts"]; // TODO shenyushi:: use fields in BaseEntry
+    index_entry_json["ft_base_names"].get_to<Vector<String>>(segment_index_entry->ft_base_names_);
+    index_entry_json["ft_base_rowids"].get_to<Vector<u64>>(segment_index_entry->ft_base_rowids_);
     return segment_index_entry;
 }
 

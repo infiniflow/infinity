@@ -21,8 +21,7 @@ import segment_posting;
 import index_segment_reader;
 import posting_iterator;
 import index_defines;
-import disk_index_segment_reader;
-import inmem_index_segment_reader;
+import memory_indexer;
 export module column_index_reader;
 
 namespace infinity {
@@ -32,20 +31,19 @@ public:
     ColumnIndexReader();
     virtual ~ColumnIndexReader() = default;
 
-    void Open(const String &index_dir, const Vector<String> &base_names, const Vector<docid_t> &base_docids, optionflag_t flag);
+    void Open(const String &index_dir,
+              const Vector<String> &base_names,
+              const Vector<docid_t> &base_docids,
+              optionflag_t flag,
+              MemoryIndexer *memory_indexer);
 
     PostingIterator *Lookup(const String &term, MemoryPool *session_pool);
 
     bool GetSegmentPosting(const String &term, SegmentPosting &seg_posting, MemoryPool *session_pool) { return false; }
 
 private:
-    SharedPtr<DiskIndexSegmentReader>
-    CreateDiskSegmentReader(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag);
-
-private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
-    Vector<docid_t> base_doc_ids_;
 };
 
 namespace detail {
