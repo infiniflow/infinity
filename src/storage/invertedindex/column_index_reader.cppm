@@ -58,7 +58,16 @@ struct Hash {
 export struct IndexReader {
     ColumnIndexReader *GetColumnIndexReader(u64 column_id) { return column_index_readers_[column_id].get(); }
 
+    bool NeedRefreshColumnIndexReader(u64 column_id, u64 ts) { return column_index_flags_[column_id] < ts; }
+
+    void SetColumnIndexReader(u64 column_id, u64 ts, UniquePtr<ColumnIndexReader> column_index_reader) {
+        column_index_flags_[column_id] = ts;
+        column_index_readers_[column_id] = std::move(column_index_reader);
+    }
+
+    FlatHashMap<u64, u64, detail::Hash<u64>> column_index_flags_;
     FlatHashMap<u64, UniquePtr<ColumnIndexReader>, detail::Hash<u64>> column_index_readers_;
+
     SharedPtr<MemoryPool> session_pool_;
 };
 

@@ -15,7 +15,7 @@
 module;
 
 #include "query_tree_builder.h"
-
+#include <utility>
 module query_builder;
 
 import stl;
@@ -38,41 +38,41 @@ import index_full_text;
 
 namespace infinity {
 
-QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) {}
-
-bool QueryBuilder::Init() {
+QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) {
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map = table_entry_->index_meta_map();
     for (auto &meta : index_meta_map) {
         List<SharedPtr<TableIndexEntry>> &index_entry_list = meta.second->index_entry_list();
         for (auto &index_entry : index_entry_list) {
             if (index_entry->index_base()->index_type_ == IndexType::kFullText) {
                 u64 column_id = table_entry_->GetColumnIdByName(meta.first);
-                UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>();
-                String index_dir = *(index_entry->index_dir());
-                HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = index_entry->index_by_segment();
-                const SharedPtr<IndexBase> &index_def = index_entry->table_index_def();
-                Vector<String> base_names;
-                Vector<RowID> base_rowids;
-                MemoryIndexer *memory_indexer = nullptr;
-                for (auto entry : index_by_segment) {
-                    Vector<String> &base_names = entry.second->GetFulltextBaseNames();
-                    Vector<u64> &base_row_ids = entry.second->GetFulltextBaseRowIDs();
-                    memory_indexer = entry.second->GetMemoryIndexer();
-                    for (auto name : base_names)
-                        base_names.push_back(name);
-                    for (auto base_row_id : base_row_ids) {
-                        RowID row_id(base_row_id);
-                        base_rowids.push_back(row_id);
+                u64 ts = index_entry->GetFulltexSegmentUpdateTs();
+                if (index_reader_.NeedRefreshColumnIndexReader(column_id, ts)) {
+                    UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>();
+                    String index_dir = *(index_entry->index_dir());
+                    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = index_entry->index_by_segment();
+                    const SharedPtr<IndexBase> &index_def = index_entry->table_index_def();
+                    Vector<String> base_names;
+                    Vector<RowID> base_rowids;
+                    MemoryIndexer *memory_indexer = nullptr;
+                    for (auto entry : index_by_segment) {
+                        Vector<String> &base_names = entry.second->GetFulltextBaseNames();
+                        Vector<u64> &base_row_ids = entry.second->GetFulltextBaseRowIDs();
+                        memory_indexer = entry.second->GetMemoryIndexer();
+                        for (auto name : base_names)
+                            base_names.push_back(name);
+                        for (auto base_row_id : base_row_ids) {
+                            RowID row_id(base_row_id);
+                            base_rowids.push_back(row_id);
+                        }
                     }
+                    optionflag_t flag = reinterpret_cast<IndexFullText *>(index_def.get())->flag_;
+                    column_index_reader->Open(index_dir, base_names, base_rowids, flag, memory_indexer);
+                    index_reader_.SetColumnIndexReader(column_id, ts, std::move(column_index_reader));
                 }
-                optionflag_t flag = reinterpret_cast<IndexFullText *>(index_def.get())->flag_;
-                column_index_reader->Open(index_dir, base_names, base_rowids, flag, memory_indexer);
-                index_reader_.column_index_readers_[column_id] = std::move(column_index_reader);
             }
         }
     }
     index_reader_.session_pool_ = MakeShared<MemoryPool>();
-    return false;
 }
 
 QueryBuilder::~QueryBuilder() {}

@@ -36,8 +36,6 @@ public:
 
     ~QueryBuilder();
 
-    bool Init();
-
     UniquePtr<DocIterator> CreateSearch(QueryContext &context);
 
 private:
