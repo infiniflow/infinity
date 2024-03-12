@@ -12,6 +12,7 @@ import in_doc_state_keeper;
 import segment_posting;
 import index_defines;
 import posting_list_format;
+import internal_types;
 
 namespace infinity {
 export class MultiPostingDecoder {
@@ -24,7 +25,7 @@ public:
 
     inline void MoveToCurrentDocPosition(ttf_t current_ttf) { in_doc_state_keeper_.MoveToDoc(current_ttf); }
 
-    bool DecodeDocBuffer(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+    bool DecodeDocBuffer(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
 
     bool DecodeCurrentTFBuffer(tf_t *tf_buffer);
 
@@ -37,37 +38,37 @@ public:
     u32 InnerGetSeekedDocCount() const { return index_decoder_->InnerGetSeekedDocCount(); }
 
 private:
-    bool DecodeDocBufferInOneSegment(docid_t start_doc_id, docid_t *doc_buffer, docid_t &first_doc_id, docid_t &last_doc_id, ttf_t &current_ttf);
+    bool DecodeDocBufferInOneSegment(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf);
 
     IndexDecoder *CreateIndexDecoder(u32 doc_list_begin_pos);
 
-    inline docid_t GetSegmentBaseDocId(u32 seg_cursor) {
+    inline RowID GetSegmentBaseRowId(u32 seg_cursor) {
         if (seg_cursor >= segment_count_) {
-            return INVALID_DOCID;
+            return INVALID_ROWID;
         }
         return (*seg_postings_)[seg_cursor].GetBaseDocId();
     }
 
-    inline u32 LocateSegment(u32 start_seg_cursor, docid_t start_doc_id) {
-        docid_t cur_seg_base_doc_id = GetSegmentBaseDocId(start_seg_cursor);
-        if (cur_seg_base_doc_id == INVALID_DOCID) {
+    inline u32 LocateSegment(u32 start_seg_cursor, RowID start_row_id) {
+        RowID cur_seg_base_doc_id = GetSegmentBaseRowId(start_seg_cursor);
+        if (cur_seg_base_doc_id == INVALID_ROWID) {
             return start_seg_cursor;
         }
 
         u32 cur_seg_cursor = start_seg_cursor;
-        docid_t next_seg_base_doc_id = GetSegmentBaseDocId(cur_seg_cursor + 1);
-        while (next_seg_base_doc_id != INVALID_DOCID && start_doc_id >= next_seg_base_doc_id) {
+        RowID next_seg_base_doc_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
+        while (next_seg_base_doc_id != INVALID_ROWID && start_row_id >= next_seg_base_doc_id) {
             ++cur_seg_cursor;
-            next_seg_base_doc_id = GetSegmentBaseDocId(cur_seg_cursor + 1);
+            next_seg_base_doc_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
         }
         return cur_seg_cursor;
     }
 
-    bool MoveToSegment(docid_t start_doc_id);
+    bool MoveToSegment(RowID start_row_id);
 
 private:
     PostingFormatOption cur_segment_format_option_;
-    docid_t base_doc_id_;
+    RowID base_row_id_;
     bool need_decode_tf_;
     bool need_decode_doc_payload_;
     IndexDecoder *index_decoder_;

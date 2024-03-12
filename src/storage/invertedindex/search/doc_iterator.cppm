@@ -21,6 +21,8 @@ import memory_pool;
 import posting_iterator;
 import index_defines;
 import match_data;
+import internal_types;
+
 namespace infinity {
 export class DocIterator {
 public:
@@ -30,25 +32,26 @@ public:
 
     virtual void AddIterator(DocIterator *iter) = 0;
 
-    virtual docid_t Doc() { return doc_id_; }
+    virtual RowID Doc() { return doc_id_; }
 
     // Check if the given doc id is a hit. If it is a hit, the
     // current doc id of this iterator is set to the given id,
-    // If it is not a hit, the current doc id is either unchanged,
-    // or set to the next hit
-    bool Seek(docid_t doc_id) {
+    // If it is not a hit, find the first doc id which is not less
+    // than the give doc id. If there is no such a doc id,
+    // INVALID_DOCID will be returned
+    bool Seek(RowID doc_id) {
         if (doc_id > doc_id_)
             DoSeek(doc_id);
         return doc_id == doc_id_;
     }
 
-    virtual void DoSeek(docid_t doc_id) = 0;
+    virtual void DoSeek(RowID doc_id) = 0;
 
     virtual u32 GetDF() const = 0;
 
-    virtual bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) { return false; }
+    virtual bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) { return false; }
 
 protected:
-    docid_t doc_id_;
+    RowID doc_id_;
 };
 } // namespace infinity

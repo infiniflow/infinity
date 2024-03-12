@@ -14,6 +14,7 @@
 
 #include "unit_test/base_test.h"
 #include <random>
+
 import stl;
 import index_defines;
 import default_values;
@@ -21,6 +22,7 @@ import doc_iterator;
 import and_iterator;
 import or_iterator;
 import and_not_iterator;
+import internal_types;
 
 using namespace infinity;
 
@@ -31,31 +33,31 @@ private:
     u32 GetDF() const override { return 0; }
 
 public:
-    MockVectorDocIterator(Vector<docid_t> doc_ids) : doc_ids_(std::move(doc_ids)) { DoSeek(0); }
+    MockVectorDocIterator(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) { DoSeek(0); }
 
     ~MockVectorDocIterator() override = default;
 
-    void DoSeek(docid_t doc_id) override {
+    void DoSeek(RowID doc_id) override {
         while (idx_ < doc_ids_.size() and doc_ids_[idx_] < doc_id) {
             ++idx_;
         }
         doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_DOCID;
     }
 
-    Vector<docid_t> doc_ids_;
+    Vector<RowID> doc_ids_;
     u32 idx_ = 0;
 };
 
 // doc id: 0-100'000
 // output length: in range [0, param_len]
-auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<docid_t> {
+auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> {
     // generate random doc ids
-    Vector<docid_t> doc_ids;
+    Vector<RowID> doc_ids;
     // random size
     u32 size = std::uniform_int_distribution<u32>(0, param_len)(rng);
     std::uniform_int_distribution<docid_t> gen_id(0, 100'000);
     for (u32 i = 0; i < size; ++i) {
-        doc_ids.push_back(gen_id(rng));
+        doc_ids.push_back(RowID(0, gen_id(rng)));
     }
     // sort and unique
     std::sort(doc_ids.begin(), doc_ids.end());
@@ -65,7 +67,7 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<docid_t
 
 class SearchIteratorTest2 : public BaseTest {
 public:
-    Vector<docid_t> doc_ids_A, doc_ids_B, doc_ids_and, doc_ids_or, doc_ids_and_not;
+    Vector<RowID> doc_ids_A, doc_ids_B, doc_ids_and, doc_ids_or, doc_ids_and_not;
 
     SearchIteratorTest2() {}
 
@@ -92,7 +94,7 @@ TEST_F(SearchIteratorTest2, test_and) {
     iterators[1] = MakeUnique<MockVectorDocIterator>(doc_ids_B);
     AndIterator and_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
         and_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_it.Doc(), expect_res.Doc());
@@ -105,7 +107,7 @@ TEST_F(SearchIteratorTest2, test_or) {
     iterators[1] = MakeUnique<MockVectorDocIterator>(doc_ids_B);
     OrIterator or_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_or);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         or_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(or_it.Doc(), expect_res.Doc());
@@ -118,7 +120,7 @@ TEST_F(SearchIteratorTest2, test_and_not) {
     iterators[1] = MakeUnique<MockVectorDocIterator>(doc_ids_B);
     AndNotIterator and_not_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and_not);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_not_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_not_it.Doc(), expect_res.Doc());
@@ -129,7 +131,7 @@ TEST_F(SearchIteratorTest2, test_and_not) {
 
 class SearchIteratorTestN : public BaseTest {
 public:
-    Vector<docid_t> doc_ids[TestN], doc_ids_and, doc_ids_or, doc_ids_and_not;
+    Vector<RowID> doc_ids[TestN], doc_ids_and, doc_ids_or, doc_ids_and_not;
 
     SearchIteratorTestN() {}
 
@@ -145,7 +147,7 @@ public:
         doc_ids_or = doc_ids[0];
         doc_ids_and_not = doc_ids[0];
         for (int i = 1; i < TestN; ++i) {
-            Vector<docid_t> new_and, new_or, new_and_not;
+            Vector<RowID> new_and, new_or, new_and_not;
             std::set_intersection(doc_ids_and.begin(), doc_ids_and.end(), doc_ids[i].begin(), doc_ids[i].end(), std::back_inserter(new_and));
             std::set_union(doc_ids_or.begin(), doc_ids_or.end(), doc_ids[i].begin(), doc_ids[i].end(), std::back_inserter(new_or));
             std::set_difference(doc_ids_and_not.begin(),
@@ -169,7 +171,7 @@ TEST_F(SearchIteratorTestN, test_and) {
     }
     AndIterator and_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_it.Doc(), expect_res.Doc());
@@ -183,7 +185,7 @@ TEST_F(SearchIteratorTestN, test_or) {
     }
     OrIterator or_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_or);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         or_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(or_it.Doc(), expect_res.Doc());
@@ -197,7 +199,7 @@ TEST_F(SearchIteratorTestN, test_and_not) {
     }
     AndNotIterator and_not_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and_not);
-    for (docid_t doc_id = 0; doc_id <= 100'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_not_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_not_it.Doc(), expect_res.Doc());

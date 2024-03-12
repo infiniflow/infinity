@@ -21,6 +21,7 @@ import doc_iterator;
 import term_queries;
 import column_index_reader;
 import match_data;
+import table_entry;
 
 namespace infinity {
 
@@ -31,14 +32,14 @@ export struct QueryContext {
 
 export class QueryBuilder {
 public:
-    QueryBuilder();
+    QueryBuilder(TableEntry *table_entry);
 
     ~QueryBuilder();
 
     UniquePtr<DocIterator> CreateSearch(QueryContext &context);
 
 private:
-    Vector<u64> column_ids_;
+    TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     UniquePtr<Scorer> scorer_;
 };

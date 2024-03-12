@@ -15,6 +15,7 @@
 module;
 
 module or_iterator;
+import internal_types;
 
 import stl;
 import index_defines;
@@ -38,7 +39,7 @@ OrIterator::OrIterator(Vector<UniquePtr<DocIterator>> iterators) {
 
 OrIterator::~OrIterator() {}
 
-void OrIterator::DoSeek(docid_t id) {
+void OrIterator::DoSeek(RowID id) {
     while (id > iterator_heap_[1].doc_id_) {
         DocIterator *top = GetDocIterator(iterator_heap_[1].entry_id_);
         top->Seek(id);

@@ -20,6 +20,8 @@ import posting_list_format;
 import posting_writer;
 import term_meta;
 import index_defines;
+import internal_types;
+
 export module segment_posting;
 
 namespace infinity {
@@ -31,17 +33,17 @@ public:
 
     bool operator==(const SegmentPosting &seg_posting) const {
         return /*(slice_list_ == seg_posting.slice_list_) && */ (term_meta_ == seg_posting.term_meta_) &&
-               /*(posting_option_ == seg_posting.posting_option_) */ (base_doc_id_ == seg_posting.base_doc_id_) &&
+               /*(posting_option_ == seg_posting.posting_option_) */ (base_row_id_ == seg_posting.base_row_id_) &&
                (doc_count_ == seg_posting.doc_count_) && (posting_writer_ == seg_posting.posting_writer_);
     }
 
     // for on disk segment posting
-    void Init(const SharedPtr<ByteSliceList> &slice_list, docid_t base_doc_id, u64 doc_count, TermMeta &term_meta);
+    void Init(const SharedPtr<ByteSliceList> &slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
     // for in memory segment posting
-    void Init(docid_t base_doc_id, PostingWriter *posting_writer);
+    void Init(RowID base_row_id, PostingWriter *posting_writer);
 
-    docid_t GetBaseDocId() const { return base_doc_id_; }
-    void SetBaseDocId(docid_t base_doc_id) { base_doc_id_ = base_doc_id; }
+    RowID GetBaseDocId() const { return base_row_id_; }
+    void SetBaseDocId(RowID base_row_id) { base_row_id_ = base_row_id; }
 
     u32 GetDocCount() const { return doc_count_; }
     void SetDocCount(const u32 doc_count) { doc_count_ = doc_count; }
@@ -65,7 +67,7 @@ public:
 
 private:
     SharedPtr<ByteSliceList> slice_list_;
-    u32 base_doc_id_;
+    RowID base_row_id_;
     u32 doc_count_;
     TermMeta term_meta_;
     PostingWriter *posting_writer_;

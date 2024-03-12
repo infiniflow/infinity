@@ -37,6 +37,8 @@ UniquePtr<TermQuery> TermQuery::Optimize(UniquePtr<TermQuery> query) {
 
 UniquePtr<DocIterator> TermQuery::CreateSearch(IndexReader &index_reader, Scorer *scorer) {
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_.column_id_);
+    if (!column_index_reader)
+        return nullptr;
     PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
     if (posting_iterator == nullptr)
         return nullptr;

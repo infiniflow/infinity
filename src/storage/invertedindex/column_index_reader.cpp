@@ -29,13 +29,14 @@ import inmem_index_segment_reader;
 import memory_indexer;
 import dict_reader;
 import posting_list_format;
+import internal_types;
 
 namespace infinity {
 ColumnIndexReader::ColumnIndexReader() {}
 
 void ColumnIndexReader::Open(const String &index_dir,
                              const Vector<String> &base_names,
-                             const Vector<docid_t> &base_docids,
+                             const Vector<RowID> &base_docids,
                              optionflag_t flag,
                              MemoryIndexer *memory_indexer) {
     flag_ = flag;

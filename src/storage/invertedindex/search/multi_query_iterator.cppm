@@ -21,6 +21,7 @@ import memory_pool;
 import posting_iterator;
 import index_defines;
 import doc_iterator;
+
 namespace infinity {
 export class MultiQueryDocIterator : public DocIterator {
 public:

@@ -20,6 +20,7 @@ import stl;
 import index_defines;
 import multi_query_iterator;
 import doc_iterator;
+import internal_types;
 
 namespace infinity {
 
@@ -31,11 +32,11 @@ AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) {
 
 AndNotIterator::~AndNotIterator() {}
 
-void AndNotIterator::DoSeek(docid_t doc_id) {
+void AndNotIterator::DoSeek(RowID doc_id) {
     bool next_loop = false;
     do {
         children_[0]->Seek(doc_id);
-        if (docid_t doc = children_[0]->Doc(); doc != doc_id) {
+        if (RowID doc = children_[0]->Doc(); doc != doc_id) {
             doc_id = doc;
         }
         if (doc_id == INVALID_DOCID) {
@@ -45,7 +46,7 @@ void AndNotIterator::DoSeek(docid_t doc_id) {
         next_loop = false;
         for (u32 i = 1; i < children_.size(); ++i) {
             children_[i]->Seek(doc_id);
-            if (docid_t doc = children_[i]->Doc(); doc == doc_id) {
+            if (RowID doc = children_[i]->Doc(); doc == doc_id) {
                 ++doc_id;
                 next_loop = true;
                 break;

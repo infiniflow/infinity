@@ -24,6 +24,8 @@ import index_defines;
 import term_meta;
 import doc_iterator;
 import match_data;
+import internal_types;
+
 namespace infinity {
 export class TermDocIterator : public DocIterator {
 public:
@@ -33,11 +35,11 @@ public:
 
     void AddIterator(DocIterator *iter) override {}
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }
 
-    bool GetTermMatchData(TermColumnMatchData &match_data, docid_t doc_id) override {
+    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) override {
         if (doc_id == doc_id_) {
             match_data.doc_id_ = doc_id_;
             iter_->GetTermMatchData(match_data);

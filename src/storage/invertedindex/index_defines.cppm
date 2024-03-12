@@ -58,6 +58,7 @@ export {
     constexpr optionflag_t NO_TERM_FREQUENCY = of_doc_payload | of_term_payload;
     constexpr optionflag_t OPTION_FLAG_NONE = of_none;
     constexpr docid_t INVALID_DOCID = -1;
+    constexpr RowID INVALID_ROWID = u64(-1);
     constexpr pos_t INVALID_POSITION = std::numeric_limits<u32>::max();
     constexpr segmentid_t INVALID_SEGMENTID = -1;
     constexpr u32 MAX_DOC_PER_RECORD = 128;
