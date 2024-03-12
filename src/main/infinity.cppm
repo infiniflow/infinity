@@ -29,6 +29,9 @@ import session;
 import parsed_expr;
 import search_expr;
 import column_def;
+import create_index_info;
+import update_statement;
+import explain_statement;
 
 namespace infinity {
 
@@ -67,7 +70,7 @@ public:
     // For embedded sqllogictest
     QueryResult Query(const String &query_text);
 
-    // Database related function
+    // Database related functions
     QueryResult CreateTable(const String &db_name,
                             const String &table_name,
                             Vector<ColumnDef *> column_defs,
@@ -82,7 +85,30 @@ public:
 
     QueryResult ShowTables(const String &db_name);
 
-    // Shortcut interface with database and table instance
+    // Table related functions
+    QueryResult CreateIndex(const String &db_name,
+                            const String &table_name,
+                            const String &index_name,
+                            Vector<IndexInfo *> *index_info_list,
+                            CreateIndexOptions create_index_options);
+
+    QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name);
+
+    QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
+
+    QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
+
+    QueryResult Delete(const String &db_name, const String &table_name, ParsedExpr *filter);
+
+    QueryResult Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
+
+    QueryResult Explain(const String &db_name,
+                        const String &table_name,
+                        ExplainType explain_type,
+                        SearchExpr *search_expr,
+                        ParsedExpr *filter,
+                        Vector<ParsedExpr *> *output_columns);
+
     QueryResult
     Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 

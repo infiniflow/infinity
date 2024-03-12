@@ -44,11 +44,18 @@ import command_statement;
 import select_statement;
 import flush_statement;
 import table_reference;
+import insert_statement;
+import copy_statement;
+import delete_statement;
+
 import create_schema_info;
 import drop_schema_info;
 import create_table_info;
 import drop_table_info;
 import query_options;
+import extra_ddl_info;
+import drop_index_info;
+import drop_table_info;
 
 namespace infinity {
 
@@ -270,6 +277,157 @@ QueryResult Infinity::ShowTables(const String &db_name) {
     show_statement->schema_name_ = db_name;
     show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::CreateIndex(const String &db_name,
+                                  const String &table_name,
+                                  const String &index_name,
+                                  Vector<IndexInfo *> *index_info_list,
+                                  CreateIndexOptions) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+
+    UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
+    SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
+
+    create_index_info->schema_name_ = db_name;
+    create_index_info->table_name_ = table_name;
+    create_index_info->index_name_ = index_name;
+    create_index_info->index_info_list_ = index_info_list;
+
+    create_statement->create_info_ = create_index_info;
+    create_statement->create_info_->conflict_type_ = ConflictType::kIgnore;
+
+    QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
+    return result;
+}
+
+QueryResult Infinity::DropIndex(const String &db_name, const String &table_name, const String &index_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
+    SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
+
+    drop_index_info->schema_name_ = db_name;
+    drop_index_info->table_name_ = table_name;
+    drop_index_info->index_name_ = index_name;
+    drop_statement->drop_info_ = drop_index_info;
+
+    drop_statement->drop_info_->conflict_type_ = ConflictType::kIgnore;
+
+    QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
+
+    insert_statement->schema_name_ = db_name;
+    insert_statement->table_name_ = table_name;
+    insert_statement->columns_ = columns;
+    insert_statement->values_ = values;
+
+    QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<CopyStatement> import_statement = MakeUnique<CopyStatement>();
+
+    import_statement->copy_from_ = true;
+    import_statement->file_path_ = path;
+    import_statement->schema_name_ = db_name;
+    import_statement->table_name_ = table_name;
+
+    import_statement->header_ = false;
+    import_statement->copy_file_type_ = import_options.copy_file_type_;
+    import_statement->delimiter_ = import_options.delimiter_;
+
+    QueryResult result = query_context_ptr->QueryStatement(import_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Delete(const String &db_name, const String &table_name, ParsedExpr *filter) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<DeleteStatement> delete_statement = MakeUnique<DeleteStatement>();
+    delete_statement->schema_name_ = db_name;
+    delete_statement->table_name_ = table_name;
+    delete_statement->where_expr_ = filter;
+    QueryResult result = query_context_ptr->QueryStatement(delete_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
+    update_statement->schema_name_ = db_name;
+    update_statement->table_name_ = table_name;
+    update_statement->where_expr_ = filter;
+    update_statement->update_expr_array_ = update_list;
+    QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Explain(const String &db_name,
+                              const String &table_name,
+                              ExplainType explain_type,
+                              SearchExpr *search_expr,
+                              ParsedExpr *filter,
+                              Vector<ParsedExpr *> *output_columns) {
+
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
+    explain_statment->type_ = explain_type;
+
+    SelectStatement *select_statement = new SelectStatement();
+
+    auto *table_ref = new TableReference();
+    table_ref->db_name_ = db_name;
+    table_ref->table_name_ = table_name;
+    select_statement->table_ref_ = table_ref;
+    select_statement->select_list_ = output_columns;
+    select_statement->where_expr_ = filter;
+    select_statement->search_expr_ = search_expr;
+
+    explain_statment->statement_ = select_statement;
+
+    QueryResult result = query_context_ptr->QueryStatement(explain_statment.get());
     return result;
 }
 

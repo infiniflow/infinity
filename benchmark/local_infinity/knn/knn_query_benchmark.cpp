@@ -65,7 +65,7 @@ std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &di
 }
 
 template <typename Function>
-inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &table_name) {
+inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn, const std::string &db_name, const std::string &table_name) {
     std::cout << "threadId = " << threadId << " [" << id_begin << ", " << id_end << ")" << std::endl;
     std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
     auto [ data_base, status1 ] = infinity->GetDatabase("default");
@@ -77,7 +77,7 @@ inline void LoopFor(size_t id_begin, size_t id_end, size_t threadId, Function fn
 }
 
 template <typename Function>
-inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string &table_name) {
+inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn, const std::string& db_name, const std::string &table_name) {
     if (numThreads <= 0) {
         numThreads = std::thread::hardware_concurrency();
     }
@@ -87,7 +87,7 @@ inline void ParallelFor(size_t start, size_t end, size_t numThreads, Function fn
     size_t extra_cnt = (end - start) % numThreads;
     for (size_t id_begin = start, threadId = 0; threadId < numThreads; ++threadId) {
         size_t id_end = id_begin + avg_cnt + (threadId < extra_cnt);
-        threads.emplace_back([id_begin, id_end, threadId, fn, table_name] { LoopFor(id_begin, id_end, threadId, fn, table_name); });
+        threads.emplace_back([&] { LoopFor(id_begin, id_end, threadId, fn, db_name, table_name); });
         id_begin = id_end;
     }
     for(auto& thread: threads) {
@@ -138,6 +138,7 @@ int main(int argc, char *argv[]) {
     size_t dimension = 0;
     int64_t topk = 100;
 
+    std::string db_name = "default";
     std::string table_name;
     if (sift) {
         dimension = 128;
@@ -241,7 +242,7 @@ int main(int argc, char *argv[]) {
         };
         BaseProfiler profiler("ParallelFor");
         profiler.Begin();
-        ParallelFor(0, query_count, thread_num, query_function, table_name);
+        ParallelFor(0, query_count, thread_num, query_function, db_name, table_name);
         profiler.End();
         // skip 2 warm up loops
         if (times >= 2) {
