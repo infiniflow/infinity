@@ -20,10 +20,11 @@ import stl;
 import third_party;
 import index_defines;
 import column_length_io;
+import internal_types;
 
 namespace infinity {
 export struct TermColumnMatchData {
-    docid_t doc_id_;
+    RowID doc_id_;
     tf_t tf_;
     docpayload_t doc_payload_;
 };
@@ -45,7 +46,7 @@ public:
 
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
-    float Score(docid_t doc_id);
+    float Score(RowID doc_id);
 
 private:
     u32 GetOrSetColumnIndex(u64 column_id);

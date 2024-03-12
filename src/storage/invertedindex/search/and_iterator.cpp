@@ -19,6 +19,7 @@ module and_iterator;
 
 import stl;
 import doc_iterator;
+import internal_types;
 
 namespace infinity {
 
@@ -35,11 +36,11 @@ AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) {
 
 AndIterator::~AndIterator() {}
 
-void AndIterator::DoSeek(docid_t doc_id) {
+void AndIterator::DoSeek(RowID doc_id) {
     auto ib = sorted_iterators_.begin(), ie = sorted_iterators_.end();
     while (ib != ie) {
         (*ib)->Seek(doc_id);
-        if (docid_t doc = (*ib)->Doc(); doc != doc_id) {
+        if (RowID doc = (*ib)->Doc(); doc != doc_id) {
             // not match, restart from the first iterator, since first iterator has fewer docs
             doc_id = doc;
             ib = sorted_iterators_.begin();

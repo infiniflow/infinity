@@ -402,7 +402,7 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     auto [table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (!status.ok()) {
-        RecoverableError(Status::SyntaxError(status.message()));
+        RecoverableError(status);
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
@@ -443,7 +443,7 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     BaseEntry *base_view_entry{nullptr};
     Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
     if (!status.ok()) {
-        RecoverableError(Status::SyntaxError(status.message()));
+        RecoverableError(status);
     }
 
     ViewEntry *view_entry = static_cast<ViewEntry *>(base_view_entry);

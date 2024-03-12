@@ -23,8 +23,6 @@
 import compilation_config;
 import internal_types;
 import infinity;
-import database;
-import table;
 import logical_type;
 
 import profiler;
@@ -109,12 +107,12 @@ int main(int argc, char *argv[]) {
         create_db_options.conflict_type_ = ConflictType::kIgnore;
         auto r1 = infinity->CreateDatabase(db_name, std::move(create_db_options));
 
-        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
+//        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
         CreateTableOptions create_tb_options;
         create_tb_options.conflict_type_ = ConflictType::kIgnore;
-        auto r2 = data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
+        auto r2 = infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
-        auto [ table, status2 ] = data_base->GetTable(table_name);
+//        auto [ table, status2 ] = data_base->GetTable(table_name);
 
         if (!fs.Exists(base_path)) {
             std::cout << "File: " << base_path << " doesn't exist" << std::endl;
@@ -126,7 +124,7 @@ int main(int argc, char *argv[]) {
 
         infinity::BaseProfiler profiler;
         profiler.Begin();
-        QueryResult query_result = table->Import(base_path, import_options);
+        QueryResult query_result = infinity->Import(db_name, table_name, base_path, import_options);
         std::cout << "Import data cost: " << profiler.ElapsedToString() << std::endl;
 
         auto index_info_list = new std::vector<IndexInfo *>();
@@ -147,7 +145,7 @@ int main(int argc, char *argv[]) {
             index_info_list->emplace_back(index_info);
         }
 
-        query_result = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+        query_result = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
 
         if (query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;

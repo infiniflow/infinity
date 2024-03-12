@@ -20,6 +20,7 @@ import stl;
 import term_doc_iterator;
 import index_defines;
 import bm25_ranker;
+import internal_types;
 
 namespace infinity {
 
@@ -59,7 +60,7 @@ void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
     iterators_[column_index].push_back(iter);
 }
 
-float Scorer::Score(docid_t doc_id) {
+float Scorer::Score(RowID doc_id) {
     float score = 0.0F;
     for (u32 i = 0; i < column_counter_; i++) {
         BM25Ranker ranker(total_df_);

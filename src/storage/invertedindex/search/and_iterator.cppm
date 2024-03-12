@@ -19,6 +19,7 @@ export module and_iterator;
 import stl;
 import index_defines;
 import multi_query_iterator;
+import internal_types;
 
 namespace infinity {
 
@@ -30,7 +31,7 @@ public:
 
     bool IsAnd() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override;
 

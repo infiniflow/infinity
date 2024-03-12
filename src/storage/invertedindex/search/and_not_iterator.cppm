@@ -20,6 +20,7 @@ import stl;
 import index_defines;
 import multi_query_iterator;
 import doc_iterator;
+import internal_types;
 
 namespace infinity {
 export class AndNotIterator : public MultiQueryDocIterator {
@@ -30,7 +31,7 @@ public:
 
     bool IsAndNot() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override;
 };

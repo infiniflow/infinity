@@ -27,8 +27,6 @@ import file_system_type;
 import third_party;
 import profiler;
 import infinity;
-import database;
-import table;
 import search_expr;
 import parsed_expr;
 import match_expr;
@@ -134,8 +132,8 @@ int main(int argn, char *argv[]) {
         std::cout << "Test " << i << std::endl;
 
         std::shared_ptr<Infinity> infinity = Infinity::LocalConnect();
-        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
-        auto [ table, status2 ] = data_base->GetTable(table_name);
+//        auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
+//        auto [ table, status2 ] = data_base->GetTable(table_name);
 
         size_t correct_n = 0;
         size_t total_n = 0;
@@ -160,7 +158,7 @@ int main(int argn, char *argv[]) {
                 output_columns->emplace_back(select_rowid_expr);
             }
 
-            auto result = table->Search(search_expr, nullptr, output_columns);
+            auto result = infinity->Search(db_name, table_name, search_expr, nullptr, output_columns);
             {
                 auto &cv = result.result_table_->GetDataBlockById(0)->column_vectors;
                 auto &column = *cv[0];

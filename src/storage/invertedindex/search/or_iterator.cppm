@@ -22,6 +22,8 @@ import index_defines;
 import doc_iterator;
 import multi_query_iterator;
 import priority_queue;
+import internal_types;
+
 namespace infinity {
 
 export class OrIterator : public MultiQueryDocIterator {
@@ -35,7 +37,7 @@ public:
     };
 
     struct DocIteratorEntry {
-        docid_t doc_id_{INVALID_DOCID};
+        RowID doc_id_{INVALID_ROWID};
         u32 entry_id_{0};
     };
 
@@ -45,7 +47,7 @@ public:
 
     bool IsOr() const override { return true; }
 
-    void DoSeek(docid_t doc_id) override;
+    void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override;
 
