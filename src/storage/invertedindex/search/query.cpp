@@ -133,8 +133,17 @@ void AndNotQuery::OptimizeSelf() {
                 while (gc->GetChildrenCount() > 1) {
                     AddChild(gc->RemoveLastChild());
                 }
-                c->AddChild(gc->RemoveChild(0));
+                UniquePtr<TermQuery> gc0 = gc->RemoveChild(0);
                 c->RemoveChild(i--);
+                if (gc0->IsAnd()) {
+                    // c is "and", gc0 is also "and", flatten gc0 into c
+                    auto gc0_ptr = reinterpret_cast<MultiQuery *>(gc0.get());
+                    while (gc0_ptr->GetChildrenCount() > 0) {
+                        c->AddChild(gc0_ptr->RemoveLastChild());
+                    }
+                } else {
+                    c->AddChild(std::move(gc0));
+                }
             }
         }
     }

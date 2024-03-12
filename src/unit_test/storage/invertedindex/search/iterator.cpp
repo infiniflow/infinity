@@ -41,7 +41,7 @@ public:
         while (idx_ < doc_ids_.size() and doc_ids_[idx_] < doc_id) {
             ++idx_;
         }
-        doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_DOCID;
+        doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_ROWID;
     }
 
     Vector<RowID> doc_ids_;
@@ -55,7 +55,7 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
     Vector<RowID> doc_ids;
     // random size
     u32 size = std::uniform_int_distribution<u32>(0, param_len)(rng);
-    std::uniform_int_distribution<docid_t> gen_id(0, 100'000);
+    std::uniform_int_distribution<SegmentOffset> gen_id(0, 100'000);
     for (u32 i = 0; i < size; ++i) {
         doc_ids.push_back(RowID(0, gen_id(rng)));
     }

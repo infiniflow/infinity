@@ -39,10 +39,10 @@ void AndNotIterator::DoSeek(RowID doc_id) {
         if (RowID doc = children_[0]->Doc(); doc != doc_id) {
             doc_id = doc;
         }
-        if (doc_id == INVALID_DOCID) {
+        if (doc_id == INVALID_ROWID) {
             break;
         }
-        // now doc_id < INVALID_DOCID
+        // now doc_id < INVALID_ROWID
         next_loop = false;
         for (u32 i = 1; i < children_.size(); ++i) {
             children_[i]->Seek(doc_id);
