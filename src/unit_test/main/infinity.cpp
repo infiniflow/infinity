@@ -80,7 +80,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_TRUE(result.IsOk());
 
         result = infinity->GetDatabase("db2");
-        EXPECT_TRUE(result.IsOk());
+        EXPECT_FALSE(result.IsOk());
 
         DropDatabaseOptions drop_db_opts;
         result = infinity->DropDatabase("db1", drop_db_opts);
@@ -144,7 +144,7 @@ TEST_F(InfinityTest, test1) {
         EXPECT_EQ(data_block->row_count(), 0);
 
         result = infinity->GetTable("default", "table1");
-        EXPECT_TRUE(result.IsOk());
+        EXPECT_FALSE(result.IsOk());
     }
 
     {
