@@ -25,18 +25,12 @@ module common_analyzer;
 
 namespace infinity {
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
-    : Analyzer(), stemmer_(nullptr), case_sensitive_(false), contain_lower_(false), extract_eng_stem_(false), extract_synonym_(false),
-      chinese_(false), remove_stopwords_(false) {
-    stemmer_ = new Stemmer();
+    : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
+      extract_eng_stem_(false), extract_synonym_(false), chinese_(false), remove_stopwords_(false) {
     stemmer_->Init(STEM_LANG_ENGLISH);
-
-    lowercase_string_buffer_ = new char[term_string_buffer_limit_];
 }
 
-CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {
-    delete stemmer_;
-    delete[] lowercase_string_buffer_;
-}
+CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}
 
 int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     Parse(input.text_);
@@ -75,7 +69,7 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
 
             // foreign language, e.g. English
             if (IsAlpha()) {
-                char *lowercase_term = lowercase_string_buffer_;
+                char *lowercase_term = lowercase_string_buffer_.data();
                 ToLower(token_, len_, lowercase_term, term_string_buffer_limit_);
                 SizeT stemming_term_str_size = 0;
                 String stem_term;

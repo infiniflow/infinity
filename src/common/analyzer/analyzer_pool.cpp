@@ -70,7 +70,7 @@ UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
             return MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(analyzer));
         } break;
         case Str2Int(STANDARD.data()): {
-            return MakeUnique<StandardAnalyzer>(*reinterpret_cast<StandardAnalyzer *>(analyzer));
+            return MakeUnique<StandardAnalyzer>();
         } break;
         case Str2Int(NGRAM.data()): {
             return MakeUnique<NGramAnalyzer>(*reinterpret_cast<NGramAnalyzer *>(analyzer));
