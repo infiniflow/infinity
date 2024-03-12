@@ -368,17 +368,17 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
-            return;
-        }
+//        auto [database, database_status] = infinity->GetDatabase(request.db_name);
+//        if (!database_status.ok()) {
+//            ProcessStatus(response, database_status);
+//            return;
+//        }
+//
+//        auto [table, table_status] = database->GetTable(request.table_name);
+//        if (!table_status.ok()) {
+//            ProcessStatus(response, table_status);
+//            return;
+//        }
 
         // auto end1 = std::chrono::steady_clock::now();
         //
@@ -517,7 +517,7 @@ public:
         //
         // auto start3 = std::chrono::steady_clock::now();
 
-        const QueryResult result = table->Search(search_expr, filter, output_columns);
+        const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, output_columns);
 
         // auto end3 = std::chrono::steady_clock::now();
         //

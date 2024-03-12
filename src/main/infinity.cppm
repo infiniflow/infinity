@@ -26,6 +26,9 @@ import query_result;
 import query_options;
 import infinity_context;
 import session;
+import parsed_expr;
+import search_expr;
+import column_def;
 
 namespace infinity {
 
@@ -59,10 +62,29 @@ public:
 
     QueryResult Flush();
 
-    QueryResult ShowVariable(const String& variable_name);
+    QueryResult ShowVariable(const String &variable_name);
 
     // For embedded sqllogictest
-    QueryResult Query(const String& query_text);
+    QueryResult Query(const String &query_text);
+
+    // Database related function
+    QueryResult CreateTable(const String &db_name,
+                            const String &table_name,
+                            Vector<ColumnDef *> column_defs,
+                            Vector<TableConstraint *> constraints,
+                            const CreateTableOptions &create_table_options);
+
+    QueryResult DropTable(const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);
+
+    QueryResult ListTables(const String &db_name);
+
+    QueryResult DescribeTable(const String &db_name, const String &table_name);
+
+    QueryResult ShowTables(const String &db_name);
+
+    // Shortcut interface with database and table instance
+    QueryResult
+    Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
 private:
     SharedPtr<BaseSession> session_{};
