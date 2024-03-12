@@ -105,7 +105,7 @@ private:
     MemoryPool *session_pool_;
     TermMeta term_meta_;
     RowID last_doc_id_in_buffer_;
-    RowID current_doc_id_;
+    RowID current_row_id_;
     docid_t *doc_buffer_cursor_;
     docid_t doc_buffer_[MAX_DOC_PER_RECORD];
     docid_t *doc_buffer_base_;
