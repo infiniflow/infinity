@@ -24,8 +24,6 @@
 import compilation_config;
 
 import infinity;
-import database;
-import table;
 
 import profiler;
 import local_file_system;

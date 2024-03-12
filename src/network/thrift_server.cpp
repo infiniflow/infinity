@@ -832,8 +832,8 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        ProcessStatus(response, database_status);
+        QueryResult result = infinity->GetDatabase(request.db_name);
+        ProcessQueryResult(response, result);
     }
 
     void GetTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetTableRequest &request) final {
@@ -843,7 +843,7 @@ public:
             return;
         }
 
-        const QueryResult result = infinity->GetTable(request.db_name, request.table_name);
+        QueryResult result = infinity->GetTable(request.db_name, request.table_name);
         ProcessQueryResult(response, result);
     }
 

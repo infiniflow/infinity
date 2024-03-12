@@ -28,8 +28,6 @@ import local_file_system;
 import third_party;
 import query_options;
 import query_result;
-import database;
-import table;
 import infinity_context;
 import session;
 import session_manager;
@@ -146,7 +144,7 @@ QueryResult Infinity::ListDatabases() {
     return result;
 }
 
-Tuple<UniquePtr<Database>, Status> Infinity::GetDatabase(const String &db_name) {
+QueryResult Infinity::GetDatabase(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -156,7 +154,7 @@ Tuple<UniquePtr<Database>, Status> Infinity::GetDatabase(const String &db_name) 
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
     command_statement->command_info_ = MakeUnique<UseCmd>(db_name.c_str());
     QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
-    return {result.IsOk() ? MakeUnique<Database>(db_name, session_) : nullptr, result.status_};
+    return result;
 }
 
 QueryResult Infinity::Query(const String &query_text) {

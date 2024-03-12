@@ -21,8 +21,6 @@ export module thrift_server;
 
 import stl;
 import infinity;
-import database;
-import table;
 
 import query_options;
 import thrift;
