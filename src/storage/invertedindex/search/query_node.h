@@ -15,9 +15,10 @@
 #pragma once
 
 import stl;
-import query_visitor;
 
 namespace infinity {
+
+class QueryVisitor;
 
 struct QueryNode {
     QueryNode() = default;
@@ -53,22 +54,37 @@ protected:
     Vector<UniquePtr<QueryNode>> children_;
 };
 
-template <typename T>
-class QueryWrapper : public MultiQueryNode {
+class And : public MultiQueryNode {
 public:
-    QueryWrapper() = default;
-
-    ~QueryWrapper() = default;
-
-    void Accept(QueryVisitor &visitor) override { visitor.Visit(static_cast<T &>(*this)); }
+    void Accept(QueryVisitor &visitor) override;
+};
+class AndNot : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class Or : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class Wand : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class Phrase : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class PrefixTerm : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class SuffixTerm : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
+};
+class SubstringTerm : public MultiQueryNode {
+public:
+    void Accept(QueryVisitor &visitor) override;
 };
 
-class And : public QueryWrapper<And> {};
-class AndNot : public QueryWrapper<AndNot> {};
-class Or : public QueryWrapper<Or> {};
-class Wand : public QueryWrapper<Wand> {};
-class Phrase : public QueryWrapper<Phrase> {};
-class PrefixTerm : public QueryWrapper<PrefixTerm> {};
-class SuffixTerm : public QueryWrapper<SuffixTerm> {};
-class SubstringTerm : public QueryWrapper<SubstringTerm> {};
 } // namespace infinity

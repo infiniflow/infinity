@@ -23,11 +23,13 @@ import bitmap;
 import index_defines;
 import term_meta;
 import doc_iterator;
+import internal_types;
+
 namespace infinity {
 TermDocIterator::TermDocIterator(PostingIterator *iter, u64 column_id) : column_id_(column_id), iter_(iter) {}
 
 TermDocIterator::~TermDocIterator() {}
 
-void TermDocIterator::DoSeek(docid_t doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
+void TermDocIterator::DoSeek(RowID doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
 
 } // namespace infinity

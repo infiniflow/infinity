@@ -12,12 +12,14 @@ import multi_posting_decoder;
 import segment_posting;
 import in_doc_pos_state;
 import index_defines;
+import internal_types;
+
 module posting_iterator;
 
 namespace infinity {
 
 PostingIterator::PostingIterator(const PostingFormatOption &posting_option, MemoryPool *session_pool)
-    : posting_option_(posting_option), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_DOCID - 1), current_doc_id_(INVALID_DOCID),
+    : posting_option_(posting_option), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_ROWID - 1), current_row_id_(INVALID_ROWID),
       doc_buffer_cursor_(nullptr), current_ttf_(0), tf_buffer_cursor_(0), tf_buffer_(nullptr), doc_payload_buffer_(nullptr),
       posting_decoder_(nullptr), need_move_to_current_doc_(false), in_doc_pos_iter_inited_(false), in_doc_pos_iterator_(nullptr) {
     tf_buffer_ = (tf_t *)((session_pool_)->Allocate(sizeof(tf_t) * MAX_DOC_PER_RECORD));
@@ -43,24 +45,24 @@ bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings
     return true;
 }
 
-docid_t PostingIterator::SeekDoc(docid_t doc_id) {
-    docid_t ret = INVALID_DOCID;
-    docid_t cur_doc_id = current_doc_id_;
-    doc_id = std::max(cur_doc_id + 1, doc_id);
-    if (unlikely(doc_id > last_doc_id_in_buffer_)) {
-        if (!posting_decoder_->DecodeDocBuffer(doc_id, doc_buffer_, cur_doc_id, last_doc_id_in_buffer_, current_ttf_))
+RowID PostingIterator::SeekDoc(RowID row_id) {
+    RowID ret = INVALID_ROWID;
+    RowID current_row_id = current_row_id_;
+    row_id = std::max(current_row_id + 1, row_id);
+    if (unlikely(row_id > last_doc_id_in_buffer_)) {
+        if (!posting_decoder_->DecodeDocBuffer(row_id, doc_buffer_, current_row_id, last_doc_id_in_buffer_, current_ttf_))
             return ret;
         doc_buffer_cursor_ = doc_buffer_ + 1;
         posting_option_ = posting_decoder_->GetPostingFormatOption();
     }
     docid_t *cursor = doc_buffer_cursor_;
-    while (cur_doc_id < doc_id) {
-        cur_doc_id += *(cursor++);
+    while (current_row_id < row_id) {
+        current_row_id += *(cursor++);
     }
-    current_doc_id_ = cur_doc_id;
+    current_row_id_ = current_row_id;
     doc_buffer_cursor_ = cursor;
     need_move_to_current_doc_ = true;
-    ret = cur_doc_id;
+    ret = current_row_id;
     return ret;
 }
 
@@ -68,7 +70,7 @@ void PostingIterator::MoveToCurrentDoc() {
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
     if (posting_option_.HasTermFrequency()) {
-        state_.SetDocId(current_doc_id_);
+        state_.SetDocId(current_row_id_.segment_offset_);
         state_.SetTermFreq(InnerGetTF());
 
         u32 seeked_doc_count = GetCurrentSeekedDocCount();
@@ -110,8 +112,8 @@ void PostingIterator::Reset() {
     posting_decoder_ = new (session_pool_->Allocate(sizeof(MultiPostingDecoder))) MultiPostingDecoder(&state_, session_pool_);
     posting_decoder_->Init(segment_postings_);
 
-    current_doc_id_ = INVALID_DOCID;
-    last_doc_id_in_buffer_ = INVALID_DOCID - 1;
+    current_row_id_ = INVALID_ROWID;
+    last_doc_id_in_buffer_ = INVALID_ROWID - 1;
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
 }

@@ -18,6 +18,7 @@ export module column_length_io;
 
 import stl;
 import index_defines;
+import internal_types;
 
 namespace infinity {
 export class ColumnLengthWriter {};
@@ -27,6 +28,6 @@ public:
     ColumnLengthReader() = default;
     ~ColumnLengthReader() = default;
 
-    u32 GetColumnLength(u64 column_id, docid_t doc_id) { return 0; }
+    u32 GetColumnLength(u64 column_id, RowID doc_id) { return 0; }
 };
 } // namespace infinity

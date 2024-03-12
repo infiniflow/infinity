@@ -24,38 +24,74 @@ constexpr uint32_t INVALID_SEGMENT = std::numeric_limits<uint32_t>::max();
 constexpr uint32_t INVALID_SEGMENT_OFFSET = std::numeric_limits<uint32_t>::max();
 
 struct RowID {
-    RowID() : segment_id_(INVALID_SEGMENT), segment_offset_(INVALID_SEGMENT_OFFSET) {}
+    RowID() : segment_offset_(INVALID_SEGMENT_OFFSET), segment_id_(INVALID_SEGMENT) {}
 
-    inline explicit RowID(uint32_t segment_id, uint32_t segment_offset) : segment_id_(segment_id), segment_offset_(segment_offset) {}
+    inline explicit RowID(uint32_t segment_id, uint32_t segment_offset) : segment_offset_(segment_offset), segment_id_(segment_id) {}
 
-    inline explicit RowID(uint64_t row_id) : segment_id_(uint32_t(row_id >> 32)), segment_offset_(uint32_t(0xFFFFFFFF & row_id)) {}
+    inline constexpr RowID(uint64_t row_id) : value_(row_id) {}
 
-    inline uint64_t ToUint64() const { return uint64_t(segment_id_) << 32 | uint64_t(segment_offset_); }
+    inline uint64_t ToUint64() const { return value_; }
 
-    uint32_t segment_id_{};
-    uint32_t segment_offset_{};
-
-    inline bool operator<(const RowID &other) const {
-        return segment_id_ < other.segment_id_ || (segment_id_ == other.segment_id_ && segment_offset_ < other.segment_offset_);
+    union {
+        struct {
+            // small endian
+            uint32_t segment_offset_;
+            uint32_t segment_id_;
+        };
+        uint64_t value_;
     };
 
-    inline bool operator==(const RowID &other) const { return segment_id_ == other.segment_id_ && segment_offset_ == other.segment_offset_; }
+    inline bool operator<(const RowID &other) const { return value_ < other.value_; };
 
-    inline bool operator>(const RowID &other) const {
-        return segment_id_ > other.segment_id_ || (segment_id_ == other.segment_id_ && segment_offset_ > other.segment_offset_);
-    };
+    inline bool operator<=(const RowID &other) const { return value_ <= other.value_; };
+
+    inline bool operator==(const RowID &other) const { return value_ == other.value_; }
+
+    inline bool operator>(const RowID &other) const { return value_ > other.value_; };
+
+    inline bool operator>=(const RowID &other) const { return value_ >= other.value_; };
+
+    inline RowID &operator=(uint64_t value) {
+        value_ = value;
+        return *this;
+    }
 
     inline RowID &operator=(uint32_t i) {
-        segment_id_ = i;
+        segment_id_ = 0;
         segment_offset_ = i;
         return *this;
     }
 
-    inline bool operator!=(uint32_t i) const { return !(segment_id_ == i && segment_offset_ == i); }
+    inline bool operator!=(uint32_t i) const { return !(segment_offset_ == i); }
+
+    inline RowID operator+(const uint32_t &other) const { return RowID(segment_id_, segment_offset_ + other); }
+
+    inline RowID operator-(const RowID &other) const { return RowID(segment_id_, segment_offset_ - other.segment_offset_); }
+
+    inline RowID &operator+=(const uint32_t &other) {
+        segment_offset_ += other;
+        return *this;
+    }
+
+    inline RowID &operator-=(const RowID &other) {
+        value_ -= other.value_;
+        return *this;
+    }
+
+    inline RowID &operator++() {
+        ++value_;
+        return *this;
+    }
+
+    inline RowID operator++(int) {
+        RowID temp = *this;
+        ++value_;
+        return temp;
+    }
 
     [[nodiscard]] std::string ToString() const;
 
-    static inline RowID FromUint64(uint64_t row_id) { return RowID(uint32_t(row_id >> 32), uint32_t(0xFFFFFFFF & row_id)); }
+    static inline RowID FromUint64(uint64_t row_id) { return RowID(row_id); }
 };
 
 } // namespace infinity
