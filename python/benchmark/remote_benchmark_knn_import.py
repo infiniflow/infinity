@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 
 import infinity
 from infinity import index
@@ -55,6 +56,7 @@ def import_gist_1m(path):
 
 
 def create_index(table_name):
+    start = time.time()
     conn = ThriftInfinityClient(REMOTE_HOST)
     table = RemoteTable(conn, "default", table_name)
     res = table.create_index("hnsw_index",
@@ -69,6 +71,9 @@ def create_index(table_name):
                                               ])], None)
 
     assert res.error_code == ErrorCode.OK
+    end = time.time()
+    dur = end - start
+    print(f"create_index dur: {dur}")
 
 
 if __name__ == '__main__':
@@ -94,4 +99,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+
+    start = time.time()
     import_data(path=data_dir)
+    end = time.time()
+    dur = end - start
+    print(f"import time: {dur}")
+

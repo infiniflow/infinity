@@ -26,6 +26,7 @@ from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 
 
+
 def fvecs_read_all(filename):
     vectors = []
     with open(filename, 'rb') as f:

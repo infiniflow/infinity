@@ -25,16 +25,16 @@ profile_record_capacity = 100
 
 [log]
 log_filename            = "infinity.log"
-log_dir                 = "/var/infinity/log"
+log_dir                 = "/tmp/infinity/log"
 log_to_stdout           = false
 log_max_size           = "10GB"
 log_file_rotate_count   = 10
 
 # trace/info/warning/error/critical 5 log levels, default: info
-log_level               = "info"
+log_level               = "trace"
 
 [storage]
-data_dir                = "/var/infinity/data"
+data_dir                = "/tmp/infinity/data"
 default_row_size        = 8192
 storage_capacity        = "64GB"
 
@@ -52,14 +52,14 @@ garbage_collection_storage_ratio = 0.1
 
 [buffer]
 buffer_pool_size        = "4GB"
-temp_dir                = "/var/infinity/temp"
+temp_dir                = "/tmp/infinity/temp"
 
 [wal]
-wal_dir                 = "/var/infinity/wal"
+wal_dir                 = "/tmp/infinity/wal"
 full_checkpoint_interval_sec      = 86400
 delta_checkpoint_interval_sec     = 60
 delta_checkpoint_interval_wal_bytes = 1000000000
 wal_file_size_threshold            = "1GB"
 
 [resource]
-dictionary_dir                = "/var/infinity/resource"
+dictionary_dir                = "/tmp/infinity/resource"
