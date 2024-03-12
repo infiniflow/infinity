@@ -19,6 +19,7 @@ import index_full_text;
 import column_index_iterator;
 import segment_term_posting;
 import fst;
+import internal_types;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool)
@@ -28,7 +29,7 @@ ColumnIndexMerger::~ColumnIndexMerger() {}
 
 SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(memory_pool_, buffer_pool_); }
 
-void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<docid_t> &base_docids, const String &dst_base_name) {
+void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
     Path path = Path(index_dir_) / dst_base_name;
     String index_prefix = path.string();
     String dict_file = index_prefix + DICT_SUFFIX;
@@ -43,7 +44,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<doc
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
-    SegmentTermPostingQueue term_posting_queue(index_dir_, base_names, base_docids, flag_);
+    SegmentTermPostingQueue term_posting_queue(index_dir_, base_names, base_rowids, flag_);
     String term;
     TermMeta term_meta;
     SizeT term_meta_offset = 0;
