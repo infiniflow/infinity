@@ -24,13 +24,14 @@ PostingWriter::PostingWriter(MemoryPool *byte_slice_pool, RecyclePool *buffer_po
                                                          buffer_pool_,
                                                          posting_format_->GetPositionListFormat());
     }
-    if (posting_option.HasTfBitmap()) {
-        doc_list_encoder_ =
-            new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
-    }
+    doc_list_encoder_ =
+        new DocListEncoder(posting_option_.GetDocListFormatOption(), byte_slice_pool_, buffer_pool_, posting_format_->GetDocListFormat());
 }
 
 PostingWriter::~PostingWriter() {
+    if (posting_format_) {
+        delete posting_format_;
+    }
     if (position_list_encoder_) {
         delete position_list_encoder_;
     }

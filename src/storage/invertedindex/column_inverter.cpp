@@ -29,7 +29,6 @@ import string_ref;
 import term;
 import radix_sort;
 import index_defines;
-import memory_indexer;
 import posting_writer;
 
 namespace infinity {
@@ -154,27 +153,25 @@ void ColumnInverter::Sort() {
 }
 
 void ColumnInverter::GeneratePosting() {
-    u32 last_term_num = 0;
-    u32 last_term_pos = 0;
+    u32 last_term_num = std::numeric_limits<u32>::max();
     u32 last_doc_id = INVALID_DOCID;
     StringRef term;
     SharedPtr<PostingWriter> posting = nullptr;
     for (auto &i : positions_) {
-        if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
-            if (last_term_num != i.term_num_) {
-                last_term_num = i.term_num_;
-                term = GetTermFromNum(last_term_num);
-                posting = posting_writer_provider_(String(term.data()));
-            }
-            last_doc_id = i.doc_id_;
-            if (last_doc_id != INVALID_DOCID) {
-                posting->EndDocument(last_doc_id, 0);
-            }
+        if (last_term_num != i.term_num_) {
+            term = GetTermFromNum(i.term_num_);
+            posting = posting_writer_provider_(String(term.data()));
+            last_term_num = i.term_num_;
+            last_doc_id = INVALID_DOCID;
         }
-        if (i.term_pos_ != last_term_pos) {
-            last_term_pos = i.term_pos_;
-            posting->AddPosition(last_term_pos);
+        if (last_doc_id != INVALID_DOCID && last_doc_id != i.doc_id_) {
+            posting->EndDocument(last_doc_id, 0);
         }
+        last_doc_id = i.doc_id_;
+        posting->AddPosition(i.term_pos_);
+    }
+    if (last_doc_id != INVALID_DOCID) {
+        posting->EndDocument(last_doc_id, 0);
     }
 }
 

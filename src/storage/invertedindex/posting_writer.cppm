@@ -45,9 +45,9 @@ private:
     MemoryPool *byte_slice_pool_;
     RecyclePool *buffer_pool_;
     PostingFormatOption posting_option_;
-    PostingFormat *posting_format_;
-    DocListEncoder *doc_list_encoder_ = nullptr;
-    PositionListEncoder *position_list_encoder_ = nullptr;
+    PostingFormat *posting_format_{nullptr};
+    DocListEncoder *doc_list_encoder_{nullptr};
+    PositionListEncoder *position_list_encoder_{nullptr};
 };
 
 export using PostingWriterProvider = std::function<SharedPtr<PostingWriter>(const String &)>;
