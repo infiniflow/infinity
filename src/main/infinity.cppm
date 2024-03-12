@@ -85,6 +85,8 @@ public:
 
     QueryResult ShowTables(const String &db_name);
 
+    QueryResult GetTable(const String &db_name, const String &table_name);
+
     // Table related functions
     QueryResult CreateIndex(const String &db_name,
                             const String &table_name,

@@ -29,6 +29,7 @@ import third_party;
 import query_options;
 import query_result;
 import database;
+import table;
 import infinity_context;
 import session;
 import session_manager;
@@ -277,6 +278,20 @@ QueryResult Infinity::ShowTables(const String &db_name) {
     show_statement->schema_name_ = db_name;
     show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::GetTable(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->set_current_schema(db_name);
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeUnique<CheckTable>(table_name.c_str());
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
     return result;
 }
 

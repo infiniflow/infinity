@@ -145,14 +145,8 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
         CreateTableOptions create_table_opts;
-        auto result = database->CreateTable(request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
+        auto result = infinity->CreateTable(request.db_name, request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
         ProcessQueryResult(response, result);
     }
 
@@ -160,12 +154,6 @@ public:
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
-            return;
-        }
-
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
             return;
         }
 
@@ -183,7 +171,7 @@ public:
                 break;
         }
 
-        auto result = database->DropTable(request.table_name, drop_table_opts);
+        auto result = infinity->DropTable(request.db_name, request.table_name, drop_table_opts);
         ProcessQueryResult(response, result);
     }
 
@@ -191,18 +179,6 @@ public:
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
-            return;
-        }
-
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
             return;
         }
 
@@ -263,7 +239,7 @@ public:
             values->emplace_back(value_list);
         }
 
-        auto result = table->Insert(columns, values);
+        auto result = infinity->Insert(request.db_name, request.table_name, columns, values);
         ProcessQueryResult(response, result);
     }
 
@@ -290,18 +266,6 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
-            return;
-        }
-
         Path path(fmt::format("{}_{}_{}_{}",
                               *InfinityContext::instance().config()->temp_dir().get(),
                               request.db_name,
@@ -321,7 +285,7 @@ public:
         }
         import_options.delimiter_ = delimiter_string[0];
 
-        const QueryResult result = table->Import(path.c_str(), import_options);
+        const QueryResult result = infinity->Import(request.db_name, request.table_name, path.c_str(), import_options);
         ProcessQueryResult(response, result);
     }
 
@@ -367,18 +331,6 @@ public:
             ProcessStatus(response, infinity_status);
             return;
         }
-
-//        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-//        if (!database_status.ok()) {
-//            ProcessStatus(response, database_status);
-//            return;
-//        }
-//
-//        auto [table, table_status] = database->GetTable(request.table_name);
-//        if (!table_status.ok()) {
-//            ProcessStatus(response, table_status);
-//            return;
-//        }
 
         // auto end1 = std::chrono::steady_clock::now();
         //
@@ -564,18 +516,6 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
-            return;
-        }
-
         if (request.__isset.select_list == false) {
             ProcessStatus(response, Status::EmptySelectFields());
             return;
@@ -703,7 +643,7 @@ public:
 
         // Explain type
         auto explain_type = GetExplainTypeFromProto(request.explain_type);
-        const QueryResult result = table->Explain(explain_type, search_expr, filter, output_columns);
+        const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
 
         if (result.IsOk()) {
             auto &columns = response.column_fields;
@@ -738,18 +678,6 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
-            return;
-        }
-
         ParsedExpr *filter = nullptr;
         if (request.__isset.where_expr == true) {
             Status parsed_expr_status;
@@ -760,7 +688,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Delete(filter);
+        const QueryResult result = infinity->Delete(request.db_name, request.table_name, filter);
         ProcessQueryResult(response, result);
     };
 
@@ -768,18 +696,6 @@ public:
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
-            return;
-        }
-
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
             return;
         }
 
@@ -822,7 +738,7 @@ public:
             }
         }
 
-        const QueryResult result = table->Update(filter, update_expr_array);
+        const QueryResult result = infinity->Update(request.db_name, request.table_name, filter, update_expr_array);
         ProcessQueryResult(response, result);
     }
 
@@ -855,13 +771,7 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto result = database->ListTables();
+        auto result = infinity->ListTables(request.db_name);
         if (result.IsOk()) {
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
             auto row_count = data_block->row_count();
@@ -888,13 +798,7 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        const QueryResult result = database->DescribeTable(request.table_name);
+        const QueryResult result = infinity->DescribeTable(request.db_name, request.table_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
@@ -911,13 +815,7 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        const QueryResult result = database->ShowTables();
+        const QueryResult result = infinity->ShowTables(request.db_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
@@ -945,32 +843,14 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        ProcessStatus(response, table_status);
+        const QueryResult result = infinity->GetTable(request.db_name, request.table_name);
+        ProcessQueryResult(response, result);
     }
 
     void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
-            return;
-        }
-
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
             return;
         }
 
@@ -1010,7 +890,11 @@ public:
             index_info_list_to_use->emplace_back(index_info_to_use);
         }
 
-        QueryResult result = table->CreateIndex(request.index_name, index_info_list_to_use, (CreateIndexOptions &)request.option);
+        QueryResult result = infinity->CreateIndex(request.db_name,
+                                                   request.table_name,
+                                                   request.index_name,
+                                                   index_info_list_to_use,
+                                                   (CreateIndexOptions &)request.option);
         ProcessQueryResult(response, result);
     }
 
@@ -1021,19 +905,7 @@ public:
             return;
         }
 
-        auto [database, database_status] = infinity->GetDatabase(request.db_name);
-        if (!database_status.ok()) {
-            ProcessStatus(response, database_status);
-            return;
-        }
-
-        auto [table, table_status] = database->GetTable(request.table_name);
-        if (!table_status.ok()) {
-            ProcessStatus(response, table_status);
-            return;
-        }
-
-        QueryResult result = table->DropIndex(request.index_name);
+        QueryResult result = infinity->DropIndex(request.db_name, request.table_name, request.index_name);
         ProcessQueryResult(response, result);
     }
 
