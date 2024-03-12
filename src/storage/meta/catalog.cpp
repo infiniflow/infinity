@@ -212,6 +212,15 @@ Tuple<SharedPtr<TableIndexEntry>, Status> Catalog::DropIndex(const String &db_na
     return table_entry->DropIndex(index_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
+Tuple<TableIndexEntry *, Status>
+Catalog::GetIndexByName(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetIndex(index_name, txn_id, begin_ts);
+}
+
 Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();
@@ -219,8 +228,14 @@ Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *tabl
     return Status::OK();
 }
 
-void Catalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
-    return TableEntry::CommitCreateIndex(txn_indexes_store_, is_replay);
+void Catalog::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {
+    auto *table_index_entry = txn_index_store->table_index_entry_;
+    table_index_entry->CommitCreateIndex(txn_index_store, commit_ts, is_replay);
+}
+
+void Catalog::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
+    auto *table_index_entry = txn_index_store->table_index_entry_;
+    table_index_entry->RollbackCreateIndex(txn_index_store);
 }
 
 void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {

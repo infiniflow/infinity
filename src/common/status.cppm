@@ -24,6 +24,7 @@ namespace infinity {
 export enum class ErrorCode : long {
 
     kOk = 0, // success
+    kIgnore = 1,
 
     // 1. config error,
     kInvalidTimeInfo = 1001,
@@ -144,6 +145,7 @@ export class Status {
 public:
     // 0. Success
     static Status OK() { return {}; }
+    static Status Ignore();
 
     // 1. Config error
     static Status InvalidTimeInfo(const String &time_info);

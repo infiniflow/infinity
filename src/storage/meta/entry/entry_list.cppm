@@ -176,16 +176,20 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore Add an existed entry."));
-                    return {nullptr, Status::OK()};
+                    return {nullptr, Status::Ignore()};
                 }
                 default: {
-                    UniquePtr<String> err_msg = MakeUnique<String>("Duplicated entry");
-                    LOG_ERROR(*err_msg);
                     if constexpr (std::is_same_v<Entry, DBEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated db entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
                     } else if constexpr (std::is_same_v<Entry, TableEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated table entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateTableName, std::move(err_msg))};
                     } else if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated table index entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
                     } else {
                         UnrecoverableError("Unimplemented");
@@ -221,7 +225,7 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore drop a not existed entry."));
-                    return {nullptr, Status::OK()};
+                    return {nullptr, Status::Ignore()};
                 }
                 default: {
                     auto err_msg = MakeUnique<String>("Not existed entry.");

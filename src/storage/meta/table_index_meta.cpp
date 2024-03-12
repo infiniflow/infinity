@@ -70,7 +70,7 @@ Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(st
                                                                               TxnTimeStamp begin_ts,
                                                                               TxnManager *txn_mgr) {
     auto init_drop_entry = [&]() {
-        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts, txn_mgr);
+        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
         drop_entry->deleted_ = true;
         return drop_entry;
     };

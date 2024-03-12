@@ -97,17 +97,45 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Import(const SharedPtr<SegmentEn
     return {nullptr, Status::OK()};
 }
 
-Tuple<UniquePtr<String>, Status>
-TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u32 segment_id, SharedPtr<SegmentIndexEntry> index) {
-    const String &index_name = *table_index_entry->index_base()->index_name_;
-    if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
-        column_index_iter->second.index_entry_map_[segment_id] = index;
-    } else {
-        TxnIndexStore index_store(table_index_entry);
-        index_store.index_entry_map_[segment_id] = index;
-        txn_indexes_store_.emplace(index_name, std::move(index_store));
+void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) { txn_indexes_.insert(table_index_entry); }
+
+void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
+    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    for (auto *segment_index_entry : segment_index_entries) {
+        auto [iter, insert_ok] = txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("Attempt to add segment index of segment {} store twice", segment_index_entry->segment_id()));
+        }
     }
-    return {nullptr, Status::OK()};
+}
+
+void TxnTableStore::AddFulltextIndexStore(TableIndexEntry *table_index_entry, FulltextIndexEntry *fulltext_index_entry) {
+    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    if (txn_index_store->fulltext_index_entry_ != nullptr) {
+        UnrecoverableError("Attempt to add fulltext index store twice");
+    }
+    txn_index_store->fulltext_index_entry_ = fulltext_index_entry;
+}
+
+void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
+    if (txn_indexes_.contains(table_index_entry)) {
+        txn_indexes_.erase(table_index_entry);
+        txn_indexes_store_.erase(*table_index_entry->GetIndexName());
+        table_index_entry->Cleanup();
+    } else {
+        txn_indexes_.insert(table_index_entry);
+    }
+}
+
+TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry) {
+    const String &index_name = *table_index_entry->GetIndexName();
+    if (auto iter = txn_indexes_store_.find(index_name); iter != txn_indexes_store_.end()) {
+        return iter->second.get();
+    }
+    auto txn_index_store = MakeUnique<TxnIndexStore>(table_index_entry);
+    auto *ptr = txn_index_store.get();
+    txn_indexes_store_.emplace(index_name, std::move(txn_index_store));
+    return ptr;
 }
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
@@ -138,10 +166,17 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 
 void TxnTableStore::Rollback() {
+    TransactionID txn_id = txn_->TxnID();
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
+    }
+    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        Catalog::RollbackCreateIndex(txn_index_store.get());
+        auto *table_index_entry = txn_index_store->table_index_entry_;
+        table_index_entry->Cleanup();
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id);
     }
     Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
@@ -168,7 +203,6 @@ void TxnTableStore::PrepareCommit() {
     }
 
     Catalog::Delete(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), delete_state_);
-    Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
@@ -179,6 +213,12 @@ void TxnTableStore::PrepareCommit() {
 void TxnTableStore::Commit() const {
     Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
     Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        Catalog::CommitCreateIndex(txn_index_store.get(), txn_->CommitTS());
+    }
+    for (auto *table_index_entry : txn_indexes_) {
+        table_index_entry->Commit(txn_->CommitTS());
+    }
 }
 
 void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {

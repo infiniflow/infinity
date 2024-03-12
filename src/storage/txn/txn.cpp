@@ -64,16 +64,9 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 }
 
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    auto [table_entry, status] = GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return status;
-    }
+    this->CheckTxn(db_name);
 
-    TxnTableStore *table_store{nullptr};
-    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
-    }
-    table_store = txn_tables_store_[table_name].get();
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     auto [err_msg, append_status] = table_store->Append(input_block);
@@ -81,6 +74,8 @@ Status Txn::Append(const String &db_name, const String &table_name, const Shared
 }
 
 Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
+    this->CheckTxn(db_name);
+
     auto [table_entry, status] = GetTableByName(db_name, table_name);
     if (!status.ok()) {
         return status;
@@ -90,11 +85,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
-    TxnTableStore *table_store{nullptr};
-    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
-    }
-    table_store = txn_tables_store_[table_name].get();
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
@@ -104,38 +95,56 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
 Status
 Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
     const String &table_name = *table_entry->GetTableName();
-    TxnTableStore *table_store{nullptr};
-    if (txn_tables_store_.find(table_name) == txn_tables_store_.end()) {
-        txn_tables_store_[table_name] = MakeUnique<TxnTableStore>(table_entry, this);
-    }
-    table_store = txn_tables_store_[table_name].get();
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
 }
 
-TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
-    std::unique_lock<std::mutex> lk(lock_);
-    auto txn_table_iter = txn_tables_store_.find(*table_entry->GetTableName());
-    if (txn_table_iter != txn_tables_store_.end()) {
-        return txn_table_iter->second.get();
+TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
+    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
+        return iter->second.get();
     }
-    txn_tables_store_[*table_entry->GetTableName()] = MakeUnique<TxnTableStore>(table_entry, this);
-    TxnTableStore *txn_table_store = txn_tables_store_[*table_entry->GetTableName()].get();
-    return txn_table_store;
+    auto [table_entry, status] = this->GetTableByName(db_name_, table_name);
+    if (table_entry == nullptr) {
+        UnrecoverableError(status.message());
+    }
+    auto [iter, insert_ok] = txn_tables_store_.emplace(table_name, MakeUnique<TxnTableStore>(table_entry, this));
+    return iter->second.get();
+}
+
+TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
+    const String &table_name = *table_entry->GetTableName();
+    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
+        return iter->second.get();
+    }
+    auto [iter, insert_ok] = txn_tables_store_.emplace(table_name, MakeUnique<TxnTableStore>(table_entry, this));
+    return iter->second.get();
+}
+
+void Txn::CheckTxnStatus() {
+    TxnState txn_state = txn_context_.GetTxnState();
+    if (txn_state != TxnState::kStarted) {
+        UnrecoverableError("Transaction isn't started.");
+    }
+}
+
+void Txn::CheckTxn(const String &db_name) {
+    this->CheckTxnStatus();
+    if (db_name_.empty()) {
+        db_name_ = db_name;
+    } else if (!IsEqual(db_name_, db_name)) {
+        UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table from another database {}", db_name));
+        LOG_ERROR(*err_msg);
+        RecoverableError(Status::InvalidDBName(db_name));
+    }
 }
 
 BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
 
 // Database OPs
 Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
-
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
-
+    this->CheckTxnStatus();
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [db_entry, status] = catalog_->CreateDatabase(db_name, this->txn_id_, begin_ts, txn_mgr_, conflict_type);
@@ -149,13 +158,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
 }
 
 Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
-
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
-
+    this->CheckTxnStatus();
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_id_, begin_ts, txn_mgr_, conflict_type);
@@ -169,12 +172,7 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 }
 
 Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
-
+    this->CheckTxnStatus();
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
@@ -195,12 +193,7 @@ Vector<DatabaseDetail> Txn::ListDatabases() {
 
 // Table and Collection OPs
 Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_array) {
-
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
+    this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -208,11 +201,7 @@ Status Txn::GetTables(const String &db_name, Vector<TableDetail> &output_table_a
 }
 
 Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
+    this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -229,11 +218,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
 }
 
 Status Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
+    this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -248,24 +233,40 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     return Status::OK();
 }
 
+// Index OPs
 Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction is not started");
-    }
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [table_index_entry, index_status] = catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_id_, begin_ts, txn_mgr_);
     if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
+    auto *txn_table_store = this->GetTxnTableStore(table_entry);
+    txn_table_store->AddIndexStore(table_index_entry);
     return {table_index_entry, index_status};
+}
+
+Tuple<TableIndexEntry *, Status> Txn::GetIndexByName(const String &db_name, const String &table_name, const String &index_name) {
+    this->CheckTxn(db_name);
+
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    return catalog_->GetIndexByName(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
 Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
-    table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
+    auto [fulltext_index_entry, segment_index_entries, status] =
+        table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto *txn_table_store = this->GetTxnTableStore(table_entry);
+    if (fulltext_index_entry == nullptr) {
+        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+    } else {
+        txn_table_store->AddFulltextIndexStore(table_index_entry, fulltext_index_entry);
+    }
 
     if (!prepare) {
         String index_dir = *table_index_entry->index_dir();
@@ -279,70 +280,48 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     auto *table_entry = table_ref->table_entry_ptr_;
 
-    auto *table_store = GetTxnTableStore(table_entry);
-    auto iter = table_store->txn_indexes_store_.find(index_name);
-    if (iter == table_store->txn_indexes_store_.end()) {
-        // the table is empty
-        return Status::OK();
+    auto [table_index_entry, status] = this->GetIndexByName(db_name_, *table_entry->GetTableName(), index_name);
+    if (!status.ok()) {
+        return status;
     }
-    TxnIndexStore &txn_index_store = iter->second;
-    auto *table_index_entry = txn_index_store.table_index_entry_;
+    if (table_index_entry->txn_id_ != txn_id_) {
+        UnrecoverableError("Index is not created by this txn. Something error happened.");
+    }
 
     return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
 }
 
 Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
-    String key = *index_base->index_name_;
-    auto it = txn_indexes_.find(key);
-    if (it != txn_indexes_.end()) {
-        // Key found, it -> second is the value
-        TableIndexEntry *found_entry = it->second;
-        this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *found_entry->index_dir(), index_base));
-        LOG_TRACE(fmt::format("The key {} exists in the map", key));
-    } else {
-        // Key not found
-        LOG_TRACE(fmt::format("The key {} does not exist in the map", key));
+    this->CheckTxn(db_name);
+
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, *index_base->index_name_);
+    if (!status.ok()) {
+        return status;
     }
+
+    this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, *table_index_entry->index_dir(), index_base));
     return Status::OK();
 }
 
 Status Txn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
-    TxnState txn_state = txn_context_.GetTxnState();
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction is not started");
-    }
+    this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     auto [table_index_entry, index_status] = catalog_->DropIndex(db_name, table_name, index_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
-    if (!index_status.ok()) {
+    if (table_index_entry.get() == nullptr) {
         return index_status;
     }
 
-    if (index_status.ok() && table_index_entry.get() == nullptr && conflict_type == ConflictType::kIgnore) {
-        return index_status;
-    }
+    auto *txn_table_store = this->GetTxnTableStore(table_name);
+    txn_table_store->DropIndexStore(table_index_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
     return index_status;
 }
 
 Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
-    TxnState txn_state = txn_context_.GetTxnState();
-
-    if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
-    }
-
-    if (db_name_.empty()) {
-        db_name_ = db_name;
-    } else {
-        if (!IsEqual(db_name_, db_name)) {
-            UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table {} from another database {}", db_name, table_name));
-            LOG_ERROR(*err_msg);
-            return {nullptr, Status(ErrorCode::kInvalidDbName, std::move(err_msg))};
-        }
-    }
+    this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -442,11 +421,6 @@ void Txn::CommitBottom() noexcept {
         table_entry->Commit(commit_ts);
     }
 
-    //  Commit indexes in catalog
-    for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        table_index_entry->Commit(commit_ts);
-    }
-
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
@@ -481,11 +455,6 @@ void Txn::FakeCommit(TxnTimeStamp commit_ts) {
 void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
-
-    for (const auto &[index_name, table_index_entry] : txn_indexes_) {
-        table_index_entry->Cleanup();
-        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id_);
-    }
 
     for (auto *table_entry : txn_tables_) {
         table_entry->Cleanup();
@@ -571,17 +540,6 @@ void Txn::DropTableStore(TableEntry *dropped_table_entry) {
         txn_tables_store_.erase(*dropped_table_entry->GetTableName());
     } else {
         txn_tables_.insert(dropped_table_entry);
-    }
-}
-
-void Txn::AddIndexStore(const String &index_name, TableIndexEntry *index_entry) { txn_indexes_.emplace(index_name, index_entry); }
-
-void Txn::DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry) {
-    if (auto iter = txn_indexes_.find(index_name); iter != txn_indexes_.end()) {
-        txn_indexes_.erase(iter);
-        dropped_index_entry->Cleanup();
-    } else {
-        txn_indexes_.emplace(index_name, dropped_index_entry);
     }
 }
 

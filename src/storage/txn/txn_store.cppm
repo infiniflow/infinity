@@ -21,6 +21,8 @@ import stl;
 import data_access_state;
 import status;
 import internal_types;
+import index_base;
+import extra_ddl_info;
 
 namespace infinity {
 
@@ -35,10 +37,6 @@ class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
 
-struct TxnSegmentIndexStore {
-    HashMap<u32, SharedPtr<SegmentIndexEntry>> index_entry_map_{};
-};
-
 export struct TxnIndexStore {
 public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry);
@@ -48,7 +46,7 @@ public:
 
     FulltextIndexEntry *fulltext_index_entry_{};
 
-    HashMap<u32, SharedPtr<SegmentIndexEntry>> index_entry_map_{}; // segment_id -> segment_index_entry
+    HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
 };
 
 export struct TxnCompactStore {
@@ -68,7 +66,15 @@ public:
 
     Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
 
-    Tuple<UniquePtr<String>, Status> CreateIndexFile(TableIndexEntry *table_index_entry, u32 segment_id, SharedPtr<SegmentIndexEntry> index);
+    void AddIndexStore(TableIndexEntry *table_index_entry);
+
+    void AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries);
+
+    void AddFulltextIndexStore(TableIndexEntry *table_index_entry, FulltextIndexEntry *fulltext_index_entry);
+
+    TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry);
+
+    void DropIndexStore(TableIndexEntry *table_index_entry);
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
@@ -88,7 +94,10 @@ public:
 public:
     Vector<SharedPtr<DataBlock>> blocks_{};
     Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{}; // Only used for IMPORT and COMPACT
-    HashMap<String, TxnIndexStore> txn_indexes_store_{};
+
+    Set<TableIndexEntry *> txn_indexes_{};
+    HashMap<String, UniquePtr<TxnIndexStore>> txn_indexes_store_{};
+
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 

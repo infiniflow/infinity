@@ -106,8 +106,6 @@ public:
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
 public:
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
-
     TableMeta *GetTableMeta() const { return table_meta_; }
 
     void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);

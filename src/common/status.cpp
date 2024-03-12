@@ -69,6 +69,8 @@ void Status::AppendMessage(const String &msg) {
 
 // Error functions
 
+Status Status::Ignore() { return Status(ErrorCode::kIgnore); }
+
 // 1. Config error
 Status Status::InvalidTimeInfo(const String &time_info) {
     return Status(ErrorCode::kInvalidTimeInfo, MakeUnique<String>(fmt::format("Invalid time info format: {}", time_info)));

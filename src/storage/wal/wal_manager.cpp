@@ -665,7 +665,9 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    Catalog::CommitCreateIndex(txn_store->txn_indexes_store_, true /*is_replay*/);
+    for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store_) {
+        Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts, true /*is_replay*/);
+    }
     table_index_entry->Commit(commit_ts);
 }
 

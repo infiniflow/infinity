@@ -237,18 +237,6 @@ void TableEntry::SetSegmentSealedForAppend(const Vector<SegmentID> &set_sealed_s
     }
 }
 
-void TableEntry::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
-    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        TableIndexEntry *table_index_entry = txn_index_store.table_index_entry_;
-        for (auto &[segment_id, segment_index] : txn_index_store.index_entry_map_) {
-            table_index_entry->CommitCreateIndex(segment_id, segment_index, is_replay);
-        }
-        if (table_index_entry->fulltext_index_entry().get() != nullptr) {
-            table_index_entry->CommitCreateIndex(table_index_entry->fulltext_index_entry());
-        }
-    }
-}
-
 Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
     Txn *txn = txn_store_ptr->txn_;

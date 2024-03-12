@@ -108,6 +108,8 @@ public:
     // operator. (called by `PhysicalCreateIndexDo`)
     Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
+    Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
+
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
@@ -156,9 +158,6 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
-    // Create txn store if not exists
-    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
-
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
     void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
@@ -180,10 +179,16 @@ private:
 
     void DropTableStore(TableEntry *dropped_table_entry);
 
-public:
-    void AddIndexStore(const String &index_name, TableIndexEntry *index_entry);
+    // Create txn store if not exists
+    TxnTableStore *GetTxnTableStore(const String &table_name);
 
-    void DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry);
+public:
+    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+private:
+    void CheckTxnStatus();
+
+    void CheckTxn(const String &db_name);
 
 private:
     // Txn store
@@ -191,7 +196,6 @@ private:
     Set<TableEntry *> txn_tables_{};
     // Key: table name Value: TxnTableStore
     HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
-    HashMap<String, TableIndexEntry *> txn_indexes_{};
 
 private:
     TxnManager *txn_mgr_{};

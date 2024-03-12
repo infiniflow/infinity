@@ -165,9 +165,14 @@ public:
                                                         TxnTimeStamp begin_ts,
                                                         TxnManager *txn_mgr);
 
+    Tuple<TableIndexEntry *, Status>
+    GetIndexByName(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id);
 
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay = false);
+    static void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
+
+    static void RollbackCreateIndex(TxnIndexStore *txn_index_store);
 
     // Append related functions
     static void Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
