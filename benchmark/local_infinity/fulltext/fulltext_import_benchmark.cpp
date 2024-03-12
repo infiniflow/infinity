@@ -22,8 +22,6 @@ import compilation_config;
 import local_file_system;
 import profiler;
 import infinity;
-import database;
-import table;
 import query_options;
 
 import internal_types;
@@ -79,18 +77,18 @@ int main() {
     create_db_options.conflict_type_ = ConflictType::kIgnore;
     infinity->CreateDatabase(db_name, std::move(create_db_options));
 
-    auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
+//    auto [ data_base, status1 ] = infinity->GetDatabase(db_name);
     CreateTableOptions create_tb_options;
     create_tb_options.conflict_type_ = ConflictType::kIgnore;
-    data_base->CreateTable(table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
+    infinity->CreateTable(db_name, table_name, std::move(column_defs), std::vector<TableConstraint *>{}, std::move(create_tb_options));
 
     BaseProfiler profiler;
 
     profiler.Begin();
-    auto [ table, status2 ] = data_base->GetTable(table_name);
+//    auto [ table, status2 ] = data_base->GetTable(table_name);
     ImportOptions import_options;
     import_options.copy_file_type_ = CopyFileType::kJSONL;
-    table->Import(import_from, std::move(import_options));
+    infinity->Import(db_name, table_name, import_from, std::move(import_options));
     std::cout << "Import data cost: " << profiler.ElapsedToString();
 
     profiler.Begin();
@@ -108,7 +106,7 @@ int main() {
         index_info_list->push_back(index_info);
     }
 
-    auto r = table->CreateIndex(index_name, index_info_list, CreateIndexOptions());
+    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
     if (r.IsOk()) {
         r = infinity->Flush();
     } else {
