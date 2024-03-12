@@ -24,6 +24,7 @@ namespace infinity {
 export class CommonLanguageAnalyzer : public Analyzer {
 public:
     CommonLanguageAnalyzer();
+    CommonLanguageAnalyzer(const CommonLanguageAnalyzer &) = delete;
     virtual ~CommonLanguageAnalyzer();
 
     void SetCaseSensitive(bool case_sensitive = true, bool contain_lower = true) {
@@ -70,9 +71,8 @@ protected:
 protected:
     static const SizeT term_string_buffer_limit_ = 4096 * 3;
 
-    char *lowercase_string_buffer_ = nullptr;
-
-    Stemmer *stemmer_{nullptr};
+    Vector<char> lowercase_string_buffer_;
+    UniquePtr<Stemmer> stemmer_{nullptr};
     const char *token_{nullptr};
     SizeT len_{0};
     const char *native_token_{nullptr};
