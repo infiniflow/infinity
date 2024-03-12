@@ -1,0 +1,54 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Mac
+
+**/.DS_Store
+
+# idea
+.idea/
+cmake-build-debug/
+
+# local build
+build*/
+_build*/
+
+# Docker
+Dockerfile
+docker-compose.yaml
+docker-compose.yml
+
+# VS
+.vs/
+out/
+CMakeSettings.json
