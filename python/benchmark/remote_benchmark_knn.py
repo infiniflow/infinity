@@ -112,13 +112,17 @@ def trace_unhandled_exceptions(func):
 
 
 @trace_unhandled_exceptions
-def work(query_vec, topk, metric_type, column_name, data_type, table_name="sift_benchmark"):
+def work(queries, topk, metric_type, column_name, data_type, table_name="sift_benchmark"):
     conn = ThriftInfinityClient(REMOTE_HOST)
-    table = RemoteTable(conn, "default", table_name)
-    query_builder = InfinityThriftQueryBuilder(table)
-    query_builder.output(["_row_id"])
-    query_builder.knn(column_name, query_vec, data_type, metric_type, topk)
-    query_builder.to_result()
+    for query in queries:
+        # print(len(query))
+        table = RemoteTable(conn, "default", table_name)
+        # table.knn(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
+        query_builder = InfinityThriftQueryBuilder(table)
+        query_builder.output(["_row_id"])
+        query_builder.knn(column_name, query, data_type, metric_type, topk)
+        query_builder.to_result()
+    conn.disconnect()
 
 
 def fvecs_read(filename):
@@ -140,13 +144,18 @@ def process_pool(threads, rounds, query_path, tabel_name):
 
     results = []
 
-    queries = fvecs_read_all(query_path)
+    total_queries = fvecs_read_all(query_path)
+    queries = [[] for i in range(threads)]
+    total_queries_count = len(total_queries)
+    print(total_queries_count)
+    for i, query in enumerate(total_queries):
+        queries[i % threads].append(query)
 
     for i in range(rounds):
         p = multiprocessing.Pool(threads)
         start = time.time()
-        for idx, query_vec in enumerate(fvecs_read(query_path)):
-            p.apply_async(work, args=(query_vec, 100, "l2", "col1", "float", tabel_name))
+        for idx in range(threads):
+            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", tabel_name))
         p.close()
         p.join()
         end = time.time()
@@ -154,7 +163,7 @@ def process_pool(threads, rounds, query_path, tabel_name):
         results.append(f"Round {i + 1}:")
         results.append(f"Total Dur: {dur} s")
         results.append(f"Query Count: {len(queries)}")
-        results.append(f"QPS: {len(queries) / dur}")
+        results.append(f"QPS: {len(total_queries) / dur}")
 
     for result in results:
         print(result)
@@ -205,6 +214,8 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         results.append(f"Recall@1: {recall_1}")
         results.append(f"Recall@10: {recall_10}")
         results.append(f"Recall@100: {recall_100}")
+
+        conn.disconnect()
 
     for result in results:
         print(result)
