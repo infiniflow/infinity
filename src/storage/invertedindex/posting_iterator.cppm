@@ -11,6 +11,8 @@ import multi_posting_decoder;
 import segment_posting;
 import index_defines;
 import match_data;
+import internal_types;
+
 export module posting_iterator;
 
 namespace infinity {
@@ -26,7 +28,7 @@ public:
 
     TermMeta *GetTermMeta() const { return const_cast<TermMeta *>(&term_meta_); }
 
-    docid_t SeekDoc(docid_t docId);
+    RowID SeekDoc(RowID docId);
 
     void SeekPosition(pos_t pos, pos_t &result);
 
@@ -102,8 +104,8 @@ private:
     PostingFormatOption posting_option_;
     MemoryPool *session_pool_;
     TermMeta term_meta_;
-    docid_t last_doc_id_in_buffer_;
-    docid_t current_doc_id_;
+    RowID last_doc_id_in_buffer_;
+    RowID current_doc_id_;
     docid_t *doc_buffer_cursor_;
     docid_t doc_buffer_[MAX_DOC_PER_RECORD];
     docid_t *doc_buffer_base_;

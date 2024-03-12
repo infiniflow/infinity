@@ -19,6 +19,7 @@ import inmem_posting_decoder;
 import inmem_pos_list_decoder;
 import pair_value_skiplist_reader;
 import tri_value_skiplist_reader;
+import internal_types;
 
 namespace infinity {
 
@@ -39,14 +40,10 @@ MultiPostingDecoder::~MultiPostingDecoder() {
 void MultiPostingDecoder::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings) {
     seg_postings_ = seg_postings;
     segment_count_ = (u32)seg_postings_->size();
-    MoveToSegment(INVALID_DOCID);
+    MoveToSegment(INVALID_ROWID);
 }
 
-bool MultiPostingDecoder::DecodeDocBuffer(docid_t start_doc_id,
-                                          docid_t *doc_buffer,
-                                          docid_t &first_doc_id,
-                                          docid_t &last_doc_id,
-                                          ttf_t &current_ttf) {
+bool MultiPostingDecoder::DecodeDocBuffer(RowID start_doc_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
     while (true) {
         if (DecodeDocBufferInOneSegment(start_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
             return true;
@@ -74,26 +71,26 @@ void MultiPostingDecoder::DecodeCurrentDocPayloadBuffer(docpayload_t *doc_payloa
     }
 }
 
-bool MultiPostingDecoder::DecodeDocBufferInOneSegment(docid_t start_doc_id,
+bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_doc_id,
                                                       docid_t *doc_buffer,
-                                                      docid_t &first_doc_id,
-                                                      docid_t &last_doc_id,
+                                                      RowID &first_row_id,
+                                                      RowID &last_row_id,
                                                       ttf_t &current_ttf) {
-    docid_t next_seg_base_doc_id = GetSegmentBaseDocId(segment_cursor_);
-    if (next_seg_base_doc_id != INVALID_DOCID && start_doc_id >= next_seg_base_doc_id) {
+    RowID next_seg_base_doc_id = GetSegmentBaseDocId(segment_cursor_);
+    if (next_seg_base_doc_id != INVALID_ROWID && start_doc_id >= next_seg_base_doc_id) {
         // start docid not in current segment
         return false;
     }
 
-    docid_t cur_seg_doc_id = std::max(docid_t(0), start_doc_id - base_doc_id_);
-    if (!index_decoder_->DecodeDocBuffer(cur_seg_doc_id, doc_buffer, first_doc_id, last_doc_id, current_ttf)) {
+    docid_t cur_seg_doc_id = std::max(docid_t(0), (start_doc_id - base_doc_id_).segment_offset_);
+    if (!index_decoder_->DecodeDocBuffer(cur_seg_doc_id, doc_buffer, first_row_id.segment_offset_, last_row_id.segment_offset_, current_ttf)) {
         return false;
     }
     need_decode_tf_ = cur_segment_format_option_.HasTfList();
     need_decode_doc_payload_ = cur_segment_format_option_.HasDocPayload();
 
-    first_doc_id += base_doc_id_;
-    last_doc_id += base_doc_id_;
+    first_row_id += base_doc_id_.segment_offset_;
+    last_row_id += base_doc_id_.segment_offset_;
     return true;
 }
 
@@ -109,7 +106,7 @@ IndexDecoder *MultiPostingDecoder::CreateIndexDecoder(u32 doc_list_begin_pos) {
     }
 }
 
-bool MultiPostingDecoder::MoveToSegment(docid_t start_doc_id) {
+bool MultiPostingDecoder::MoveToSegment(RowID start_doc_id) {
     u32 locate_seg_cursor = LocateSegment(segment_cursor_, start_doc_id);
     if (locate_seg_cursor >= segment_count_) {
         return false;

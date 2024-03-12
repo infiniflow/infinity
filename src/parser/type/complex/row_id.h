@@ -41,15 +41,15 @@ struct RowID {
         uint64_t value_;
     };
 
-    inline bool operator<(const RowID &other) const {
-        return segment_id_ < other.segment_id_ || (segment_id_ == other.segment_id_ && segment_offset_ < other.segment_offset_);
-    };
+    inline bool operator<(const RowID &other) const { return value_ < other.value_; };
 
-    inline bool operator==(const RowID &other) const { return segment_id_ == other.segment_id_ && segment_offset_ == other.segment_offset_; }
+    inline bool operator<=(const RowID &other) const { return value_ <= other.value_; };
 
-    inline bool operator>(const RowID &other) const {
-        return segment_id_ > other.segment_id_ || (segment_id_ == other.segment_id_ && segment_offset_ > other.segment_offset_);
-    };
+    inline bool operator==(const RowID &other) const { return value_ == other.value_; }
+
+    inline bool operator>(const RowID &other) const { return value_ > other.value_; };
+
+    inline bool operator>=(const RowID &other) const { return value_ >= other.value_; };
 
     inline RowID &operator=(uint64_t value) {
         value_ = value;
@@ -57,19 +57,19 @@ struct RowID {
     }
 
     inline RowID &operator=(uint32_t i) {
-        segment_id_ = i;
+        segment_id_ = 0;
         segment_offset_ = i;
         return *this;
     }
 
-    inline bool operator!=(uint32_t i) const { return !(segment_id_ == i && segment_offset_ == i); }
+    inline bool operator!=(uint32_t i) const { return !(segment_offset_ == i); }
 
-    inline RowID operator+(const RowID &other) const { return RowID(value_ + other.value_); }
+    inline RowID operator+(const uint32_t &other) const { return RowID(segment_id_, segment_offset_ + other); }
 
-    inline RowID operator-(const RowID &other) const { return RowID(value_ - other.value_); }
+    inline RowID operator-(const RowID &other) const { return RowID(segment_id_, segment_offset_ - other.segment_offset_); }
 
-    inline RowID &operator+=(const RowID &other) {
-        value_ += other.value_;
+    inline RowID &operator+=(const uint32_t &other) {
+        segment_offset_ += other;
         return *this;
     }
 

@@ -12,6 +12,8 @@ import multi_posting_decoder;
 import segment_posting;
 import in_doc_pos_state;
 import index_defines;
+import internal_types;
+
 module posting_iterator;
 
 namespace infinity {
@@ -43,9 +45,9 @@ bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings
     return true;
 }
 
-docid_t PostingIterator::SeekDoc(docid_t doc_id) {
-    docid_t ret = INVALID_DOCID;
-    docid_t cur_doc_id = current_doc_id_;
+RowID PostingIterator::SeekDoc(RowID doc_id) {
+    RowID ret = INVALID_ROWID;
+    RowID cur_doc_id = current_doc_id_;
     doc_id = std::max(cur_doc_id + 1, doc_id);
     if (unlikely(doc_id > last_doc_id_in_buffer_)) {
         if (!posting_decoder_->DecodeDocBuffer(doc_id, doc_buffer_, cur_doc_id, last_doc_id_in_buffer_, current_ttf_))
@@ -68,7 +70,7 @@ void PostingIterator::MoveToCurrentDoc() {
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
     if (posting_option_.HasTermFrequency()) {
-        state_.SetDocId(current_doc_id_);
+        state_.SetDocId(current_doc_id_.segment_offset_);
         state_.SetTermFreq(InnerGetTF());
 
         u32 seeked_doc_count = GetCurrentSeekedDocCount();
