@@ -82,13 +82,12 @@ public:
     void Cleanup();
 
 protected:
-    u16 AppendData(TransactionID txn_id, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
+    u16
+    AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
-    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts);
-
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts);
+    void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -165,7 +164,7 @@ protected:
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;
 
-    TxnTimeStamp min_row_ts_{0};    // Indicate the commit_ts which create this BlockEntry
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which create this BlockEntry
     TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
     TxnTimeStamp checkpoint_ts_{0}; // replay not set
 

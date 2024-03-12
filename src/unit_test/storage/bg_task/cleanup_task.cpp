@@ -350,8 +350,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -450,8 +449,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }

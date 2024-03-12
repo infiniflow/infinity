@@ -665,7 +665,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(table_entry, block_index.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store_) {
+    for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts, true /*is_replay*/);
     }
     table_index_entry->Commit(commit_ts);
@@ -728,8 +728,8 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Delete(table_store->table_entry_, table_store->txn_->TxnID(), (void *)table_store.get(), table_store->txn_->CommitTS(), table_store->delete_state_);
-    Catalog::CommitDelete(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->delete_state_);
+    Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store.get(), fake_txn->CommitTS(), table_store->delete_state_);
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
 }
 
 void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -768,8 +768,8 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Append(table_store->table_entry_, table_store->txn_->TxnID(), table_store.get(), storage_->buffer_manager());
-    Catalog::CommitAppend(table_store->table_entry_, table_store->txn_->TxnID(), table_store->txn_->CommitTS(), table_store->append_state_.get());
+    Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store.get(), commit_ts, storage_->buffer_manager());
+    Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
 }
 
 void WalManager::WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatusSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

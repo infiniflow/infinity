@@ -600,8 +600,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             block_entry->IncreaseRowCount(1);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn4->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn4, segment_entry);
             txn_mgr->CommitTxn(txn4);
         }
 
@@ -731,8 +730,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn2->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn2, segment_entry);
             txn_mgr->CommitTxn(txn2);
         }
 

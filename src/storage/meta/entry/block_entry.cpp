@@ -155,6 +155,7 @@ void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const
 }
 
 u16 BlockEntry::AppendData(TransactionID txn_id,
+                           TxnTimeStamp commit_ts,
                            DataBlock *input_data_block,
                            BlockOffset input_block_offset,
                            u16 append_rows,
@@ -183,6 +184,7 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
     }
 
     this->row_count_ += actual_copied;
+
     return actual_copied;
 }
 
@@ -206,40 +208,26 @@ void BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
 }
 
-// A txn may invoke AppendData() multiple times, and then invoke CommitAppend() once.
-void BlockEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
-    if (this->using_txn_id_ != txn_id) {
-        UnrecoverableError(
-            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
-    }
-    this->using_txn_id_ = 0;
-    if (this->min_row_ts_ == 0) {
-        this->min_row_ts_ = commit_ts;
-    }
-    this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
-
-    auto &block_version = this->block_version_;
-    block_version->created_.push_back({commit_ts, i32(this->row_count_)});
-}
-
-void BlockEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts) {
-    std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
+void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
         UnrecoverableError(
             fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
     }
-
-    if (this->using_txn_id_ == 0) {
-        // Which case will come here?
-        return;
-    }
-
     this->using_txn_id_ = 0;
-    if (this->min_row_ts_ == 0) {
-        this->min_row_ts_ = commit_ts;
+
+    min_row_ts_ = std::min(min_row_ts_, commit_ts);
+    if (commit_ts < max_row_ts_) {
+        UnrecoverableError(fmt::format("BlockEntry commit_ts {} is less than max_row_ts_ {}", commit_ts, max_row_ts_));
     }
-    this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+    max_row_ts_ = commit_ts;
+    if (!this->Committed()) {
+        this->Commit(commit_ts);
+    }
+
+    auto &block_version = this->block_version_;
+    if (block_version->created_.empty() || block_version->created_.back().create_ts_ != commit_ts) {
+        block_version->created_.emplace_back(commit_ts, i32(this->row_count_));
+    }
 }
 
 void BlockEntry::FlushData(int64_t checkpoint_row_count) {
@@ -302,7 +290,8 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     FlushData(checkpoint_row_count);
     this->checkpoint_ts_ = checkpoint_ts;
     this->checkpoint_row_count_ = checkpoint_row_count;
-    LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed {} rows", this->segment_entry_->segment_id(), this->block_id_, this->checkpoint_row_count_));
+    LOG_TRACE(
+        fmt::format("Segment: {}, Block {} is flushed {} rows", this->segment_entry_->segment_id(), this->block_id_, this->checkpoint_row_count_));
     return;
 }
 

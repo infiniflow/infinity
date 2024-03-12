@@ -47,6 +47,7 @@ import bg_task;
 import background_process;
 import base_table_ref;
 import compact_segments_task;
+import default_values;
 
 namespace infinity {
 
@@ -61,6 +62,36 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, Trans
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id);
     return txn;
+}
+
+// DML
+Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
+    this->CheckTxn(db_name);
+
+    String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
+    Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
+    const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
+    // build WalCmd
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name,
+                                                         table_name,
+                                                         WalSegmentInfo{*segment_entry->segment_dir(),
+                                                                        segment_entry->segment_id(),
+                                                                        static_cast<u16>(block_cnt),
+                                                                        DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
+                                                                        last_block_row_count,
+                                                                        u8(1), // have_rough_filter_: true
+                                                                        segment_filter_binary_data,
+                                                                        block_filter_binary_data}));
+
+    // build delta catalog operation
+    auto catalog_delta_op =
+        MakeUnique<UpdateSegmentBloomFilterDataOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
+    this->AddCatalogDeltaOperation(std::move(catalog_delta_op));
+
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
+    table_store->Import(std::move(segment_entry));
+
+    return Status::OK();
 }
 
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
@@ -395,9 +426,8 @@ TxnTimeStamp Txn::Commit() {
 void Txn::CommitBottom() noexcept {
 
     // prepare to commit txn local data into table
-    for (const auto &name_table_pair : txn_tables_store_) {
-        TxnTableStore *table_local_store = name_table_pair.second.get();
-        table_local_store->PrepareCommit();
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->PrepareCommit();
     }
 
     txn_context_.SetTxnCommitted();

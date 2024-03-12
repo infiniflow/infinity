@@ -238,12 +238,8 @@ void Catalog::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
     table_index_entry->RollbackCreateIndex(txn_index_store);
 }
 
-void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
-    return table_entry->Append(txn_id, txn_store, buffer_mgr);
-}
-
-void Catalog::CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
-    return table_entry->CommitAppend(txn_id, commit_ts, append_state_ptr);
+void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    return table_entry->Append(txn_id, txn_store, commit_ts, buffer_mgr);
 }
 
 void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
@@ -252,10 +248,6 @@ void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnT
 
 Status Catalog::Delete(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     return table_entry->Delete(txn_id, txn_store, commit_ts, delete_state);
-}
-
-void Catalog::CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
-    return table_entry->CommitDelete(txn_id, commit_ts, append_state);
 }
 
 Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
@@ -271,8 +263,15 @@ Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, T
     return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
 }
 
-Status Catalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
-    return table_entry->CommitImport(commit_ts, segment);
+Status Catalog::CommitWrite(TableEntry *table_entry,
+                            TransactionID txn_id,
+                            TxnTimeStamp commit_ts,
+                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
+    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores);
+}
+
+Status Catalog::RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {
+    return table_entry->RollbackWrite(commit_ts, segment_stores);
 }
 
 SegmentID Catalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }

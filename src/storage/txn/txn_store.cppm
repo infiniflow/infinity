@@ -31,17 +31,32 @@ struct TableIndexEntry;
 struct FulltextIndexEntry;
 struct TableEntry;
 struct SegmentEntry;
+struct BlockEntry;
 class DataBlock;
 class SegmentIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
 
+export struct TxnSegmentStore {
+public:
+    static TxnSegmentStore AddSegmentStore(SegmentEntry *segment_entry);
+
+    explicit TxnSegmentStore(SegmentEntry *segment_entry);
+
+    TxnSegmentStore() = default;
+
+public:
+    SegmentEntry *const segment_entry_ = nullptr;
+    Vector<BlockEntry *> block_entries_;
+};
+
 export struct TxnIndexStore {
 public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry);
     TxnIndexStore() = default;
 
+public:
     TableIndexEntry *const table_index_entry_{};
 
     FulltextIndexEntry *fulltext_index_entry_{};
@@ -50,21 +65,21 @@ public:
 };
 
 export struct TxnCompactStore {
-    Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data_;
+    Vector<Pair<TxnSegmentStore, Vector<SegmentEntry *>>> compact_data_;
 
     CompactSegmentsTaskType task_type_;
 
     TxnCompactStore();
-    TxnCompactStore(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&, CompactSegmentsTaskType);
+    TxnCompactStore(CompactSegmentsTaskType type);
 };
 
 export class TxnTableStore {
 public:
     explicit inline TxnTableStore(TableEntry *table_entry, Txn *txn) : table_entry_(table_entry), txn_(txn) {}
 
-    Tuple<UniquePtr<String>, Status> Append(const SharedPtr<DataBlock> &input_block);
+    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry);
 
-    Tuple<UniquePtr<String>, Status> Import(const SharedPtr<SegmentEntry> &segment);
+    Tuple<UniquePtr<String>, Status> Append(const SharedPtr<DataBlock> &input_block);
 
     void AddIndexStore(TableIndexEntry *table_index_entry);
 
@@ -91,12 +106,28 @@ public:
 
     void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
 
-public:
-    Vector<SharedPtr<DataBlock>> blocks_{};
-    Vector<SharedPtr<SegmentEntry>> uncommitted_segments_{}; // Only used for IMPORT and COMPACT
+    void AddSegmentStore(SegmentEntry *segment_entry);
+
+    void AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry);
+
+    void AddSealedSegment(SegmentEntry *segment_entry);
+
+public: // Getter
+    const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
+
+    const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_; }
+
+private:
+    HashMap<SegmentID, TxnSegmentStore> txn_segments_{};
+    Vector<SegmentEntry *> set_sealed_segments_{};
 
     Set<TableIndexEntry *> txn_indexes_{};
     HashMap<String, UniquePtr<TxnIndexStore>> txn_indexes_store_{};
+
+    TxnCompactStore compact_state_;
+
+public:
+    Vector<SharedPtr<DataBlock>> blocks_{};
 
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
@@ -105,9 +136,6 @@ public:
 
     TableEntry *table_entry_{};
     Txn *txn_{};
-
-private:
-    TxnCompactStore compact_state_;
 };
 
 } // namespace infinity

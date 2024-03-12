@@ -108,17 +108,15 @@ public:
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }
 
-    void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
+    void Import(SharedPtr<SegmentEntry> segment_entry);
 
-    void SetSegmentSealedForAppend(const Vector<SegmentID> &set_sealed_segments);
+    void AddCompactNew(SharedPtr<SegmentEntry> segment_entry);
 
-    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
+    void Append(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
     Status Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
-
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
@@ -126,10 +124,9 @@ public:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
+    Status CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
 
-    // This is private, **DO NOT** use by catalog
-    Status CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> &segment);
+    Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 

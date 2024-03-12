@@ -80,8 +80,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            auto txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }
