@@ -11,8 +11,8 @@ import column_index_iterator;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag)
-    : base_doc_id_(base_doc_id) {
+SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_doc_id, optionflag_t flag)
+    : base_row_id_(base_doc_id) {
     column_index_iterator_ = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
 }
 
@@ -25,11 +25,11 @@ bool SegmentTermPosting::HasNext() {
 
 SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
                                                  const Vector<String> &base_names,
-                                                 const Vector<docid_t> &base_docids,
+                                                 const Vector<RowID> &base_rowids,
                                                  optionflag_t flag)
-    : index_dir_(index_dir), base_names_(base_names), base_docids_(base_docids) {
+    : index_dir_(index_dir), base_names_(base_names), base_docids_(base_rowids) {
     for (u32 i = 0; i < base_names.size(); ++i) {
-        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_docids[i], flag);
+        SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_rowids[i], flag);
         if (segment_term_posting->HasNext()) {
             segment_term_postings_.push(segment_term_posting);
         } else
