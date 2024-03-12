@@ -16,7 +16,7 @@ export class SegmentTermPosting {
 public:
     SegmentTermPosting();
 
-    SegmentTermPosting(docid_t base_doc_id);
+    SegmentTermPosting(const String &index_dir, const String &base_name, docid_t base_doc_id, optionflag_t flag);
 
     docid_t GetBaesDocId() const { return base_doc_id_; }
 
@@ -52,9 +52,6 @@ public:
     const Vector<SegmentTermPosting *> &GetCurrentMerging(String &term);
 
     void MoveToNextTerm();
-
-private:
-    SharedPtr<ColumnIndexIterator> CreateIndexIterator(const String &index_dir, const String &base_name, optionflag_t flag);
 
 private:
     using PriorityQueue = Heap<SegmentTermPosting *, SegmentTermPostingComparator>;

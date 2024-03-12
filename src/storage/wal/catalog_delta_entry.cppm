@@ -362,7 +362,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *this->db_name_, *this->table_name_, this->segment_id_));
     }
-    void FlushDataToDisk(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
+    void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
 public:
     const String &db_name() const { return *db_name_; }

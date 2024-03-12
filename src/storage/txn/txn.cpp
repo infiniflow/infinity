@@ -537,7 +537,7 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
     String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.DELTA.{}", dir_name, max_commit_ts));
     // only save the catalog delta entry
-    bool skip = catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, false);
+    bool skip = catalog_->SaveDeltaCatalog(delta_path, max_commit_ts);
     if (skip) {
         return;
     }
@@ -546,12 +546,17 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
-    String delta_path = String(fmt::format("{}/CATALOG_DELTA_ENTRY.FULL.{}", dir_name, max_commit_ts));
-    String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));
 
-    catalog_->FlushGlobalCatalogDeltaEntry(delta_path, max_commit_ts, true);
-    catalog_->SaveAsFile(catalog_path, max_commit_ts);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, catalog_path));
+//    String delta_path = String(fmt::format("{}/META_CATALOG.{}.delta", dir_name, max_commit_ts));
+//    String delta_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.delta", dir_name, max_commit_ts));
+//
+//    String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));
+//    String catalog_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.json", dir_name, max_commit_ts));
+
+    // Full Check point don't need increment checkpoint
+    // catalog_->SaveDeltaCatalog(delta_path, max_commit_ts, true);
+    UniquePtr<String> catalog_path_ptr = catalog_->SaveFullCatalog(dir_name, max_commit_ts);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, *catalog_path_ptr));
 }
 
 void Txn::AddDBStore(DBEntry *db_entry) { txn_dbs_.insert(db_entry); }

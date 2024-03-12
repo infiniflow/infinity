@@ -59,19 +59,17 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
                              docid_t base_doc_id,
-                             const String &analyzer,
                              optionflag_t flag,
+                             const String &analyzer,
                              MemoryPool &byte_slice_pool,
                              RecyclePool &buffer_pool,
                              ThreadPool &thread_pool)
-    : index_dir_(index_dir), base_name_(base_name), base_doc_id_(base_doc_id), flag_(flag), byte_slice_pool_(byte_slice_pool),
+    : index_dir_(index_dir), base_name_(base_name), base_doc_id_(base_doc_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
     posting_store_ = MakeUnique<PostingTable>(KeyComp(), &byte_slice_pool_);
 
     Path path = Path(index_dir) / "tmp.merge";
     spill_full_path_ = path.string();
-    analyzer_ = AnalyzerPool::instance().Get(analyzer);
-    jieba_specialize_ = analyzer.compare("chinese") == 0 ? true : false;
 }
 
 MemoryIndexer::~MemoryIndexer() { Reset(); }
@@ -83,8 +81,9 @@ void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u3
     }
     u64 seq_inserted = seq_inserted_++;
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count_);
-    auto func = [this, &task](int id) {
-        auto inverter = MakeShared<ColumnInverter>(*this);
+    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+    auto func = [this, &task, &provider](int id) {
+        auto inverter = MakeShared<ColumnInverter>(analyzer_, &byte_slice_pool_, provider);
         inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         this->ring_inverted_.Put(task->task_seq_, inverter);
     };
@@ -128,7 +127,7 @@ void MemoryIndexer::Dump() {
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
-    FstBuilder builder(wtr);
+    FstBuilder fst_builder(wtr);
 
     if (posting_store_.get() != nullptr) {
         SizeT term_meta_offset = 0;
@@ -138,23 +137,23 @@ void MemoryIndexer::Dump() {
             posting_writer->Dump(posting_file_writer, term_meta);
             term_meta_dumpler.Dump(dict_file_writer, term_meta);
             const String &term = it.Key();
-            builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
+            fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
             term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
         dict_file_writer->Sync();
-        builder.Finish();
+        fst_builder.Finish();
         fs.AppendFile(dict_file, fst_file);
         fs.DeleteFile(fst_file);
     }
     Reset();
 }
 
-MemoryIndexer::PostingPtr MemoryIndexer::GetOrAddPosting(const TermKey &term) {
+SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     MemoryIndexer::PostingTable::Iterator iter = posting_store_->Find(term);
     if (iter != posting_store_->End())
         return iter.Value();
     else {
-        MemoryIndexer::PostingPtr posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
         posting_store_->Insert(term, posting);
         return posting;
     }
@@ -167,8 +166,8 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->Clear();
     }
-    thread_pool_.stop(true);
-    cv_.notify_all();
+    base_doc_id_ = INVALID_DOCID;
+    doc_count_ = 0;
 }
 
 void MemoryIndexer::OfflineDump() {

@@ -23,21 +23,35 @@ import doc_iterator;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) { children_ = std::move(iterators); }
+AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) {
+    children_ = std::move(iterators);
+    // initialize doc_id_ to first valid doc
+    DoSeek(0);
+}
 
 AndNotIterator::~AndNotIterator() {}
 
 void AndNotIterator::DoSeek(docid_t doc_id) {
-    if (!children_[0]->Seek(doc_id)) {
-        // not match in positive child
-        return;
-    }
-    for (u32 i = 1; i < children_.size(); ++i) {
-        if (children_[i]->Seek(doc_id)) {
-            // match in negative child
-            return;
+    bool next_loop = false;
+    do {
+        children_[0]->Seek(doc_id);
+        if (docid_t doc = children_[0]->Doc(); doc != doc_id) {
+            doc_id = doc;
         }
-    }
+        if (doc_id == INVALID_DOCID) {
+            break;
+        }
+        // now doc_id < INVALID_DOCID
+        next_loop = false;
+        for (u32 i = 1; i < children_.size(); ++i) {
+            children_[i]->Seek(doc_id);
+            if (docid_t doc = children_[i]->Doc(); doc == doc_id) {
+                ++doc_id;
+                next_loop = true;
+                break;
+            }
+        }
+    } while (next_loop);
     doc_id_ = doc_id;
 }
 

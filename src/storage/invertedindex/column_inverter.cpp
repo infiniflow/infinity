@@ -22,6 +22,7 @@ module;
 module column_inverter;
 import stl;
 import analyzer;
+import analyzer_pool;
 import memory_pool;
 import pool_allocator;
 import string_ref;
@@ -29,6 +30,8 @@ import term;
 import radix_sort;
 import index_defines;
 import memory_indexer;
+import posting_writer;
+
 namespace infinity {
 
 template <u32 T>
@@ -36,9 +39,9 @@ static u32 Align(u32 unaligned) {
     return (unaligned + T - 1) & (-T);
 }
 
-ColumnInverter::ColumnInverter(MemoryIndexer &memory_indexer)
-    : memory_indexer_(memory_indexer), analyzer_(memory_indexer.GetAnalyzer()), jieba_specialize_(memory_indexer.IsJiebaSpecialize()),
-      alloc_(memory_indexer.GetPool()), terms_(alloc_), positions_(alloc_), term_refs_(alloc_) {}
+ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider)
+    : analyzer_(AnalyzerPool::instance().Get(analyzer)), alloc_(memory_pool), terms_(alloc_), positions_(alloc_), term_refs_(alloc_),
+      posting_writer_provider_(posting_writer_provider) {}
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
@@ -51,7 +54,7 @@ void ColumnInverter::InvertColumn(const ColumnVector &column_vector, u32 row_off
 
 void ColumnInverter::InvertColumn(u32 doc_id, const String &val) {
     auto terms_once_ = MakeUnique<TermList>();
-    analyzer_->Analyze(val, *terms_once_, jieba_specialize_);
+    analyzer_->Analyze(val, *terms_once_);
     terms_per_doc_.push_back(Pair<u32, UniquePtr<TermList>>(doc_id, std::move(terms_once_)));
 }
 
@@ -155,13 +158,13 @@ void ColumnInverter::GeneratePosting() {
     u32 last_term_pos = 0;
     u32 last_doc_id = INVALID_DOCID;
     StringRef term;
-    MemoryIndexer::PostingPtr posting = nullptr;
+    SharedPtr<PostingWriter> posting = nullptr;
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_ || last_doc_id != i.doc_id_) {
             if (last_term_num != i.term_num_) {
                 last_term_num = i.term_num_;
                 term = GetTermFromNum(last_term_num);
-                posting = memory_indexer_.GetOrAddPosting(String(term.data()));
+                posting = posting_writer_provider_(String(term.data()));
             }
             last_doc_id = i.doc_id_;
             if (last_doc_id != INVALID_DOCID) {
