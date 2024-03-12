@@ -13,8 +13,8 @@
 //  limitations under the License.
 
 #include "unit_test/base_test.h"
-#include <iostream>
 #include <random>
+
 import stl;
 import index_defines;
 import default_values;
@@ -107,7 +107,7 @@ TEST_F(SearchIteratorTest2, test_or) {
     iterators[1] = MakeUnique<MockVectorDocIterator>(doc_ids_B);
     OrIterator or_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_or);
-    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         or_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(or_it.Doc(), expect_res.Doc());
@@ -120,7 +120,7 @@ TEST_F(SearchIteratorTest2, test_and_not) {
     iterators[1] = MakeUnique<MockVectorDocIterator>(doc_ids_B);
     AndNotIterator and_not_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and_not);
-    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_not_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_not_it.Doc(), expect_res.Doc());
@@ -171,7 +171,7 @@ TEST_F(SearchIteratorTestN, test_and) {
     }
     AndIterator and_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and);
-    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_it.Doc(), expect_res.Doc());
@@ -185,7 +185,7 @@ TEST_F(SearchIteratorTestN, test_or) {
     }
     OrIterator or_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_or);
-    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         or_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(or_it.Doc(), expect_res.Doc());
@@ -199,7 +199,7 @@ TEST_F(SearchIteratorTestN, test_and_not) {
     }
     AndNotIterator and_not_it(std::move(iterators));
     MockVectorDocIterator expect_res(doc_ids_and_not);
-    for (RowID doc_id = 0; doc_id <= RowID(0, 100'000); ++doc_id) {
+    for (RowID doc_id = 0; doc_id <= 100'000; ++doc_id) {
         and_not_it.Seek(doc_id);
         expect_res.Seek(doc_id);
         EXPECT_EQ(and_not_it.Doc(), expect_res.Doc());
