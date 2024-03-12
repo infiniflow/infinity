@@ -82,11 +82,11 @@ namespace infinity {
 
 constexpr String kErrorMsgHeader = "[THRIFT ERROR]";
 
-class InfinityServiceHandler : virtual public infinity_thrift_rpc::InfinityServiceIf {
+class InfinityServiceHandler final : public infinity_thrift_rpc::InfinityServiceIf {
 public:
     InfinityServiceHandler() = default;
 
-    void Connect(infinity_thrift_rpc::CommonResponse &response) override {
+    void Connect(infinity_thrift_rpc::CommonResponse &response) final {
         auto infinity = Infinity::RemoteConnect();
         std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
         infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
@@ -95,7 +95,7 @@ public:
         LOG_TRACE(fmt::format("THRIFT: Connect success, new session {}", response.session_id));
     }
 
-    void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) override {
+    void Disconnect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommonRequest &request) final {
         auto status = GetAndRemoveSessionID(request.session_id);
         if (status.ok()) {
             response.__set_error_code((i64)(status.code()));
@@ -107,7 +107,7 @@ public:
         }
     }
 
-    void CreateDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseRequest &request) override {
+    void CreateDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseRequest &request) final {
         auto [infinity, status] = GetInfinityBySessionID(request.session_id);
         if (status.ok()) {
             auto result = infinity->CreateDatabase(request.db_name, (const CreateDatabaseOptions &)request.option);
@@ -117,7 +117,7 @@ public:
         }
     }
 
-    void DropDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropDatabaseRequest &request) override {
+    void DropDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropDatabaseRequest &request) final {
         auto [infinity, status] = GetInfinityBySessionID(request.session_id);
         if (status.ok()) {
             auto result = infinity->DropDatabase(request.db_name, (const DropDatabaseOptions &)request.option);
@@ -127,7 +127,7 @@ public:
         }
     }
 
-    void CreateTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableRequest &request) override {
+    void CreateTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateTableRequest &request) final {
         Vector<ColumnDef *> column_defs;
 
         for (auto &proto_column_def : request.column_defs) {
@@ -156,7 +156,7 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) override {
+    void DropTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -187,7 +187,7 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) override {
+    void Insert(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::InsertRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -283,7 +283,7 @@ public:
         }
     }
 
-    void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) override {
+    void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -325,7 +325,7 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) override {
+    void UploadFileChunk(infinity_thrift_rpc::UploadResponse &response, const infinity_thrift_rpc::FileChunk &request) final {
         LocalFileSystem fs;
         Path path(fmt::format("{}_{}_{}_{}",
                               *InfinityContext::instance().config()->temp_dir().get(),
@@ -358,7 +358,7 @@ public:
         LOG_TRACE(fmt::format("Upload file name: {} , index: {}", path.c_str(), request.index));
     }
 
-    void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) override {
+    void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) final {
         // ++count_;
         // auto start1 = std::chrono::steady_clock::now();
 
@@ -557,7 +557,7 @@ public:
         // }
     }
 
-    void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) override {
+    void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -714,7 +714,7 @@ public:
         }
     }
 
-    void ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) override {
+    void ShowVariable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowVariableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -731,7 +731,7 @@ public:
         }
     }
 
-    void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) override {
+    void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -764,7 +764,7 @@ public:
         ProcessQueryResult(response, result);
     };
 
-    void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) override {
+    void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -826,7 +826,7 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) override {
+    void ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response, const infinity_thrift_rpc::ListDatabaseRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -848,7 +848,7 @@ public:
         }
     }
 
-    void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) override {
+    void ListTable(infinity_thrift_rpc::ListTableResponse &response, const infinity_thrift_rpc::ListTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -876,12 +876,12 @@ public:
         }
     }
 
-    void DescribeDatabase(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeDatabaseRequest &request) override {
+    void DescribeDatabase(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeDatabaseRequest &request) final {
         // Your implementation goes here
         printf("DescribeDatabase\n");
     }
 
-    void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) override {
+    void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -904,7 +904,7 @@ public:
         }
     }
 
-    void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) override {
+    void ShowTables(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowTablesRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -927,7 +927,7 @@ public:
         }
     }
 
-    void GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) override {
+    void GetDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetDatabaseRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -938,7 +938,7 @@ public:
         ProcessStatus(response, database_status);
     }
 
-    void GetTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetTableRequest &request) override {
+    void GetTable(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::GetTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -955,7 +955,7 @@ public:
         ProcessStatus(response, table_status);
     }
 
-    void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) override {
+    void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -1014,7 +1014,7 @@ public:
         ProcessQueryResult(response, result);
     }
 
-    void DropIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropIndexRequest &request) override {
+    void DropIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropIndexRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -1745,11 +1745,11 @@ private:
     }
 };
 
-class InfinityServiceCloneFactory : virtual public infinity_thrift_rpc::InfinityServiceIfFactory {
+class InfinityServiceCloneFactory final : public infinity_thrift_rpc::InfinityServiceIfFactory {
 public:
-    ~InfinityServiceCloneFactory() override = default;
+    ~InfinityServiceCloneFactory() final = default;
 
-    infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) override {
+    infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final {
         SharedPtr<TSocket> sock = std::dynamic_pointer_cast<TSocket>(connInfo.transport);
 
         LOG_TRACE(fmt::format("Incoming connection, SocketInfo: {}, PeerHost: {}, PeerAddress: {}, PeerPort: {}",
@@ -1761,7 +1761,7 @@ public:
         return new InfinityServiceHandler;
     }
 
-    void releaseHandler(infinity_thrift_rpc::InfinityServiceIf *handler) override { delete handler; }
+    void releaseHandler(infinity_thrift_rpc::InfinityServiceIf *handler) final { delete handler; }
 };
 
 // Thrift server
