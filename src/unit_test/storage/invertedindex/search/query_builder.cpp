@@ -16,6 +16,7 @@
 #include "unit_test/base_test.h"
 #include <random>
 import stl;
+import internal_types;
 import index_defines;
 import default_values;
 import doc_iterator;
@@ -36,30 +37,30 @@ private:
     u32 GetDF() const override { return 0; }
 
 public:
-    MockVectorDocIterator(Vector<docid_t> doc_ids) : doc_ids_(std::move(doc_ids)) { DoSeek(0); }
+    MockVectorDocIterator(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) { DoSeek(0); }
     ~MockVectorDocIterator() override = default;
-    void DoSeek(docid_t doc_id) override {
+    void DoSeek(RowID doc_id) override {
         while (idx_ < doc_ids_.size() and doc_ids_[idx_] < doc_id) {
             ++idx_;
         }
-        doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_DOCID;
+        doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_ROWID;
     }
-    Vector<docid_t> doc_ids_;
+    Vector<RowID> doc_ids_;
     u32 idx_ = 0;
 };
 
 class MockQuery : public TermQuery {
 public:
-    Vector<docid_t> doc_ids_;
-    MockQuery(Vector<docid_t> doc_ids) : doc_ids_(std::move(doc_ids)) {}
+    Vector<RowID> doc_ids_;
+    MockQuery(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) {}
     UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader, Scorer *scorer) override {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
     }
 };
 
 struct MockQueryNode : public QueryNode {
-    Vector<docid_t> doc_ids_;
-    MockQueryNode(Vector<docid_t> doc_ids) : doc_ids_(std::move(doc_ids)) {}
+    Vector<RowID> doc_ids_;
+    MockQueryNode(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) {}
     void Accept(QueryVisitor &visitor) override;
 };
 
@@ -81,13 +82,13 @@ constexpr int TestNotVecN = 5'000;
 
 // doc id: 0-100'000
 // output length: in range [0, param_len]
-auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<docid_t> {
+auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> {
     // generate random doc ids
-    Vector<docid_t> doc_ids;
+    Vector<RowID> doc_ids;
     // random size
     u32 size = std::uniform_int_distribution<u32>(0, param_len)(rng);
     doc_ids.reserve(size);
-    std::uniform_int_distribution<docid_t> gen_id(0, DocIDMaxN);
+    std::uniform_int_distribution<SegmentOffset> gen_id(0, DocIDMaxN);
     for (u32 i = 0; i < size; ++i) {
         doc_ids.push_back(gen_id(rng));
     }
@@ -103,10 +104,13 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<docid_t
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
 
-class QueryBuilderTest : public BaseTest {
-public:
-    void SetUp() override {}
-    void TearDown() override {}
+class QueryBuilderTest : public BaseTest {};
+
+union FakeQueryBuilder {
+    char empty_space[2 * sizeof(QueryBuilder)];
+    QueryBuilder builder;
+    FakeQueryBuilder() : empty_space{} {}
+    ~FakeQueryBuilder() {}
 };
 
 // 1. (A and B) and ((C and D) and E) -> A and B and C and D and E
@@ -116,10 +120,10 @@ TEST_F(QueryBuilderTest, test_and) {
     std::mt19937 rng{rd()};
     // prepare query node
     auto and_root = MakeUnique<And>();
-    Vector<docid_t> expect_result;
+    Vector<RowID> expect_result;
     {
         auto and_AB = MakeUnique<And>();
-        Vector<docid_t> vec_AB_and;
+        Vector<RowID> vec_AB_and;
         {
             auto vec_A = get_random_doc_ids(rng, TestAndVecN);
             auto vec_B = get_random_doc_ids(rng, TestAndVecN);
@@ -128,10 +132,10 @@ TEST_F(QueryBuilderTest, test_and) {
             and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
         }
         auto and_CDE = MakeUnique<And>();
-        Vector<docid_t> vec_CDE_and;
+        Vector<RowID> vec_CDE_and;
         {
             auto and_CD = MakeUnique<And>();
-            Vector<docid_t> vec_CD_and;
+            Vector<RowID> vec_CD_and;
             {
                 auto vec_C = get_random_doc_ids(rng, TestAndVecN);
                 auto vec_D = get_random_doc_ids(rng, TestAndVecN);
@@ -151,7 +155,8 @@ TEST_F(QueryBuilderTest, test_and) {
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_root);
-    QueryBuilder builder;
+    FakeQueryBuilder fake_query_builder;
+    QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
     // check iter tree
     // A and B and C and D and E
@@ -160,7 +165,7 @@ TEST_F(QueryBuilderTest, test_and) {
     ASSERT_EQ(and_iter->GetChildren().size(), u32(5));
     // check result
     UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
-    for (docid_t doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
         result_iter->Seek(doc_id);
         expect_iter_result->Seek(doc_id);
         ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
@@ -174,10 +179,10 @@ TEST_F(QueryBuilderTest, test_or) {
     std::mt19937 rng{rd()};
     // prepare query node
     auto or_root = MakeUnique<Or>();
-    Vector<docid_t> expect_result;
+    Vector<RowID> expect_result;
     {
         auto or_AB = MakeUnique<Or>();
-        Vector<docid_t> vec_AB_or;
+        Vector<RowID> vec_AB_or;
         {
             auto vec_A = get_random_doc_ids(rng, TestOrVecN);
             auto vec_B = get_random_doc_ids(rng, TestOrVecN);
@@ -186,10 +191,10 @@ TEST_F(QueryBuilderTest, test_or) {
             or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
         }
         auto or_CDE = MakeUnique<Or>();
-        Vector<docid_t> vec_CDE_or;
+        Vector<RowID> vec_CDE_or;
         {
             auto or_CD = MakeUnique<Or>();
-            Vector<docid_t> vec_CD_or;
+            Vector<RowID> vec_CD_or;
             {
                 auto vec_C = get_random_doc_ids(rng, TestOrVecN);
                 auto vec_D = get_random_doc_ids(rng, TestOrVecN);
@@ -209,7 +214,8 @@ TEST_F(QueryBuilderTest, test_or) {
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(or_root);
-    QueryBuilder builder;
+    FakeQueryBuilder fake_query_builder;
+    QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
     // check iter tree
     // A or B or C or D or E
@@ -218,7 +224,7 @@ TEST_F(QueryBuilderTest, test_or) {
     ASSERT_EQ(or_iter->GetChildren().size(), u32(5));
     // check result
     UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
-    for (docid_t doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
         result_iter->Seek(doc_id);
         expect_iter_result->Seek(doc_id);
         ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
@@ -232,16 +238,16 @@ TEST_F(QueryBuilderTest, test_and_not) {
     std::mt19937 rng{rd()};
     // prepare query node
     auto and_not_root = MakeUnique<AndNot>();
-    Vector<docid_t> expect_result;
+    Vector<RowID> expect_result;
     {
         auto and_not_ABC_D = MakeUnique<AndNot>();
-        Vector<docid_t> vec_ABC_D_and_not;
+        Vector<RowID> vec_ABC_D_and_not;
         {
             auto or_ABC = MakeUnique<Or>();
-            Vector<docid_t> vec_ABC_or;
+            Vector<RowID> vec_ABC_or;
             {
                 auto or_AB = MakeUnique<Or>();
-                Vector<docid_t> vec_AB_or;
+                Vector<RowID> vec_AB_or;
                 {
                     auto vec_A = get_random_doc_ids(rng, TestOrVecN);
                     auto vec_B = get_random_doc_ids(rng, TestOrVecN);
@@ -267,7 +273,8 @@ TEST_F(QueryBuilderTest, test_and_not) {
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_not_root);
-    QueryBuilder builder;
+    FakeQueryBuilder fake_query_builder;
+    QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
     // check iter tree
     // (A or B or C) and not (D, E)
@@ -282,7 +289,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
     ASSERT_EQ(child_or_iter->GetChildren().size(), u32(3));
     // check result
     UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
-    for (docid_t doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
         result_iter->Seek(doc_id);
         expect_iter_result->Seek(doc_id);
         ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
@@ -296,16 +303,16 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     std::mt19937 rng{rd()};
     // prepare query node
     auto and_not_root = MakeUnique<AndNot>();
-    Vector<docid_t> expect_result;
+    Vector<RowID> expect_result;
     {
         auto and_ABC_D = MakeUnique<And>();
-        Vector<docid_t> vec_ABC_D_and;
+        Vector<RowID> vec_ABC_D_and;
         {
             auto and_not_AB_C = MakeUnique<AndNot>();
-            Vector<docid_t> vec_AB_C_and_not;
+            Vector<RowID> vec_AB_C_and_not;
             {
                 auto and_AB = MakeUnique<And>();
-                Vector<docid_t> vec_AB_and;
+                Vector<RowID> vec_AB_and;
                 {
                     auto vec_A = get_random_doc_ids(rng, TestAndVecN);
                     auto vec_B = get_random_doc_ids(rng, TestAndVecN);
@@ -331,7 +338,8 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_not_root);
-    QueryBuilder builder;
+    FakeQueryBuilder fake_query_builder;
+    QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
     // check iter tree
     // (A and B and D) and not (C, E)
@@ -346,7 +354,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     ASSERT_EQ(child_and_iter->GetChildren().size(), u32(3));
     // check result
     UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
-    for (docid_t doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
+    for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
         result_iter->Seek(doc_id);
         expect_iter_result->Seek(doc_id);
         ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
