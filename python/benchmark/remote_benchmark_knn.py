@@ -148,7 +148,7 @@ def process_pool(threads, rounds, query_path, tabel_name):
     total_queries = fvecs_read_all(query_path)
     queries = [[] for i in range(threads)]
     total_queries_count = len(total_queries)
-    print(total_queries_count)
+    # print(total_queries_count)
     for i, query in enumerate(total_queries):
         queries[i % threads].append(query)
 
@@ -163,7 +163,7 @@ def process_pool(threads, rounds, query_path, tabel_name):
         dur = end - start
         results.append(f"Round {i + 1}:")
         results.append(f"Total Dur: {dur} s")
-        results.append(f"Query Count: {len(queries)}")
+        results.append(f"Query Count: {total_queries_count}")
         results.append(f"QPS: {len(total_queries) / dur}")
 
     for result in results:
