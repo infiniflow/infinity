@@ -72,16 +72,18 @@ std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std
 }
 
 int SearchDriver::parse_helper(std::istream &stream) {
+    std::unique_ptr<SearchParser> parser;
+    std::unique_ptr<SearchScanner> scanner;
     try {
-        scanner_ = std::make_unique<SearchScanner>(&stream);
-        parser_ = std::make_unique<SearchParser>((*scanner_) /* scanner */, (*this) /* driver */);
+        scanner = std::make_unique<SearchScanner>(&stream);
+        parser = std::make_unique<SearchParser>((*scanner) /* scanner */, (*this) /* driver */);
     } catch (std::bad_alloc &ba) {
         std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
         return -1;
     }
 
     const int accept(0);
-    if (parser_->parse() != accept) {
+    if (parser->parse() != accept) {
         return -1;
     }
     return 0;

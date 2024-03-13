@@ -14,7 +14,6 @@
 
 module;
 
-#include "query_node.h"
 #include <utility>
 #include <vector>
 module query_builder;
@@ -40,6 +39,7 @@ import index_base;
 import index_full_text;
 import posting_iterator;
 import infinity_exception;
+import query_node;
 
 namespace infinity {
 

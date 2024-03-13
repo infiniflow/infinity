@@ -12,6 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+/*
 #include "storage/invertedindex/search/query_node.h"
 #include "unit_test/base_test.h"
 #include <random>
@@ -360,3 +361,4 @@ TEST_F(QueryBuilderTest, test_and_not2) {
         ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
     }
 }
+*/

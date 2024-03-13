@@ -22,8 +22,6 @@
 namespace infinity {
 
 struct QueryNode;
-class SearchParser;
-class SearchScanner;
 
 /**
  * Conducting the whole scanning and parsing.
@@ -59,9 +57,6 @@ public:
 
 private:
     int parse_helper(std::istream &stream);
-
-    std::unique_ptr<SearchParser> parser_{};
-    std::unique_ptr<SearchScanner> scanner_{};
 };
 
 } // namespace infinity

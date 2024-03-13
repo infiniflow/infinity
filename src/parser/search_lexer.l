@@ -29,6 +29,7 @@ static thread_local std::stringstream string_buffer;
 %option c++
 %option yyclass="infinity::SearchScanner"
 %option noyywrap nounput batch debug noinput
+%option prefix="yy_search_"
 %option warn
 %option never-interactive
 
