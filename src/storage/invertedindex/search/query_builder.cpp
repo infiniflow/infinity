@@ -21,10 +21,6 @@ module query_builder;
 import stl;
 import memory_pool;
 import doc_iterator;
-import term_doc_iterator;
-import and_iterator;
-import and_not_iterator;
-import or_iterator;
 import column_index_reader;
 import match_data;
 import table_entry;
@@ -84,100 +80,9 @@ QueryBuilder::~QueryBuilder() {}
 
 UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
     // Optimize the query tree.
-    UniquePtr<QueryNode> root = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
-    // put it back
-    context.query_tree_ = std::move(root);
+    context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     // Create the iterator from the query tree.
-    return CreateSearchForQueryNode(*context.query_tree_);
-}
-
-UniquePtr<DocIterator> QueryBuilder::CreateSearchForQueryNode(const QueryNode &query_node) {
-    switch (query_node.GetType()) {
-        case QueryNodeType::TERM: {
-            const auto &term_node = static_cast<const TermQueryNode &>(query_node);
-            ColumnID column_id = table_entry_->GetColumnIdByName(term_node.column_);
-            ColumnIndexReader *column_index_reader = index_reader_.GetColumnIndexReader(column_id);
-            if (!column_index_reader)
-                return nullptr;
-            PostingIterator *posting_iterator = column_index_reader->Lookup(term_node.term_, index_reader_.session_pool_.get());
-            if (posting_iterator == nullptr)
-                return nullptr;
-            auto search = MakeUnique<TermDocIterator>(posting_iterator, column_id);
-            scorer_->AddDocIterator(search.get(), column_id);
-            return std::move(search);
-        }
-        case QueryNodeType::AND: {
-            const auto &and_node = static_cast<const AndQueryNode &>(query_node);
-            Vector<UniquePtr<DocIterator>> sub_doc_iters;
-            sub_doc_iters.reserve(and_node.children_.size());
-            for (auto &child : and_node.children_) {
-                auto iter = CreateSearchForQueryNode(*child);
-                if (iter) {
-                    sub_doc_iters.emplace_back(std::move(iter));
-                }
-            }
-            if (sub_doc_iters.empty()) {
-                return nullptr;
-            } else if (sub_doc_iters.size() == 1) {
-                return std::move(sub_doc_iters[0]);
-            } else {
-                return MakeUnique<AndIterator>(std::move(sub_doc_iters));
-            }
-        }
-        case QueryNodeType::AND_NOT: {
-            const auto &and_not_node = static_cast<const AndNotQueryNode &>(query_node);
-            Vector<UniquePtr<DocIterator>> sub_doc_iters;
-            sub_doc_iters.reserve(and_not_node.children_.size());
-            // check if the first child is a valid query
-            auto first_iter = CreateSearchForQueryNode(*and_not_node.children_[0]);
-            if (!first_iter) {
-                // no need to continue if the first child is invalid
-                return nullptr;
-            }
-            sub_doc_iters.emplace_back(std::move(first_iter));
-            for (u32 i = 1; i < and_not_node.children_.size(); ++i) {
-                auto iter = CreateSearchForQueryNode(*and_not_node.children_[i]);
-                if (iter) {
-                    sub_doc_iters.emplace_back(std::move(iter));
-                }
-            }
-            if (sub_doc_iters.size() == 1) {
-                return std::move(sub_doc_iters[0]);
-            } else {
-                return MakeUnique<AndNotIterator>(std::move(sub_doc_iters));
-            }
-        }
-        case QueryNodeType::OR: {
-            const auto &or_node = static_cast<const OrQueryNode &>(query_node);
-            Vector<UniquePtr<DocIterator>> sub_doc_iters;
-            sub_doc_iters.reserve(or_node.children_.size());
-            for (auto &child : or_node.children_) {
-                auto iter = CreateSearchForQueryNode(*child);
-                if (iter) {
-                    sub_doc_iters.emplace_back(std::move(iter));
-                }
-            }
-            if (sub_doc_iters.empty()) {
-                return nullptr;
-            } else if (sub_doc_iters.size() == 1) {
-                return std::move(sub_doc_iters[0]);
-            } else {
-                return MakeUnique<OrIterator>(std::move(sub_doc_iters));
-            }
-        }
-        case QueryNodeType::WAND:
-        case QueryNodeType::PHRASE:
-        case QueryNodeType::PREFIX_TERM:
-        case QueryNodeType::SUFFIX_TERM:
-        case QueryNodeType::SUBSTRING_TERM: {
-            UnrecoverableError("Unsupported query node type");
-            return nullptr;
-        }
-        case QueryNodeType::NOT: {
-            UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
-            return nullptr;
-        }
-    }
+    return context.query_tree_->CreateSearch(table_entry_, index_reader_, scorer_);
 }
 
 } // namespace infinity

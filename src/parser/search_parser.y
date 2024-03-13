@@ -24,7 +24,7 @@
     }
 }
 
-%parse-param {SearchScanner &scanner} {SearchDriver &driver}
+%parse-param {SearchScanner &scanner} {const SearchDriver &driver} {std::unique_ptr<QueryNode> &parse_result}
 
 /* code snippet copied to generated search_parser.tab.cc */
 %code{
@@ -70,7 +70,7 @@
 // ConjQuery ::= Clause ( AND Clause )*
 topLevelQuery
 : query END {
-    driver.result_ = std::move($1);
+    parse_result = std::move($1);
 };
 
 query

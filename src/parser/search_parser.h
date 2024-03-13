@@ -811,7 +811,7 @@ switch (yykind)
     };
 
     /// Build a parser object.
-    SearchParser (SearchScanner &scanner_yyarg, SearchDriver &driver_yyarg);
+    SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg);
     virtual ~SearchParser ();
 
 #if 201103L <= YY_CPLUSPLUS
@@ -1359,14 +1359,15 @@ switch (yykind)
 
     // User arguments.
     SearchScanner &scanner;
-    SearchDriver &driver;
+    const SearchDriver &driver;
+    std::unique_ptr<QueryNode> &parse_result;
 
   };
 
 
 #line 9 "search_parser.y"
 } // infinity
-#line 1370 "search_parser.h"
+#line 1371 "search_parser.h"
 
 
 

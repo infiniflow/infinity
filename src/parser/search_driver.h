@@ -25,38 +25,34 @@ struct QueryNode;
 
 /**
  * Conducting the whole scanning and parsing.
- * WARNNING: Parse* are not thread-safe since they access the shared parsing options and result.
  */
 class SearchDriver {
 public:
-    SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field);
+    SearchDriver(std::map<std::string, std::string> &field2analyzer, std::string &default_field)
+        : field2analyzer_{field2analyzer}, default_field_{default_field} {}
 
     /**
      * parse a single query
      * @param query - a single query string
      */
-    int ParseSingle(const std::string &query);
-
-    void Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms);
+    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query) const;
 
     static std::unique_ptr<QueryNode> BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms);
 
-    using AnalyzeFunc = void (*)(const std::string &analyzer_name, const std::string &text, std::vector<std::string> &terms);
-    AnalyzeFunc analyze_func_{};
+    void Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) const;
 
-    /**
-     * parsing result
-     */
-    std::unique_ptr<QueryNode> result_{};
+    using AnalyzeFunc = void (*)(const std::string &analyzer_name, const std::string &text, std::vector<std::string> &terms);
+
+    AnalyzeFunc analyze_func_{};
 
     /**
      * parsing options
      */
-    const std::string &default_field_;
     const std::map<std::string, std::string> &field2analyzer_;
+    const std::string &default_field_;
 
 private:
-    int parse_helper(std::istream &stream);
+    std::unique_ptr<QueryNode> ParseHelper(std::istream &stream) const;
 };
 
 } // namespace infinity

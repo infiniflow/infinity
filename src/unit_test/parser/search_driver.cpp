@@ -33,12 +33,15 @@ int ParseStream(SearchDriver &driver, std::istream &ist) {
         }
         line = line.substr(firstNonBlank);
         std::cerr << "---query: ###" << line << "###" << std::endl;
-        int rc = driver.ParseSingle(line);
-        if (rc != 0) {
+        std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
+        if (!parser_result) {
             std::cerr << "---failed" << std::endl;
-            return rc;
+            return -1;
         } else {
             std::cerr << "---accepted" << std::endl;
+            std::cerr << "---parser output tree:" << std::endl;
+            parser_result->PrintTree(std::cerr);
+            std::cerr << std::endl;
         }
     }
     return 0;
@@ -50,122 +53,44 @@ TEST_F(SearchDriverTest, good_test1) {
     std::string row_quires = R"##(
 #basic_filter with implicit field
 dune
-/star.*/
-duna~
-duna~2
-=123
-=google
-<123
-<google
->123
->google
-<=123.456
-<= google
->= 123.456
->= google
-{TO 123.456}
-{TO google}
-[-1000 TO]
-[google TO]
-{-1000 TO 123.456]
-{microsoft TO google}
-[-1000 TO 123.456}
-{microsoft TO google}
 
 #basic_filter with explicit field
 name:dune
-name:/star.*/
-name:duna~
-name:=123
-name:=google
-name:<123
-name:<google
-name:>123
-name:>google
-name:<= 123.456
-name:<= google
-name:>= 123.456
-name:>= google
-name:{TO 123.456}
-name:{TO google}
-name:[-1000 TO]
-name:[google TO]
-name:{-1000 TO 123.456]
-name:{microsoft TO google}
-name:[-1000 TO 123.456}
-name:{microsoft TO google}
 
 #basic_filter_boost with implicit field
 dune^1.2
-/star.*/^1.2
-duna~^1.2
-=123^1.2
-=google^1.2
-<123^1.2
-<google^1.2
->123^1.2
->google^1.2
-<=123.456^1.2
-<= google^1.2
->= 123.456^1.2
->= google^1.2
-{TO 123.456}^1.2
-{TO google}^1.2
-[-1000 TO]^1.2
-[google TO]^1.2
-{-1000 TO 123.456]^1.2
-{microsoft TO google}^1.2
-[-1000 TO 123.456}^1.2
-{microsoft TO google}^1.2
 
 #basic_filter_boost with explicit field
 name:dune^1.2
-name:/star.*/^1.2
-name:duna~^1.2
-name:=123^1.2
-name:=google^1.2
-name:<123^1.2
-name:<google^1.2
-name:>123^1.2
-name:>google^1.2
-name:<= 123.456^1.2
-name:<= google^1.2
-name:>= 123.456^1.2
-name:>= google^1.2
-name:{TO 123.456}^1.2
-name:{TO google}^1.2
-name:[-1000 TO]^1.2
-name:[google TO]^1.2
-name:{-1000 TO 123.456]^1.2
-name:{microsoft TO google}^1.2
-name:[-1000 TO 123.456}^1.2
-name:{microsoft TO google}^1.2
 
 #term
-NOT name:{microsoft TO google}^1.2
--name:{microsoft TO google}^1.2
-!name:{microsoft TO google}^1.2
-(duna~2)
-(name:duna~ ) 
-(name:/star.*/ OR name:duna~)
+NOT name:microsoft^1.2
+-name:google^1.2
+!name:microsoft^1.2
+(name:star OR name:duna)
 (dune god)
 (dune god)^1.3
 !(dune god)^1.3
 
 #clause
-foo AND name:duna~^1.2
+foo AND name:duna^1.2
 foo +bar
-duna~2 AND foo
-duna~ AND foo
+duna^2 AND foo
+duna AND foo
 (dune god) AND (foo bar)
-_exists_:"author" AND page_count:>200 AND name:/star.*/^1.3
+_exists_:"author" AND page_count:xxx AND name:star^1.3
 
 #query
 dune god
 dune OR god
-name:/star.*/ OR name:duna~
-_exists_:"author" AND page_count:>200 AND (name:/star.*/ OR name:duna~)
-_exists_:"author" AND page_count:>200^1.3 AND (name:/star.*/ OR name:duna~^1.2)^1.2
+name:star OR name:duna
+_exists_:"author" AND page_count:yyy AND (name:star OR name:duna)
+_exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.2
+
+#test
+(dune^1.2 AND NOT name:god^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
+(dune^1.2 AND NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
+(dune^1.2 AND (NOT name:god^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
     )##";
 
     Map<String, String> column2analyzer;

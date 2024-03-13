@@ -23,34 +23,13 @@
 #include "search_scanner.h"
 
 namespace infinity {
-SearchDriver::SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
-    : default_field_{default_field}, field2analyzer_{field2analyzer} {}
 
-int SearchDriver::ParseSingle(const std::string &query) {
+std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query) const {
     std::istringstream iss(query);
-    if (!iss.good() && iss.eof()) {
-        return -1;
+    if (!iss.good()) {
+        return nullptr;
     }
-    int rc = parse_helper(iss);
-    return rc;
-}
-
-void SearchDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) {
-    if (field.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    auto it = field2analyzer_.find(field);
-    if (it == field2analyzer_.end()) {
-        terms.push_back(text);
-        return;
-    }
-    const std::string &analyzer_name = it->second;
-    if (analyzer_name.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    analyze_func_(analyzer_name, text, terms);
+    return ParseHelper(iss);
 }
 
 std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms) {
@@ -71,22 +50,41 @@ std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std
     }
 }
 
-int SearchDriver::parse_helper(std::istream &stream) {
+void SearchDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) const {
+    if (field.empty()) {
+        terms.push_back(text);
+        return;
+    }
+    auto it = field2analyzer_.find(field);
+    if (it == field2analyzer_.end()) {
+        terms.push_back(text);
+        return;
+    }
+    const std::string &analyzer_name = it->second;
+    if (analyzer_name.empty()) {
+        terms.push_back(text);
+        return;
+    }
+    analyze_func_(analyzer_name, text, terms);
+}
+
+std::unique_ptr<QueryNode> SearchDriver::ParseHelper(std::istream &stream) const {
     std::unique_ptr<SearchParser> parser;
     std::unique_ptr<SearchScanner> scanner;
+    std::unique_ptr<QueryNode> result;
     try {
         scanner = std::make_unique<SearchScanner>(&stream);
-        parser = std::make_unique<SearchParser>((*scanner) /* scanner */, (*this) /* driver */);
+        parser = std::make_unique<SearchParser>((*scanner) /* scanner */, (*this) /* driver */, (result) /* parsing result */);
     } catch (std::bad_alloc &ba) {
         std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
-        return -1;
+        return nullptr;
     }
 
     const int accept(0);
     if (parser->parse() != accept) {
-        return -1;
+        return nullptr;
     }
-    return 0;
+    return result;
 }
 
 } // namespace infinity

@@ -21,19 +21,21 @@ export module query_node;
 namespace infinity {
 
 export using infinity::QueryNodeType;
+export using infinity::QueryNodeTypeToString;
 
 export using infinity::QueryNode;
 export using infinity::TermQueryNode;
+export using infinity::MultiQueryNode;
 export using infinity::AndQueryNode;
 export using infinity::AndNotQueryNode;
 export using infinity::OrQueryNode;
 export using infinity::NotQueryNode;
 
 // unimplemented
-export using infinity::WandQueryNode;
-export using infinity::PhraseQueryNode;
-export using infinity::PrefixTermQueryNode;
-export using infinity::SuffixTermQueryNode;
-export using infinity::SubstringTermQueryNode;
+// export using infinity::WandQueryNode;
+// export using infinity::PhraseQueryNode;
+// export using infinity::PrefixTermQueryNode;
+// export using infinity::SuffixTermQueryNode;
+// export using infinity::SubstringTermQueryNode;
 
 } // namespace infinity

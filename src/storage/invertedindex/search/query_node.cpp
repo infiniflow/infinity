@@ -1,8 +1,19 @@
 #include "query_node.h"
 
+import stl;
 import status;
 import infinity_exception;
 import logger;
+import doc_iterator;
+import term_doc_iterator;
+import and_iterator;
+import and_not_iterator;
+import or_iterator;
+import table_entry;
+import column_index_reader;
+import match_data;
+import posting_iterator;
+
 namespace infinity {
 
 // optimize: from leaf to root, replace tree node in place
@@ -112,6 +123,7 @@ std::unique_ptr<QueryNode> AndQueryNode::OptimizeInPlaceInner(std::unique_ptr<Qu
                 not_list.insert(not_list.end(),
                                 std::make_move_iterator(std::next(and_not_node.children_.begin())),
                                 std::make_move_iterator(and_not_node.children_.end()));
+                break;
             }
             default: {
                 UnrecoverableError("OptimizeInPlaceInner: Unexpected case!");
@@ -226,6 +238,143 @@ std::unique_ptr<QueryNode> OrQueryNode::OptimizeInPlaceInner(std::unique_ptr<Que
 std::unique_ptr<QueryNode> AndNotQueryNode::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
     UnrecoverableError("OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output");
     return nullptr;
+}
+
+// create search iterator
+
+std::unique_ptr<DocIterator>
+TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+    ColumnID column_id = table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
+    if (!column_index_reader)
+        return nullptr;
+    PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
+    if (posting_iterator == nullptr)
+        return nullptr;
+    auto search = MakeUnique<TermDocIterator>(posting_iterator, column_id);
+    scorer->AddDocIterator(search.get(), column_id);
+    return std::move(search);
+}
+
+std::unique_ptr<DocIterator>
+AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (auto &child : children_) {
+        auto iter = child->CreateSearch(table_entry, index_reader, scorer);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<AndIterator>(std::move(sub_doc_iters));
+    }
+}
+
+std::unique_ptr<DocIterator>
+AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    // check if the first child is a valid query
+    auto first_iter = children_.front()->CreateSearch(table_entry, index_reader, scorer);
+    if (!first_iter) {
+        // no need to continue if the first child is invalid
+        return nullptr;
+    }
+    sub_doc_iters.emplace_back(std::move(first_iter));
+    for (u32 i = 1; i < children_.size(); ++i) {
+        auto iter = children_[i]->CreateSearch(table_entry, index_reader, scorer);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<AndNotIterator>(std::move(sub_doc_iters));
+    }
+}
+
+std::unique_ptr<DocIterator>
+OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    for (auto &child : children_) {
+        auto iter = child->CreateSearch(table_entry, index_reader, scorer);
+        if (iter) {
+            sub_doc_iters.emplace_back(std::move(iter));
+        }
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else if (sub_doc_iters.size() == 1) {
+        return std::move(sub_doc_iters[0]);
+    } else {
+        return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+    }
+}
+
+std::unique_ptr<DocIterator>
+NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+    return nullptr;
+}
+
+// print tree
+
+std::string QueryNodeTypeToString(QueryNodeType type) {
+    switch (type) {
+        case QueryNodeType::INVALID:
+            return "INVALID";
+        case QueryNodeType::TERM:
+            return "TERM";
+        case QueryNodeType::AND:
+            return "AND";
+        case QueryNodeType::AND_NOT:
+            return "AND_NOT";
+        case QueryNodeType::OR:
+            return "OR";
+        case QueryNodeType::NOT:
+            return "NOT";
+        case QueryNodeType::WAND:
+            return "WAND";
+        case QueryNodeType::PHRASE:
+            return "PHRASE";
+        case QueryNodeType::PREFIX_TERM:
+            return "PREFIX_TERM";
+        case QueryNodeType::SUFFIX_TERM:
+            return "SUFFIX_TERM";
+        case QueryNodeType::SUBSTRING_TERM:
+            return "SUBSTRING_TERM";
+    }
+}
+
+void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << QueryNodeTypeToString(type_);
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << column_ << ")";
+    os << " (term: " << term_ << ")";
+    os << '\n';
+}
+
+void MultiQueryNode::PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << QueryNodeTypeToString(type_);
+    os << " (weight: " << weight_ << ")";
+    os << " (children count: " << children_.size() << ")";
+    os << '\n';
+    std::string next_prefix = prefix + (is_final ? "    " : "│   ");
+    for (u32 i = 0; i + 1 < children_.size(); ++i) {
+        children_[i]->PrintTree(os, next_prefix, false);
+    }
+    children_.back()->PrintTree(os, next_prefix, true);
 }
 
 } // namespace infinity
