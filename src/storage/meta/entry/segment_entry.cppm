@@ -53,7 +53,7 @@ public:
     friend struct TableEntry;
 
 public:
-    explicit SegmentEntry(const TableEntry *table_entry,
+    explicit SegmentEntry(TableEntry *table_entry,
                           SharedPtr<String> segment_dir,
                           SegmentID segment_id,
                           SizeT row_capacity,
@@ -61,22 +61,22 @@ public:
                           SegmentStatus status);
 
 private:
-    static SharedPtr<SegmentEntry> InnerNewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status);
+    static SharedPtr<SegmentEntry> InnerNewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status);
 
 public:
     // create unsealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewAppendSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewAppendSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewImportSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewImportSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewCompactSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewCompactSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
-    NewReplaySegmentEntry(const TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
+    NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
 
-    static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
+    static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(TableEntry *table_entry,
                                                                 SegmentID segment_id,
                                                                 const SharedPtr<String> &segment_dir,
                                                                 SegmentStatus status,
@@ -188,14 +188,13 @@ public:
     BlockEntry *GetBlockEntryByID(BlockID block_id) const;
 
 public:
-    // called by wal thread
-    u64 AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
+    u64 AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn);
 
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap, Txn *txn);
 
-    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, BlockID block_id, u16 start_pos, u16 row_count);
+    void CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap);
+    void RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry);
 
 private:
     static SharedPtr<String> DetermineSegmentDir(const String &parent_dir, SegmentID seg_id);
@@ -216,7 +215,7 @@ protected: // protected for unit test
     }
 
 private:
-    const TableEntry *table_entry_{};
+    TableEntry *table_entry_{};
     const SharedPtr<String> segment_dir_{};
     const SegmentID segment_id_{};
     const SizeT row_capacity_{};
@@ -228,7 +227,7 @@ private:
     SizeT actual_row_count_{}; // not deleted row count
 
     TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this SegmentEntry
-    TxnTimeStamp max_row_ts_{UNCOMMIT_TS};
+    TxnTimeStamp max_row_ts_{0};
     TxnTimeStamp first_delete_ts_{UNCOMMIT_TS}; // Indicate the first delete commit ts. If not delete, it is UNCOMMIT_TS
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};    // FIXME: need persist to disk
 

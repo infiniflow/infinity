@@ -75,12 +75,12 @@ private:
                                                TxnManager *txn_mgr,
                                                ConflictType conflict_type);
 
-    Tuple<TableEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                             TransactionID txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             TxnManager *txn_mgr,
-                                             const String &table_name,
-                                             ConflictType conflict_type);
+    Tuple<SharedPtr<TableEntry>, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                      TransactionID txn_id,
+                                                      TxnTimeStamp begin_ts,
+                                                      TxnManager *txn_mgr,
+                                                      const String &table_name,
+                                                      ConflictType conflict_type);
 
     Tuple<TableEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);

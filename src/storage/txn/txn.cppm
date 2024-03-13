@@ -102,13 +102,13 @@ public:
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
-    Tuple<TableEntry *, Status> GetTableEntry(const String &db_name, const String &table_name);
-
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
     Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
+
+    Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
 
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
@@ -130,6 +130,8 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
+    Status Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry);
+
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
@@ -158,9 +160,6 @@ public:
     // Dangerous! only used during replaying wal.
     void FakeCommit(TxnTimeStamp commit_ts);
 
-    // Create txn store if not exists
-    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
-
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
     void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
@@ -173,7 +172,7 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
-public:
+private:
     void AddDBStore(DBEntry *db_entry);
 
     void DropDBStore(DBEntry *dropped_db_entry);
@@ -182,15 +181,23 @@ public:
 
     void DropTableStore(TableEntry *dropped_table_entry);
 
-    void AddIndexStore(const String &index_name, TableIndexEntry *index_entry);
+    // Create txn store if not exists
+    TxnTableStore *GetTxnTableStore(const String &table_name);
 
-    void DropIndexStore(const String &index_name, TableIndexEntry *dropped_index_entry);
+public:
+    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+private:
+    void CheckTxnStatus();
+
+    void CheckTxn(const String &db_name);
 
 private:
     // Txn store
     Set<DBEntry *> txn_dbs_{};
     Set<TableEntry *> txn_tables_{};
-    HashMap<String, TableIndexEntry *> txn_indexes_{};
+    // Key: table name Value: TxnTableStore
+    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 
 private:
     TxnManager *txn_mgr_{};
@@ -201,11 +208,6 @@ private:
     TransactionID txn_id_{};
 
     TxnContext txn_context_{};
-
-    // Only one db can be handled in one transaction.
-    HashMap<String, BaseEntry *> txn_table_entries_{};
-    // Key: table name Value: TxnTableStore
-    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
 
     // Handled database
     String db_name_{};

@@ -66,11 +66,11 @@ private:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts,
-                                          TxnManager *txn_mgr,
-                                          ConflictType conflict_type = ConflictType::kError);
+    Tuple<SharedPtr<DBEntry>, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   ConflictType conflict_type = ConflictType::kError);
 
     void DeleteNewEntry(TransactionID txn_id);
 
