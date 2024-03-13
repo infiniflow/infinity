@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
 module;
 
 module term_queries;
@@ -176,3 +177,4 @@ UniquePtr<DocIterator> OrQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>>
 
 UniquePtr<DocIterator> WandQuery::CreateMultiSearch(Vector<UniquePtr<DocIterator>> sub_doc_iters) { return nullptr; }
 } // namespace infinity
+*/

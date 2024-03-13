@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
 module;
 
 #include "query_node.h"
@@ -82,3 +83,4 @@ template <>
 void QueryVisitor::Visit<SubstringTerm>(SubstringTerm &node) {}
 
 } // namespace infinity
+*/

@@ -42,5 +42,7 @@ private:
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     UniquePtr<Scorer> scorer_;
+
+    UniquePtr<DocIterator> CreateSearchForQueryNode(const QueryNode &query_node);
 };
 } // namespace infinity
