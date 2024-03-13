@@ -10,7 +10,7 @@ namespace infinity {
 // expected property of optimized node:
 // 1. children of "and" can only be term or "or", because "and", "not", "and_not" will be optimized
 // 2. children of "or" can only be term, "and" or "and_not", because "or" will be optimized, and "not" is not allowed
-// 3. children of "not" can only be term, "and", "or", "and_not", because "not" is not allowed
+// 3. children of "not" can only be term, "and" or "and_not", because "not" is not allowed, and "or" will be flattened to not list
 // 4. "and_not" does not exist in parser output, it is generated during optimization
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 
@@ -27,6 +27,37 @@ namespace infinity {
 // invalid query: "A and ((not B) or C)" : subexpression "(not B) or C" is invalid
 // here it is equivalent to "(A and_not B) or (A and C)", but it is more simple to disallow this case
 
+std::unique_ptr<QueryNode> Not::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
+    if (children_.empty()) {
+        UnrecoverableError("Invalid query statement: Not node should have at least 1 child");
+    }
+    std::vector<std::unique_ptr<QueryNode>> new_not_list;
+    for (auto &child : children_) {
+        switch (child->GetType()) {
+            case QueryNodeType::TERM:
+            case QueryNodeType::AND:
+            case QueryNodeType::AND_NOT: {
+                new_not_list.emplace_back(std::move(child));
+                break;
+            }
+            case QueryNodeType::OR: {
+                auto &or_node = static_cast<Or &>(*child);
+                for (auto &or_child : or_node.GetChildren()) {
+                    new_not_list.emplace_back(std::move(or_child));
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError("OptimizeInPlaceInner: Unexpected case!");
+                break;
+            }
+        }
+    }
+    auto new_not_node = std::make_unique<Not>(); // new node, weight is reset to 1.0
+    new_not_node->GetChildren() = std::move(new_not_list);
+    return new_not_node;
+}
+
 // 2. deal with "and":
 // rule for "and" (in execute order)
 // 2.1. for all children,
@@ -40,7 +71,7 @@ namespace infinity {
 //                       Y     |      N       => build "and"
 //                       N     |      Y       => build "not"
 
-std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) {
+std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
     if (children_.size() < 2) {
         UnrecoverableError("Invalid query statement: And node should have at least 2 children");
     }

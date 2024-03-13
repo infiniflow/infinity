@@ -94,7 +94,7 @@ protected:
 class And final : public MultiQueryNode {
 public:
     And() : MultiQueryNode(QueryNodeType::AND) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
+    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
 };
 class AndNot final : public MultiQueryNode {
 public:
@@ -138,7 +138,7 @@ public:
 class Not final : public MultiQueryNode {
 public:
     Not() : MultiQueryNode(QueryNodeType::NOT) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
+    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
 };
 
 } // namespace infinity
