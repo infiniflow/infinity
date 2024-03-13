@@ -17,9 +17,9 @@ export class SegmentTermPosting {
 public:
     SegmentTermPosting();
 
-    SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_doc_id, optionflag_t flag);
+    SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag);
 
-    RowID GetBaesDocId() const { return base_row_id_; }
+    RowID GetBaesRowId() const { return base_row_id_; }
 
     bool HasNext();
 

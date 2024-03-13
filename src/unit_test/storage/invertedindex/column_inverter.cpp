@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "type/complex/row_id.h"
 #include "type/logical_type.h"
 #include "unit_test/base_test.h"
 
@@ -30,6 +31,8 @@ import column_vector;
 import data_type;
 import value;
 import column_inverter;
+import segment_posting;
+import posting_iterator;
 
 using namespace infinity;
 
@@ -39,6 +42,13 @@ protected:
     RecyclePool buffer_pool_{};
     optionflag_t flag_{OPTION_FLAG_ALL};
     Map<String, SharedPtr<PostingWriter>> postings_;
+
+public:
+    struct ExpectedPosting {
+        String term;
+        Vector<RowID> doc_ids;
+        Vector<u32> tfs;
+    };
 
 public:
     void SetUp() override {
@@ -87,4 +97,34 @@ TEST_F(ColumnInverterTest, Invert) {
     inverter1.Sort();
 
     inverter1.GeneratePosting();
+
+    Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
+
+    for (SizeT i = 0; i < expected_postings.size(); ++i) {
+        const ExpectedPosting &expected = expected_postings[i];
+        const String &term = expected.term;
+        auto it = postings_.find(term);
+        ASSERT_TRUE(it != postings_.end());
+        SharedPtr<PostingWriter> posting = it->second;
+        ASSERT_TRUE(posting != nullptr);
+        ASSERT_EQ(posting->GetDF(), expected.doc_ids.size());
+
+        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>(1);
+        seg_postings->at(0).Init(u64(0), posting.get());
+
+        PostingIterator post_iter(flag_, &byte_slice_pool_);
+        post_iter.Init(seg_postings, 0);
+
+        RowID doc_id = INVALID_ROWID;
+        for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
+            doc_id = post_iter.SeekDoc(expected.doc_ids[j]);
+            ASSERT_EQ(doc_id, expected.doc_ids[j]);
+            u32 tf = post_iter.GetCurrentTF();
+            ASSERT_EQ(tf, expected.tfs[j]);
+        }
+        if (doc_id != INVALID_ROWID) {
+            doc_id = post_iter.SeekDoc(doc_id + 1);
+            ASSERT_EQ(doc_id, INVALID_ROWID);
+        }
+    }
 }
