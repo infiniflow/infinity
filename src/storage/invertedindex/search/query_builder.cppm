@@ -18,7 +18,6 @@ export module query_builder;
 
 import stl;
 import doc_iterator;
-import term_queries;
 import column_index_reader;
 import match_data;
 import table_entry;

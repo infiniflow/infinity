@@ -76,13 +76,13 @@ topLevelQuery
 query
 : clause { $$ = std::move($1); }
 | query clause {
-    auto query = std::make_unique<Or>();
+    auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move($1));
     query->Add(std::move($2));
     $$ = std::move(query);
 }
 | query OR clause {
-    auto query = std::make_unique<Or>();
+    auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move($1));
     query->Add(std::move($3));
     $$ = std::move(query);
@@ -91,7 +91,7 @@ query
 clause
 : term { $$ = std::move($1); }
 | clause AND term {
-    auto query = std::make_unique<And>();
+    auto query = std::make_unique<AndQueryNode>();
     query->Add(std::move($1));
     query->Add(std::move($3));
     $$ = std::move(query);
@@ -100,7 +100,7 @@ clause
 term
 : basic_filter_boost { $$ = std::move($1); }
 | NOT term {
-    auto query = std::make_unique<Not>();
+    auto query = std::make_unique<NotQueryNode>();
     query->Add(std::move($2));
     $$ = std::move(query);
 }
@@ -116,7 +116,7 @@ basic_filter_boost
 }
 | basic_filter CARAT {
     $$ = std::move($1);
-    $1->MultiplyWeight($2);
+    $$->MultiplyWeight($2);
 };
 
 basic_filter

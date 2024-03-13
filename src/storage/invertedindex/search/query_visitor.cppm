@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
 module;
 
-export module query_visitor;
+export module query_visitor_deprecated;
 
+/*
 import stl;
 import index_defines;
 import term_queries;

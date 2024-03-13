@@ -777,7 +777,7 @@ namespace infinity {
   case 4: // query: query clause
 #line 78 "search_parser.y"
                {
-    auto query = std::make_unique<Or>();
+    auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
@@ -788,7 +788,7 @@ namespace infinity {
   case 5: // query: query OR clause
 #line 84 "search_parser.y"
                   {
-    auto query = std::make_unique<Or>();
+    auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
@@ -805,7 +805,7 @@ namespace infinity {
   case 7: // clause: clause AND term
 #line 93 "search_parser.y"
                   {
-    auto query = std::make_unique<And>();
+    auto query = std::make_unique<AndQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
@@ -822,7 +822,7 @@ namespace infinity {
   case 9: // term: NOT term
 #line 102 "search_parser.y"
            {
-    auto query = std::make_unique<Not>();
+    auto query = std::make_unique<NotQueryNode>();
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
 }
@@ -856,7 +856,7 @@ namespace infinity {
 #line 117 "search_parser.y"
                      {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
-    yystack_[1].value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
+    yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
 }
 #line 862 "search_parser.cpp"
     break;

@@ -27,9 +27,9 @@ namespace infinity {
 // invalid query: "A and ((not B) or C)" : subexpression "(not B) or C" is invalid
 // here it is equivalent to "(A and_not B) or (A and C)", but it is more simple to disallow this case
 
-std::unique_ptr<QueryNode> Not::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
+std::unique_ptr<QueryNode> NotQueryNode::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
     if (children_.empty()) {
-        UnrecoverableError("Invalid query statement: Not node should have at least 1 child");
+        UnrecoverableError("Invalid query statement: NotQueryNode node should have at least 1 child");
     }
     std::vector<std::unique_ptr<QueryNode>> new_not_list;
     for (auto &child : children_) {
@@ -41,7 +41,7 @@ std::unique_ptr<QueryNode> Not::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
                 break;
             }
             case QueryNodeType::OR: {
-                auto &or_node = static_cast<Or &>(*child);
+                auto &or_node = static_cast<OrQueryNode &>(*child);
                 for (auto &or_child : or_node.children_) {
                     new_not_list.emplace_back(std::move(or_child));
                 }
@@ -53,7 +53,7 @@ std::unique_ptr<QueryNode> Not::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
             }
         }
     }
-    auto new_not_node = std::make_unique<Not>(); // new node, weight is reset to 1.0
+    auto new_not_node = std::make_unique<NotQueryNode>(); // new node, weight is reset to 1.0
     new_not_node->children_ = std::move(new_not_list);
     return new_not_node;
 }
@@ -71,9 +71,9 @@ std::unique_ptr<QueryNode> Not::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
 //                       Y     |      N       => build "and"
 //                       N     |      Y       => build "not"
 
-std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
+std::unique_ptr<QueryNode> AndQueryNode::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
     if (children_.size() < 2) {
-        UnrecoverableError("Invalid query statement: And node should have at least 2 children");
+        UnrecoverableError("Invalid query statement: AndQueryNode node should have at least 2 children");
     }
     std::vector<std::unique_ptr<QueryNode>> and_list;
     std::vector<std::unique_ptr<QueryNode>> not_list;
@@ -81,7 +81,7 @@ std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
     for (auto &child : children_) {
         switch (child->GetType()) {
             case QueryNodeType::AND: {
-                auto &and_node = static_cast<And &>(*child);
+                auto &and_node = static_cast<AndQueryNode &>(*child);
                 and_list.insert(and_list.end(),
                                 std::make_move_iterator(and_node.children_.begin()),
                                 std::make_move_iterator(and_node.children_.end()));
@@ -93,16 +93,16 @@ std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
                 break;
             }
             case QueryNodeType::NOT: {
-                auto &not_node = static_cast<Not &>(*child);
+                auto &not_node = static_cast<NotQueryNode &>(*child);
                 not_list.insert(not_list.end(),
                                 std::make_move_iterator(not_node.children_.begin()),
                                 std::make_move_iterator(not_node.children_.end()));
                 break;
             }
             case QueryNodeType::AND_NOT: {
-                auto &and_not_node = static_cast<AndNot &>(*child);
+                auto &and_not_node = static_cast<AndNotQueryNode &>(*child);
                 if (auto &first_child = and_not_node.children_.front(); first_child->GetType() == QueryNodeType::AND) {
-                    auto &and_node = static_cast<And &>(*first_child);
+                    auto &and_node = static_cast<AndQueryNode &>(*first_child);
                     and_list.insert(and_list.end(),
                                     std::make_move_iterator(and_node.children_.begin()),
                                     std::make_move_iterator(and_node.children_.end()));
@@ -122,21 +122,21 @@ std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
     // 2.2.
     if (and_list.empty()) {
         // at least 2 children
-        auto not_node = std::make_unique<Not>(); // new node, weight is reset to 1.0
+        auto not_node = std::make_unique<NotQueryNode>(); // new node, weight is reset to 1.0
         not_node->children_ = std::move(not_list);
         return not_node;
     } else if (not_list.empty()) {
         // at least 2 children
-        auto and_node = std::make_unique<And>(); // new node, weight is reset to 1.0
+        auto and_node = std::make_unique<AndQueryNode>(); // new node, weight is reset to 1.0
         and_node->children_ = std::move(and_list);
         return and_node;
     } else {
-        auto and_not_node = std::make_unique<AndNot>(); // new node, weight is reset to 1.0
+        auto and_not_node = std::make_unique<AndNotQueryNode>(); // new node, weight is reset to 1.0
         // build first child from and_list
         if (and_list.size() == 1) {
             and_not_node->children_.emplace_back(std::move(and_list.front()));
         } else {
-            auto and_node = std::make_unique<And>(); // new node, weight is reset to 1.0
+            auto and_node = std::make_unique<AndQueryNode>(); // new node, weight is reset to 1.0
             and_node->children_ = std::move(and_list);
             and_not_node->children_.emplace_back(std::move(and_node));
         }
@@ -160,9 +160,9 @@ std::unique_ptr<QueryNode> And::OptimizeInPlaceInner(std::unique_ptr<QueryNode> 
 //                       Y    |      N       => build "or"
 //                       N    |      Y       => build "not" of (child and ...)
 
-std::unique_ptr<QueryNode> Or::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
+std::unique_ptr<QueryNode> OrQueryNode::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
     if (children_.size() < 2) {
-        UnrecoverableError("Invalid query statement: Or node should have at least 2 children");
+        UnrecoverableError("Invalid query statement: OrQueryNode node should have at least 2 children");
     }
     std::vector<std::unique_ptr<QueryNode>> or_list;
     std::vector<std::unique_ptr<QueryNode>> not_list;
@@ -170,7 +170,7 @@ std::unique_ptr<QueryNode> Or::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &
     for (auto &child : children_) {
         switch (child->GetType()) {
             case QueryNodeType::OR: {
-                auto &or_node = static_cast<Or &>(*child);
+                auto &or_node = static_cast<OrQueryNode &>(*child);
                 or_list.insert(or_list.end(), std::make_move_iterator(or_node.children_.begin()), std::make_move_iterator(or_node.children_.end()));
                 break;
             }
@@ -194,15 +194,15 @@ std::unique_ptr<QueryNode> Or::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &
     if (or_list.empty()) {
         // at least 2 children
         // build "not" of (child and ...)
-        auto not_node = std::make_unique<Not>(); // new node, weight is reset to 1.0
-        auto and_node = std::make_unique<And>(); // new node, weight is reset to 1.0
+        auto not_node = std::make_unique<NotQueryNode>(); // new node, weight is reset to 1.0
+        auto and_node = std::make_unique<AndQueryNode>(); // new node, weight is reset to 1.0
         for (auto &not_child : not_list) {
-            auto &not_child_node = static_cast<Not &>(*not_child);
+            auto &not_child_node = static_cast<NotQueryNode &>(*not_child);
             if (not_child_node.children_.size() == 1) {
                 and_node->children_.emplace_back(std::move(not_child_node.children_.front()));
             } else {
                 // build "or" which exists in "not" children list
-                auto or_node = std::make_unique<Or>(); // new node, weight is reset to 1.0
+                auto or_node = std::make_unique<OrQueryNode>(); // new node, weight is reset to 1.0
                 or_node->children_ = std::move(not_child_node.children_);
                 and_node->children_.emplace_back(std::move(or_node));
             }
@@ -211,11 +211,11 @@ std::unique_ptr<QueryNode> Or::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &
         return not_node;
     } else if (not_list.empty()) {
         // at least 2 children
-        auto or_node = std::make_unique<Or>(); // new node, weight is reset to 1.0
+        auto or_node = std::make_unique<OrQueryNode>(); // new node, weight is reset to 1.0
         or_node->children_ = std::move(or_list);
         return or_node;
     } else {
-        UnrecoverableError("Invalid query statement: Or node should not have both or list and not list");
+        UnrecoverableError("Invalid query statement: OrQueryNode node should not have both or list and not list");
         return nullptr;
     }
 }
@@ -223,8 +223,8 @@ std::unique_ptr<QueryNode> Or::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &
 // 4. deal with "and_not":
 // "and_not" does not exist in parser output, it is generated during optimization
 
-std::unique_ptr<QueryNode> AndNot::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
-    UnrecoverableError("OptimizeInPlaceInner: Unexpected case! AndNot should not exist in parser output");
+std::unique_ptr<QueryNode> AndNotQueryNode::OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) {
+    UnrecoverableError("OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output");
     return nullptr;
 }
 

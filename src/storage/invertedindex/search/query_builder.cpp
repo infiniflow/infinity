@@ -38,7 +38,8 @@ import index_defines;
 import internal_types;
 import index_base;
 import index_full_text;
-import infinity_exceptions;
+import posting_iterator;
+import infinity_exception;
 
 namespace infinity {
 
@@ -90,7 +91,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
     return CreateSearchForQueryNode(*context.query_tree_);
 }
 
-UniquePtr<DocIterator> CreateSearchForQueryNode(const QueryNode &query_node) {
+UniquePtr<DocIterator> QueryBuilder::CreateSearchForQueryNode(const QueryNode &query_node) {
     switch (query_node.GetType()) {
         case QueryNodeType::TERM: {
             const auto &term_node = static_cast<const TermQueryNode &>(query_node);
@@ -106,7 +107,7 @@ UniquePtr<DocIterator> CreateSearchForQueryNode(const QueryNode &query_node) {
             return std::move(search);
         }
         case QueryNodeType::AND: {
-            const auto &and_node = static_cast<const And &>(query_node);
+            const auto &and_node = static_cast<const AndQueryNode &>(query_node);
             Vector<UniquePtr<DocIterator>> sub_doc_iters;
             sub_doc_iters.reserve(and_node.children_.size());
             for (auto &child : and_node.children_) {
@@ -124,7 +125,7 @@ UniquePtr<DocIterator> CreateSearchForQueryNode(const QueryNode &query_node) {
             }
         }
         case QueryNodeType::AND_NOT: {
-            const auto &and_not_node = static_cast<const AndNot &>(query_node);
+            const auto &and_not_node = static_cast<const AndNotQueryNode &>(query_node);
             Vector<UniquePtr<DocIterator>> sub_doc_iters;
             sub_doc_iters.reserve(and_not_node.children_.size());
             // check if the first child is a valid query
@@ -147,7 +148,7 @@ UniquePtr<DocIterator> CreateSearchForQueryNode(const QueryNode &query_node) {
             }
         }
         case QueryNodeType::OR: {
-            const auto &or_node = static_cast<const Or &>(query_node);
+            const auto &or_node = static_cast<const OrQueryNode &>(query_node);
             Vector<UniquePtr<DocIterator>> sub_doc_iters;
             sub_doc_iters.reserve(or_node.children_.size());
             for (auto &child : or_node.children_) {

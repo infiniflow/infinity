@@ -17,37 +17,14 @@
 #include <sstream>
 #include <utility>
 
+#include "query_node.h"
 #include "search_driver.h"
 #include "search_parser.h"
 #include "search_scanner.h"
-#include "query_node.h"
 
 namespace infinity {
 SearchDriver::SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
-    : default_field_(default_field), field2analyzer_(field2analyzer) {}
-
-/*
-int SearchDriver::ParseStream(std::istream &ist) {
-    // read and parse line by line, ignoring empty lines and comments
-    std::string line;
-    while (std::getline(ist, line)) {
-        size_t firstNonBlank = line.find_first_not_of(" \t");
-        if (firstNonBlank == std::string::npos || line[firstNonBlank] == '#') {
-            continue;
-        }
-        line = line.substr(firstNonBlank);
-        std::cerr << "---query: ###" << line << "###" << std::endl;
-        int rc = ParseSingle(line);
-        if (rc != 0) {
-            std::cerr << "---failed" << std::endl;
-            return rc;
-        } else {
-            std::cerr << "---accepted" << std::endl;
-        }
-    }
-    return 0;
-}
-*/
+    : default_field_{default_field}, field2analyzer_{field2analyzer} {}
 
 int SearchDriver::ParseSingle(const std::string &query) {
     std::istringstream iss(query);
@@ -56,6 +33,42 @@ int SearchDriver::ParseSingle(const std::string &query) {
     }
     int rc = parse_helper(iss);
     return rc;
+}
+
+void SearchDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) {
+    if (field.empty()) {
+        terms.push_back(text);
+        return;
+    }
+    auto it = field2analyzer_.find(field);
+    if (it == field2analyzer_.end()) {
+        terms.push_back(text);
+        return;
+    }
+    const std::string &analyzer_name = it->second;
+    if (analyzer_name.empty()) {
+        terms.push_back(text);
+        return;
+    }
+    analyze_func_(analyzer_name, text, terms);
+}
+
+std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms) {
+    if (terms.size() == 1) {
+        auto result = std::make_unique<TermQueryNode>();
+        result->term_ = std::move(terms[0]);
+        result->column_ = field;
+        return result;
+    } else {
+        auto result = std::make_unique<OrQueryNode>();
+        for (std::string &term : terms) {
+            auto subquery = std::make_unique<TermQueryNode>();
+            subquery->term_ = std::move(term);
+            subquery->column_ = field;
+            result->Add(std::move(subquery));
+        }
+        return result;
+    }
 }
 
 int SearchDriver::parse_helper(std::istream &stream) {
@@ -72,42 +85,6 @@ int SearchDriver::parse_helper(std::istream &stream) {
         return -1;
     }
     return 0;
-}
-
-void SearchDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) {
-    if (field.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    auto it = field2analyzer_.find(field);
-    if (it == field2analyzer_.end()) {
-        terms.push_back(text);
-        return;
-    }
-    std::string &analyzer_name = it->second;
-    if (analyzer_name.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    analyze_func_(analyzer_name, text, terms);
-}
-
-std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms) {
-    if (terms.size() == 1) {
-        auto result = std::make_unique<TermQueryNode>();
-        result->term_ = std::move(terms[0]);
-        result->column_ = field;
-        return result;
-    } else {
-        auto result = std::make_unique<Or>();
-        for (std::string &term : terms) {
-            auto subquery = std::make_unique<TermQueryNode>();
-            subquery->term_ = std::move(term);
-            subquery->column_ = field;
-            result->Add(std::move(subquery));
-        }
-        return result;
-    }
 }
 
 } // namespace infinity
