@@ -540,7 +540,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
@@ -600,8 +600,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             block_entry->IncreaseRowCount(1);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn4->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn4, segment_entry);
             txn_mgr->CommitTxn(txn4);
         }
 
@@ -627,7 +626,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             TxnTimeStamp begin_ts = txn->BeginTS();
 
             Vector<ColumnID> column_ids{0, 1, 2};
-            auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
             auto segment_entry = table_entry->GetSegmentByID(0, begin_ts);
             EXPECT_NE(segment_entry, nullptr);
@@ -702,7 +701,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto txn2 = txn_mgr->CreateTxn();
             txn2->Begin();
 
-            auto [table_entry, status] = txn2->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn2->GetTableByName("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -731,8 +730,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto txn_store = txn2->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn2, segment_entry);
             txn_mgr->CommitTxn(txn2);
         }
 
@@ -740,7 +738,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn4->GetTableByName("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -767,7 +765,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             txn->Begin();
             TxnTimeStamp begin_ts = txn->BeginTS();
 
-            auto [table_entry, status] = txn->GetTableEntry("default", "tbl1");
+            auto [table_entry, status] = txn->GetTableByName("default", "tbl1");
             EXPECT_NE(table_entry, nullptr);
 
             for (u64 i = 0; i < test_segment_n; ++i) {
@@ -871,7 +869,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableEntry("default", "test_annivfflat");
+            auto [table_entry, status] = txn->GetTableByName("default", "test_annivfflat");
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
             EXPECT_NE(table_index_meta, nullptr);
@@ -975,7 +973,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableEntry("default", "test_hnsw");
+            auto [table_entry, status] = txn->GetTableByName("default", "test_hnsw");
             EXPECT_NE(table_entry, nullptr);
             auto table_index_meta = table_entry->index_meta_map()["hnsw_index"].get();
             EXPECT_NE(table_index_meta, nullptr);

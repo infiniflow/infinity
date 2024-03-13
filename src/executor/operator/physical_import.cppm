@@ -108,7 +108,7 @@ public:
 
     inline char delimiter() const { return delimiter_; }
 
-    static void SaveSegmentData(TxnTableStore *txn_store, SharedPtr<SegmentEntry> &segment_entry);
+    static void SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> segment_entry);
 
 private:
     static void CSVHeaderHandler(void *);

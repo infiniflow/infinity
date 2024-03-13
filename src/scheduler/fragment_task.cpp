@@ -61,6 +61,7 @@ void FragmentTask::OnExecute(i64) {
 
     bool execute_success{false};
     source_op->Execute(fragment_context->query_context(), source_state_.get());
+    Status operator_status{};
     if (source_state_->status_.ok()) {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
@@ -69,7 +70,6 @@ void FragmentTask::OnExecute(i64) {
         TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
         HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
         profiler.Begin();
-        Status operator_status{};
         try {
             for (i64 op_idx = operator_count_ - 1; op_idx >= 0; --op_idx) {
                 profiler.StartOperator(operator_refs[op_idx]);
@@ -79,6 +79,10 @@ void FragmentTask::OnExecute(i64) {
                 execute_success = operator_refs[op_idx]->Execute(fragment_context->query_context(), operator_states_[op_idx].get());
                 operator_refs[op_idx]->FillingTableRefs(table_refs);
 
+                if (!operator_states_[op_idx]->status_.ok()) {
+                    operator_status = operator_states_[op_idx]->status_;
+                    break;
+                }
                 if (!execute_success) {
                     break;
                 }
@@ -93,14 +97,12 @@ void FragmentTask::OnExecute(i64) {
 
         profiler.End();
         fragment_context->FlushProfiler(profiler);
-
-        if (!operator_status.ok()) {
-            sink_state_->status_ = operator_status;
-            status_ = FragmentTaskStatus::kError;
-        }
     }
 
-    if (execute_success or !sink_state_->status_.ok()) {
+    if (!operator_status.ok()) {
+        sink_state_->status_ = operator_status;
+        status_ = FragmentTaskStatus::kError;
+    } else if (execute_success) {
         PhysicalSink *sink_op = fragment_context->GetSinkOperator();
         sink_op->Execute(query_context, fragment_context, sink_state_.get());
     }

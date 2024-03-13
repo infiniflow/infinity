@@ -50,7 +50,6 @@ export struct AppendState {
     u16 current_block_offset_{};
 
     Vector<AppendRange> append_ranges_{};
-    Vector<SegmentID> set_sealed_segments_{}; // segments which turned to sealed state in append operation
 
     [[nodiscard]] inline bool Finished() const { return current_count_ == total_count_; }
 };

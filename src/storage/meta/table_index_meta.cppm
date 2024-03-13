@@ -60,11 +60,11 @@ public:
                                                            bool is_replay,
                                                            String replay_table_index_dir);
 
-    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                         ConflictType conflict_type,
-                                                         TransactionID txn_id,
-                                                         TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr);
+    Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                                  ConflictType conflict_type,
+                                                                  TransactionID txn_id,
+                                                                  TxnTimeStamp begin_ts,
+                                                                  TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);

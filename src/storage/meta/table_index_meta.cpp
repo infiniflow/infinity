@@ -64,13 +64,13 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
     return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                                     ConflictType conflict_type,
-                                                                     TransactionID txn_id,
-                                                                     TxnTimeStamp begin_ts,
-                                                                     TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                                              ConflictType conflict_type,
+                                                                              TransactionID txn_id,
+                                                                              TxnTimeStamp begin_ts,
+                                                                              TxnManager *txn_mgr) {
     auto init_drop_entry = [&]() {
-        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts, txn_mgr);
+        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
         drop_entry->deleted_ = true;
         return drop_entry;
     };
