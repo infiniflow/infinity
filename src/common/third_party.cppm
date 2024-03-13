@@ -228,5 +228,6 @@ export using HttpConnectionProvider = oatpp::network::tcp::server::ConnectionPro
 export using WebServer = oatpp::network::Server;
 export using WebEnvironment = oatpp::base::Environment;
 export using WebAddress = oatpp::network::Address;
+export using HTTPStatus = oatpp::web::protocol::http::Status;
 
 } // namespace infinity

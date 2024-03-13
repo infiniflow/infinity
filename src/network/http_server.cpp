@@ -40,8 +40,10 @@ public:
         DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
 
         auto result = infinity->ListDatabases();
+        nlohmann::json json_response;
+        HTTPStatus http_status;
         if(result.IsOk()) {
-            nlohmann::json json_response;
+
             SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
             auto row_count = data_block->row_count();
             for (int i = 0; i < row_count; ++i) {
@@ -50,10 +52,14 @@ public:
                 json_response["databases"].push_back(db_name);
             }
 
-            return ResponseFactory::createResponse(Status::CODE_200, json_response.dump());
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
         } else {
-            return ResponseFactory::createResponse(Status::CODE_404, "No database found");
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
         }
+        return ResponseFactory::createResponse(HTTPStatus::CODE_500, json_response.dump());
     }
 };
 

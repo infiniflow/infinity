@@ -6,7 +6,7 @@ create a new database.
 
 #### Request
 ```http request
-curl --request GET \
+curl --request POST \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
@@ -360,8 +360,6 @@ curl --request POST \
 ```
 
 ---
-
-
 ## Drop index
 
 Drop index
@@ -391,8 +389,6 @@ curl --request DELETE \
 ```
 
 ---
-
-
 
 ## Insert
 
@@ -516,7 +512,6 @@ curl --request PUT \
 
 ---
 
-
 ## Select
 
 select data from table
@@ -583,7 +578,7 @@ Get variables
 ```http request
 curl --request GET \
      --url localhost:23820/variables/{variable_name} \
-     --header 'accept: application/json' \
+     --header 'accept: application/json'
 ```
 
 #### Response
