@@ -46,7 +46,7 @@ TEST_F(ConfigTest, test1) {
     // Network
     EXPECT_EQ(config.listen_address(), "0.0.0.0");
     EXPECT_EQ(config.pg_port(), 5432);
-    EXPECT_EQ(config.http_port(), 8088u);
+    EXPECT_EQ(config.http_port(), 24820u);
     EXPECT_EQ(config.sdk_port(), 23817u);
 
     // Log
@@ -83,7 +83,7 @@ TEST_F(ConfigTest, test2) {
 
     EXPECT_EQ(config.listen_address(), "127.0.0.1");
     EXPECT_EQ(config.pg_port(), 25432);
-    EXPECT_EQ(config.http_port(), 24820u);
+    EXPECT_EQ(config.http_port(), 24821u);
     EXPECT_EQ(config.sdk_port(), 24817u);
 
     EXPECT_EQ(*config.log_filename(), "info.log");

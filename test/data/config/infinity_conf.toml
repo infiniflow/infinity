@@ -11,7 +11,7 @@ query_memory_limit      = "4MB"
 [network]
 listen_address          = "127.0.0.1"
 pg_port                 = 25432
-http_port               = 8089
+http_port               = 24821
 sdk_port                = 24817
 connection_limit        = 128
 
