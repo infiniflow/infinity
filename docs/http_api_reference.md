@@ -529,7 +529,28 @@ curl --request GET \
         "name",
         "age"
     ],
-    filter: "age > 15"
+    filter: "age > 15",
+    fusion: 
+    {
+        method: "rrf",
+        match:
+        {
+            "title": 
+            {
+                "query": "rock fire",
+                "operator": "and"
+            }
+        }
+        knn:
+        {
+            "vector_column":
+            {
+                "query_vector": [1.0, 2.0],
+                "ef" : 150,
+                "top_k": 3
+            }
+        }
+    }
     knn: 
     {
         vector: 
