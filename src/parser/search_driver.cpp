@@ -26,8 +26,7 @@ namespace infinity {
 SearchDriver::SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
     : default_field_(default_field), field2analyzer_(field2analyzer) {}
 
-SearchDriver::~SearchDriver() = default;
-
+/*
 int SearchDriver::ParseStream(std::istream &ist) {
     // read and parse line by line, ignoring empty lines and comments
     std::string line;
@@ -48,6 +47,7 @@ int SearchDriver::ParseStream(std::istream &ist) {
     }
     return 0;
 }
+*/
 
 int SearchDriver::ParseSingle(const std::string &query) {
     std::istringstream iss(query);

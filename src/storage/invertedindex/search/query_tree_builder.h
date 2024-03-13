@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
 #pragma once
 
 #include "query_node.h"
@@ -56,3 +57,4 @@ private:
     std::stack<NodeInfo> nodes_;
 };
 } // namespace infinity
+*/

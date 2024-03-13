@@ -32,13 +32,12 @@ class SearchScanner;
 class SearchDriver {
 public:
     SearchDriver(const std::map<std::string, std::string> &field2analyzer_, const std::string &default_field_);
-    virtual ~SearchDriver();
 
     /**
      * parse a stream - read and parse line by line
      * @param ist - std::istream&, valid input stream
      */
-    int ParseStream(std::istream &ist);
+    // int ParseStream(std::istream &ist);
 
     /**
      * parse a single query

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
 #include "query_tree_builder.h"
 #include "query_node.h"
 
@@ -73,3 +74,4 @@ void QueryTreeBuilder::AddIntermediateNode(MultiQueryNode *n, int child_count) {
 }
 
 } // namespace infinity
+*/

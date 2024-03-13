@@ -25,7 +25,7 @@ import table_entry;
 
 namespace infinity {
 
-class QueryNode;
+struct QueryNode;
 export struct QueryContext {
     UniquePtr<QueryNode> query_tree_;
 };
