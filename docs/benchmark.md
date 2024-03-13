@@ -71,15 +71,21 @@ python remote_benchmark_knn_import.py -d gist_1m
 
 # ROUNDS indicates the number of times Python executes the benchmark, and the result represents the average duration for each run.
 
-# Perform a benchmark on the SIFT1M dataset using a single thread, running it only once.
+# Perform a latency benchmark on the SIFT1M dataset using a single thread, running it only once.
 python remote_benchmark_knn.py -t 1 -r 1 -d sift_1m
-# Perform a benchmark on the GIST1M dataset using a single thread, running it only once.
-python remote_benchmark_knn -t 1 -r 1 -d gist_1m
+# Perform a latency benchmark on the GIST1M dataset using a single thread, running it only once.
+python remote_benchmark_knn.py -t 1 -r 1 -d gist_1m
+
+# Perform a QPS benchmark on the SIFT1M dataset using a single thread, running it only once.
+python remote_benchmark_knn.py -t 16 -r 1 -d sift_1m
+# Perform a latency benchmark on the GIST1M dataset using a single thread, running it only once.
+python remote_benchmark_knn.py -t 16 -r 1 -d gist_1m
 ```
 ## A SIFT1M Benchmark report
 
 - **Hardware**: Intel i5-12500H, 16C, 16GB
 - **Operating system**: Ubuntu 22.04
 - **Dataset**: SIFT1M; **topk**: 100; **recall**: 97%+
-- **QPS**: 10,305
-- **P99 Latency**: < 0.4 ms
+- **P99 QPS**: 15,688 (16 clients)
+- **P99 Latency**: 0.36 ms
+- **Memory usage**: 408 MB
