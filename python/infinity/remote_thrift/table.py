@@ -188,7 +188,7 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float]]]]):
+    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
         # {"c1": 1, "c2": 1.1}
         match cond:
             case None:
@@ -212,6 +212,13 @@ class RemoteTable(Table, ABC):
                         elif isinstance(value, float) or isinstance(value, np.float32):
                             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                                       f64_value=value)
+                        elif isinstance(value, list):
+                            if isinstance(value[0], int):
+                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                                          i64_array_value=value)
+                            elif isinstance(value[0], float):
+                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                                          f64_array_value=value)
                         else:
                             raise Exception("Invalid constant expression")
 

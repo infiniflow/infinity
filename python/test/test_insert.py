@@ -207,7 +207,6 @@ class TestInsert:
         res = table_obj.insert([{"c1": [-9999999] * 65535}])
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.skip("Unexpected error.")
     def test_insert_big_embedding_float(self):
         """
         target: test insert embedding float with big dimension
