@@ -45,7 +45,10 @@ DBEntry::DBEntry(DBMeta *db_meta,
                  TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir
+                                                                                   // is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)
+                                                                                   ),
+      db_name_(db_name) {
     //    atomic_u64 txn_id_{0};
     //    TxnTimeStamp begin_ts_{0};
     //    atomic_u64 commit_ts_{UNCOMMIT_TS};
@@ -61,47 +64,43 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
     SharedPtr<String> db_entry_dir = is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name);
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
-    return db_entry;
+    return MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
 }
 
-SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(DBMeta *db_meta,
-                                             const SharedPtr<String> &db_entry_dir,
-                                             const SharedPtr<String> &db_name,
-                                             TransactionID txn_id,
-                                             TxnTimeStamp begin_ts,
-                                             TxnTimeStamp commit_ts,
-                                             bool is_delete) noexcept {
+SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
+                                          const SharedPtr<String> &db_entry_dir,
+                                          const SharedPtr<String> &db_name,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts,
+                                          TxnTimeStamp commit_ts,
+                                          bool is_delete) noexcept {
     auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
 
 Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
-                                                 const SharedPtr<String> &table_collection_name,
+                                                 const SharedPtr<String> &table_name,
                                                  const Vector<SharedPtr<ColumnDef>> &columns,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
                                                  TxnManager *txn_mgr,
                                                  ConflictType conflict_type) {
-    const String &table_name = *table_collection_name;
-    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_collection_name, this); };
-    LOG_TRACE(fmt::format("Adding new table entry: {}", table_name));
-    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_name, std::move(init_table_meta), txn_id, begin_ts, txn_mgr);
-
-    return table_meta->CreateNewEntry(std::move(r_lock), table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
+    LOG_TRACE(fmt::format("Adding new table entry: {}", *table_name));
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(*table_name, std::move(init_table_meta)
+                                                              // , txn_id, begin_ts, txn_mgr
+    );
+    return table_meta->CreateEntry(std::move(r_lock), table_entry_type, table_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<SharedPtr<TableEntry>, Status> DBEntry::DropTable(const String &table_collection_name,
-                                                        ConflictType conflict_type,
-                                                        TransactionID txn_id,
-                                                        TxnTimeStamp begin_ts,
-                                                        TxnManager *txn_mgr) {
-    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_collection_name, conflict_type);
-    if (table_meta == nullptr) {
+Tuple<SharedPtr<TableEntry>, Status>
+DBEntry::DropTable(const String &table_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, conflict_type);
+    if (!status.ok()) {
         return {nullptr, status};
     }
-    return table_meta->DropNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, table_collection_name, conflict_type);
+    return table_meta->DropEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, table_name, conflict_type);
 }
 
 Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -124,9 +123,40 @@ Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String& table_na
 }
 
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
-    auto [table_meta, _1, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
+    auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("error when get table/collection entry: {}", status.message()));
+    }
     LOG_TRACE(fmt::format("Remove a db entry: {}", table_name));
-    table_meta->DeleteNewEntry(txn_id);
+    table_meta->DeleteEntry(txn_id);
+}
+
+void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
+                                std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                TransactionID txn_id,
+                                TxnTimeStamp begin_ts) {
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
+    auto *table_meta = table_meta_map_.GetMetaNoLock(*table_name, std::move(init_table_meta));
+    table_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+void DBEntry::DropTableReplay(const String &table_name,
+                              std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp begin_ts) {
+    auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    table_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+TableEntry *DBEntry::GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_meta, status] = table_meta_map_.GetExistMetaNoLock(table_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return table_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
 Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {

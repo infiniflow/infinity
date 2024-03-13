@@ -39,19 +39,19 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
     switch (operation_type) {
-        case CatalogDeltaOpType::ADD_DATABASE_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String data_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBMetaOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, data_dir);
-            break;
-        }
-        case CatalogDeltaOpType::ADD_TABLE_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), table_name, db_entry_dir);
-            break;
-        }
+        // case CatalogDeltaOpType::ADD_DATABASE_META: {
+        //     String db_name = ReadBufAdv<String>(ptr);
+        //     String data_dir = ReadBufAdv<String>(ptr);
+        //     operation = MakeUnique<AddDBMetaOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, data_dir);
+        //     break;
+        // }
+        // case CatalogDeltaOpType::ADD_TABLE_META: {
+        //     String db_name = ReadBufAdv<String>(ptr);
+        //     String table_name = ReadBufAdv<String>(ptr);
+        //     String db_entry_dir = ReadBufAdv<String>(ptr);
+        //     operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), table_name, db_entry_dir);
+        //     break;
+        // }
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String db_entry_dir = ReadBufAdv<String>(ptr);
@@ -172,14 +172,15 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                      next_outline_idx);
             break;
         }
-        case CatalogDeltaOpType::ADD_INDEX_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            operation =
-                MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), std::move(index_name));
-            break;
-        }
+        // case CatalogDeltaOpType::ADD_INDEX_META: {
+        //     String db_name = ReadBufAdv<String>(ptr);
+        //     String table_name = ReadBufAdv<String>(ptr);
+        //     String index_name = ReadBufAdv<String>(ptr);
+        //     operation =
+        //         MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name),
+        //         std::move(index_name));
+        //     break;
+        // }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
             String db_name = ReadBufAdv<String>(ptr);
             String table_name = ReadBufAdv<String>(ptr);
@@ -275,7 +276,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                                    segment_id,
                                                                    std::move(segment_filter_binary_data),
                                                                    std::move(block_filter_binary_data));
-           break;
+            break;
         }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
@@ -291,18 +292,18 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     return operation;
 }
 
-void AddDBMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->data_dir_);
-}
+// void AddDBMetaOp::WriteAdv(char *&buf) const {
+//     WriteAdvBase(buf);
+//     WriteBufAdv(buf, this->db_name_);
+//     WriteBufAdv(buf, this->data_dir_);
+// }
 
-void AddTableMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->db_entry_dir_);
-}
+// void AddTableMetaOp::WriteAdv(char *&buf) const {
+//     WriteAdvBase(buf);
+//     WriteBufAdv(buf, *this->db_name_);
+//     WriteBufAdv(buf, this->table_name_);
+//     WriteBufAdv(buf, this->db_entry_dir_);
+// }
 
 void AddDBEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
@@ -371,12 +372,12 @@ void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->next_outline_idx_);
 }
 
-void AddIndexMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, *this->index_name_);
-}
+// void AddIndexMetaOp::WriteAdv(char *&buf) const {
+//     WriteAdvBase(buf);
+//     WriteBufAdv(buf, *this->db_name_);
+//     WriteBufAdv(buf, *this->table_name_);
+//     WriteBufAdv(buf, *this->index_name_);
+// }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
@@ -435,22 +436,22 @@ void UpdateSegmentBloomFilterDataOp::WriteAdv(char *&buf) const {
     }
 }
 
-void AddDBMetaOp::SaveState() {
-    this->db_name_ = *this->db_meta_->db_name();
-    this->data_dir_ = *this->db_meta_->data_dir();
-    is_saved_sate_ = true;
-}
+// void AddDBMetaOp::SaveState() {
+//     this->db_name_ = *this->db_meta_->db_name();
+//     this->data_dir_ = *this->db_meta_->data_dir();
+//     is_saved_sate_ = true;
+// }
 
-void AddTableMetaOp::SaveState() {
-    this->table_name_ = this->table_meta_->table_name();
-    this->db_entry_dir_ = this->table_meta_->db_entry_dir();
-    is_saved_sate_ = true;
-}
+// void AddTableMetaOp::SaveState() {
+//     this->table_name_ = this->table_meta_->table_name();
+//     this->db_entry_dir_ = this->table_meta_->db_entry_dir();
+//     is_saved_sate_ = true;
+// }
 
 void AddDBEntryOp::SaveState() {
     this->is_delete_ = this->db_entry_->deleted_;
     this->begin_ts_ = this->db_entry_->begin_ts_;
-    this->db_name_ = this->db_entry_->db_name();
+    this->db_name_ = *this->db_entry_->db_name_ptr();
     if (!this->is_delete_) {
         this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
     }
@@ -506,7 +507,7 @@ void AddColumnEntryOp::SaveState() {
 }
 
 /// Related to index
-void AddIndexMetaOp::SaveState() { is_saved_sate_ = true; }
+// void AddIndexMetaOp::SaveState() { is_saved_sate_ = true; }
 
 void AddTableIndexEntryOp::SaveState() {
     this->is_delete_ = table_index_entry_->deleted_;
@@ -547,11 +548,11 @@ void UpdateSegmentBloomFilterDataOp::SaveState() {
     this->segment_id_ = this->segment_entry_->segment_id();
 }
 
-const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
+// const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
 
-const String AddTableMetaOp::ToString() const {
-    return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", *db_name_, table_name_, db_entry_dir_);
-}
+// const String AddTableMetaOp::ToString() const {
+//     return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", *db_name_, table_name_, db_entry_dir_);
+// }
 
 const String AddDBEntryOp::ToString() const { return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", db_name_, db_entry_dir_); }
 
@@ -615,9 +616,9 @@ const String AddColumnEntryOp::ToString() const {
                        next_outline_idx_);
 }
 
-const String AddIndexMetaOp::ToString() const {
-    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
-}
+// const String AddIndexMetaOp::ToString() const {
+//     return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
+// }
 
 const String AddTableIndexEntryOp::ToString() const {
     return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",

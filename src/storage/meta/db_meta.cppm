@@ -34,15 +34,15 @@ import cleanup_scanner;
 namespace infinity {
 
 struct Catalog;
-class AddDBMetaOp;
+// class AddDBMetaOp;
 
 export struct DBMeta : public MetaInterface {
     using EntryT = DBEntry;
 
     friend struct Catalog;
 
-public:
-    using MetaOp = AddDBMetaOp;
+    // public:
+    //     using MetaOp = AddDBMetaOp;
 
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> db_name) : db_name_(std::move(db_name)), data_dir_(data_dir) {}
@@ -82,7 +82,17 @@ private:
 
     Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }
 
-    Tuple<DBEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryReplay(txn_id, begin_ts); }
+    // replay
+    void CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
 
 private:
     SharedPtr<String> db_name_{};

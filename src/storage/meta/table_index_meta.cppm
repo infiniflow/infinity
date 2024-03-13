@@ -34,13 +34,13 @@ class TxnManager;
 class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
-class AddIndexMetaOp;
+// class AddIndexMetaOp;
 
 export class TableIndexMeta : public MetaInterface {
     friend struct TableEntry;
 
 public:
-    using MetaOp = AddIndexMetaOp;
+    // using MetaOp = AddIndexMetaOp;
 
     using EntryT = TableIndexEntry;
 
@@ -54,12 +54,14 @@ public:
 
     Tuple<TableIndexEntry *, Status> CreateTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                            const SharedPtr<IndexBase> &index_base,
+                                                           const SharedPtr<String> &table_entry_dir,
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
                                                            TxnTimeStamp begin_ts,
-                                                           TxnManager *txn_mgr,
-                                                           bool is_replay,
-                                                           String replay_table_index_dir);
+                                                           TxnManager *txn_mgr
+                                                           //,    bool is_replay,
+                                                           //    String replay_table_index_dir
+    );
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                   ConflictType conflict_type,
@@ -78,11 +80,19 @@ public:
         return index_entry_list_.GetEntryNolock(txn_id, begin_ts);
     }
 
-    Tuple<TableIndexEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return index_entry_list_.GetEntryReplay(txn_id, begin_ts);
-    }
+    void DeleteEntry(TransactionID txn_id);
 
-    void DeleteNewEntry(TransactionID txn_id);
+    // replay
+    TableIndexEntry *
+    CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                      TransactionID txn_id,
+                      TxnTimeStamp begin_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
     SharedPtr<String> ToString();

@@ -36,7 +36,9 @@ public:
 };
 
 export template <typename Meta>
-concept MetaConcept = requires { typename Meta::MetaOp; } and std::derived_from<Meta, MetaInterface>;
+concept MetaConcept =
+    // requires { typename Meta::MetaOp; } and
+    std::derived_from<Meta, MetaInterface>;
 
 export class EntryInterface {
 public:
@@ -48,6 +50,8 @@ public:
 };
 
 export template <typename Entry>
-concept EntryConcept = requires { typename Entry::EntryOp; } and std::derived_from<Entry, EntryInterface>;
+concept EntryConcept =
+    //  requires { typename Entry::EntryOp; } and
+    std::derived_from<Entry, EntryInterface>;
 
 } // namespace infinity

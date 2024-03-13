@@ -152,8 +152,8 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
     }
     if (--running_task_n_ == 0) {
         status_ = CompactionStatus::kEnable;
+        cv_.notify_one();
     }
-    cv_.notify_one();
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {

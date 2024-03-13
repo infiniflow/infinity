@@ -49,10 +49,10 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     SharedPtr<IndexBase> index_base{nullptr};
 
     // db meta
-    auto op1 = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
-    auto op1_same_name = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op1));
-    local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
+    // auto op1 = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
+    // auto op1_same_name = MakeUnique<AddDBMetaOp>(1, false, 0, 0, db_name, db_dir);
+    // local_catalog_delta_entry->operations().push_back(std::move(op1));
+    // local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
 
     // db entry
     auto op2 = MakeUnique<AddDBEntryOp>(2, false, 0, 0, db_name, db_dir);
@@ -63,10 +63,10 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op2_same_name));
 
     // table meta
-    auto op4 = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
-    auto op4_same_name = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
-    local_catalog_delta_entry->operations().push_back(std::move(op4));
-    local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
+    // auto op4 = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
+    // auto op4_same_name = MakeUnique<AddTableMetaOp>(4, false, 0, 0, db_name, table_name, db_dir);
+    // local_catalog_delta_entry->operations().push_back(std::move(op4));
+    // local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
 
     // table entry
     auto op5 = MakeUnique<AddTableEntryOp>(5, false, 0, 0, db_name, table_name, table_entry_dir, column_defs);
@@ -95,10 +95,10 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op9_same_name));
 
     // index meta
-    auto op10 = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
-    auto op10_same_name = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
-    local_catalog_delta_entry->operations().push_back(std::move(op10));
-    local_catalog_delta_entry->operations().push_back(std::move(op10_same_name));
+    // auto op10 = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
+    // auto op10_same_name = MakeUnique<AddIndexMetaOp>(10, false, 0, 0, db_name, table_name, index_name);
+    // local_catalog_delta_entry->operations().push_back(std::move(op10));
+    // local_catalog_delta_entry->operations().push_back(std::move(op10_same_name));
 
     // table index entry
     auto op11 = MakeUnique<AddTableIndexEntryOp>(11, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);

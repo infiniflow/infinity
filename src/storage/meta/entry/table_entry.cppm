@@ -77,25 +77,23 @@ public:
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
-                                                     SharedPtr<String> table_entry_dir,
-                                                     SharedPtr<String> table_name,
-                                                     Vector<SharedPtr<ColumnDef>> &column_defs,
-                                                     TableEntryType table_entry_type,
-                                                     TransactionID txn_id,
-                                                     TxnTimeStamp begin_ts,
-                                                     TxnTimeStamp commit_ts,
-                                                     bool is_delete,
-                                                     SizeT row_count) noexcept;
+    static SharedPtr<TableEntry> ReplayTableEntry(TableMeta *table_meta,
+                                                  SharedPtr<String> table_entry_dir,
+                                                  SharedPtr<String> table_name,
+                                                  Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                  TableEntryType table_entry_type,
+                                                  TransactionID txn_id,
+                                                  TxnTimeStamp begin_ts,
+                                                  TxnTimeStamp commit_ts,
+                                                  bool is_delete,
+                                                  SizeT row_count) noexcept;
 
 public:
-    Tuple<TableIndexEntry *, Status> CreateIndex(const SharedPtr<IndexBase> &index_base,
-                                                 ConflictType conflict_type,
-                                                 TransactionID txn_id,
-                                                 TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr,
-                                                 bool is_replay = false,
-                                                 String replay_table_index_dir = "");
+    Tuple<TableIndexEntry *, Status>
+    CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr
+                //  ,bool is_replay = false,
+                //  String replay_table_index_dir = ""
+    );
 
     Tuple<SharedPtr<TableIndexEntry>, Status>
     DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -107,6 +105,21 @@ public:
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+
+    // replay
+    TableIndexEntry *
+    CreateIndexReplay(const SharedPtr<String> &index_name,
+                      std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                      TransactionID txn_id,
+                      TxnTimeStamp begin_ts);
+
+    void DropIndexReplay(const String &index_name,
+                         std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
 
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }
@@ -184,10 +197,10 @@ public:
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
-    Vector<SharedPtr<ColumnDef>> &column_defs() { return columns_; }
+    const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
 private:
-    TableMeta *table_meta_{};
+    TableMeta *const table_meta_{};
 
     MetaMap<TableIndexMeta> index_meta_map_{};
 
@@ -195,11 +208,11 @@ private:
 
     const SharedPtr<String> table_entry_dir_{};
 
-    SharedPtr<String> table_name_{};
+    const SharedPtr<String> table_name_{};
 
-    Vector<SharedPtr<ColumnDef>> columns_{};
+    const Vector<SharedPtr<ColumnDef>> columns_{};
 
-    TableEntryType table_entry_type_{TableEntryType::kTableEntry};
+    const TableEntryType table_entry_type_{TableEntryType::kTableEntry};
 
     // From data table
     Atomic<SizeT> row_count_{}; // this is actual row count

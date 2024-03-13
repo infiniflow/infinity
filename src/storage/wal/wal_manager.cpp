@@ -667,14 +667,9 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    auto [table_index_entry, index_def_entry_status] = storage_->catalog()->CreateIndex(table_entry,
-                                                                                        cmd.index_base_,
-                                                                                        ConflictType::kError,
-                                                                                        txn_id,
-                                                                                        commit_ts,
-                                                                                        nullptr,
-                                                                                        true, /*is_replay*/
-                                                                                        cmd.table_index_dir_);
+    TxnTimeStamp begin_ts = 0; // TODO: FIX IT
+    auto *table_index_entry =
+        storage_->catalog()->CreateIndexReplay(table_entry, cmd.index_base_, MakeShared<String>(cmd.table_index_dir_), txn_id, begin_ts, commit_ts);
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 

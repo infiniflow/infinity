@@ -52,23 +52,23 @@ namespace infinity {
 
 TableEntry::TableEntry(bool is_delete,
                        const SharedPtr<String> &table_entry_dir,
-                       SharedPtr<String> table_collection_name,
+                       SharedPtr<String> table_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(table_entry_dir),
-      table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
+    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)),
+      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type) {
+    begin_ts_ = begin_ts;
+    txn_id_ = txn_id;
+
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
         column_name2column_id_[columns[idx]->name()] = idx;
     }
 
-    begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
-
-    // SetCompactionAlg(nullptr);
+    // this->SetCompactionAlg(nullptr);
     if (!is_delete) {
         this->SetCompactionAlg(MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, this));
         compaction_alg_->Enable({});
@@ -77,29 +77,41 @@ TableEntry::TableEntry(bool is_delete,
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 const SharedPtr<String> &db_entry_dir,
-                                                SharedPtr<String> table_collection_name,
+                                                SharedPtr<String> table_name,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
                                                 TableEntryType table_entry_type,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-    auto table_entry_dir = is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_collection_name);
-    auto table_entry =
-        MakeShared<TableEntry>(is_delete, table_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
-    return table_entry;
+    SharedPtr<String> table_entry_dir = is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
+    return MakeShared<TableEntry>(is_delete,
+                                  std::move(table_entry_dir),
+                                  std::move(table_name),
+                                  columns,
+                                  table_entry_type,
+                                  table_meta,
+                                  txn_id,
+                                  begin_ts);
 }
 
-SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
-                                                      SharedPtr<String> table_entry_dir,
-                                                      SharedPtr<String> table_name,
-                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
-                                                      TableEntryType table_entry_type,
-                                                      TransactionID txn_id,
-                                                      TxnTimeStamp begin_ts,
-                                                      TxnTimeStamp commit_ts,
-                                                      bool is_delete,
-                                                      SizeT row_count) noexcept {
-    auto table_entry = MakeShared<TableEntry>(is_delete, table_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
+SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
+                                                   SharedPtr<String> table_entry_dir,
+                                                   SharedPtr<String> table_name,
+                                                   Vector<SharedPtr<ColumnDef>> &column_defs,
+                                                   TableEntryType table_entry_type,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnTimeStamp commit_ts,
+                                                   bool is_delete,
+                                                   SizeT row_count) noexcept {
+    auto table_entry = MakeShared<TableEntry>(is_delete,
+                                              std::move(table_entry_dir),
+                                              std::move(table_name),
+                                              column_defs,
+                                              table_entry_type,
+                                              table_meta,
+                                              txn_id,
+                                              begin_ts);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -111,9 +123,10 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr,
-                                                         bool is_replay,
-                                                         String replay_table_index_dir) {
+                                                         TxnManager *txn_mgr
+                                                         //  ,bool is_replay,
+                                                         //  String replay_table_index_dir
+) {
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
@@ -121,17 +134,18 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
-    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta), txn_id, begin_ts, txn_mgr);
+    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta)
+                                                              // , txn_id, begin_ts, txn_mgr
+    );
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
-    return table_index_meta
-        ->CreateTableIndexEntry(std::move(r_lock), index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    return table_index_meta->CreateTableIndexEntry(std::move(r_lock), index_base, table_entry_dir_, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
 Tuple<SharedPtr<TableIndexEntry>, Status>
 TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, conflict_type);
-    if (index_meta == nullptr) {
+    if (!status.ok()) {
         return {nullptr, status};
     }
     return index_meta->DropTableIndexEntry(std::move(r_lock), conflict_type, txn_id, begin_ts, txn_mgr);
@@ -139,7 +153,7 @@ TableEntry::DropIndex(const String &index_name, ConflictType conflict_type, Tran
 
 Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
-    if (index_meta == nullptr) {
+    if (!status.ok()) {
         return {nullptr, status};
     }
     return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
@@ -154,10 +168,42 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const Str
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
-    auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
-    r_lock.unlock();
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
-    return index_meta->DeleteNewEntry(txn_id);
+    return index_meta->DeleteEntry(txn_id);
+}
+
+TableIndexEntry *TableEntry::CreateIndexReplay(
+    const SharedPtr<String> &index_name,
+    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+    auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_name); };
+    auto *index_meta = index_meta_map_.GetMetaNoLock(*index_name, std::move(init_index_meta));
+    return index_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+void TableEntry::DropIndexReplay(
+    const String &index_name,
+    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,

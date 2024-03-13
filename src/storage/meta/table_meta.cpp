@@ -54,27 +54,27 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
  * @param txn_mgr
  * @return Status
  */
-Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                      TableEntryType table_entry_type,
-                                                      const SharedPtr<String> &table_collection_name_ptr,
-                                                      const Vector<SharedPtr<ColumnDef>> &columns,
-                                                      TransactionID txn_id,
-                                                      TxnTimeStamp begin_ts,
-                                                      TxnManager *txn_mgr,
-                                                      ConflictType conflict_type) {
-    auto init_table_entry = [&]() {
-        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
+Tuple<TableEntry *, Status> TableMeta::CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TableEntryType table_entry_type,
+                                                   const SharedPtr<String> &table_name,
+                                                   const Vector<SharedPtr<ColumnDef>> &columns,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   ConflictType conflict_type) {
+    auto init_table_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_name, columns, table_entry_type, this, txn_id, begin_ts);
     };
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                             TransactionID txn_id,
-                                                             TxnTimeStamp begin_ts,
-                                                             TxnManager *txn_mgr,
-                                                             const String &table_name,
-                                                             ConflictType conflict_type) {
-    auto init_drop_entry = [&]() {
+Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                          TransactionID txn_id,
+                                                          TxnTimeStamp begin_ts,
+                                                          TxnManager *txn_mgr,
+                                                          const String &table_name,
+                                                          ConflictType conflict_type) {
+    auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
         Vector<SharedPtr<ColumnDef>> dummy_columns;
         return TableEntry::NewTableEntry(true,
                                          this->db_entry_dir_,
@@ -107,7 +107,39 @@ TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
     return {table_info, status};
 }
 
-void TableMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }
+void TableMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }
+
+void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                  TransactionID txn_id,
+                                  TxnTimeStamp begin_ts) {
+    auto [entry, status] =
+        table_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
+                                         txn_id,
+                                         begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                TransactionID txn_id,
+                                TxnTimeStamp begin_ts) {
+    auto [entry, status] = table_entry_list_.DropEntryReplay(
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, table_name_, txn_id, begin_ts); },
+        txn_id,
+        begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [entry, status] = table_entry_list_.GetEntryReplay(txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return entry;
+}
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 

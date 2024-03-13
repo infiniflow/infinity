@@ -125,6 +125,19 @@ public:
 
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
+    // replay
+    void CreateDatabaseReplay(const SharedPtr<String> &db_name,
+                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp begin_ts);
+
+    void DropDatabaseReplay(const String &db_name,
+                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts);
+
+    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -157,9 +170,17 @@ public:
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr,
-                                                 bool is_replay = false,
-                                                 String replay_table_index_dir = "");
+                                                 TxnManager *txn_mgr
+                                                 //  ,bool is_replay = false,
+                                                 //  String replay_table_index_dir = ""
+    );
+
+    TableIndexEntry *CreateIndexReplay(TableEntry *table_entry,
+                                       const SharedPtr<IndexBase> &index_base,
+                                       const SharedPtr<String> &index_entry_dir,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts,
+                                       TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropIndex(const String &db_name,
                                                         const String &table_name,

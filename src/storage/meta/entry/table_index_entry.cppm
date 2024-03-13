@@ -53,33 +53,38 @@ public:
 
 public:
     TableIndexEntry(const SharedPtr<IndexBase> &index_base,
+                    bool is_delete,
                     TableIndexMeta *table_index_meta,
-                    SharedPtr<String> index_dir,
+                    const SharedPtr<String> &index_entry_dir,
                     TransactionID txn_id,
-                    TxnTimeStamp begin_ts,
-                    bool replay = false);
+                    TxnTimeStamp begin_ts
+                    // ,bool replay = false
+    );
 
-    TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
+    // TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
+                                                         bool is_delete,
+                                                         const SharedPtr<String> &table_entry_dir,
                                                          TableIndexMeta *table_index_meta,
-                                                         Txn *txn,
+                                                         Txn *txn, // TODO: remove it
                                                          TransactionID txn_id,
-                                                         TxnTimeStamp begin_ts,
-                                                         bool is_replay = false,
-                                                         String replay_table_index_dir = "");
+                                                         TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
+    // static SharedPtr<TableIndexEntry>
+    // ReplayTableIndexEntry(const SharedPtr<IndexBase> &index_base, TableIndexMeta *table_index_meta, Txn *txn, TransactionID txn_id);
 
-    static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
-                                                               const SharedPtr<IndexBase> &index_base,
-                                                               const SharedPtr<String> &index_dir,
-                                                               TransactionID txn_id,
-                                                               TxnTimeStamp begin_ts,
-                                                               TxnTimeStamp commit_ts,
-                                                               bool is_delete) noexcept;
+    // static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static SharedPtr<TableIndexEntry> NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<TableIndexEntry> ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                            const SharedPtr<IndexBase> &index_base,
+                                                            const SharedPtr<String> &index_entry_dir,
+                                                            TransactionID txn_id,
+                                                            TxnTimeStamp begin_ts,
+                                                            TxnTimeStamp commit_ts,
+                                                            bool is_delete) noexcept;
+
+    // static SharedPtr<TableIndexEntry> NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -128,9 +133,9 @@ private:
 
 private:
     std::shared_mutex rw_locker_{};
-    TableIndexMeta *table_index_meta_{};
+    TableIndexMeta *const table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
-    SharedPtr<String> index_dir_{};
+    const SharedPtr<String> index_dir_{};
 
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
