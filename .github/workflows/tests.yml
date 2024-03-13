@@ -62,17 +62,31 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
 
-      - name: Start infinity debug version
+      - name: Start infinity pysdk debug version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
-      - name: pysdk & sqllogictest debug version
+      - name: pysdk debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py && python3 tools/sqllogictest.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py"
 
-      - name: Stop infinity debug
+      - name: Stop infinity pysdk debug
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: sudo kill $(pidof cmake-build-debug/src/infinity)
+
+      - name: Start infinity sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+
+      - name: sqllogictest debug version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+
+      - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: sudo kill $(pidof cmake-build-debug/src/infinity)
 
@@ -125,16 +139,30 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
 
-      - name: Start infinity release version
+      - name: Start infinity pysdk release version
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          # Run a command in the background
+           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+
+      - name: pysdk release version
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py"
+
+      - name: Stop infinity pysdk release
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        run: sudo kill $(pidof cmake-build-release/src/infinity)
+
+      - name: Start infinity sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /tmp/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
-      - name: pysdk & sqllogictest release version
+      - name: sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py && python3 tools/sqllogictest.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-      - name: Stop infinity release
+      - name: Stop infinity sqllogictest release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: sudo kill $(pidof cmake-build-release/src/infinity)
 

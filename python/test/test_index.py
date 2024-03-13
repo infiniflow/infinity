@@ -13,21 +13,22 @@
 # limitations under the License.
 import os
 
+import numpy as np
 import pytest
 
 from common import common_values
-import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
+from infinity.remote_thrift.table import RemoteTable
 
 TEST_DATA_DIR = "/test/data/"
 
 
 class TestIndex:
 
-    def test_create_index_IVFFlat(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+    def test_create_index_IVFFlat(self, get_infinity_db):
+        db_obj = get_infinity_db
         res = db_obj.drop_table("test_index_ivfflat", True)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_index_ivfflat", {
@@ -44,10 +45,9 @@ class TestIndex:
         res = table_obj.drop_index("my_index")
         assert res.error_code == ErrorCode.OK
 
-    def test_create_index_HNSW(self):
+    def test_create_index_HNSW(self, get_infinity_db):
         # CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         res = db_obj.drop_table("test_index_hnsw", True)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
@@ -73,10 +73,9 @@ class TestIndex:
         res = table_obj.drop_index("my_index")
         assert res.error_code == ErrorCode.OK
 
-    def test_create_index_fulltext(self):
+    def test_create_index_fulltext(self, get_infinity_db):
         # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(ANALYZER=segmentation);
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         res = db_obj.drop_table("test_index_fulltext", if_exists=True)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
@@ -95,10 +94,9 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
 
     # drop non-existent index
-    def test_drop_non_existent_index(self):
+    def test_drop_non_existent_index(self, get_infinity_db):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         res = db_obj.drop_table("test_drop_non_existent_index", if_exists=True)
 
         table_obj = db_obj.create_table("test_drop_non_existent_index", {
@@ -108,15 +106,10 @@ class TestIndex:
         # drop none index
         table_obj.drop_index("none_index")
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # create created index
-    def test_create_created_index(self):
+    def test_create_created_index(self, get_infinity_db):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_create_created_index", if_exists=True)
         table_obj = db_obj.create_table("test_create_created_index", {
             "c1": "vector,3,float"}, None)
@@ -137,9 +130,6 @@ class TestIndex:
                                                        index.InitParameter("metric", "l2")])], None)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # create / drop index with invalid options
     @pytest.mark.parametrize("column_name",
@@ -160,10 +150,9 @@ class TestIndex:
           index.InitParameter("metric", "l2")], True)
     ])
     @pytest.mark.parametrize("types", ["vector, 3, float"])
-    def test_create_drop_vector_index_invalid_options(self, column_name, index_type, params, types):
+    def test_create_drop_vector_index_invalid_options(self, get_infinity_db, column_name, index_type, params, types):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_create_drop_vector_index_invalid_options", if_exists=True)
         table_obj = db_obj.create_table("test_create_drop_vector_index_invalid_options", {
             "c1": types}, None)
@@ -175,9 +164,6 @@ class TestIndex:
         else:
             table_obj.create_index("my_index", index_info, None)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("column_name", [
@@ -196,10 +182,9 @@ class TestIndex:
     @pytest.mark.parametrize("types", ["int", "int8", "int16", "int32", "int64", "integer",
                                        "float", "float32", "double", "float64",
                                        "varchar", "bool", "vector, 3, float"])
-    def test_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type, params, types):
+    def test_create_drop_different_fulltext_index_invalid_options(self, get_infinity_db, column_name, index_type, params, types):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_create_drop_different_fulltext_index_invalid_options", if_exists=True)
         table_obj = db_obj.create_table("test_create_drop_different_fulltext_index_invalid_options", {
             "c1": types}, None)
@@ -211,15 +196,10 @@ class TestIndex:
         else:
             table_obj.create_index("my_index", index_info, None)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # create index on dropped table instance
-    def test_create_index_on_dropped_table(self):
+    def test_create_index_on_dropped_table(self, get_infinity_db):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table(
             "test_create_drop_index_invalid_options", if_exists=True)
         table_obj = db_obj.create_table("test_create_drop_index_invalid_options", {
@@ -235,16 +215,11 @@ class TestIndex:
                                                     [index.InitParameter("centroids_count", "128"),
                                                      index.InitParameter("metric", "l2")])], None)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # create index then show index
     @pytest.mark.skip(reason="Not support for showing index yet.")
-    def test_create_index_show_index(self):
+    def test_create_index_show_index(self, get_infinity_db):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_create_index_show_index", if_exists=True)
         table_obj = db_obj.create_table("test_create_index_show_index", {
             "c1": "vector,3,float"}, None)
@@ -255,16 +230,11 @@ class TestIndex:
                                                       [index.InitParameter("centroids_count", "128"),
                                                        index.InitParameter("metric", "l2")])], None)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # drop index then show index
     @pytest.mark.skip(reason="Not support for showing index yet.")
-    def test_drop_index_show_index(self):
+    def test_drop_index_show_index(self, get_infinity_db):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_create_index_show_index", if_exists=True)
         table_obj = db_obj.create_table("test_create_index_show_index", {
             "c1": "vector,3,float"}, None)
@@ -276,9 +246,6 @@ class TestIndex:
                                                        index.InitParameter("metric", "l2")])], None)
 
         table_obj.drop_index("my_index")
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # create index on different type of column and show index
     @pytest.mark.parametrize("types", ["vector, 3, float"])
@@ -287,10 +254,9 @@ class TestIndex:
         (index.IndexType.IVFFlat, True),
         (index.IndexType.FullText, False, "ERROR:3009*")
     ])
-    def test_create_index_on_different_type_of_column(self, types, index_type):
+    def test_create_index_on_different_type_of_column(self, get_infinity_db, types, index_type):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table(
             "test_create_index_on_different_type_of_column", if_exists=True)
         table_obj = db_obj.create_table("test_create_index_on_different_type_of_column", {
@@ -311,18 +277,13 @@ class TestIndex:
                                                            index.InitParameter("metric", "l2")])], None)
             assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # insert data, then create index
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat
     ])
-    def test_insert_data_create_index(self, index_type):
+    def test_insert_data_create_index(self, get_infinity_db, index_type):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_insert_data_create_index", if_exists=True)
         table_obj = db_obj.create_table("test_insert_data_create_index", {
             "c1": "vector,1024,float"}, None)
@@ -336,19 +297,14 @@ class TestIndex:
                                                        index.InitParameter("metric", "l2")])], None)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     @pytest.mark.parametrize("index_type", [
         (index.IndexType.IVFFlat, True),
         (index.IndexType.FullText, False, "ERROR:3009*")
     ])
     @pytest.mark.parametrize("file_format", ["csv"])
-    def test_import_data_create_index(self, index_type, file_format):
+    def test_import_data_create_index(self, get_infinity_db, index_type, file_format):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_import_data_create_index", if_exists=True)
         table_obj = db_obj.create_table("test_import_data_create_index", {
             "c1": "int",
@@ -371,18 +327,13 @@ class TestIndex:
                                                         [index.InitParameter("centroids_count", "128"),
                                                          index.InitParameter("metric", "l2")])], None)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # create index then insert / import data
     @pytest.mark.skip(reason="TODO")
     @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat, index.IndexType.FullText])
     @pytest.mark.parametrize("file_format", ["csv"])
-    def test_create_index_import_data(self, index_type, file_format):
+    def test_create_index_import_data(self, get_infinity_db, index_type, file_format):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_import_data_create_index", if_exists=True)
         table_obj = db_obj.create_table("test_import_data_create_index", {
             "c1": "int",
@@ -395,13 +346,58 @@ class TestIndex:
         assert res.error_code == ErrorCode.OK
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
 
-        # disconnect
-        res = infinity_obj.disconnect()
+    # create index on all data are deleted table.
+    @pytest.mark.skip(reason="Core dumped")
+    def test_create_index_on_deleted_table(self, get_infinity_db):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_create_index_on_deleted_table", if_exists=True)
+
+        table_obj = db_obj.create_table("test_create_index_on_deleted_table", {"c1": "vector,128,float"}, None)
+        # insert data
+        embedding_data = [i for i in range(128)]
+        value = [{"c1": embedding_data} for _ in range(1024)]
+        table_obj.insert(value)
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+
+        # delete data
+        table_obj.delete()
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+
+        # create index
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], None)
         assert res.error_code == ErrorCode.OK
 
-    # create index on all data are deleted table.
     # create index on all data are updated.
+    @pytest.mark.skip(reason="Not support yet.")
+    def test_create_index_on_update_table(self, get_infinity_db):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_create_index_on_update_table")
+        table_obj = db_obj.create_table("test_create_index_on_update_table", {"c1": "vector,128,float", "c2": "int"}, None)
+
+        # insert data
+        embedding_data = [i for i in range(128)]
+        value = [{"c1": embedding_data, "c2": i} for i in range(10)]
+        table_obj.insert(value)
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+        # update data
+        embedding_data = [i + 0.1 * i for i in range(128)]
+        # embedding_data = [i for i in range(128)]
+
+        value = [{"c1": embedding_data} for _ in range(10)]
+        for i in range(10):
+            table_obj.update("c2 = " + str(i), [{"c1": embedding_data}])
+        res = table_obj.output(["*"]).to_pl()
+        print(res)
+
     # create index on no date are deleted.
+    # def test_create_index
     # create index on no date are update.
     # create index on table has multiple segments
     # create index on table has only one segment
