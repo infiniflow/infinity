@@ -60,17 +60,8 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        const SharedPtr<String> &data_dir,
                                        const SharedPtr<String> &db_name,
                                        TransactionID txn_id,
-                                       TxnTimeStamp begin_ts,
-                                       TxnManager *txn_mgr) {
+                                       TxnTimeStamp begin_ts) {
     auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
-    if (txn_mgr) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        if (is_delete) {
-            txn->DropDBStore(db_entry.get());
-        } else {
-            txn->AddDBStore(db_entry.get());
-        }
-    }
     return db_entry;
 }
 
@@ -101,11 +92,11 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
     return table_meta->CreateNewEntry(std::move(r_lock), table_entry_type, table_collection_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> DBEntry::DropTable(const String &table_collection_name,
-                                               ConflictType conflict_type,
-                                               TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableEntry>, Status> DBEntry::DropTable(const String &table_collection_name,
+                                                        ConflictType conflict_type,
+                                                        TransactionID txn_id,
+                                                        TxnTimeStamp begin_ts,
+                                                        TxnManager *txn_mgr) {
     auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_collection_name, conflict_type);
     if (table_meta == nullptr) {
         return {nullptr, status};

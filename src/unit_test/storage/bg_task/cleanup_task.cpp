@@ -193,7 +193,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
         txn_mgr->CommitTxn(txn);
@@ -272,7 +272,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
         txn_mgr->CommitTxn(txn);
@@ -316,7 +316,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
 
@@ -350,8 +350,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -359,7 +358,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
         auto txn = txn_mgr->CreateTxn();
         txn->Begin();
 
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
 
         {
@@ -416,7 +415,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
 
@@ -450,8 +449,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -461,7 +459,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
 
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
 
-        auto [table_entry, status1] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
         TxnTimeStamp begin_ts = txn->BeginTS();
@@ -478,7 +476,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
         auto txn = txn_mgr->CreateTxn();
         txn->Begin();
 
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
 
         {

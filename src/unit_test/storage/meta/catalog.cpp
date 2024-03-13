@@ -93,7 +93,7 @@ TEST_F(CatalogTest, simple_test1) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(base_entry, databases["db1"]);
+        EXPECT_EQ(base_entry.get(), databases["db1"]);
         // remove this entry
         databases.erase("db1");
 

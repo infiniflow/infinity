@@ -69,8 +69,7 @@ public:
                                                          bool is_replay = false,
                                                          String replay_table_index_dir = "");
 
-    static SharedPtr<TableIndexEntry>
-    NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
                                                                const SharedPtr<IndexBase> &index_base,
@@ -89,17 +88,19 @@ public:
 
 public:
     // Getter
+    const SharedPtr<String> &GetIndexName() const { return index_base_->index_name_; }
+
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
     const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
 
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &segment_index_map() { return segment_index_map_; }
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     SharedPtr<String> index_dir() { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
 
-    Status CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
+    Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
+    CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
 
     Status CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
@@ -116,15 +117,14 @@ public:
 
     void UpdateFulltextSegmentTs(u64 ts) { segment_update_ts_ = ts; }
 
+    void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
+
+    void RollbackCreateIndex(TxnIndexStore *txn_index_store);
+
 private:
     static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
         return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));
     }
-
-    // For SegmentIndexEntry
-    void CommitCreateIndex(u32 segment_id, SharedPtr<SegmentIndexEntry> index_entry, bool is_replay = false);
-    // For FulltextIndexEntry
-    void CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry);
 
 private:
     std::shared_mutex rw_locker_{};
@@ -133,7 +133,6 @@ private:
     SharedPtr<String> index_dir_{};
 
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
-    HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> segment_index_map_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
     // For fulltext index

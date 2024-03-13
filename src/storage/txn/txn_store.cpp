@@ -39,12 +39,28 @@ import compact_segments_task;
 
 namespace infinity {
 
+TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
+    TxnSegmentStore txn_segment_store(segment_entry);
+    for (auto &block_entry : segment_entry->block_entries()) {
+        txn_segment_store.block_entries_.emplace_back(block_entry.get());
+    }
+    return txn_segment_store;
+}
+
+TxnSegmentStore::TxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
+
 TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
 
 TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
 
-TxnCompactStore::TxnCompactStore(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&data, CompactSegmentsTaskType type)
-    : segment_data_(std::move(data)), task_type_(type) {}
+TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
+
+Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry) {
+    this->AddSegmentStore(segment_entry.get());
+    this->AddSealedSegment(segment_entry.get());
+    table_entry_->Import(std::move(segment_entry));
+    return {nullptr, Status::OK()};
+}
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
     SizeT column_count = table_entry_->ColumnCount();
@@ -92,22 +108,45 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock
     return {nullptr, Status::OK()};
 }
 
-Tuple<UniquePtr<String>, Status> TxnTableStore::Import(const SharedPtr<SegmentEntry> &segment) {
-    uncommitted_segments_.emplace_back(segment);
-    return {nullptr, Status::OK()};
+void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) { txn_indexes_.insert(table_index_entry); }
+
+void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
+    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    for (auto *segment_index_entry : segment_index_entries) {
+        auto [iter, insert_ok] = txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
+        if (!insert_ok) {
+            UnrecoverableError(fmt::format("Attempt to add segment index of segment {} store twice", segment_index_entry->segment_id()));
+        }
+    }
 }
 
-Tuple<UniquePtr<String>, Status>
-TxnTableStore::CreateIndexFile(TableIndexEntry *table_index_entry, u32 segment_id, SharedPtr<SegmentIndexEntry> index) {
-    const String &index_name = *table_index_entry->index_base()->index_name_;
-    if (auto column_index_iter = txn_indexes_store_.find(index_name); column_index_iter != txn_indexes_store_.end()) {
-        column_index_iter->second.index_entry_map_[segment_id] = index;
-    } else {
-        TxnIndexStore index_store(table_index_entry);
-        index_store.index_entry_map_[segment_id] = index;
-        txn_indexes_store_.emplace(index_name, std::move(index_store));
+void TxnTableStore::AddFulltextIndexStore(TableIndexEntry *table_index_entry, FulltextIndexEntry *fulltext_index_entry) {
+    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    if (txn_index_store->fulltext_index_entry_ != nullptr) {
+        UnrecoverableError("Attempt to add fulltext index store twice");
     }
-    return {nullptr, Status::OK()};
+    txn_index_store->fulltext_index_entry_ = fulltext_index_entry;
+}
+
+void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
+    if (txn_indexes_.contains(table_index_entry)) {
+        txn_indexes_.erase(table_index_entry);
+        txn_indexes_store_.erase(*table_index_entry->GetIndexName());
+        table_index_entry->Cleanup();
+    } else {
+        txn_indexes_.insert(table_index_entry);
+    }
+}
+
+TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry) {
+    const String &index_name = *table_index_entry->GetIndexName();
+    if (auto iter = txn_indexes_store_.find(index_name); iter != txn_indexes_store_.end()) {
+        return iter->second.get();
+    }
+    auto txn_index_store = MakeUnique<TxnIndexStore>(table_index_entry);
+    auto *ptr = txn_index_store.get();
+    txn_indexes_store_.emplace(index_name, std::move(txn_index_store));
+    return ptr;
 }
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
@@ -128,20 +167,34 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                                         CompactSegmentsTaskType type) {
-    if (!compact_state_.segment_data_.empty()) {
+    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         UnrecoverableError("Attempt to compact table store twice");
     }
-    compact_state_ = TxnCompactStore(std::move(segment_data), type);
+    compact_state_ = TxnCompactStore(type);
+    for (auto &[new_segment, old_segments] : segment_data) {
+        auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
+        compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), std::move(old_segments));
+
+        this->AddSegmentStore(new_segment.get());
+        table_entry_->AddCompactNew(std::move(new_segment));
+    }
     return {nullptr, Status::OK()};
 }
 
 void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 
 void TxnTableStore::Rollback() {
+    TransactionID txn_id = txn_->TxnID();
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
+    }
+    for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        Catalog::RollbackCreateIndex(txn_index_store.get());
+        auto *table_index_entry = txn_index_store->table_index_entry_;
+        table_index_entry->Cleanup();
+        Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id);
     }
     Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
     blocks_.clear();
@@ -153,14 +206,8 @@ void TxnTableStore::PrepareCommit() {
 
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
-    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->GetBufferMgr());
+    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), txn_->GetBufferMgr());
 
-    SizeT segment_count = uncommitted_segments_.size();
-    for (SizeT seg_idx = 0; seg_idx < segment_count; ++seg_idx) {
-        const SharedPtr<SegmentEntry> &uncommitted = uncommitted_segments_[seg_idx];
-        // Segments in `uncommitted_segments_` are already persisted. Import them to memory catalog.
-        Catalog::CommitImport(table_entry_, txn_->CommitTS(), uncommitted);
-    }
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), txn_->CommitTS()));
@@ -168,7 +215,6 @@ void TxnTableStore::PrepareCommit() {
     }
 
     Catalog::Delete(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), delete_state_);
-    Catalog::CommitCreateIndex(txn_indexes_store_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
@@ -177,26 +223,23 @@ void TxnTableStore::PrepareCommit() {
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit() const {
-    Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
-    Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    Catalog::CommitWrite(table_entry_, txn_->TxnID(), txn_->CommitTS(), txn_segments_);
+    // Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
+    // Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        Catalog::CommitCreateIndex(txn_index_store.get(), txn_->CommitTS());
+    }
+    for (auto *table_index_entry : txn_indexes_) {
+        table_index_entry->Commit(txn_->CommitTS());
+    }
 }
 
 void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
     std::function<Txn *()> generate_txn = [txn_mgr]() { return txn_mgr->CreateTxn(); };
 
     // FIXME OPT: trigger compaction one time for all segments
-    for (const SharedPtr<SegmentEntry> &new_segment : uncommitted_segments_) {
-        auto ret = table_entry_->TryCompactAddSegment(new_segment.get(), generate_txn);
-        if (!ret.has_value()) {
-            continue;
-        }
-        auto &[to_compacts, txn] = *ret;
-        auto compact_task = CompactSegmentsTask::MakeTaskWithPickedSegments(table_entry_, std::move(to_compacts), txn);
-        bg_task_processor->Submit(std::move(compact_task));
-    }
-    for (SegmentID segment_id : append_state_->set_sealed_segments_) {
-        auto sealed_segment = table_entry_->GetSegmentByID(segment_id, txn_->CommitTS());
-        auto ret = table_entry_->TryCompactAddSegment(sealed_segment.get(), generate_txn);
+    for (auto *sealed_segment : set_sealed_segments_) {
+        auto ret = table_entry_->TryCompactAddSegment(sealed_segment, generate_txn);
         if (!ret.has_value()) {
             continue;
         }
@@ -214,5 +257,22 @@ void TxnTableStore::TryTriggerCompaction(BGTaskProcessor *bg_task_processor, Txn
         bg_task_processor->Submit(std::move(compact_task));
     }
 }
+
+void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
+    auto [iter, insert_ok] = txn_segments_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry));
+    if (!insert_ok) {
+        UnrecoverableError(fmt::format("Attempt to add segment store twice"));
+    }
+}
+
+void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry) {
+    auto iter = txn_segments_.find(segment_entry->segment_id());
+    if (iter == txn_segments_.end()) {
+        iter = txn_segments_.emplace(segment_entry->segment_id(), TxnSegmentStore::AddSegmentStore(segment_entry)).first;
+    }
+    iter->second.block_entries_.emplace_back(block_entry);
+}
+
+void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
 
 } // namespace infinity

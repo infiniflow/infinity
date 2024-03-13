@@ -55,7 +55,7 @@ protected:
             auto *txn = txn_mgr->CreateTxn();
             txn->Begin();
 
-            auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default", table_name);
             table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
             auto column_count = table_entry->ColumnCount();
 
@@ -80,8 +80,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            auto txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }
@@ -125,7 +124,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -138,7 +137,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             auto txn5 = txn_mgr->CreateTxn();
             txn5->Begin();
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             size_t test_segment_n = segment_sizes.size();
@@ -201,7 +200,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -214,7 +213,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             auto txn5 = txn_mgr->CreateTxn();
             txn5->Begin();
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
@@ -304,7 +303,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -317,7 +316,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             auto txn5 = txn_mgr->CreateTxn();
             txn5->Begin();
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
@@ -403,7 +402,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             auto txn4 = txn_mgr->CreateTxn();
             txn4->Begin();
 
-            auto [table_entry, status] = txn4->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn4->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             {
@@ -444,7 +443,7 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             auto txn5 = txn_mgr->CreateTxn();
             txn5->Begin();
             TxnTimeStamp begin_ts = txn5->BeginTS();
-            auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn5->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             int test_segment_n = segment_sizes.size();
@@ -532,7 +531,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             auto compact_txn = txn_mgr->CreateTxn();
             compact_txn->Begin();
 
-            auto [table_entry, status] = compact_txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = compact_txn->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
 
             Vector<RowID> delete_row_ids2;
@@ -610,7 +609,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 auto txn5 = txn_mgr->CreateTxn();
                 txn5->Begin();
                 TxnTimeStamp begin_ts = txn5->BeginTS();
-                auto [table_entry, status] = txn5->GetTableEntry("default", table_name);
+                auto [table_entry, status] = txn5->GetTableByName("default", table_name);
                 EXPECT_NE(table_entry, nullptr);
 
                 int test_segment_n = segment_sizes.size();
