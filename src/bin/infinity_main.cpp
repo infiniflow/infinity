@@ -78,7 +78,6 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             break;
         }
         case SIGSEGV: {
-            // Print back strace
             infinity::PrintStacktrace("SEGMENT FAULTS");
             exit(0);
             break;
@@ -88,7 +87,6 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
             fmt::print("Other type of signal: %d\n", signal_number);
         }
     }
-    //    exit(0);
 }
 
 void RegisterSignal() {
