@@ -11,8 +11,8 @@ import column_index_iterator;
 
 namespace infinity {
 
-SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_doc_id, optionflag_t flag)
-    : base_row_id_(base_doc_id) {
+SegmentTermPosting::SegmentTermPosting(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag)
+    : base_row_id_(base_row_id) {
     column_index_iterator_ = MakeShared<ColumnIndexIterator>(index_dir, base_name, flag);
 }
 

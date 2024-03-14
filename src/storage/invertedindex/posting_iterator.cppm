@@ -32,7 +32,7 @@ public:
 
     void SeekPosition(pos_t pos, pos_t &result);
 
-    tf_t GetCurrentTF() { return state_.GetTermFreq(); }
+    tf_t GetCurrentTF() { return InnerGetTF(); }
 
     docpayload_t GetCurrentDocPayload() {
         if (posting_option_.HasDocPayload()) {

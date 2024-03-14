@@ -93,9 +93,4 @@ export u32 RowID2DocID(u32 segment_id, u32 block_id, u32 block_offset) {
 
 export RowID DocID2RowID(u32 doc_id) { return RowID((doc_id - 1) >> SEGMENT_OFFSET_IN_DOCID, (doc_id - 1) & SEGMENT_MASK_IN_DOCID); }
 
-// homebrewed fulltext index stores relative doc_id which begins with 0
-export u32 ToDocID(RowID row_id) { return (row_id.segment_id_ << SEGMENT_OFFSET_IN_DOCID) + row_id.segment_offset_; }
-
-export RowID ToRowID(u32 doc_id) { return RowID(doc_id >> SEGMENT_OFFSET_IN_DOCID, doc_id & SEGMENT_MASK_IN_DOCID); }
-
 } // namespace infinity
