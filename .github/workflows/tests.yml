@@ -74,7 +74,7 @@ jobs:
 
       - name: Stop infinity pysdk debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-debug/src/infinity)
+        run: sudo kill $(pidof cmake-build-debug/src/infinity) && sleep 5s
 
       - name: Start infinity sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
@@ -151,7 +151,7 @@ jobs:
 
       - name: Stop infinity pysdk release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: sudo kill $(pidof cmake-build-release/src/infinity)
+        run: sudo kill $(pidof cmake-build-release/src/infinity) && sleep 5s
 
       - name: Start infinity sqllogictest release version
         if: ${{ !cancelled() && !failure() }}
