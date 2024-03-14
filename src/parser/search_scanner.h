@@ -12,31 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
-export module query_visitor;
+#if !defined(yyFlexLexerOnce)
+#include <FlexLexer.h>
+#endif
 
-import stl;
-import index_defines;
-import term_queries;
+#include "location.hh"
+#include "search_parser.h"
 
 namespace infinity {
 
-export class QueryVisitor {
+class SearchScanner : public yyFlexLexer {
 public:
-    QueryVisitor() = default;
-    ~QueryVisitor() = default;
+    SearchScanner(std::istream *in) : yyFlexLexer(in){};
+    ~SearchScanner() override = default;
 
-    template <typename NodeType>
-    void Visit(NodeType &node);
+    // get rid of override virtual function warning
+    using FlexLexer::yylex;
 
-    UniquePtr<TermQuery> Build() { return std::move(result_); }
+    virtual int yylex(SearchParser::semantic_type *const lval, SearchParser::location_type *location);
+    // YY_DECL defined in lucene_lexer.l
+    // Method body created by flex in lucene_lexer.y.cc
 
 private:
-    template <typename NodeType>
-    void BuildMultiQuery(MultiQuery *query, NodeType &n);
-
-    UniquePtr<TermQuery> result_;
+    /* yylval ptr */
+    SearchParser::semantic_type *yylval = nullptr;
 };
 
 } // namespace infinity

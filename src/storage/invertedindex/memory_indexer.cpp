@@ -58,13 +58,13 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::MemoryIndexer(const String &index_dir,
                              const String &base_name,
-                             docid_t base_doc_id,
+                             RowID base_row_id,
                              optionflag_t flag,
                              const String &analyzer,
                              MemoryPool &byte_slice_pool,
                              RecyclePool &buffer_pool,
                              ThreadPool &thread_pool)
-    : index_dir_(index_dir), base_name_(base_name), base_doc_id_(base_doc_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
+    : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
       buffer_pool_(buffer_pool), thread_pool_(thread_pool), ring_inverted_(10UL), ring_sorted_(10UL) {
     posting_store_ = MakeUnique<PostingTable>(KeyComp(), &byte_slice_pool_);
 
@@ -166,7 +166,7 @@ void MemoryIndexer::Reset() {
         }
         posting_store_->Clear();
     }
-    base_doc_id_ = INVALID_DOCID;
+    base_row_id_ = INVALID_ROWID;
     doc_count_ = 0;
 }
 

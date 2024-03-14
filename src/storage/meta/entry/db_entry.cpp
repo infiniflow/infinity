@@ -39,14 +39,13 @@ namespace infinity {
 
 DBEntry::DBEntry(DBMeta *db_meta,
                  bool is_delete,
-                 const SharedPtr<String> &data_dir,
+                 const SharedPtr<String> &db_entry_dir,
                  const SharedPtr<String> &db_name,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts)
     // "data_dir": "/tmp/infinity/data"
     // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)),
-      db_name_(db_name) {
+    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
     //    atomic_u64 txn_id_{0};
     //    TxnTimeStamp begin_ts_{0};
     //    atomic_u64 commit_ts_{UNCOMMIT_TS};
@@ -61,18 +60,19 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        const SharedPtr<String> &db_name,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
+    SharedPtr<String> db_entry_dir = is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name);
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
     return db_entry;
 }
 
 SharedPtr<DBEntry> DBEntry::NewReplayDBEntry(DBMeta *db_meta,
-                                             const SharedPtr<String> &data_dir,
+                                             const SharedPtr<String> &db_entry_dir,
                                              const SharedPtr<String> &db_name,
                                              TransactionID txn_id,
                                              TxnTimeStamp begin_ts,
                                              TxnTimeStamp commit_ts,
                                              bool is_delete) noexcept {
-    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_name, txn_id, begin_ts);
+    auto db_entry = MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
@@ -213,7 +213,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     u64 begin_ts = db_entry_json["begin_ts"];
 
     SharedPtr<String> db_entry_dir{};
-    if(!deleted) {
+    if (!deleted) {
         db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     }
     UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_meta, deleted, db_entry_dir, db_name, txn_id, begin_ts);

@@ -80,7 +80,12 @@ void PostingWriter::EndSegment() {
     }
 }
 
-void PostingWriter::AddPosition(pos_t pos) {}
+void PostingWriter::AddPosition(pos_t pos) {
+    doc_list_encoder_->AddPosition();
+    if (position_list_encoder_) {
+        position_list_encoder_->AddPosition(pos);
+    }
+}
 
 InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder(MemoryPool *session_pool) const {
     InMemPostingDecoder *posting_decoder =

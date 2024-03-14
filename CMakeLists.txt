@@ -89,8 +89,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
-    set(CMAKE_CXX_FLAGS "-O0 -g -DNDEBUG")
-    set(CMAKE_C_FLAGS "-O0 -g -DNDEBUG")
+    set(CMAKE_CXX_FLAGS "-O0 -g")
+    set(CMAKE_C_FLAGS "-O0 -g")
 
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
     #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
@@ -100,7 +100,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_DEBUG_POSTFIX "")
 
 else ()
-    message(FATAL_ERROR "Only support CMake build type: Release, Debug, and MinSizeRel")
+    message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
 endif ()
 
 if (CLANG_VERSION_STRING VERSION_EQUAL 17)

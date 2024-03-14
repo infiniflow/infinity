@@ -26,7 +26,7 @@ import memory_indexer;
 
 namespace infinity {
 InMemIndexSegmentReader::InMemIndexSegmentReader(MemoryIndexer *memory_indexer)
-    : posting_table_(memory_indexer->GetPostingTable()), base_doc_id_(memory_indexer->GetBaseDocId()) {}
+    : posting_table_(memory_indexer->GetPostingTable()), base_row_id_(memory_indexer->GetBaseRowId()) {}
 
 PostingWriter *InMemIndexSegmentReader::GetPostingWriter(const String &term) const {
     MemoryIndexer::PostingTable::Iterator iter = posting_table_->Find(term);
@@ -41,7 +41,7 @@ bool InMemIndexSegmentReader::GetSegmentPosting(const String &term, SegmentPosti
     if (posting_writer == nullptr) {
         return false;
     }
-    seg_posting.Init(base_doc_id_, posting_writer);
+    seg_posting.Init(base_row_id_, posting_writer);
     return true;
 }
 

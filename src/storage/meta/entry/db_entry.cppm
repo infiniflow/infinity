@@ -46,7 +46,7 @@ public:
 
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &data_dir,
+                     const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
@@ -59,7 +59,7 @@ public:
                                          TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> NewReplayDBEntry(DBMeta *db_meta,
-                                               const SharedPtr<String> &data_dir,
+                                               const SharedPtr<String> &db_entry_dir,
                                                const SharedPtr<String> &db_name,
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
