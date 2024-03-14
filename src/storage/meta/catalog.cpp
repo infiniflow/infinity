@@ -185,6 +185,17 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
+Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
+        return {nullptr, status};
+    }
+
+    return db_entry->GetTableInfo(table_name, txn_id, begin_ts);
+}
+
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));

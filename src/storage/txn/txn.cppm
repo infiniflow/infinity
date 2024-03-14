@@ -102,6 +102,8 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String& db_name, const String& table_name);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     // Index OPs

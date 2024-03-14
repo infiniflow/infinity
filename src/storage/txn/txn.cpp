@@ -366,6 +366,11 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
     return catalog_->GetTableByName(db_name, table_name, txn_id_, begin_ts);
 }
 
+Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String& db_name, const String& table_name) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    return catalog_->GetTableInfo(db_name, table_name, txn_id_, begin_ts);
+}
+
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
     UnrecoverableError("Not Implemented");
     return {ErrorCode::kNotSupported, "Not Implemented"};

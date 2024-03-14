@@ -113,6 +113,16 @@ Tuple<TableEntry *, Status> DBEntry::GetTableCollection(const String &table_name
     return table_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
+Tuple<SharedPtr<TableInfo>, Status> DBEntry::GetTableInfo(const String& table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    LOG_TRACE(fmt::format("Get a table entry {}", table_name));
+    auto [table_meta, status, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
+    if (table_meta == nullptr) {
+        return {nullptr, status};
+    }
+
+    return table_meta->GetTableInfo(std::move(r_lock), txn_id, begin_ts);
+}
+
 void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
     auto [table_meta, _1, r_lock] = table_meta_map_.GetExistMeta(table_name, ConflictType::kError);
     LOG_TRACE(fmt::format("Remove a db entry: {}", table_name));

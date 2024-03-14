@@ -80,6 +80,8 @@ public:
 
     [[nodiscard]] inline const Optional<u16> block_id() const { return block_id_; }
 
+    [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String schema_name_;

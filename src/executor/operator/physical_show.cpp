@@ -320,9 +320,8 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
 }
 
 void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    // Define output table schema
+    // Define output database detailed info
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
@@ -400,7 +399,111 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    // Define output table detailed info
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
+
+    if (!status.ok()) {
+        show_operator_state->status_ = status;
+        RecoverableError(status);
+        return;
+    }
+
+    // Prepare the output data block
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("table name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const String *table_name = table_info->table_name_.get();
+            Value value = Value::MakeVarchar(*table_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const String *table_dir = table_info->table_entry_dir_.get();
+            Value value = Value::MakeVarchar(*table_dir);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("column count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(table_info->column_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("segment count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(table_info->segment_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(table_info->row_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *show_operator_state) {
