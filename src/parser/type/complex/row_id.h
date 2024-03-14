@@ -34,9 +34,13 @@ struct RowID {
 
     union {
         struct {
-            // small endian
+#ifdef __BIG_ENDIAN__
+            uint32_t segment_id_;
+            uint32_t segment_offset_;
+#else
             uint32_t segment_offset_;
             uint32_t segment_id_;
+#endif
         };
         uint64_t value_;
     };
@@ -46,6 +50,7 @@ struct RowID {
     inline bool operator<=(const RowID &other) const { return value_ <= other.value_; };
 
     inline bool operator==(const RowID &other) const { return value_ == other.value_; }
+    inline bool operator!=(const RowID &other) const { return value_ != other.value_; }
 
     inline bool operator>(const RowID &other) const { return value_ > other.value_; };
 
@@ -56,25 +61,19 @@ struct RowID {
         return *this;
     }
 
-    inline RowID &operator=(uint32_t i) {
-        segment_id_ = 0;
-        segment_offset_ = i;
+    inline RowID operator+(const uint32_t &docid) const { return RowID(value_ + docid); }
+
+    inline uint32_t operator-(const RowID &other) const { return uint32_t(value_ - other.value_); }
+
+    inline RowID operator-(const uint32_t &docid) const { return RowID(value_ - docid); }
+
+    inline RowID &operator+=(const uint32_t &docid) {
+        value_ += docid;
         return *this;
     }
 
-    inline bool operator!=(uint32_t i) const { return !(segment_offset_ == i); }
-
-    inline RowID operator+(const uint32_t &other) const { return RowID(segment_id_, segment_offset_ + other); }
-
-    inline RowID operator-(const RowID &other) const { return RowID(segment_id_, segment_offset_ - other.segment_offset_); }
-
-    inline RowID &operator+=(const uint32_t &other) {
-        segment_offset_ += other;
-        return *this;
-    }
-
-    inline RowID &operator-=(const RowID &other) {
-        value_ -= other.value_;
+    inline RowID &operator-=(const uint32_t &docid) {
+        value_ -= docid;
         return *this;
     }
 

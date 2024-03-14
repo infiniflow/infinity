@@ -117,7 +117,9 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     BufferedByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(session_pool, session_pool);
     pos_list_buffer_.SnapShot(posting_buffer);
 
-    InMemPositionListDecoder *decoder = new InMemPositionListDecoder(pos_list_format_option_, session_pool);
+    InMemPositionListDecoder *decoder = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListDecoder)))
+                                                           InMemPositionListDecoder(pos_list_format_option_, session_pool)
+                                                     : new InMemPositionListDecoder(pos_list_format_option_, session_pool);
     decoder->Init(ttf, in_mem_skiplist_reader, posting_buffer);
 
     return decoder;

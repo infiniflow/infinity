@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <cstdio>
 
 export module memory_indexer;
@@ -40,7 +41,7 @@ public:
 
     MemoryIndexer(const String &index_dir,
                   const String &base_name,
-                  docid_t base_doc_id,
+                  RowID base_row_id,
                   optionflag_t flag,
                   const String &analyzer,
                   MemoryPool &byte_slice_pool,
@@ -60,7 +61,7 @@ public:
     // WARN: Don't reuse MemoryIndexer after calling Dump!
     void Dump();
 
-    docid_t GetBaseDocId() const { return base_doc_id_; }
+    RowID GetBaseRowId() const { return base_row_id_; }
 
     u32 GetDocCount() const { return doc_count_; }
 
@@ -87,7 +88,7 @@ private:
 private:
     String index_dir_;
     String base_name_;
-    docid_t base_doc_id_{INVALID_DOCID};
+    RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
     String analyzer_;
     MemoryPool &byte_slice_pool_;
