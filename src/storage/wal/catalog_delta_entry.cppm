@@ -870,13 +870,13 @@ public:
                                             SegmentID segment_id,
                                             String segment_filter_binary_data,
                                             Vector<Pair<BlockID, String>> block_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
+        : CatalogDeltaOperation(CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
           block_filter_binary_data_(std::move(block_filter_binary_data)) {}
     explicit UpdateSegmentBloomFilterDataOp(SegmentEntry *segment_entry,
                                             String segment_filter_binary_data,
                                             Vector<Pair<BlockID, String>> block_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED), segment_entry_(segment_entry),
+        : CatalogDeltaOperation(CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA), segment_entry_(segment_entry),
           segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {
         db_name_ = *this->segment_entry_->GetTableEntry()->GetDBName();
         table_name_ = *this->segment_entry_->GetTableEntry()->GetTableName();

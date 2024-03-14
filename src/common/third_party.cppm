@@ -19,6 +19,7 @@ module;
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-W#pragma-messages"
+#pragma clang diagnostic ignored "-Wpessimizing-move"
 
 #include "CLI11.hpp"
 
@@ -53,6 +54,10 @@ module;
 
 #include "parallel_hashmap/phmap.h"
 #include "pgm/pgm_index.hpp"
+
+#include "oatpp/web/server/HttpConnectionHandler.hpp"
+#include "oatpp/network/Server.hpp"
+#include "oatpp/network/tcp/server/ConnectionProvider.hpp"
 
 #pragma clang diagnostic pop
 
@@ -213,5 +218,16 @@ using FlatHashSet = phmap::flat_hash_set<T, Hash, Eq, Alloc>;
 
 export template <typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
 using PGMIndex = pgm::PGMIndex<K, Epsilon, EpsilonRecursive, Floating>;
+
+
+// Http
+export using HttpRequestHandler = oatpp::web::server::HttpRequestHandler;
+export using HttpRouter = oatpp::web::server::HttpRouter;
+export using HttpConnectionHandler = oatpp::web::server::HttpConnectionHandler;
+export using HttpConnectionProvider = oatpp::network::tcp::server::ConnectionProvider;
+export using WebServer = oatpp::network::Server;
+export using WebEnvironment = oatpp::base::Environment;
+export using WebAddress = oatpp::network::Address;
+export using HTTPStatus = oatpp::web::protocol::http::Status;
 
 } // namespace infinity

@@ -117,7 +117,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *t
 void SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("SetSealing only accept unsealed segment");
+        UnrecoverableError("SetSealed failed");
     }
     status_ = SegmentStatus::kSealed;
 }

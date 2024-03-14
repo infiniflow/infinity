@@ -147,8 +147,8 @@ private:
 
 class SortedPosting {
 public:
-    SortedPosting(const PostingFormatOption &format_option, RowID base_doc_id, PostingDecoder *posting_decoder)
-        : format_option_(format_option), base_doc_id_(base_doc_id), doc_merger_(format_option, posting_decoder) {}
+    SortedPosting(const PostingFormatOption &format_option, RowID base_row_id, PostingDecoder *posting_decoder)
+        : format_option_(format_option), base_row_id_(base_row_id), doc_merger_(format_option, posting_decoder) {}
     ~SortedPosting() {}
 
     bool Next() {
@@ -168,11 +168,11 @@ public:
         doc_merger_.Merge(current_doc_id_, posting_writer.get());
     }
 
-    RowID GetCurrentDocID() const { return base_doc_id_ + current_doc_id_; }
+    RowID GetCurrentDocID() const { return base_row_id_ + current_doc_id_; }
 
 private:
     PostingFormatOption format_option_;
-    RowID base_doc_id_;
+    RowID base_row_id_;
     docid_t current_doc_id_{INVALID_DOCID};
     DocMerger doc_merger_;
 };
@@ -193,9 +193,9 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_posti
     PriorityQueue queue;
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];
-        RowID base_doc_id = term_posting->GetBaesDocId();
+        RowID base_row_id = term_posting->GetBaesRowId();
         PostingDecoder *decoder = term_posting->GetPostingDecoder();
-        SortedPosting *sorted_posting = new SortedPosting(format_option_, base_doc_id, decoder);
+        SortedPosting *sorted_posting = new SortedPosting(format_option_, base_row_id, decoder);
         queue.push(sorted_posting);
     }
 

@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module inmem_index_segment_reader;
 
 import stl;
@@ -36,7 +38,7 @@ private:
     PostingWriter *GetPostingWriter(const String &term) const;
 
     MemoryIndexer::PostingTable *posting_table_{nullptr};
-    docid_t base_doc_id_{0};
+    RowID base_row_id_{INVALID_ROWID};
 };
 
 } // namespace infinity

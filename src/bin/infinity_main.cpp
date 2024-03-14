@@ -22,6 +22,7 @@ import pg_server;
 import infinity_exception;
 import infinity_context;
 import thrift_server;
+import http_server;
 
 namespace {
 
@@ -32,6 +33,9 @@ infinity::PGServer pg_server;
 
 infinity::Thread pool_thrift_thread;
 infinity::PoolThriftServer pool_thrift_server;
+
+infinity::Thread http_server_thread;
+infinity::HTTPServer http_server;
 // infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 std::mutex server_mutex;
@@ -50,13 +54,15 @@ void ShutdownServer() {
     //            threaded_thrift_server.Shutdown();
     //            threaded_thrift_thread.join();
 
+    http_server.Shutdown();
+    http_server_thread.join();
+    fmt::print("HTTP Server is shutdown.\n");
     pool_thrift_server.Shutdown();
     pool_thrift_thread.join();
-
+    fmt::print("Thrift Server is shutdown.\n");
     //            non_block_pool_thrift_server.Shutdown();
-
     pg_server.Shutdown();
-
+    fmt::print("PG Server is shutdown.\n");
     infinity::InfinityContext::instance().UnInit();
     fmt::print("Shutdown infinity server successfully\n");
 }
@@ -144,6 +150,8 @@ auto main(int argc, char **argv) -> int {
                git_commit_id());
     //    threaded_thrift_server.Init(9090);
     //    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+    http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->http_port()); });
+
     u32 thrift_server_port = InfinityContext::instance().config()->sdk_port();
     i32 thrift_server_pool_size = InfinityContext::instance().config()->connection_limit();
 

@@ -33,7 +33,7 @@ protected:
             pos_list_encoder.Flush();
         }
 
-        UniquePtr<InMemPositionListDecoder> pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+        InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
         ASSERT_TRUE(pos_list_decoder);
 
         // compress mode is useless in decoder
@@ -96,7 +96,7 @@ protected:
             pos_list_encoder.Flush();
         }
 
-        UniquePtr<InMemPositionListDecoder> pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+        InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
         ASSERT_TRUE(pos_list_decoder);
 
         InDocPositionState state(option);
@@ -136,7 +136,7 @@ TEST_F(InMemPositionListDecoderTest, test1) {
     pos_list_encoder.AddPosition(3);
     pos_list_encoder.EndDocument();
 
-    UniquePtr<InMemPositionListDecoder> pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
+    InMemPositionListDecoder *pos_list_decoder(pos_list_encoder.GetInMemPositionListDecoder(&byte_slice_pool_));
     ASSERT_TRUE(pos_list_decoder);
 
     InDocPositionState state(option);

@@ -15,7 +15,7 @@ query_cpu_limit         = "4MB"
 [network]
 listen_address          = "0.0.0.0"
 pg_port                 = 5432
-http_port               = 8088
+http_port               = 23810
 sdk_port                = 23817
 connection_limit        = 128
 

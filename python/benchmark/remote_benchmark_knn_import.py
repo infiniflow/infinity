@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 
 import infinity
 from infinity import index
@@ -30,10 +31,20 @@ def import_sift_1m(path):
     assert table_obj
 
     assert os.path.exists(path)
+
+    start = time.time()
     res = table_obj.import_data(path, None)
+    end = time.time()
+    dur = end - start
+    print(f"Import sift_1m cost time: {dur} s")
+
     assert res.error_code == ErrorCode.OK
 
+    start = time.time()
     create_index("sift_benchmark")
+    end = time.time()
+    dur = end - start
+    print(f"Create index on sift_1m cost time: {dur} s")
 
 
 def import_gist_1m(path):
@@ -48,10 +59,20 @@ def import_gist_1m(path):
     assert table_obj
 
     assert os.path.exists(path)
+
+    start = time.time()
     res = table_obj.import_data(path, None)
+    end = time.time()
+    dur = end - start
+    print(f"Import gist_1m cost time: {dur} s")
+
     assert res.error_code == ErrorCode.OK
 
+    start = time.time()
     create_index("gist_benchmark")
+    end = time.time()
+    dur = end - start
+    print(f"Create index on gist_1m cost time: {dur} s")
 
 
 def create_index(table_name):

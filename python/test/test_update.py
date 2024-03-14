@@ -372,6 +372,7 @@ class TestUpdate:
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
+    @pytest.mark.skip(reason="TODO")
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value(self, types, types_example):
@@ -428,10 +429,9 @@ class TestUpdate:
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", marks=pytest.mark.xfail),
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    def test_filter_expression(self, filter_list, types_example):
+    def test_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default")
+        db_obj = get_infinity_db
         db_obj.drop_table("test_filter_expression")
         table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, None)
 

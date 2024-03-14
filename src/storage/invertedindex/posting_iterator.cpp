@@ -19,7 +19,7 @@ module posting_iterator;
 namespace infinity {
 
 PostingIterator::PostingIterator(const PostingFormatOption &posting_option, MemoryPool *session_pool)
-    : posting_option_(posting_option), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_ROWID - 1), current_row_id_(INVALID_ROWID),
+    : posting_option_(posting_option), session_pool_(session_pool), last_doc_id_in_buffer_(INVALID_ROWID), current_row_id_(INVALID_ROWID),
       doc_buffer_cursor_(nullptr), current_ttf_(0), tf_buffer_cursor_(0), tf_buffer_(nullptr), doc_payload_buffer_(nullptr),
       posting_decoder_(nullptr), need_move_to_current_doc_(false), in_doc_pos_iter_inited_(false), in_doc_pos_iterator_(nullptr) {
     tf_buffer_ = (tf_t *)((session_pool_)->Allocate(sizeof(tf_t) * MAX_DOC_PER_RECORD));
@@ -35,6 +35,7 @@ PostingIterator::~PostingIterator() {
         session_pool_->Deallocate((void *)doc_payload_buffer_, sizeof(docpayload_t) * MAX_DOC_PER_RECORD);
     }
     if (posting_decoder_) {
+        posting_decoder_->~MultiPostingDecoder();
         session_pool_->Deallocate((void *)posting_decoder_, sizeof(posting_decoder_));
     }
 }
@@ -49,7 +50,7 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
     RowID ret = INVALID_ROWID;
     RowID current_row_id = current_row_id_;
     row_id = std::max(current_row_id + 1, row_id);
-    if (unlikely(row_id > last_doc_id_in_buffer_)) {
+    if (unlikely(last_doc_id_in_buffer_ == INVALID_ROWID || row_id > last_doc_id_in_buffer_)) {
         if (!posting_decoder_->DecodeDocBuffer(row_id, doc_buffer_, current_row_id, last_doc_id_in_buffer_, current_ttf_))
             return ret;
         doc_buffer_cursor_ = doc_buffer_ + 1;
@@ -70,7 +71,7 @@ void PostingIterator::MoveToCurrentDoc() {
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
     if (posting_option_.HasTermFrequency()) {
-        state_.SetDocId(current_row_id_.segment_offset_);
+        state_.SetRowID(current_row_id_);
         state_.SetTermFreq(InnerGetTF());
 
         u32 seeked_doc_count = GetCurrentSeekedDocCount();
@@ -106,6 +107,7 @@ void PostingIterator::Reset() {
         return;
     }
     if (posting_decoder_) {
+        posting_decoder_->~MultiPostingDecoder();
         session_pool_->Deallocate((void *)posting_decoder_, sizeof(posting_decoder_));
     }
 
@@ -113,7 +115,7 @@ void PostingIterator::Reset() {
     posting_decoder_->Init(segment_postings_);
 
     current_row_id_ = INVALID_ROWID;
-    last_doc_id_in_buffer_ = INVALID_ROWID - 1;
+    last_doc_id_in_buffer_ = INVALID_ROWID;
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
 }

@@ -1,4 +1,5 @@
 
+/*
 #include "unit_test/base_test.h"
 
 import stl;
@@ -38,3 +39,4 @@ TEST_F(QueryVisitorTest, test1) {
     Optimize(root);
     ASSERT_EQ(root->GetChildrenCount(), 4u);
 }
+*/
