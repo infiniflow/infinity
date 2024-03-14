@@ -520,6 +520,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
             break;
         }
+        case ShowStmtType::kBlocks: {
+            result->emplace_back(MakeShared<String>("SHOW BLOCKS: "));
+            break;
+        }
         case ShowStmtType::kIndexes: {
             result->emplace_back(MakeShared<String>("SHOW INDEXES: "));
             intent_size += 2;

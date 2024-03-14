@@ -209,7 +209,7 @@ Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
     return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String& db_name) {
+Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
@@ -291,6 +291,11 @@ Tuple<TableIndexEntry *, Status> Txn::GetIndexByName(const String &db_name, cons
     return catalog_->GetIndexByName(db_name, table_name, index_name, txn_id_, begin_ts);
 }
 
+Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+    return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_id_, begin_ts);
+}
+
 Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
     auto *table_entry = table_ref->table_entry_ptr_;
     auto [fulltext_index_entry, segment_index_entries, status] =
@@ -366,7 +371,7 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
     return catalog_->GetTableByName(db_name, table_name, txn_id_, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String& db_name, const String& table_name) {
+Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
     return catalog_->GetTableInfo(db_name, table_name, txn_id_, begin_ts);
 }
@@ -548,11 +553,11 @@ void Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     String dir_name = *txn_mgr_->GetBufferMgr()->BaseDir().get() + "/catalog";
 
-//    String delta_path = String(fmt::format("{}/META_CATALOG.{}.delta", dir_name, max_commit_ts));
-//    String delta_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.delta", dir_name, max_commit_ts));
-//
-//    String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));
-//    String catalog_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.json", dir_name, max_commit_ts));
+    //    String delta_path = String(fmt::format("{}/META_CATALOG.{}.delta", dir_name, max_commit_ts));
+    //    String delta_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.delta", dir_name, max_commit_ts));
+    //
+    //    String catalog_path = String(fmt::format("{}/META_CATALOG.{}.json", dir_name, max_commit_ts));
+    //    String catalog_tmp_path = String(fmt::format("{}/_META_CATALOG.{}.json", dir_name, max_commit_ts));
 
     // Full Check point don't need increment checkpoint
     // catalog_->SaveDeltaCatalog(delta_path, max_commit_ts, true);

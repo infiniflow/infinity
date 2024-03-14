@@ -60,6 +60,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show Segments";
             break;
         }
+        case ShowStmtType::kBlocks : {
+            ss << "Show Blocks";
+            break;
+        }
         case ShowStmtType::kConfigs: {
             ss << "Show configs";
             break;

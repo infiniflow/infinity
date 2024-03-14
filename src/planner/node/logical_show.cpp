@@ -50,6 +50,8 @@ String ToString(ShowType type) {
             return "Show profiles";
         case ShowType::kShowSegments:
             return "Show segments";
+        case ShowType::kShowBlocks:
+            return "Show blocks";
         case ShowType::kShowSessionStatus:
             return "Show session status";
         case ShowType::kShowGlobalStatus:

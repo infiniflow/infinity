@@ -185,7 +185,8 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableInfo>, Status>
+Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -239,6 +240,15 @@ Catalog::GetIndexByName(const String &db_name, const String &table_name, const S
         return {nullptr, table_status};
     }
     return table_entry->GetIndex(index_name, txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<TableIndexInfo>, Status>
+Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
 }
 
 Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {

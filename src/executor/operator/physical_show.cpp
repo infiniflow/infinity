@@ -216,6 +216,17 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowBlocks: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("size");
+
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowType::kShowSessionStatus: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -296,6 +307,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowSegments(query_context, show_operator_state);
             break;
         }
+        case ShowType::kShowBlocks: {
+            ExecuteShowBlocks(query_context, show_operator_state);
+            break;
+        }
         case ShowType::kShowViews: {
             ExecuteShowViews(query_context, show_operator_state);
             break;
@@ -329,7 +344,6 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
 
     if (!status.ok()) {
-        show_operator_state->status_ = status;
         RecoverableError(status);
         return;
     }
@@ -408,7 +422,6 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
 
     if (!status.ok()) {
-        show_operator_state->status_ = status;
         RecoverableError(status);
         return;
     }
@@ -419,6 +432,22 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
         column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("database name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(db_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
 
     {
         SizeT column_id = 0;
@@ -507,7 +536,125 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    // Define output table detailed info
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, object_name_, index_name_.value());
+
+    if (!status.ok()) {
+        RecoverableError(status);
+        return;
+    }
+
+    // Prepare the output data block
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("database name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(db_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("table name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(object_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("index name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(index_name_.value());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("index info");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(*table_index_info->index_info_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            const String *table_dir = table_index_info->index_entry_dir_.get();
+            Value value = Value::MakeVarchar(*table_dir);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("segment index count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(table_index_info->segment_index_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
 /**
@@ -565,7 +712,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     Status status = txn->GetTables(db_name_, table_collections_detail);
 
     if (!status.ok()) {
-        show_operator_state->status_ = status;
         RecoverableError(status);
         return;
     }
@@ -970,6 +1116,60 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
         }
     }
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    auto txn = query_context->GetTxn();
+    TxnTimeStamp begin_ts = txn->BeginTS();
+
+    auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
+        return;
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "path", HashSet<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "size", HashSet<ConstraintType>()),
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    auto chuck_filling = [&](const std::function<u64(const String &)> &file_size_func, const String &path) {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar(path);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(Utility::FormatByteSize(file_size_func(path)));
+
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    };
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
+
+    if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
+        auto block_entry_iter = BlockEntryIter(segment_entry.get());
+        for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+            auto dir_path = block_entry->DirPath();
+
+            chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
+        }
+    }
+
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }

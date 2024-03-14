@@ -42,7 +42,8 @@ BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
-BLOCK          { return BLOCK; }
+BLOCK           { return BLOCK; }
+BLOCKS          { return BLOCKS; }
 BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }

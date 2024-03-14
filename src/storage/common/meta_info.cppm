@@ -38,7 +38,8 @@ export struct TableInfo {
 export struct TableIndexInfo {
     SharedPtr<String> index_name_{};
     SharedPtr<String> index_entry_dir_{};
-    i64 segment_count_{};
+    i64 segment_index_count_{};
+    SharedPtr<String> index_info_{};
 };
 
 export struct TableDetail {

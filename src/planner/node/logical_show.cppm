@@ -38,6 +38,7 @@ export enum class ShowType {
     kShowProfiles,
     kShowIndexes,
     kShowSegments,
+    kShowBlocks,
     kShowSessionStatus,
     kShowGlobalStatus,
     kShowVar,

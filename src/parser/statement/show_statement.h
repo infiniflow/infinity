@@ -32,6 +32,7 @@ enum class ShowStmtType {
     kConfigs,
     kProfiles,
     kSegments,
+    kBlocks,
     kSessionStatus,
     kGlobalStatus,
     kVar,
