@@ -56,14 +56,13 @@ void ShutdownServer() {
 
     http_server.Shutdown();
     http_server_thread.join();
-
+    fmt::print("HTTP Server is shutdown.\n");
     pool_thrift_server.Shutdown();
     pool_thrift_thread.join();
-
+    fmt::print("Thrift Server is shutdown.\n");
     //            non_block_pool_thrift_server.Shutdown();
-
     pg_server.Shutdown();
-
+    fmt::print("PG Server is shutdown.\n");
     infinity::InfinityContext::instance().UnInit();
     fmt::print("Shutdown infinity server successfully\n");
 }

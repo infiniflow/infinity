@@ -88,8 +88,8 @@ void HTTPServer::Start(u16 port) {
 
 void HTTPServer::Shutdown() {
 
-    WebEnvironment::destroy();
     server_->stop();
+    WebEnvironment::destroy();
 
 }
 
