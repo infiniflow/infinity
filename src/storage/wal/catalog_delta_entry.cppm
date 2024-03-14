@@ -220,7 +220,7 @@ public:
 
 public:
     const String &db_name() const { return db_name_; }
-    const String &data_dir() const { return db_entry_dir_; }
+    const String &db_entry_dir() const { return db_entry_dir_; }
 
 public:
     SharedPtr<DBEntry> db_entry_{};
