@@ -177,36 +177,19 @@ public:
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
-private:
-    void AddDBStore(DBEntry *db_entry);
-
-    void DropDBStore(DBEntry *dropped_db_entry);
-
-    void AddTableStore(TableEntry *table_entry);
-
-    void DropTableStore(TableEntry *dropped_table_entry);
-
     // Create txn store if not exists
-    TxnTableStore *GetTxnTableStore(const String &table_name);
-
-public:
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
 private:
+    TxnTableStore *GetTxnTableStore(const String &table_name);
+
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);
 
-    void MakeDeltaOps();
-
 private:
-    // Txn store
-    Set<DBEntry *> txn_dbs_{};
-    Set<TableEntry *> txn_tables_{};
-    // Key: table name Value: TxnTableStore
-    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
+    TxnStore txn_store_;
 
-private:
     TxnManager *txn_mgr_{};
     // This BufferManager ptr Only for replaying wal
     BufferManager *buffer_mgr_{};

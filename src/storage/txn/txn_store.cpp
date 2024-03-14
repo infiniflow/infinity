@@ -49,12 +49,16 @@ TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
 
 TxnSegmentStore::TxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
 
+void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state) const {
+    // local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_, append_state));
+}
+
 ///-----------------------------------------------------------------------------
 
 TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
 
-void TxnIndexStore::AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const {
-    local_catalog_delta_ops_entry->AddOperation(MakeUnique<AddTableIndexEntryOp>(table_index_entry_));
+void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
+    local_delta_ops->AddOperation(MakeUnique<AddTableIndexEntryOp>(table_index_entry_));
 }
 
 ///-----------------------------------------------------------------------------
@@ -62,6 +66,10 @@ void TxnIndexStore::AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_de
 TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
 
 TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
+
+void TxnCompactStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
+    //
+}
 
 ///-----------------------------------------------------------------------------
 
@@ -140,9 +148,9 @@ void TxnTableStore::AddFulltextIndexStore(TableIndexEntry *table_index_entry, Fu
 
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
     if (txn_indexes_.contains(table_index_entry)) {
+        table_index_entry->Cleanup();
         txn_indexes_.erase(table_index_entry);
         txn_indexes_store_.erase(*table_index_entry->GetIndexName());
-        table_index_entry->Cleanup();
     } else {
         txn_indexes_.insert(table_index_entry);
     }
@@ -193,11 +201,10 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 
 void TxnTableStore::Scan(SharedPtr<DataBlock> &) {}
 
-void TxnTableStore::Rollback() {
-    TransactionID txn_id = txn_->TxnID();
+void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
-        Catalog::RollbackAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), this);
+        Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
         LOG_TRACE(fmt::format("Rollback prepare appended data in table: {}", *table_entry_->GetTableName()));
     }
     for (auto &[index_name, txn_index_store] : txn_indexes_store_) {
@@ -206,25 +213,26 @@ void TxnTableStore::Rollback() {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(index_name, table_index_entry, txn_id);
     }
-    Catalog::RollbackCompact(table_entry_, txn_->TxnID(), txn_->CommitTS(), compact_state_);
+    Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
     blocks_.clear();
 }
 
-void TxnTableStore::PrepareCommit() {
+// TODO: remove commit_ts
+void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     // Init append state
     append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
-    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), txn_->buffer_manager());
+    Catalog::Append(table_entry_, txn_id, this, commit_ts, buffer_mgr);
 
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
-        LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), txn_->CommitTS()));
-        Catalog::CommitCompact(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), compact_state_);
+        LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
+        Catalog::CommitCompact(table_entry_, txn_id, this, commit_ts, compact_state_);
     }
 
-    Catalog::Delete(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), delete_state_);
+    Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Complete commit preparing", *table_entry_->GetTableName()));
 }
@@ -232,15 +240,15 @@ void TxnTableStore::PrepareCommit() {
 /**
  * @brief Call for really commit the data to disk.
  */
-void TxnTableStore::Commit() const {
-    Catalog::CommitWrite(table_entry_, txn_->TxnID(), txn_->CommitTS(), txn_segments_);
-    // Catalog::CommitAppend(table_entry_, txn_->TxnID(), txn_->CommitTS(), append_state_.get());
-    // Catalog::CommitDelete(table_entry_, txn_->TxnID(), txn_->CommitTS(), delete_state_);
+void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
+    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_);
+    // Catalog::CommitAppend(table_entry_, txn_id, commit_ts, append_state_.get());
+    // Catalog::CommitDelete(table_entry_, txn_id, commit_ts, delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        Catalog::CommitCreateIndex(txn_index_store.get(), txn_->CommitTS());
+        Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
     }
     for (auto *table_index_entry : txn_indexes_) {
-        table_index_entry->Commit(txn_->CommitTS());
+        table_index_entry->Commit(commit_ts);
     }
 }
 
@@ -285,9 +293,110 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
 
-void TxnTableStore::AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const {
+void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
-        index_store->AddCatalogDeltaOperation(local_catalog_delta_ops_entry);
+        index_store->AddDeltaOp(local_delta_ops);
+    }
+    for (const auto &[segment_id, segment_store] : txn_segments_) {
+        segment_store.AddDeltaOp(local_delta_ops, append_state_.get());
+    }
+    // for (const auto *sealed_segment : set_sealed_segments_) {
+        // local_delta_ops->AddOperation(MakeUnique<AddSealedSegmentOp>(sealed_segment));
+    // }
+}
+
+TxnStore::TxnStore(Txn *txn, Catalog *catalog) : txn_(txn), catalog_(catalog) {}
+
+void TxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.insert(db_entry); }
+
+void TxnStore::DropDBStore(DBEntry *dropped_db_entry) {
+    if (txn_dbs_.contains(dropped_db_entry)) {
+        dropped_db_entry->Cleanup();
+        txn_dbs_.erase(dropped_db_entry);
+    } else {
+        txn_dbs_.insert(dropped_db_entry);
+    }
+}
+
+void TxnStore::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entry); }
+
+void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
+    if (txn_tables_.contains(dropped_table_entry)) {
+        txn_tables_.erase(dropped_table_entry);
+        dropped_table_entry->Cleanup();
+        txn_tables_store_.erase(*dropped_table_entry->GetTableName());
+    } else {
+        txn_tables_.insert(dropped_table_entry);
+    }
+}
+
+TxnTableStore *TxnStore::GetTxnTableStore(const String &table_name) {
+    auto iter = txn_tables_store_.find(table_name);
+    return iter == txn_tables_store_.end() ? nullptr : iter->second.get();
+}
+
+TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
+    const String &table_name = *table_entry->GetTableName();
+    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
+        return iter->second.get();
+    }
+    auto [iter, insert_ok] = txn_tables_store_.emplace(table_name, MakeUnique<TxnTableStore>(txn_, table_entry));
+    return iter->second.get();
+}
+
+void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
+    for (auto *db_entry : txn_dbs_) {
+        local_delta_ops->AddOperation(MakeUnique<AddDBEntryOp>(db_entry));
+    }
+    for (auto *table_entry : txn_tables_) {
+        local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry));
+    }
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->AddDeltaOp(local_delta_ops);
+        // this->AddDeltaOp(MakeUnique<AddTxnTableStoreOp>(table_name));
+    }
+}
+
+void TxnStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
+    }
+}
+
+void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) {
+    // Commit the prepared data
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->Commit(txn_id, commit_ts);
+        table_local_store->TryTriggerCompaction(bg_task_processor, txn_mgr);
+    }
+
+    // Commit databases to memory catalog
+    for (auto *db_entry : txn_dbs_) {
+        db_entry->Commit(commit_ts);
+    }
+
+    // Commit tables to memory catalog
+    for (auto *table_entry : txn_tables_) {
+        table_entry->Commit(commit_ts);
+    }
+}
+
+void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
+    // Rollback the prepared data
+    for (const auto &name_table_pair : txn_tables_store_) {
+        TxnTableStore *table_local_store = name_table_pair.second.get();
+        table_local_store->Rollback(txn_id, abort_ts);
+    }
+
+    for (auto *table_entry : txn_tables_) {
+        table_entry->Cleanup();
+        Catalog::RemoveTableEntry(table_entry, txn_id);
+    }
+
+    for (auto *db_entry : txn_dbs_) {
+        db_entry->Cleanup();
+        catalog_->RemoveDBEntry(db_entry, txn_id);
     }
 }
 
