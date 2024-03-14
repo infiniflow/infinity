@@ -1,16 +1,16 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+//  Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
 //
-//     https://www.apache.org/licenses/LICENSE-2.0
+//      https://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
 
 #include "unit_test/base_test.h"
 
@@ -20,9 +20,9 @@ import query_node;
 
 using namespace infinity;
 
-class SearchDriverTest : public BaseTest {};
+class QueryParserAndOptimizerTest : public BaseTest {};
 
-int ParseStream(const SearchDriver &driver, std::istream &ist) {
+int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
     // read and parse line by line, ignoring empty lines and comments
     std::string line;
     while (std::getline(ist, line)) {
@@ -34,19 +34,29 @@ int ParseStream(const SearchDriver &driver, std::istream &ist) {
         std::cerr << "---query: ###" << line << "###" << std::endl;
         std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
         if (!parser_result) {
-            std::cerr << "---failed" << std::endl;
+            std::cerr << "---parser failed" << std::endl;
             return -1;
         } else {
-            std::cerr << "---accepted" << std::endl;
+            std::cerr << "---parser accepted" << std::endl;
             std::cerr << "---parser output tree:" << std::endl;
             parser_result->PrintTree(std::cerr);
             std::cerr << std::endl;
+            auto optimizer_result = QueryNode::GetOptimizedQueryTree(std::move(parser_result));
+            if (!optimizer_result) {
+                std::cerr << "---optimizer failed" << std::endl;
+                return -1;
+            } else {
+                std::cerr << "---optimizer accepted" << std::endl;
+                std::cerr << "---optimizer output tree:" << std::endl;
+                optimizer_result->PrintTree(std::cerr);
+                std::cerr << std::endl;
+            }
         }
     }
     return 0;
 }
 
-TEST_F(SearchDriverTest, good_test1) {
+TEST_F(QueryParserAndOptimizerTest, test1) {
     using namespace infinity;
 
     std::string row_quires = R"##(
@@ -96,6 +106,6 @@ _exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.
     String default_field("body");
     SearchDriver driver(column2analyzer, default_field);
     IStringStream iss(row_quires);
-    int rc = ParseStream(driver, iss);
+    int rc = ParseAndOptimizeFromStream(driver, iss);
     EXPECT_EQ(rc, 0);
 }
