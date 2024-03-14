@@ -123,10 +123,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr
-                                                         //  ,bool is_replay,
-                                                         //  String replay_table_index_dir
-) {
+                                                         TxnManager *txn_mgr) {
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
         UnrecoverableError("Attempt to create no name index.");
@@ -134,9 +131,7 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
 
-    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta)
-                                                              // , txn_id, begin_ts, txn_mgr
-    );
+    auto [table_index_meta, r_lock] = index_meta_map_.GetMeta(*index_base->index_name_, std::move(init_index_meta));
 
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     return table_index_meta->CreateTableIndexEntry(std::move(r_lock), index_base, table_entry_dir_, conflict_type, txn_id, begin_ts, txn_mgr);

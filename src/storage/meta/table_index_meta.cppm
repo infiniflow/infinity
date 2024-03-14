@@ -34,14 +34,11 @@ class TxnManager;
 class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
-// class AddIndexMetaOp;
 
 export class TableIndexMeta : public MetaInterface {
     friend struct TableEntry;
 
 public:
-    // using MetaOp = AddIndexMetaOp;
-
     using EntryT = TableIndexEntry;
 
     explicit TableIndexMeta(TableEntry *table_entry, SharedPtr<String> index_name);
@@ -58,10 +55,7 @@ public:
                                                            ConflictType conflict_type,
                                                            TransactionID txn_id,
                                                            TxnTimeStamp begin_ts,
-                                                           TxnManager *txn_mgr
-                                                           //,    bool is_replay,
-                                                           //    String replay_table_index_dir
-    );
+                                                           TxnManager *txn_mgr);
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                   ConflictType conflict_type,

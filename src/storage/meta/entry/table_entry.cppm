@@ -90,10 +90,7 @@ public:
 
 public:
     Tuple<TableIndexEntry *, Status>
-    CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr
-                //  ,bool is_replay = false,
-                //  String replay_table_index_dir = ""
-    );
+    CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<SharedPtr<TableIndexEntry>, Status>
     DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);

@@ -43,16 +43,7 @@ DBEntry::DBEntry(DBMeta *db_meta,
                  const SharedPtr<String> &db_name,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts)
-    // "data_dir": "/tmp/infinity/data"
-    // "db_entry_dir": "/tmp/infinity/data/db1/txn_6"
-    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir
-                                                                                   // is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name)
-                                                                                   ),
-      db_name_(db_name) {
-    //    atomic_u64 txn_id_{0};
-    //    TxnTimeStamp begin_ts_{0};
-    //    atomic_u64 commit_ts_{UNCOMMIT_TS};
-    //    bool deleted_{false};
+    : BaseEntry(EntryType::kDatabase, is_delete), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
     begin_ts_ = begin_ts;
     txn_id_.store(txn_id);
 }
@@ -88,9 +79,7 @@ Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type
                                                  ConflictType conflict_type) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     LOG_TRACE(fmt::format("Adding new table entry: {}", *table_name));
-    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(*table_name, std::move(init_table_meta)
-                                                              // , txn_id, begin_ts, txn_mgr
-    );
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(*table_name, std::move(init_table_meta));
     return table_meta->CreateEntry(std::move(r_lock), table_entry_type, table_name, columns, txn_id, begin_ts, txn_mgr, conflict_type);
 }
 

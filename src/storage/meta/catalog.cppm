@@ -170,10 +170,7 @@ public:
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr
-                                                 //  ,bool is_replay = false,
-                                                 //  String replay_table_index_dir = ""
-    );
+                                                 TxnManager *txn_mgr);
 
     TableIndexEntry *CreateIndexReplay(TableEntry *table_entry,
                                        const SharedPtr<IndexBase> &index_base,

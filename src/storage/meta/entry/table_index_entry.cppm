@@ -57,11 +57,7 @@ public:
                     TableIndexMeta *table_index_meta,
                     const SharedPtr<String> &index_entry_dir,
                     TransactionID txn_id,
-                    TxnTimeStamp begin_ts
-                    // ,bool replay = false
-    );
-
-    // TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
+                    TxnTimeStamp begin_ts);
 
     static SharedPtr<TableIndexEntry> NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                          bool is_delete,
@@ -71,11 +67,6 @@ public:
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts);
 
-    // static SharedPtr<TableIndexEntry>
-    // ReplayTableIndexEntry(const SharedPtr<IndexBase> &index_base, TableIndexMeta *table_index_meta, Txn *txn, TransactionID txn_id);
-
-    // static SharedPtr<TableIndexEntry> NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
-
     static SharedPtr<TableIndexEntry> ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
                                                             const SharedPtr<IndexBase> &index_base,
                                                             const SharedPtr<String> &index_entry_dir,
@@ -83,8 +74,6 @@ public:
                                                             TxnTimeStamp begin_ts,
                                                             TxnTimeStamp commit_ts,
                                                             bool is_delete) noexcept;
-
-    // static SharedPtr<TableIndexEntry> NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 

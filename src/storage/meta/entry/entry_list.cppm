@@ -192,12 +192,7 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
         case FindResult::kNotFound: {
             SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
             auto *entry_ptr = entry.get();
-            entry_list_.push_front(entry);
-            // if (txn_mgr != nullptr) {
-            //     auto op = MakeUnique<typename Entry::EntryOp>(std::move(entry), false);
-            //     Txn *txn = txn_mgr->GetTxn(txn_id);
-            //     txn->AddCatalogDeltaOperation(std::move(op));
-            // }
+            entry_list_.push_front(std::move(entry));
             return {entry_ptr, Status::OK()};
         }
         case FindResult::kUncommitted:
@@ -275,21 +270,11 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
             SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
             SharedPtr<Entry> uncommitted_entry = std::move(entry_list_.front());
             entry_list_.pop_front();
-            if (txn_mgr != nullptr) {
-                auto op = MakeUnique<typename Entry::EntryOp>(std::move(drop_entry), true);
-                Txn *txn = txn_mgr->GetTxn(txn_id);
-                txn->AddCatalogDeltaOperation(std::move(op));
-            }
             return {uncommitted_entry, Status::OK()};
         }
         case FindResult::kFound: {
             SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
             entry_list_.push_front(drop_entry);
-            if (txn_mgr != nullptr) {
-                auto op = MakeUnique<typename Entry::EntryOp>(drop_entry, true);
-                Txn *txn = txn_mgr->GetTxn(txn_id);
-                txn->AddCatalogDeltaOperation(std::move(op));
-            }
             return {drop_entry, Status::OK()};
         }
         case FindResult::kConflict: {

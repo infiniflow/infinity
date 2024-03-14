@@ -49,9 +49,7 @@ public:
     };
 
 public:
-    Tuple<Meta *, std::shared_lock<std::shared_mutex>> GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func
-                                                               // , TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr
-    );
+    Tuple<Meta *, std::shared_lock<std::shared_mutex>> GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func);
 
     Meta *GetMetaNoLock(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
         return std::get<0>(this->GetMeta(name, std::move(init_func)));
@@ -77,11 +75,7 @@ public:                                     // TODO: make both private
 };
 
 template <MetaConcept Meta>
-Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func
-                                                                          //   , TransactionID txn_id,
-                                                                          //   TxnTimeStamp begin_ts,
-                                                                          //   TxnManager *txn_mgr
-) {
+Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
     std::shared_lock r_lock(rw_locker_);
     auto iter = meta_map_.find(name);
     if (iter == meta_map_.end()) {

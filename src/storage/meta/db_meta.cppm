@@ -34,15 +34,11 @@ import cleanup_scanner;
 namespace infinity {
 
 struct Catalog;
-// class AddDBMetaOp;
 
 export struct DBMeta : public MetaInterface {
     using EntryT = DBEntry;
 
     friend struct Catalog;
-
-    // public:
-    //     using MetaOp = AddDBMetaOp;
 
 public:
     explicit DBMeta(const SharedPtr<String> &data_dir, SharedPtr<String> db_name) : db_name_(std::move(db_name)), data_dir_(data_dir) {}

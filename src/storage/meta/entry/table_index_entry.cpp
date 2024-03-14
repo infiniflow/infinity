@@ -46,20 +46,12 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  TableIndexMeta *table_index_meta,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
-                                 TxnTimeStamp begin_ts
-                                 //  ,bool is_replay
-                                 )
+                                 TxnTimeStamp begin_ts)
     : BaseEntry(EntryType::kTableIndex, is_delete), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
       index_dir_(index_entry_dir), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
-
-// TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts)
-//     : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
-//     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
-//     txn_id_ = txn_id;
-// }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                                                bool is_delete,
@@ -68,12 +60,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
                                                                Txn *txn,
                                                                TransactionID txn_id,
                                                                TxnTimeStamp begin_ts) {
-    // if (is_replay) {
-    //     auto table_index_entry =
-    //         MakeShared<TableIndexEntry>(index_base, table_index_meta, MakeShared<String>(replay_table_index_dir), txn_id, begin_ts);
-    //     return table_index_entry;
-    // } else {
-
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
@@ -100,7 +86,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     }
 
     return table_index_entry;
-    // }
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
@@ -124,15 +109,6 @@ bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
     return homebrewed;
 }
 
-// SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-//     auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
-//     return dropped_index_entry;
-// }
-
-// SharedPtr<TableIndexEntry>
-// TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-//     return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
-// }
 
 // For segment_index_entry
 void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {

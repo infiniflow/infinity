@@ -52,10 +52,7 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
                                                                        ConflictType conflict_type,
                                                                        TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts,
-                                                                       TxnManager *txn_mgr
-                                                                       //    ,bool is_replay,
-                                                                       //    String replay_table_index_dir
-) {
+                                                                       TxnManager *txn_mgr) {
     auto init_index_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
         auto *txn = txn_mgr->GetTxn(txn_id);
         return TableIndexEntry::NewTableIndexEntry(index_base, false, table_entry_dir, this, txn, txn_id, begin_ts);

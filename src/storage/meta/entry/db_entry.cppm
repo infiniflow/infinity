@@ -35,15 +35,12 @@ import cleanup_scanner;
 namespace infinity {
 
 class TxnManager;
-class AddDBEntryOp;
 class DBMeta;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
-    using EntryOp = AddDBEntryOp;
-
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
                      const SharedPtr<String> &db_entry_dir,
@@ -72,8 +69,6 @@ public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
-
-    // [[nodiscard]] const String &db_name() const { return *db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
