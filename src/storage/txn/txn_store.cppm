@@ -37,6 +37,7 @@ class SegmentIndexEntry;
 class BGTaskProcessor;
 class TxnManager;
 enum class CompactSegmentsTaskType;
+class CatalogDeltaEntry;
 
 export struct TxnSegmentStore {
 public:
@@ -55,6 +56,8 @@ export struct TxnIndexStore {
 public:
     explicit TxnIndexStore(TableIndexEntry *table_index_entry);
     TxnIndexStore() = default;
+
+    void AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const;
 
 public:
     TableIndexEntry *const table_index_entry_{};
@@ -111,6 +114,8 @@ public:
     void AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry);
 
     void AddSealedSegment(SegmentEntry *segment_entry);
+
+    void AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }

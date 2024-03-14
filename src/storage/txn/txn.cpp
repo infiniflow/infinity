@@ -466,6 +466,8 @@ void Txn::CommitBottom() noexcept {
         table_entry->Commit(commit_ts);
     }
 
+    MakeDeltaOps();
+
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
@@ -585,6 +587,19 @@ void Txn::DropTableStore(TableEntry *dropped_table_entry) {
         txn_tables_store_.erase(*dropped_table_entry->GetTableName());
     } else {
         txn_tables_.insert(dropped_table_entry);
+    }
+}
+
+void Txn::MakeDeltaOps() {
+    for (auto *db_entry : txn_dbs_) {
+        this->AddCatalogDeltaOperation(MakeUnique<AddDBEntryOp>(db_entry));
+    }
+    for (auto *table_entry : txn_tables_) {
+        this->AddCatalogDeltaOperation(MakeUnique<AddTableEntryOp>(table_entry));
+    }
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->AddCatalogDeltaOperation(local_catalog_delta_ops_entry_.get());
+        // this->AddCatalogDeltaOperation(MakeUnique<AddTxnTableStoreOp>(table_name));
     }
 }
 

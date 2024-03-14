@@ -66,11 +66,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
-    // {
-    //     auto operation = MakeUnique<AddTableIndexEntryOp>(table_index_entry);
-    //     txn->AddCatalogDeltaOperation(std::move(operation));
-    // }
-
     // Get column info
     if (index_base->column_names_.size() != 1) {
         RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));

@@ -166,6 +166,7 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
+    // TODO: be private
     void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
 
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -196,6 +197,8 @@ private:
 
     void CheckTxn(const String &db_name);
 
+    void MakeDeltaOps();
+
 private:
     // Txn store
     Set<DBEntry *> txn_dbs_{};
@@ -220,6 +223,7 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
 
+    // TODO: remove this
     UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
 
     // WalManager notify the  commit bottom half is done

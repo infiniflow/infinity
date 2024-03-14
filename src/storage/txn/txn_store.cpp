@@ -49,11 +49,21 @@ TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
 
 TxnSegmentStore::TxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
 
+///-----------------------------------------------------------------------------
+
 TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_entry_(table_index_entry) {}
+
+void TxnIndexStore::AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const {
+    local_catalog_delta_ops_entry->AddOperation(MakeUnique<AddTableIndexEntryOp>(table_index_entry_));
+}
+
+///-----------------------------------------------------------------------------
 
 TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvalid) {}
 
 TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
+
+///-----------------------------------------------------------------------------
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry) {
     this->AddSegmentStore(segment_entry.get());
@@ -274,5 +284,11 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 }
 
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
+
+void TxnTableStore::AddCatalogDeltaOperation(CatalogDeltaEntry *local_catalog_delta_ops_entry) const {
+    for (const auto &[index_name, index_store] : txn_indexes_store_) {
+        index_store->AddCatalogDeltaOperation(local_catalog_delta_ops_entry);
+    }
+}
 
 } // namespace infinity

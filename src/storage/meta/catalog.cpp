@@ -505,11 +505,11 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             // -----------------------------
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
-                auto db_name = add_db_entry_op->db_name();
-                auto db_entry_dir = MakeShared<String>(std::move(add_db_entry_op->data_dir()));
+                const auto &db_name = add_db_entry_op->db_name();
+                const auto &db_entry_dir = add_db_entry_op->db_entry_dir();
                 if (!is_delete) {
                     catalog->CreateDatabaseReplay(
-                        MakeShared<String>(db_name),
+                        db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, false);
                         },
@@ -517,7 +517,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         begin_ts);
                 } else {
                     catalog->DropDatabaseReplay(
-                        db_name,
+                        *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, true);
                         },
@@ -528,20 +528,20 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             }
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                auto db_name = add_table_entry_op->db_name();
-                auto table_name = add_table_entry_op->table_name();
-                auto table_entry_dir = add_table_entry_op->table_entry_dir();
+                const auto &db_name = add_table_entry_op->db_name();
+                const auto &table_name = add_table_entry_op->table_name();
+                const auto &table_entry_dir = add_table_entry_op->table_entry_dir();
                 auto column_defs = add_table_entry_op->column_defs();
                 auto entry_type = add_table_entry_op->table_entry_type();
                 auto row_count = add_table_entry_op->row_count();
 
-                auto *db_entry = catalog->GetDatabaseReplay(db_name, txn_id, begin_ts);
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 if (!is_delete) {
                     db_entry->CreateTableReplay(
-                        MakeShared<String>(table_name),
+                        table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(table_meta,
-                                                                MakeShared<String>(table_entry_dir),
+                                                                table_entry_dir,
                                                                 table_name,
                                                                 column_defs,
                                                                 entry_type,
@@ -555,10 +555,10 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         begin_ts);
                 } else {
                     db_entry->DropTableReplay(
-                        table_name,
+                        *table_name,
                         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
                             return TableEntry::ReplayTableEntry(table_meta,
-                                                                MakeShared<String>(table_entry_dir),
+                                                                table_entry_dir,
                                                                 table_name,
                                                                 column_defs,
                                                                 entry_type,
@@ -667,39 +667,27 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             // -----------------------------
             case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
                 auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
-                auto db_name = add_table_index_entry_op->db_name();
-                auto table_name = add_table_index_entry_op->table_name();
-                auto index_name = add_table_index_entry_op->index_name();
-                auto index_dir = add_table_index_entry_op->index_dir();
+                const auto &db_name = add_table_index_entry_op->db_name();
+                const auto &table_name = add_table_index_entry_op->table_name();
+                const auto &index_name = add_table_index_entry_op->index_name();
+                const auto &index_dir = add_table_index_entry_op->index_dir();
                 auto index_base = add_table_index_entry_op->index_base();
 
-                auto *db_entry = catalog->GetDatabaseReplay(db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 if (!is_delete) {
                     table_entry->CreateIndexReplay(
-                        MakeShared<String>(index_name),
+                        index_name,
                         [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableIndexEntry::ReplayTableIndexEntry(index_meta,
-                                                                          index_base,
-                                                                          MakeShared<String>(index_dir),
-                                                                          txn_id,
-                                                                          begin_ts,
-                                                                          commit_ts,
-                                                                          false);
+                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, false);
                         },
                         txn_id,
                         begin_ts);
                 } else {
                     table_entry->DropIndexReplay(
-                        index_name,
+                        *index_name,
                         [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return TableIndexEntry::ReplayTableIndexEntry(index_meta,
-                                                                          index_base,
-                                                                          MakeShared<String>(index_dir),
-                                                                          txn_id,
-                                                                          begin_ts,
-                                                                          commit_ts,
-                                                                          true);
+                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, true);
                         },
                         txn_id,
                         begin_ts);

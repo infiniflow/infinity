@@ -40,15 +40,15 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
     switch (operation_type) {
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, db_entry_dir);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto db_entry_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
+            operation = MakeUnique<AddDBEntryOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(db_entry_dir));
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String table_entry_dir = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_entry_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
 
             i32 columns_size = ReadBufAdv<i32>(ptr);
             Vector<SharedPtr<ColumnDef>> columns;
@@ -76,8 +76,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                     txn_id,
                                                     commit_ts,
                                                     std::move(db_name),
-                                                    table_name,
-                                                    table_entry_dir,
+                                                    std::move(table_name),
+                                                    std::move(table_entry_dir),
                                                     columns,
                                                     row_count);
             break;
@@ -160,10 +160,10 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            String index_dir = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto index_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
             SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
                                                          is_delete,
@@ -172,7 +172,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                          std::move(db_name),
                                                          std::move(table_name),
                                                          std::move(index_name),
-                                                         index_dir,
+                                                         std::move(index_dir),
                                                          index_base);
             break;
         }
@@ -394,27 +394,9 @@ void UpdateSegmentBloomFilterDataOp::WriteAdv(char *&buf) const {
     }
 }
 
-void AddDBEntryOp::SaveState() {
-    this->is_delete_ = this->db_entry_->deleted_;
-    this->begin_ts_ = this->db_entry_->begin_ts_;
-    this->db_name_ = *this->db_entry_->db_name_ptr();
-    if (!this->is_delete_) {
-        this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
-    }
-    is_saved_sate_ = true;
-}
+void AddDBEntryOp::SaveState() { is_saved_sate_ = true; }
 
-void AddTableEntryOp::SaveState() {
-    this->is_delete_ = this->table_entry_->deleted_;
-    this->begin_ts_ = this->table_entry_->begin_ts_;
-    this->table_name_ = *this->table_entry_->GetTableName();
-    if (!this->is_delete_) {
-        this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
-        this->column_defs_ = this->table_entry_->column_defs();
-        this->row_count_ = this->table_entry_->row_count();
-    }
-    is_saved_sate_ = true;
-}
+void AddTableEntryOp::SaveState() { is_saved_sate_ = true; }
 
 void AddSegmentEntryOp::SaveState() {
     this->is_delete_ = segment_entry_->deleted_;
@@ -454,15 +436,7 @@ void AddColumnEntryOp::SaveState() {
 
 /// Related to index
 
-void AddTableIndexEntryOp::SaveState() {
-    this->is_delete_ = table_index_entry_->deleted_;
-    this->begin_ts_ = table_index_entry_->begin_ts_;
-    if (!this->is_delete_) {
-        this->index_dir_ = *this->table_index_entry_->index_dir();
-        this->index_base_ = this->table_index_entry_->table_index_def();
-    }
-    is_saved_sate_ = true;
-}
+void AddTableIndexEntryOp::SaveState() { is_saved_sate_ = true; }
 
 void AddFulltextIndexEntryOp::SaveState() {
     this->is_delete_ = fulltext_index_entry_->deleted_;
@@ -493,11 +467,16 @@ void UpdateSegmentBloomFilterDataOp::SaveState() {
     this->segment_id_ = this->segment_entry_->segment_id();
 }
 
-const String AddDBEntryOp::ToString() const { return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", db_name_, db_entry_dir_); }
+const String AddDBEntryOp::ToString() const {
+    return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", *db_name_, db_entry_dir_ ? *db_entry_dir_ : "nullptr");
+}
 
 const String AddTableEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}", *db_name_, table_name_, table_entry_dir_);
+    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}",
+                           *db_name_,
+                           *table_name_,
+                           table_entry_dir_ ? *table_entry_dir_ : "nullptr");
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
@@ -560,7 +539,7 @@ const String AddTableIndexEntryOp::ToString() const {
                        *db_name_,
                        *table_name_,
                        *index_name_,
-                       index_dir_,
+                       index_dir_ ? *index_dir_ : "nullptr",
                        index_base_ ? index_base_->ToString() : "nullptr");
 }
 
