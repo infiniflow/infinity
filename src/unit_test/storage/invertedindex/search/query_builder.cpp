@@ -12,9 +12,10 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#include "storage/invertedindex/search/query_node.h"
 #include "unit_test/base_test.h"
 #include <random>
+#include <sstream>
+#include <string>
 import stl;
 import internal_types;
 import index_defines;
@@ -23,11 +24,12 @@ import doc_iterator;
 import and_iterator;
 import or_iterator;
 import and_not_iterator;
-import term_queries;
-import query_visitor;
 import column_index_reader;
 import match_data;
 import query_builder;
+import query_node;
+import search_driver;
+import table_entry;
 
 namespace infinity {
 
@@ -49,27 +51,32 @@ public:
     u32 idx_ = 0;
 };
 
-class MockQuery : public TermQuery {
-public:
-    Vector<RowID> doc_ids_;
-    MockQuery(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) {}
-    UniquePtr<DocIterator> CreateSearch(IndexReader &index_reader, Scorer *scorer) override {
-        return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
-    }
-};
-
+// treat it as TERM in optimization
 struct MockQueryNode : public QueryNode {
     Vector<RowID> doc_ids_;
-    MockQueryNode(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) {}
-    void Accept(QueryVisitor &visitor) override;
+    MockQueryNode(Vector<RowID> doc_ids) : QueryNode(QueryNodeType::TERM), doc_ids_(std::move(doc_ids)) {}
+
+    void PushDownWeight() final {}
+    std::unique_ptr<QueryNode> OptimizeInPlace(std::unique_ptr<QueryNode> &self_node) final { return std::move(self_node); }
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, std::unique_ptr<Scorer> &) const final {
+        return MakeUnique<MockVectorDocIterator>(doc_ids_);
+    }
+    void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
+        os << prefix;
+        os << (is_final ? "└──" : "├──");
+        os << "MockQueryNode";
+        int print_child_num = std::min<int>(doc_ids_.size(), 5);
+        os << " (first " << print_child_num << " doc_ids_: ";
+        for (int i = 0; i < print_child_num; ++i) {
+            os << doc_ids_[i].ToUint64();
+            if (i != print_child_num - 1) {
+                os << ", ";
+            }
+        }
+        os << ")";
+        os << '\n';
+    }
 };
-
-template <>
-void QueryVisitor::Visit<MockQueryNode>(MockQueryNode &node) {
-    result_ = MakeUnique<MockQuery>(std::move(node.doc_ids_));
-}
-
-void MockQueryNode::Accept(QueryVisitor &visitor) { visitor.Visit(*this); }
 
 } // namespace infinity
 
@@ -119,10 +126,10 @@ TEST_F(QueryBuilderTest, test_and) {
     std::random_device rd;
     std::mt19937 rng{rd()};
     // prepare query node
-    auto and_root = MakeUnique<And>();
+    auto and_root = MakeUnique<AndQueryNode>();
     Vector<RowID> expect_result;
     {
-        auto and_AB = MakeUnique<And>();
+        auto and_AB = MakeUnique<AndQueryNode>();
         Vector<RowID> vec_AB_and;
         {
             auto vec_A = get_random_doc_ids(rng, TestAndVecN);
@@ -131,10 +138,10 @@ TEST_F(QueryBuilderTest, test_and) {
             and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
             and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
         }
-        auto and_CDE = MakeUnique<And>();
+        auto and_CDE = MakeUnique<AndQueryNode>();
         Vector<RowID> vec_CDE_and;
         {
-            auto and_CD = MakeUnique<And>();
+            auto and_CD = MakeUnique<AndQueryNode>();
             Vector<RowID> vec_CD_and;
             {
                 auto vec_C = get_random_doc_ids(rng, TestAndVecN);
@@ -152,12 +159,16 @@ TEST_F(QueryBuilderTest, test_and) {
         and_root->Add(std::move(and_CDE));
         std::set_intersection(vec_AB_and.begin(), vec_AB_and.end(), vec_CDE_and.begin(), vec_CDE_and.end(), std::back_inserter(expect_result));
     }
+    std::cerr << "\nQueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_root.get())->PrintTree(std::cerr);
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    std::cerr << "\nQueryTree after optimization:" << std::endl;
+    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // A and B and C and D and E
     auto and_iter = dynamic_cast<AndIterator *>(result_iter.get());
@@ -178,10 +189,10 @@ TEST_F(QueryBuilderTest, test_or) {
     std::random_device rd;
     std::mt19937 rng{rd()};
     // prepare query node
-    auto or_root = MakeUnique<Or>();
+    auto or_root = MakeUnique<OrQueryNode>();
     Vector<RowID> expect_result;
     {
-        auto or_AB = MakeUnique<Or>();
+        auto or_AB = MakeUnique<OrQueryNode>();
         Vector<RowID> vec_AB_or;
         {
             auto vec_A = get_random_doc_ids(rng, TestOrVecN);
@@ -190,10 +201,10 @@ TEST_F(QueryBuilderTest, test_or) {
             or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
             or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
         }
-        auto or_CDE = MakeUnique<Or>();
+        auto or_CDE = MakeUnique<OrQueryNode>();
         Vector<RowID> vec_CDE_or;
         {
-            auto or_CD = MakeUnique<Or>();
+            auto or_CD = MakeUnique<OrQueryNode>();
             Vector<RowID> vec_CD_or;
             {
                 auto vec_C = get_random_doc_ids(rng, TestOrVecN);
@@ -211,12 +222,16 @@ TEST_F(QueryBuilderTest, test_or) {
         or_root->Add(std::move(or_CDE));
         std::set_union(vec_AB_or.begin(), vec_AB_or.end(), vec_CDE_or.begin(), vec_CDE_or.end(), std::back_inserter(expect_result));
     }
+    std::cerr << "\nQueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(or_root.get())->PrintTree(std::cerr);
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    std::cerr << "\nQueryTree after optimization:" << std::endl;
+    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // A or B or C or D or E
     auto or_iter = dynamic_cast<OrIterator *>(result_iter.get());
@@ -237,16 +252,16 @@ TEST_F(QueryBuilderTest, test_and_not) {
     std::random_device rd;
     std::mt19937 rng{rd()};
     // prepare query node
-    auto and_not_root = MakeUnique<AndNot>();
+    auto and_not_root = MakeUnique<AndQueryNode>();
     Vector<RowID> expect_result;
     {
-        auto and_not_ABC_D = MakeUnique<AndNot>();
+        auto and_not_ABC_D = MakeUnique<AndQueryNode>();
         Vector<RowID> vec_ABC_D_and_not;
         {
-            auto or_ABC = MakeUnique<Or>();
+            auto or_ABC = MakeUnique<OrQueryNode>();
             Vector<RowID> vec_ABC_or;
             {
-                auto or_AB = MakeUnique<Or>();
+                auto or_AB = MakeUnique<OrQueryNode>();
                 Vector<RowID> vec_AB_or;
                 {
                     auto vec_A = get_random_doc_ids(rng, TestOrVecN);
@@ -263,19 +278,27 @@ TEST_F(QueryBuilderTest, test_and_not) {
             auto vec_D = get_random_doc_ids(rng, TestNotVecN);
             std::set_difference(vec_ABC_or.begin(), vec_ABC_or.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_ABC_D_and_not));
             and_not_ABC_D->Add(std::move(or_ABC));
-            and_not_ABC_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+            auto not_D = MakeUnique<NotQueryNode>();
+            not_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+            and_not_ABC_D->Add(std::move(not_D));
         }
         auto vec_E = get_random_doc_ids(rng, TestNotVecN);
         std::set_difference(vec_ABC_D_and_not.begin(), vec_ABC_D_and_not.end(), vec_E.begin(), vec_E.end(), std::back_inserter(expect_result));
         and_not_root->Add(std::move(and_not_ABC_D));
-        and_not_root->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        auto not_E = MakeUnique<NotQueryNode>();
+        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        and_not_root->Add(std::move(not_E));
     }
+    std::cerr << "\nQueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    std::cerr << "\nQueryTree after optimization:" << std::endl;
+    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // (A or B or C) and not (D, E)
     // child: 1. (A or B or C), 2. D, 3. E
@@ -302,16 +325,16 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     std::random_device rd;
     std::mt19937 rng{rd()};
     // prepare query node
-    auto and_not_root = MakeUnique<AndNot>();
+    auto and_not_root = MakeUnique<AndQueryNode>();
     Vector<RowID> expect_result;
     {
-        auto and_ABC_D = MakeUnique<And>();
+        auto and_ABC_D = MakeUnique<AndQueryNode>();
         Vector<RowID> vec_ABC_D_and;
         {
-            auto and_not_AB_C = MakeUnique<AndNot>();
+            auto and_not_AB_C = MakeUnique<AndQueryNode>();
             Vector<RowID> vec_AB_C_and_not;
             {
-                auto and_AB = MakeUnique<And>();
+                auto and_AB = MakeUnique<AndQueryNode>();
                 Vector<RowID> vec_AB_and;
                 {
                     auto vec_A = get_random_doc_ids(rng, TestAndVecN);
@@ -323,7 +346,9 @@ TEST_F(QueryBuilderTest, test_and_not2) {
                 auto vec_C = get_random_doc_ids(rng, TestNotVecN);
                 std::set_difference(vec_AB_and.begin(), vec_AB_and.end(), vec_C.begin(), vec_C.end(), std::back_inserter(vec_AB_C_and_not));
                 and_not_AB_C->Add(std::move(and_AB));
-                and_not_AB_C->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
+                auto not_C = MakeUnique<NotQueryNode>();
+                not_C->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
+                and_not_AB_C->Add(std::move(not_C));
             }
             auto vec_D = get_random_doc_ids(rng, TestAndVecN);
             std::set_intersection(vec_AB_C_and_not.begin(), vec_AB_C_and_not.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_ABC_D_and));
@@ -333,14 +358,20 @@ TEST_F(QueryBuilderTest, test_and_not2) {
         auto vec_E = get_random_doc_ids(rng, TestAndVecN);
         std::set_difference(vec_ABC_D_and.begin(), vec_ABC_D_and.end(), vec_E.begin(), vec_E.end(), std::back_inserter(expect_result));
         and_not_root->Add(std::move(and_ABC_D));
-        and_not_root->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        auto not_E = MakeUnique<NotQueryNode>();
+        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        and_not_root->Add(std::move(not_E));
     }
+    std::cerr << "\nQueryTree before optimization:" << std::endl;
+    static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
     // apply query builder
     QueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
     UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    std::cerr << "\nQueryTree after optimization:" << std::endl;
+    static_cast<QueryNode *>(context.query_tree_.get())->PrintTree(std::cerr);
     // check iter tree
     // (A and B and D) and not (C, E)
     // child: 1. (A and B and D), 2. C, 3. E

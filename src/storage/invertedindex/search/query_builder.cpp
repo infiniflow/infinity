@@ -14,16 +14,14 @@
 
 module;
 
-#include "query_tree_builder.h"
 #include <utility>
+#include <vector>
 module query_builder;
 
 import stl;
 import memory_pool;
 import doc_iterator;
-import term_queries;
 import column_index_reader;
-import query_visitor;
 import match_data;
 import table_entry;
 import table_index_meta;
@@ -35,6 +33,9 @@ import index_defines;
 import internal_types;
 import index_base;
 import index_full_text;
+import posting_iterator;
+import infinity_exception;
+import query_node;
 
 namespace infinity {
 
@@ -78,10 +79,10 @@ QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) 
 QueryBuilder::~QueryBuilder() {}
 
 UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
-    QueryVisitor visitor;
-    context.query_tree_->Accept(visitor);
-    UniquePtr<TermQuery> root = visitor.Build();
-    root = TermQuery::Optimize(std::move(root));
-    return root->CreateSearch(index_reader_, scorer_.get());
+    // Optimize the query tree.
+    context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
+    // Create the iterator from the query tree.
+    return context.query_tree_->CreateSearch(table_entry_, index_reader_, scorer_);
 }
+
 } // namespace infinity
