@@ -67,17 +67,17 @@ RowID PostingIterator::SeekDoc(RowID row_id) {
     return ret;
 }
 
-void PostingIterator::MoveToCurrentDoc() {
+void PostingIterator::MoveToCurrentDoc(bool fetch_position) {
     need_move_to_current_doc_ = false;
     in_doc_pos_iter_inited_ = false;
     if (posting_option_.HasTermFrequency()) {
         state_.SetRowID(current_row_id_);
-        state_.SetTermFreq(InnerGetTF());
+        state_.SetTermFreq(GetCurrentTF());
 
         u32 seeked_doc_count = GetCurrentSeekedDocCount();
         state_.SetSeekedDocCount(seeked_doc_count);
 
-        if (posting_option_.HasPositionList()) {
+        if (fetch_position && posting_option_.HasPositionList()) {
             ttf_t current_ttf = 0;
             current_ttf = GetCurrentTTF();
             posting_decoder_->MoveToCurrentDocPosition(current_ttf);
@@ -87,7 +87,7 @@ void PostingIterator::MoveToCurrentDoc() {
 
 void PostingIterator::SeekPosition(pos_t pos, pos_t &result) {
     if (need_move_to_current_doc_) {
-        MoveToCurrentDoc();
+        MoveToCurrentDoc(true);
     }
     if (!in_doc_pos_iter_inited_) {
         if (posting_option_.HasPositionList()) {

@@ -126,5 +126,13 @@ TEST_F(ColumnInverterTest, Invert) {
             doc_id = post_iter.SeekDoc(doc_id + 1);
             ASSERT_EQ(doc_id, INVALID_ROWID);
         }
+
+        pos_t pos = 0;
+        u32 ii = 0;
+        pos_t ret_occ = INVALID_POSITION;
+        do {
+            post_iter.SeekPosition(pos + ii, ret_occ);
+            ++ii;
+        } while (ret_occ != INVALID_POSITION);
     }
 }
