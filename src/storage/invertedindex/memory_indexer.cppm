@@ -57,9 +57,17 @@ public:
     // Other threads can also call this method.
     void Commit();
 
+    // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
+    SizeT CommitSync();
+
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
     void Dump();
+
+    SizeT GetInflightTasks() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return inflight_tasks_;
+    }
 
     RowID GetBaseRowId() const { return base_row_id_; }
 

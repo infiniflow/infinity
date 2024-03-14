@@ -66,6 +66,9 @@ SizeT BufferedSkipListWriter::DoFlush() {
 }
 
 void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file) {
+    posting_writer_.Dump(file);
+    return;
+
     u32 skiplist_size = GetTotalCount();
     if (skiplist_size == 0) {
         return;
