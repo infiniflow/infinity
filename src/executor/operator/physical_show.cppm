@@ -68,15 +68,19 @@ public:
 
 private:
 
-    void ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_columns);
-
     void ExecuteShowViewDetail(QueryContext *query_context,
                                const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
                                const SharedPtr<Vector<String>> &column_names);
 
-    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
+    void ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowTables(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowViews(QueryContext *query_context, ShowOperatorState *operator_state);
 

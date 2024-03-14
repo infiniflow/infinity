@@ -30,7 +30,7 @@ import infinity_exception;
 import table_entry_type;
 import value_expression;
 import logical_show;
-import table_detail;
+import meta_info;
 
 import value;
 import table_def;
@@ -67,6 +67,33 @@ void PhysicalShow::Init() {
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
     switch (scan_type_) {
+        case ShowType::kShowDatabase: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_types_->emplace_back(varchar_type);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowTable: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_types_->emplace_back(varchar_type);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowIndex: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_types_->emplace_back(varchar_type);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowType::kShowDatabases: {
             output_names_->reserve(1);
             output_types_->reserve(1);
@@ -229,12 +256,24 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
     switch (scan_type_) {
+        case ShowType::kShowDatabase: {
+            ExecuteShowDatabase(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowTable: {
+            ExecuteShowTable(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowIndex: {
+            ExecuteShowIndex(query_context, show_operator_state);
+            break;
+        }
         case ShowType::kShowDatabases: {
             ExecuteShowDatabases(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowTables: {
-            ExecuteShowTable(query_context, show_operator_state);
+            ExecuteShowTables(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowColumn: {
@@ -280,6 +319,94 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
     return true;
 }
 
+void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    // Define output table schema
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
+
+    if (!status.ok()) {
+        show_operator_state->status_ = status;
+        RecoverableError(status);
+        return;
+    }
+
+    // Prepare the output data block
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>>
+        column_types{varchar_type, varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("database name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append database name to the 1 column
+            const String *table_name = database_info->db_name_.get();
+            Value value = Value::MakeVarchar(*table_name);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("storage directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append database storage directory to the 1 column
+            const String *db_dir = database_info->db_entry_dir_.get();
+            Value value = Value::MakeVarchar(*db_dir);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("table count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            // Append database storage directory to the 1 column
+            Value value = Value::MakeVarchar(std::to_string(database_info->table_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+
+}
+
+void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+
+}
+
 /**
  * @brief Execute show table
  * @param query_context
@@ -323,7 +450,7 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
  * @param input_state
  * @param output_state
  */
-void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table schema
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -1418,64 +1545,6 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     }
     output_block_ptr->Finalize();
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
-}
-
-void PhysicalShow::ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_collecton_columns) {
-    SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, varchar_type, "column_name", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "column_type", HashSet<ConstraintType>()),
-        MakeShared<ColumnDef>(3, varchar_type, "constraint", HashSet<ConstraintType>()),
-    };
-
-    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default"), MakeShared<String>("Views"), column_defs);
-    output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-    SharedPtr<DataBlock> output_block_ptr = DataBlock::Make();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        varchar_type,
-    };
-
-    output_block_ptr->Init(column_types);
-
-    for (auto &column : table_collecton_columns) {
-
-        SizeT column_id = 0;
-        {
-            // Append column name to the first column
-            Value value = Value::MakeVarchar(column->name());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append column type to the second column
-            String column_type = column->type()->ToString();
-            Value value = Value::MakeVarchar(column_type);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            // Append column constraint to the third column
-            String column_constraint;
-            for (auto &constraint : column->constraints_) {
-                column_constraint += " " + ConstrainTypeToString(constraint);
-            }
-
-            Value value = Value::MakeVarchar(column_constraint);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    output_block_ptr->Finalize();
-    output_->Append(output_block_ptr);
 }
 
 void PhysicalShow::ExecuteShowViewDetail(QueryContext *query_context,

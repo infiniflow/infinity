@@ -17,7 +17,7 @@ export module txn;
 
 import stl;
 
-import table_detail;
+import meta_info;
 import table_def;
 import index_base;
 import data_block;
@@ -86,6 +86,8 @@ public:
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
+
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String& db_name);
 
     Vector<DatabaseDetail> ListDatabases();
 

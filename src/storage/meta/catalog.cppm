@@ -27,7 +27,7 @@ import buffer_manager;
 import profiler;
 import status;
 import default_values;
-import table_detail;
+import meta_info;
 import index_base;
 import txn_store;
 import data_access_state;
@@ -120,6 +120,8 @@ public:
                                                    ConflictType conflict_type = ConflictType::kError);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 

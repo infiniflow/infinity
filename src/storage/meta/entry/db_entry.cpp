@@ -22,7 +22,7 @@ import table_entry_type;
 import stl;
 
 import txn_manager;
-import table_detail;
+import meta_info;
 import buffer_manager;
 import default_values;
 import block_index;

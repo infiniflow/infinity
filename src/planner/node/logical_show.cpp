@@ -28,6 +28,12 @@ namespace infinity {
 
 String ToString(ShowType type) {
     switch (type) {
+        case ShowType::kShowDatabase:
+            return "Show database";
+        case ShowType::kShowTable:
+            return "Show table";
+        case ShowType::kShowIndex:
+            return "Show index";
         case ShowType::kShowTables:
             return "Show tables";
         case ShowType::kShowViews:

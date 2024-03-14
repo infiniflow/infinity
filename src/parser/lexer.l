@@ -49,6 +49,7 @@ CASE            { return CASE; }
 CAST            { return CAST; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 COPY            { return COPY; }
@@ -96,6 +97,7 @@ HUGEINT         { return HUGEINT; }
 IF              { return IF; }
 IN              { return IN; }
 INDEX           { return INDEX; }
+INDEXES         { return INDEXES; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }

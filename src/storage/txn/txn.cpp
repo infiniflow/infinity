@@ -35,7 +35,7 @@ import txn_state;
 import meta_state;
 import data_access_state;
 import status;
-import table_detail;
+import meta_info;
 import table_entry_type;
 
 import database_detail;
@@ -207,6 +207,13 @@ Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
     return catalog_->GetDatabase(db_name, this->txn_id_, begin_ts);
+}
+
+Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String& db_name) {
+    this->CheckTxnStatus();
+    TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
+
+    return catalog_->GetDatabaseInfo(db_name, this->txn_id_, begin_ts);
 }
 
 Vector<DatabaseDetail> Txn::ListDatabases() {

@@ -22,7 +22,7 @@ import table_meta;
 import base_entry;
 import table_entry;
 import third_party;
-import table_detail;
+import meta_info;
 import buffer_manager;
 import status;
 import extra_ddl_info;

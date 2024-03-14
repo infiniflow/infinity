@@ -1097,6 +1097,60 @@ void ExplainPhysicalPlan::Explain(const PhysicalNestedLoopJoin *join_node, Share
 
 void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (show_node->scan_type()) {
+        case ShowType::kShowDatabase: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DATABASE ";
+            } else {
+                show_str = "SHOW DATABASE ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowTable: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowIndex: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TABLES ";
+            } else {
+                show_str = "SHOW TABLES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowTables: {
             String show_str;
             if (intent_size != 0) {
@@ -1136,7 +1190,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            String show_column_db_str = String(intent_size, ' ') + " - database: ";
             show_column_db_str += show_node->db_name();
             result->emplace_back(MakeShared<String>(show_column_db_str));
 
@@ -1158,7 +1212,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             show_str += "(" + std::to_string(show_node->node_id()) + ")";
             result->emplace_back(MakeShared<String>(show_str));
 
-            String show_column_db_str = String(intent_size, ' ') + " - schema: ";
+            String show_column_db_str = String(intent_size, ' ') + " - database: ";
             show_column_db_str += show_node->db_name();
             result->emplace_back(MakeShared<String>(show_column_db_str));
 

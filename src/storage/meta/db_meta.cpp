@@ -59,6 +59,20 @@ Tuple<SharedPtr<DBEntry>, Status> DBMeta::DropNewEntry(std::shared_lock<std::sha
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = db_entry_list_.DeleteEntry(txn_id); }
 
+Tuple<SharedPtr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
+    auto [db_entry, status] = db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", *db_name_));
+        return {db_info, status};
+    }
+    db_info->db_name_ = db_entry->db_name_ptr();
+    db_info->db_entry_dir_ = db_entry->db_entry_dir();
+
+    return {db_info, Status::OK()};
+}
+
 SharedPtr<String> DBMeta::ToString() {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(

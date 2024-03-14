@@ -230,6 +230,8 @@ add_executable(infinity
         ${network_cpp}
         network/http_server.cppm
         network/http_server.cpp
+        ../sdk/cpp/infinity_client.h
+        ../sdk/cpp/infinity_client.cpp
 )
 
 target_sources(infinity

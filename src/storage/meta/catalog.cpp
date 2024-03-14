@@ -36,7 +36,7 @@ import file_system_type;
 import file_system;
 import table_def;
 import table_entry_type;
-import table_detail;
+import meta_info;
 import index_base;
 import txn_store;
 import data_access_state;
@@ -97,6 +97,15 @@ Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, Transaction
         return {nullptr, status};
     }
     return db_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
+    if (db_meta == nullptr) {
+        return {nullptr, status};
+    }
+
+    return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {

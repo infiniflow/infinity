@@ -133,6 +133,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 find_package(Lz4 REQUIRED)
 
 add_subdirectory(src)
+add_subdirectory(sdk)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # set parameters for unit test coverage
