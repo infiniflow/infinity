@@ -56,12 +56,12 @@ tf_t PostingWriter::GetCurrentTF() const { return doc_list_encoder_->GetCurrentT
 void PostingWriter::SetCurrentTF(tf_t tf) { doc_list_encoder_->SetCurrentTF(tf); }
 
 void PostingWriter::Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta) {
-    term_meta.doc_start_ = file_writer->GetFileSize();
+    term_meta.doc_start_ = file_writer->TotalWrittenBytes();
     doc_list_encoder_->Dump(file_writer);
     if (position_list_encoder_) {
-        term_meta.pos_start_ = file_writer->GetFileSize();
+        term_meta.pos_start_ = file_writer->TotalWrittenBytes();
         position_list_encoder_->Dump(file_writer);
-        term_meta.pos_end_ = file_writer->GetFileSize();
+        term_meta.pos_end_ = file_writer->TotalWrittenBytes();
     }
 }
 
