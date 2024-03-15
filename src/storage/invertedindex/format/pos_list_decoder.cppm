@@ -28,7 +28,6 @@ public:
 
     void SetNeedReopen(bool need_reopen) { need_reopen_ = need_reopen; }
 
-    // TODO: separate TfBitmap CalculateRecordOffset from LocateRecord
     virtual bool LocateRecord(const InDocPositionState *state, u32 &tf);
 
     virtual u32 DecodeRecord(pos_t *pos_buffer, u32 pos_buffer_len);

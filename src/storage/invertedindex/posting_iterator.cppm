@@ -32,13 +32,19 @@ public:
 
     void SeekPosition(pos_t pos, pos_t &result);
 
-    tf_t GetCurrentTF() { return InnerGetTF(); }
-
     docpayload_t GetCurrentDocPayload() {
         if (posting_option_.HasDocPayload()) {
             DecodeTFBuffer();
             DecodeDocPayloadBuffer();
             return doc_payload_buffer_[GetDocOffsetInBuffer()];
+        }
+        return 0;
+    }
+
+    tf_t GetCurrentTF() {
+        if (posting_option_.HasTfList()) {
+            DecodeTFBuffer();
+            return tf_buffer_[GetDocOffsetInBuffer()];
         }
         return 0;
     }
@@ -56,11 +62,11 @@ public:
 
     bool HasPosition() const { return posting_option_.HasPositionList(); }
 
-    void GetTermMatchData(TermColumnMatchData &match_data) {
+    void GetTermMatchData(TermColumnMatchData &match_data, bool fetch_position = false) {
         DecodeTFBuffer();
         DecodeDocPayloadBuffer();
         if (need_move_to_current_doc_) {
-            MoveToCurrentDoc();
+            MoveToCurrentDoc(fetch_position);
         }
         if (posting_option_.HasTfList()) {
             match_data.tf_ = tf_buffer_[GetDocOffsetInBuffer()];
@@ -89,15 +95,7 @@ private:
         }
     }
 
-    void MoveToCurrentDoc();
-
-    tf_t InnerGetTF() {
-        if (posting_option_.HasTfList()) {
-            DecodeTFBuffer();
-            return tf_buffer_[GetDocOffsetInBuffer()];
-        }
-        return 0;
-    }
+    void MoveToCurrentDoc(bool fetch_position);
 
 private:
     SharedPtr<Vector<SegmentPosting>> segment_postings_;

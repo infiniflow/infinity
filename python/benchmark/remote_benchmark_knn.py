@@ -147,7 +147,7 @@ def process_pool(threads, rounds, query_path, tabel_name):
     total_queries = fvecs_read_all(query_path)
     queries = [[] for i in range(threads)]
     total_queries_count = len(total_queries)
-    print(total_queries_count)
+    print(f"Total Query Count: {total_queries_count}")
     for i, query in enumerate(total_queries):
         queries[i % threads].append(query)
 
@@ -161,9 +161,9 @@ def process_pool(threads, rounds, query_path, tabel_name):
         end = time.time()
         dur = end - start
         results.append(f"Round {i + 1}:")
-        results.append(f"Total Dur: {dur} s")
-        results.append(f"Query Count: {len(queries)}")
-        results.append(f"QPS: {len(total_queries) / dur}")
+        results.append(f"Total Dur: {dur:.2f} s")
+        results.append(f"Query Count: {total_queries_count}")
+        results.append(f"QPS: {(len(total_queries) / dur):.2f}")
 
     for result in results:
         print(result)
@@ -208,9 +208,9 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         recall_1, recall_10, recall_100 = calculate_recall_all(ground_truth_sets_1, ground_truth_sets_10,
                                                                ground_truth_sets_100, query_results)
         results.append(f"Round {i + 1}:")
-        results.append(f"Total Dur: {dur} s")
+        results.append(f"Total Dur: {dur:.2f} s")
         results.append(f"Query Count: {len(queries)}")
-        results.append(f"QPS: {len(queries) / dur}")
+        results.append(f"QPS: {(len(queries) / dur):.2f}")
         results.append(f"Recall@1: {recall_1}")
         results.append(f"Recall@10: {recall_10}")
         results.append(f"Recall@100: {recall_100}")

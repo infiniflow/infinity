@@ -6,6 +6,8 @@ import buffered_byte_slice;
 import buffered_byte_slice_reader;
 import pair_value_skiplist_reader;
 import index_defines;
+import logger;
+import third_party;
 
 module inmem_pair_value_skiplist_reader;
 
@@ -51,7 +53,7 @@ Pair<int, bool> InMemPairValueSkipListReader::LoadBuffer() {
         return MakePair(0, false);
     }
     if (key_num != value_num) {
-        // LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} offset_num = {}", key_num, value_num));
+        LOG_ERROR(fmt::format("SKipList decode error, doc_num = {} offset_num = {}", key_num, value_num));
         return MakePair(-1, false);
     }
     num_in_buffer_ = key_num;

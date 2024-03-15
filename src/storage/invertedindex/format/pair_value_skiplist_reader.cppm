@@ -31,6 +31,7 @@ public:
     u32 GetCurrentKey() const { return current_key_; }
 
     u32 GetLastValueInBuffer() const override;
+
     u32 GetLastKeyInBuffer() const override;
 
 private:

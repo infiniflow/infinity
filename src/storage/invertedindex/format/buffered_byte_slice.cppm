@@ -57,7 +57,7 @@ public:
     virtual SizeT EstimateDumpSize() const { return posting_writer_.GetSize(); }
 
 protected:
-    virtual SizeT DoFlush();
+    SizeT DoFlush();
 
 protected:
     FlushInfo flush_info_;

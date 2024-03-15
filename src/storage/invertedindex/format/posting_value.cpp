@@ -2,6 +2,7 @@ module;
 
 import stl;
 import int_encoder;
+import no_compress_encoder;
 
 module posting_value;
 
@@ -10,6 +11,7 @@ namespace infinity {
 struct EncoderProvider {
     UniquePtr<Int32Encoder> int32_encoder_;
     UniquePtr<Int16Encoder> int16_encoder_;
+    UniquePtr<NoCompressIntEncoder<u32>> no_compress_encoder_;
 
     static EncoderProvider *GetInstance() {
         static EncoderProvider instance;
@@ -26,6 +28,12 @@ struct EncoderProvider {
         if (!int16_encoder_.get())
             int16_encoder_.reset(new Int16Encoder);
         return int16_encoder_.get();
+    }
+
+    NoCompressEncoder *GetNoCompressEncoder() {
+        if (!no_compress_encoder_.get())
+            no_compress_encoder_.reset(new NoCompressEncoder);
+        return no_compress_encoder_.get();
     }
 };
 
