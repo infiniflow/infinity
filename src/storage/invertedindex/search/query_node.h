@@ -22,17 +22,23 @@
 namespace infinity {
 
 enum class QueryNodeType : char {
+    // may be used in test cases,
+    // but should not appear in parser output:
     INVALID,
+    // may appear in parser output,
+    // but should not appear in optimized query tree:
+    NOT,
+    // may appear in optimized query tree:
     TERM,
     AND,
     AND_NOT,
     OR,
+    // unimplemented:
     WAND,
     PHRASE,
     PREFIX_TERM,
     SUFFIX_TERM,
     SUBSTRING_TERM,
-    NOT,
 };
 
 std::string QueryNodeTypeToString(QueryNodeType type);
@@ -62,15 +68,17 @@ struct QueryNode {
     void MultiplyWeight(float factor) { weight_ *= factor; }
     void ResetWeight() { weight_ = 1.0f; }
 
-    static std::unique_ptr<QueryNode> GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
-        root->PushDownWeight();
-        return root->OptimizeInPlace(root);
-    }
+    // will do two jobs:
+    // 1. push down the weight to the leaf term node
+    // 2. optimize the query tree
+    static std::unique_ptr<QueryNode> GetOptimizedQueryTree(std::unique_ptr<QueryNode> root);
 
-    virtual void PushDownWeight() = 0;
-    virtual std::unique_ptr<QueryNode> OptimizeInPlace(std::unique_ptr<QueryNode> &self_node) = 0;
+    // recursively multiply and push down the weight to the leaf term nodes
+    virtual void PushDownWeight(float factor = 1.0f) = 0;
+    // create the iterator from the query tree, need to be called after optimization
     virtual std::unique_ptr<DocIterator>
     CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const = 0;
+    // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 };
 
@@ -78,10 +86,10 @@ struct TermQueryNode final : public QueryNode {
     std::string term_;
     std::string column_;
     bool position_{false};
+
     TermQueryNode() : QueryNode(QueryNodeType::TERM) {}
 
-    void PushDownWeight() final {}
-    std::unique_ptr<QueryNode> OptimizeInPlace(std::unique_ptr<QueryNode> &self_node) final { return std::move(self_node); }
+    void PushDownWeight(float factor) final { MultiplyWeight(factor); }
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final;
 };
@@ -90,74 +98,50 @@ struct MultiQueryNode : public QueryNode {
     std::vector<std::unique_ptr<QueryNode>> children_;
 
     MultiQueryNode(QueryNodeType type) : QueryNode(type) {}
-    void Add(std::unique_ptr<QueryNode> &&node) { children_.emplace_back(std::move(node)); }
 
-    void PushDownWeight() final {
-        float factor = GetWeight();
+    void Add(std::unique_ptr<QueryNode> &&node) { children_.emplace_back(std::move(node)); }
+    void PushDownWeight(float factor) final {
+        // no need to update weight for MultiQueryNode, because it will be reset to 1.0
+        factor *= GetWeight();
         for (auto &child : children_) {
-            child->MultiplyWeight(factor);
-            child->PushDownWeight();
+            child->PushDownWeight(factor);
         }
         ResetWeight();
     }
-    std::unique_ptr<QueryNode> OptimizeInPlace(std::unique_ptr<QueryNode> &self_node) final {
-        for (auto &child : children_) {
-            std::unique_ptr<QueryNode> new_child = child->OptimizeInPlace(child);
-            child = std::move(new_child);
-        }
-        return OptimizeInPlaceInner(self_node);
-    }
-    virtual std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) = 0;
+    std::unique_ptr<QueryNode> GetNewOptimizedQueryTree();
+    virtual std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() = 0;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final;
 };
 
-struct AndQueryNode final : public MultiQueryNode {
-    AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct AndNotQueryNode final : public MultiQueryNode {
-    AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct OrQueryNode final : public MultiQueryNode {
-    OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct WandQueryNode final : public MultiQueryNode {
-    WandQueryNode() : MultiQueryNode(QueryNodeType::WAND) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct PhraseQueryNode final : public MultiQueryNode {
-    PhraseQueryNode() : MultiQueryNode(QueryNodeType::PHRASE) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct PrefixTermQueryNode final : public MultiQueryNode {
-    PrefixTermQueryNode() : MultiQueryNode(QueryNodeType::PREFIX_TERM) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct SuffixTermQueryNode final : public MultiQueryNode {
-    SuffixTermQueryNode() : MultiQueryNode(QueryNodeType::SUFFIX_TERM) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
-struct SubstringTermQueryNode final : public MultiQueryNode {
-    SubstringTermQueryNode() : MultiQueryNode(QueryNodeType::SUBSTRING_TERM) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &self_node) final;
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
-};
 // "NotQueryNode" will be generated by parser
 // need to be optimized to AndNotQueryNode
 // otherwise, query statement is invalid
 struct NotQueryNode final : public MultiQueryNode {
     NotQueryNode() : MultiQueryNode(QueryNodeType::NOT) {}
-    std::unique_ptr<QueryNode> OptimizeInPlaceInner(std::unique_ptr<QueryNode> &) final;
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
 };
+struct AndQueryNode final : public MultiQueryNode {
+    AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
+};
+struct AndNotQueryNode final : public MultiQueryNode {
+    AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
+};
+struct OrQueryNode final : public MultiQueryNode {
+    OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() final;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const final;
+};
+
+// unimplemented
+struct WandQueryNode;
+struct PhraseQueryNode;
+struct PrefixTermQueryNode;
+struct SuffixTermQueryNode;
+struct SubstringTermQueryNode;
 
 } // namespace infinity
