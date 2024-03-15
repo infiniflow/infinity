@@ -42,7 +42,7 @@ MultiPostingDecoder::~MultiPostingDecoder() {
 void MultiPostingDecoder::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings) {
     seg_postings_ = seg_postings;
     segment_count_ = (u32)seg_postings_->size();
-    MoveToSegment(INVALID_ROWID);
+    MoveToSegment(0UL);
 }
 
 bool MultiPostingDecoder::DecodeDocBuffer(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {

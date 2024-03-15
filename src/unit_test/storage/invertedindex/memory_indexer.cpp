@@ -51,8 +51,6 @@ public:
     void SetUp() override {
         system("rm -rf /tmp/infinity/fulltext_tbl1_col1");
         system("mkdir -p /tmp/infinity/fulltext_tbl1_col1");
-        AnalyzerPool::instance().Set("standard");
-        AnalyzerPool::instance().Set("ngram");
     }
 
     void TearDown() override {}
@@ -77,16 +75,14 @@ TEST_F(MemoryIndexerTest, Insert) {
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
     MemoryIndexer
-        indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer2.Insert(*column, 0, 5);
-    // indexer1.Insert(*column, 3, 1);
-    indexer2.Dump();
+        indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    indexer1.Insert(column, 0, 1);
+    indexer1.Insert(column, 1, 3);
+    indexer1.Dump();
 
-    /*
     MemoryIndexer
         indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk2", RowID(0U, 4U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer2.Insert(*column, 4, 1);
-    */
+    indexer2.Insert(column, 4, 1);
     while (indexer2.GetInflightTasks() > 0) {
         sleep(1);
         indexer2.CommitSync();

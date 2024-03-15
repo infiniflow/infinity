@@ -78,13 +78,17 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
+    u64 seq_inserted(0);
+    u32 doc_count(0);
     {
         std::unique_lock<std::mutex> lock(mutex_);
         inflight_tasks_++;
+        seq_inserted = seq_inserted_++;
+        doc_count = doc_count_;
+        doc_count_ += row_count;
     }
-    u64 seq_inserted = seq_inserted_++;
-    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count_);
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     auto func = [this, task, provider](int id) {
         auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);

@@ -277,7 +277,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
                 memory_indexer_->Insert(column_vector, 0, block_entry->row_count());
             }
             memory_indexer_->Commit();

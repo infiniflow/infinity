@@ -45,9 +45,9 @@ ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, 
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void ColumnInverter::InvertColumn(const ColumnVector &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
+void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
     for (SizeT i = 0; i < row_count; ++i) {
-        String data = column_vector.ToString(row_offset + i);
+        String data = column_vector->ToString(row_offset + i);
         InvertColumn(start_doc_id + i, data);
     }
 }

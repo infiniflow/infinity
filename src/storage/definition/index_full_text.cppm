@@ -40,8 +40,8 @@ public:
                   bool homebrewed,
                   optionflag_t flag = OPTION_FLAG_ALL)
         : IndexBase(IndexType::kFullText, index_name, file_name, std::move(column_names)), analyzer_(analyzer), homebrewed_(homebrewed), flag_(flag) {
-        if (!homebrewed && analyzer.empty()) {
-            analyzer_ = "standard";
+        if (analyzer.empty()) {
+            analyzer_ = homebrewed ? "standard" : "segmentation";
         }
     };
 

@@ -48,10 +48,7 @@ public:
     };
 
 public:
-    void SetUp() override {
-        AnalyzerPool::instance().Set("standard");
-        AnalyzerPool::instance().Set("ngram");
-    }
+    void SetUp() override {}
 
     void TearDown() override {}
 
@@ -87,8 +84,8 @@ TEST_F(ColumnInverterTest, Invert) {
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     ColumnInverter inverter1("standard", &byte_slice_pool_, provider);
     ColumnInverter inverter2("standard", &byte_slice_pool_, provider);
-    inverter1.InvertColumn(*column, 0, 3, 0);
-    inverter2.InvertColumn(*column, 3, 2, 3);
+    inverter1.InvertColumn(column, 0, 3, 0);
+    inverter2.InvertColumn(column, 3, 2, 3);
 
     inverter1.Merge(inverter2);
 
