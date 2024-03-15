@@ -21,8 +21,14 @@ namespace infinity {
 
 atomic_bool GlobalResourceUsage::initialized_ = false;
 
-ai64 GlobalResourceUsage::object_count_ = 0;
+i64 GlobalResourceUsage::object_count_ = 0;
+HashMap<String, i64> GlobalResourceUsage::object_map_;
 
-ai64 GlobalResourceUsage::raw_memory_count_ = 0;
+i64 GlobalResourceUsage::raw_memory_count_ = 0;
+HashMap<String, i64> GlobalResourceUsage::raw_memory_map_;
+
+std::mutex GlobalResourceUsage::object_mutex_{};
+
+std::mutex GlobalResourceUsage::raw_memory_mutex_{};
 
 } // namespace infinity
