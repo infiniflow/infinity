@@ -208,8 +208,7 @@ public:
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static Status
-    CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
+    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
@@ -222,9 +221,6 @@ public:
 
     // This not add row count
     static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
-
-    // Check if allow drop table
-    bool CheckAllowCleanup(TableEntry *dropped_table_entry);
 
 public:
     // Function related methods

@@ -261,11 +261,6 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
                                                       u8(1), // have_rough_filter_: true
                                                       segment_filter_binary_data,
                                                       block_filter_binary_data});
-            // build delta catalog operation
-            auto catalog_delta_op = MakeUnique<UpdateSegmentBloomFilterDataOp>(new_segment.get(),
-                                                                               std::move(segment_filter_binary_data),
-                                                                               std::move(block_filter_binary_data));
-            txn_->AddCatalogDeltaOperation(std::move(catalog_delta_op));
         }
 
         for (auto *old_segment : old_segments) {

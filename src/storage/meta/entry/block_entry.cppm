@@ -81,6 +81,8 @@ public:
 
     void Cleanup();
 
+    void Flush(TxnTimeStamp checkpoint_ts);
+
 protected:
     u16
     AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, DataBlock *input_data_block, BlockOffset, u16 append_rows, BufferManager *buffer_mgr);
@@ -88,8 +90,6 @@ protected:
     void DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const Vector<BlockOffset> &rows);
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
-
-    void Flush(TxnTimeStamp checkpoint_ts);
 
     static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
 
@@ -131,8 +131,6 @@ public:
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
-
-    const String &DirPath() { return *block_dir_; }
 
     String VersionFilePath() { return LocalFileSystem::ConcatenateFilePath(*block_dir_, String(BlockVersion::PATH)); }
 

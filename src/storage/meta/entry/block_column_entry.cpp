@@ -43,10 +43,7 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddColumnEntryOp>(block_column_entry.get());
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
+
     auto begin_ts = txn->BeginTS();
     block_column_entry->begin_ts_ = begin_ts;
 

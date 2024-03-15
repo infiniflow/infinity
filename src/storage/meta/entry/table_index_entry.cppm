@@ -90,7 +90,7 @@ public:
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
-    SharedPtr<String> index_dir() { return index_dir_; }
+    const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
 
     Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>

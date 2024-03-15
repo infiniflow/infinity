@@ -88,12 +88,6 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
                 iter = iter1;
             } else {
                 LOG_TRACE("Add new entry in existed meta_map");
-                // // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
-                // // In replay phase, not need to recording the catalog delta operation.
-                // if (txn_mgr != nullptr) {
-                //     auto operation = MakeUnique<typename Meta::MetaOp>(new_meta.get(), begin_ts);
-                //     txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                // }
                 iter = meta_map_.emplace(name, std::move(new_meta)).first;
             }
         }

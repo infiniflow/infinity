@@ -46,11 +46,6 @@ UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_id, checkpoint_ts);
 
-    {
-        auto operation = MakeUnique<AddBlockEntryOp>(block_entry.get());
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
-
     auto begin_ts = txn->BeginTS();
     block_entry->begin_ts_ = begin_ts;
 

@@ -54,7 +54,7 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        const SharedPtr<String> &db_name,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
-    SharedPtr<String> db_entry_dir = is_delete ? nullptr : DetermineDBDir(*data_dir, *db_name);
+    SharedPtr<String> db_entry_dir = is_delete ? MakeShared<String>("deleted") : DetermineDBDir(*data_dir, *db_name);
     return MakeShared<DBEntry>(db_meta, is_delete, db_entry_dir, db_name, txn_id, begin_ts);
 }
 

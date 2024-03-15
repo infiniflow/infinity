@@ -53,6 +53,7 @@ void UpdateSegmentBloomFilterTask::Execute() {
     ExecuteInner(segment_, txn_mgr_);
 }
 
+// deprecated temporary
 void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManager *txn_mgr) {
     // create txn
     auto update_bloom_filter_txn = txn_mgr->CreateTxn();
@@ -82,11 +83,11 @@ void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManage
         update_bloom_filter_txn->AddWalCmd(std::move(wal_cmd));
     }
     // build CatalogDeltaOperation
-    {
-        auto catalog_delta_op =
-            MakeUnique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
-        update_bloom_filter_txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
-    }
+    // {
+    //     auto catalog_delta_op =
+    //         MakeUnique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
+    //     update_bloom_filter_txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
+    // }
     // segment status will be changed in SetSegmentStatusSealedOp::SaveSate(), in CommitBottom()
     auto commit_ts = txn_mgr->CommitTxn(update_bloom_filter_txn);
     LOG_TRACE(fmt::format("SetSegmentStatusSealedTask: CommitTS: {} end task for segment: {}", commit_ts, segment->segment_id()));

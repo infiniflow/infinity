@@ -83,7 +83,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-    SharedPtr<String> table_entry_dir = is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
+    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
     return MakeShared<TableEntry>(is_delete,
                                   std::move(table_entry_dir),
                                   std::move(table_name),
@@ -271,21 +271,12 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_) {
                     set_sealed_segments.push_back(unsealed_segment_.get());
-                    txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
 
                     // Add a catalog delta operation to set the unsealed_segment to sealed
                     // build minmax filter and optional bloom filter
                     // TODO: skip rebuild in wal?
                     BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(unsealed_segment_.get(), buffer_mgr, txn->BeginTS());
-                    // delta catalog
-                    {
-                        String segment_filter_binary_data = unsealed_segment_->GetFastRoughFilter()->SerializeToString();
-                        Vector<Pair<BlockID, String>> block_filter_binary_data = unsealed_segment_->GetBlockFilterBinaryDataVector();
-                        auto operation = MakeUnique<SetSegmentStatusSealedOp>(unsealed_segment_.get(),
-                                                                              std::move(segment_filter_binary_data),
-                                                                              std::move(block_filter_binary_data));
-                        txn->AddCatalogDeltaOperation(std::move(operation));
-                    }
+                    txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
@@ -295,9 +286,6 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
         }
-        // Append data from app_state_ptr to the buffer in segment. If append all data, then set finish.
-        auto operation = MakeUnique<AddSegmentEntryOp>(this->unsealed_segment_.get(), this->unsealed_segment_->status());
-        txn->AddCatalogDeltaOperation(std::move(operation));
         u64 actual_appended = unsealed_segment_->AppendData(txn_id, commit_ts, append_state_ptr, buffer_mgr, txn);
 
         LOG_TRACE(fmt::format("Segment {} is appended with {} rows", this->unsealed_segment_->segment_id(), actual_appended));
@@ -329,8 +317,6 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
             return Status(ErrorCode::kTableNotExist, std::move(err_msg));
         }
         const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap = to_delete_seg_rows.second;
-        auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), segment_entry->status());
-        txn->AddCatalogDeltaOperation(std::move(operation));
         segment_entry->DeleteData(txn_id, commit_ts, block_row_hashmap, txn);
 
         row_count += block_row_hashmap.size();
@@ -350,16 +336,13 @@ Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferMan
     return Status::OK();
 }
 
-Status TableEntry::CommitCompact(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
     if (compact_store.task_type_ == CompactSegmentsTaskType::kInvalid) {
         return Status::OK();
     }
 
     Vector<SegmentEntry *> new_segments;
     {
-        TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
-        Txn *txn = txn_store_ptr->txn_;
-
         {
             String ss = "Compact commit: " + *this->GetTableName();
             for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
@@ -384,9 +367,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, void *txn_store, TxnTimeS
 
             for (const auto &old_segment : old_segments) {
                 // old_segment->TrySetDeprecated(commit_ts);
-                old_segment->SetForbidCleanup(commit_ts);
-                auto operation = MakeUnique<AddSegmentEntryOp>(old_segment, old_segment->status());
-                txn->AddCatalogDeltaOperation(std::move(operation));
+                old_segment->SetDeprecated(commit_ts);
             }
         }
     }

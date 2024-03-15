@@ -62,9 +62,6 @@ SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(TableEntry *table_ent
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
                                                                      status);
-    auto operation = MakeUnique<AddSegmentEntryOp>(segment_entry.get(), status);
-    // have no effect in fake txn in wal replay
-    txn->AddCatalogDeltaOperation(std::move(operation));
     segment_entry->begin_ts_ = txn->BeginTS();
     return segment_entry;
 }
@@ -92,7 +89,6 @@ SegmentEntry::NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_i
 
 SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *table_entry,
                                                                    SegmentID segment_id,
-                                                                   const SharedPtr<String> &segment_dir,
                                                                    SegmentStatus status,
                                                                    u64 column_count,
                                                                    SizeT row_count,
@@ -103,7 +99,8 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *t
                                                                    TxnTimeStamp commit_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
-    auto segment_entry = MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, row_capacity, column_count, status);
+    auto segment_dir = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry, std::move(segment_dir), segment_id, row_capacity, column_count, status);
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->max_row_ts_ = max_row_ts;
     segment_entry->commit_ts_ = commit_ts;
@@ -162,21 +159,13 @@ void SegmentEntry::SetNoDelete() {
     compact_task_ = nullptr;
 }
 
-void SegmentEntry::SetForbidCleanup(TxnTimeStamp deprecate_ts) {
+void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kForbidCleanup is only allowed to set on kNoDelete segment.");
+        UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
     }
-
-    status_ = SegmentStatus::kForbidCleanup;
+    status_ = SegmentStatus::kDeprecated;
     deprecate_ts_ = deprecate_ts;
-}
-
-void SegmentEntry::TrySetDeprecated() {
-    std::unique_lock lock(rw_locker_);
-    if (status_ == SegmentStatus::kForbidCleanup) {
-        status_ = SegmentStatus::kDeprecated;
-    }
 }
 
 void SegmentEntry::RollbackCompact() {
@@ -193,8 +182,7 @@ bool SegmentEntry::CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<Segmen
     Vector<std::shared_lock<std::shared_mutex>> locks;
     for (const auto &[segment_entry, delete_offsets] : segments) {
         locks.emplace_back(segment_entry->rw_locker_);
-        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kForbidCleanup ||
-            segment_entry->status_ == SegmentStatus::kNoDelete) {
+        if (segment_entry->status_ == SegmentStatus::kDeprecated || segment_entry->status_ == SegmentStatus::kNoDelete) {
             return true;
         }
     }
@@ -281,13 +269,6 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
                 mut_blocks.push_back(last_block_entry);
             }
 
-            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(last_block_entry);
-            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
-            for (auto &column_block_entry : last_block_entry->columns()) {
-                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
-                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
-            }
-
             SegmentID range_segment_id = this->segment_id_;
             BlockID range_block_id = last_block_entry->block_id();
             u16 range_block_start_row = last_block_entry->row_count();
@@ -332,12 +313,6 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
         {
             std::shared_lock lck(this->rw_locker_);
             block_entry = block_entries_.at(block_id).get();
-            auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(block_entry);
-            txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
-            for (auto &column_block_entry : block_entry->columns()) {
-                auto add_column_entry_op = MakeUnique<AddColumnEntryOp>(column_block_entry.get());
-                txn->AddCatalogDeltaOperation(std::move(add_column_entry_op));
-            }
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);

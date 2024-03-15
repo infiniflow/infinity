@@ -50,7 +50,14 @@ TxnSegmentStore TxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
 TxnSegmentStore::TxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
 
 void TxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state) const {
-    // local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_, append_state));
+    // FIXME: use append_state
+    local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(segment_entry_));
+    for (auto *block_entry : block_entries_) {
+        local_delta_ops->AddOperation(MakeUnique<AddBlockEntryOp>(block_entry));
+        for (const auto &column_entry : block_entry->columns()) {
+            local_delta_ops->AddOperation(MakeUnique<AddColumnEntryOp>(column_entry.get()));
+        }
+    }
 }
 
 ///-----------------------------------------------------------------------------
@@ -59,6 +66,12 @@ TxnIndexStore::TxnIndexStore(TableIndexEntry *table_index_entry) : table_index_e
 
 void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
     local_delta_ops->AddOperation(MakeUnique<AddTableIndexEntryOp>(table_index_entry_));
+    if (fulltext_index_entry_ != nullptr) {
+        local_delta_ops->AddOperation(MakeUnique<AddFulltextIndexEntryOp>(fulltext_index_entry_));
+    }
+    for (auto [segment_id, segment_index_entry] : index_entry_map_) {
+        local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry));
+    }
 }
 
 ///-----------------------------------------------------------------------------
@@ -229,7 +242,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         LOG_INFO(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
-        Catalog::CommitCompact(table_entry_, txn_id, this, commit_ts, compact_state_);
+        Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
     }
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
@@ -300,9 +313,12 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
     for (const auto &[segment_id, segment_store] : txn_segments_) {
         segment_store.AddDeltaOp(local_delta_ops, append_state_.get());
     }
-    // for (const auto *sealed_segment : set_sealed_segments_) {
-        // local_delta_ops->AddOperation(MakeUnique<AddSealedSegmentOp>(sealed_segment));
-    // }
+    for (auto *sealed_segment : set_sealed_segments_) {
+        String segment_filter_binary_data = sealed_segment->GetFastRoughFilter()->SerializeToString();
+        Vector<Pair<BlockID, String>> block_filter_binary_data = sealed_segment->GetBlockFilterBinaryDataVector();
+        local_delta_ops->AddOperation(
+            MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data)));
+    }
 }
 
 TxnStore::TxnStore(Txn *txn, Catalog *catalog) : txn_(txn), catalog_(catalog) {}

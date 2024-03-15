@@ -166,9 +166,6 @@ public:
 
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    // TODO: be private
-    void AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation);
-
     void Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);

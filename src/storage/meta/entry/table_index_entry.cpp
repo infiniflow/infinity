@@ -63,7 +63,8 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
-    SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
+    SharedPtr<String> index_dir =
+        is_delete ? MakeShared<String>("deleted") : DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info
@@ -75,8 +76,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         if (index_fulltext->homebrewed_) {
             // TODO yzc: remove table_index_entry->fulltext_index_entry_
         } else {
-            table_index_entry->fulltext_index_entry_ =
-                FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn, txn_id, table_index_entry->index_dir_, begin_ts);
+            table_index_entry->fulltext_index_entry_ = FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn, txn_id, begin_ts);
         }
     }
 
@@ -103,7 +103,6 @@ bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
     }
     return homebrewed;
 }
-
 
 // For segment_index_entry
 void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {

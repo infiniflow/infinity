@@ -83,12 +83,7 @@ Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<Se
                                                                         segment_filter_binary_data,
                                                                         block_filter_binary_data}));
 
-    // build delta catalog operation
-    auto catalog_delta_op =
-        MakeUnique<UpdateSegmentBloomFilterDataOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
-    this->AddCatalogDeltaOperation(std::move(catalog_delta_op));
-
-    TxnTableStore *table_store = txn_store_.GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
     table_store->Import(std::move(segment_entry));
 
     return Status::OK();
@@ -97,7 +92,7 @@ Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<Se
 Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
 
-    TxnTableStore *table_store = txn_store_.GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
     auto [err_msg, append_status] = table_store->Append(input_block);
@@ -116,7 +111,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
         RecoverableError(Status::TxnRollback(TxnID()));
     }
 
-    TxnTableStore *table_store = txn_store_.GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
@@ -126,7 +121,7 @@ Status Txn::Delete(const String &db_name, const String &table_name, const Vector
 Status
 Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type) {
     const String &table_name = *table_entry->GetTableName();
-    TxnTableStore *table_store = txn_store_.GetTxnTableStore(table_name);
+    TxnTableStore *table_store = this->GetTxnTableStore(table_name);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
@@ -347,7 +342,7 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
         return index_status;
     }
 
-    auto *txn_table_store = txn_store_.GetTxnTableStore(table_name);
+    auto *txn_table_store = this->GetTxnTableStore(table_name);
     txn_table_store->DropIndexStore(table_index_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
@@ -486,10 +481,6 @@ void Txn::Rollback() {
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
-
-// called by worker thread when create new entry
-// Add lock because multiple threads may add catalog
-void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) { local_catalog_delta_ops_entry_->AddOperation(std::move(operation)); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {

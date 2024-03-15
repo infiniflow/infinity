@@ -76,10 +76,6 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
 
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
     return segment_index_entry;
 }
 

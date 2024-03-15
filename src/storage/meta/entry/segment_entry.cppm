@@ -43,7 +43,6 @@ export enum class SegmentStatus : u8 {
     kSealed,
     kCompacting,
     kNoDelete,
-    kForbidCleanup,
     kDeprecated,
 };
 
@@ -78,7 +77,6 @@ public:
 
     static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(TableEntry *table_entry,
                                                                 SegmentID segment_id,
-                                                                const SharedPtr<String> &segment_dir,
                                                                 SegmentStatus status,
                                                                 u64 column_count,
                                                                 SizeT row_count,
@@ -110,10 +108,7 @@ public:
 
     void SetNoDelete();
 
-    // TODO: Remove after refactor catalog delta operations log
-    void SetForbidCleanup(TxnTimeStamp deprecate_ts);
-
-    void TrySetDeprecated();
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
 
     void RollbackCompact();
 

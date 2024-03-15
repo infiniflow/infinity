@@ -1101,7 +1101,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         if (auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts); segment_entry) {
             auto block_entry_iter = BlockEntryIter(segment_entry.get());
             for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
-                auto dir_path = block_entry->DirPath();
+                const auto &dir_path = *block_entry->base_dir();
 
                 chuck_filling(LocalFileSystem::GetFolderSizeByPath, dir_path);
             }
