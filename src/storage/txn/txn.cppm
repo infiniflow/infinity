@@ -17,7 +17,7 @@ export module txn;
 
 import stl;
 
-import table_detail;
+import meta_info;
 import table_def;
 import index_base;
 import data_block;
@@ -87,6 +87,8 @@ public:
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
 
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
+
     Vector<DatabaseDetail> ListDatabases();
 
     // Table and Collection OPs
@@ -100,6 +102,8 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     // Index OPs
@@ -109,6 +113,8 @@ public:
     Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
+
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
     Status CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 

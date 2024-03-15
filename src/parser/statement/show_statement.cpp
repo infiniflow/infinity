@@ -20,16 +20,28 @@ namespace infinity {
 std::string ShowStatement::ToString() const {
     std::stringstream ss;
     switch (show_type_) {
+        case ShowStmtType::kDatabase: {
+            ss << "Show database, database: " << schema_name_;
+            break;
+        }
+        case ShowStmtType::kTable: {
+            ss << "Show table, database: " << schema_name_;
+            break;
+        }
+        case ShowStmtType::kIndex: {
+            ss << "Show index, database: " << schema_name_;
+            break;
+        }
         case ShowStmtType::kTables: {
-            ss << "Show tables, schema: " << schema_name_;
+            ss << "Show tables, database: " << schema_name_;
             break;
         }
         case ShowStmtType::kCollections: {
-            ss << "Show collections, schema: " << schema_name_;
+            ss << "Show collections, database: " << schema_name_;
             break;
         }
         case ShowStmtType::kViews: {
-            ss << "Show views, schema: " << schema_name_;
+            ss << "Show views, database: " << schema_name_;
             break;
         }
         case ShowStmtType::kColumns: {
@@ -46,6 +58,10 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kSegments : {
             ss << "Show Segments";
+            break;
+        }
+        case ShowStmtType::kBlocks : {
+            ss << "Show Blocks";
             break;
         }
         case ShowStmtType::kConfigs: {

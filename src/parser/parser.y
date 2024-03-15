@@ -362,9 +362,9 @@ struct SQL_LTYPE {
 
 /* SQL keywords */
 
-%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE DESCRIBE UNION ALL INTERSECT COMPACT
+%token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMNS INDEXES
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
@@ -1532,54 +1532,83 @@ show_statement: SHOW DATABASES {
     $$->var_name_ = std::string($3);
     free($3);
 }
-| DESCRIBE table_name {
+| SHOW DATABASE IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kDatabase;
+    $$->schema_name_ = $3;
+    free($3);
+}
+| SHOW TABLE table_name {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTable;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+}
+| SHOW TABLE table_name COLUMNS {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kColumns;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 }
-| DESCRIBE table_name SEGMENTS {
+| SHOW TABLE table_name SEGMENTS {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
 }
-| DESCRIBE table_name SEGMENT LONG_VALUE {
+| SHOW TABLE table_name SEGMENT LONG_VALUE {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    $$->segment_id_ = $4;
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    delete $3;
 }
-| DESCRIBE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+| SHOW TABLE table_name SEGMENT LONG_VALUE BLOCKS {
     $$ = new infinity::ShowStatement();
-    $$->show_type_ = infinity::ShowStmtType::kSegments;
-    if($2->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $2->schema_name_ptr_;
-        free($2->schema_name_ptr_);
+    $$->show_type_ = infinity::ShowStmtType::kBlocks;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
     }
-    $$->table_name_ = $2->table_name_ptr_;
-    free($2->table_name_ptr_);
-    $$->segment_id_ = $4;
-    $$->block_id_ = $6;
-    delete $2;
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    delete $3;
 }
-| DESCRIBE INDEX table_name {
+| SHOW TABLE table_name SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kBlocks;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    $$->segment_id_ = $5;
+    $$->block_id_ = $7;
+    delete $3;
+}
+| SHOW TABLE table_name INDEXES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kIndexes;
     if($3->schema_name_ptr_ != nullptr) {
@@ -1589,6 +1618,20 @@ show_statement: SHOW DATABASES {
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
+};
+| SHOW TABLE table_name INDEX IDENTIFIER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndex;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+
+    $$->index_name_ = $5;
+    free($5);
 };
 
 /*

@@ -22,7 +22,7 @@ import table_meta;
 import base_entry;
 import table_entry;
 import third_party;
-import table_detail;
+import meta_info;
 import buffer_manager;
 import status;
 import extra_ddl_info;
@@ -92,12 +92,15 @@ private:
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String& table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
+
 
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));

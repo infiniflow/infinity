@@ -55,16 +55,8 @@ DROP TABLE IF EXISTS descr1;
 statement ok
 CREATE TABLE descr1 (i INTEGER, t TIME, d DATE, ts TIMESTAMP, dt DATETIME, vc VARCHAR);
 
-# check table description
-query I
-DESCRIBE descr1;
-----
-i Integer (empty)
-t Time (empty)
-d Date (empty)
-ts Timestamp (empty)
-dt DateTime (empty)
-vc Varchar (empty)
+statement ok
+SHOW TABLE descr1;
 
 statement ok
 DROP TABLE descr1;
