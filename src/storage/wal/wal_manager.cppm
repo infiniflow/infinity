@@ -19,6 +19,7 @@ export module wal_manager;
 import stl;
 import bg_task;
 import wal_entry;
+import options;
 
 namespace infinity {
 
@@ -33,7 +34,8 @@ public:
                u64 wal_size_threshold,
                u64 full_checkpoint_interval_sec,
                u64 delta_checkpoint_interval_sec,
-               u64 delta_checkpoint_interval_wal_bytes);
+               u64 delta_checkpoint_interval_wal_bytes,
+               FlushOption flush_option);
 
     ~WalManager();
 
@@ -123,7 +125,7 @@ private:
     i64 last_delta_ckp_wal_size_{};
     i64 last_full_ckp_time_{};
     i64 last_delta_ckp_time_{};
-
+    FlushOption flush_option_{FlushOption::kOnlyWrite};
 
     Vector<String> wal_list_{};
 };

@@ -110,6 +110,8 @@ public:
 
     [[nodiscard]] inline u64 wal_size_threshold() const { return system_option_.wal_size_threshold_; }
 
+    [[nodiscard]] inline FlushOption flush_at_commit() const { return system_option_.flush_at_commit_; }
+
     // Resource
     [[nodiscard]] inline String resource_dict_path() const { return system_option_.resource_dict_path_; }
 
@@ -144,6 +146,7 @@ export enum class SysVar {
     kHttpAPIPort,
     kDataURL,
     kTimezone,
+    kLogFlushPolicy,
     kInvalid,
 };
 
