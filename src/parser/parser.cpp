@@ -4906,7 +4906,7 @@ yyreduce:
 #line 1598 "parser.y"
                                                             {
     (yyval.show_stmt) = new infinity::ShowStatement();
-    (yyval.show_stmt)->show_type_ = infinity::ShowStmtType::kSegments;
+    (yyval.show_stmt)->show_type_ = infinity::ShowStmtType::kBlocks;
     if((yyvsp[-4].table_name_t)->schema_name_ptr_ != nullptr) {
         (yyval.show_stmt)->schema_name_ = (yyvsp[-4].table_name_t)->schema_name_ptr_;
         free((yyvsp[-4].table_name_t)->schema_name_ptr_);

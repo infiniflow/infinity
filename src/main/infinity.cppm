@@ -40,15 +40,18 @@ public:
 
     ~Infinity() = default;
 
-    static SharedPtr<Infinity> RemoteConnect();
-
     u64 GetSessionId();
-
-    void RemoteDisconnect();
 
     static void LocalInit(const String &path);
 
     static void LocalUnInit();
+
+    // Infinity API
+public:
+
+    static SharedPtr<Infinity> RemoteConnect();
+
+    void RemoteDisconnect();
 
     static SharedPtr<Infinity> LocalConnect();
 
