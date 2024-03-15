@@ -40,6 +40,7 @@ import meta_entry_interface;
 import cleanup_scanner;
 import random;
 import memory_pool;
+import meta_info;
 
 namespace infinity {
 
@@ -59,7 +60,7 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
-                        const SharedPtr<String> &db_entry_dir,
+                        const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
@@ -77,7 +78,7 @@ public:
                                                TxnTimeStamp begin_ts);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
-                                                     SharedPtr<String> db_entry_dir,
+                                                     SharedPtr<String> table_entry_dir,
                                                      SharedPtr<String> table_name,
                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
                                                      TableEntryType table_entry_type,
@@ -100,6 +101,8 @@ public:
     DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 

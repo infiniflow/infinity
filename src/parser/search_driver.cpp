@@ -69,8 +69,8 @@ void SearchDriver::Analyze(const std::string &field, const std::string &text, st
 }
 
 std::unique_ptr<QueryNode> SearchDriver::ParseHelper(std::istream &stream) const {
-    std::unique_ptr<SearchParser> parser;
     std::unique_ptr<SearchScanner> scanner;
+    std::unique_ptr<SearchParser> parser;
     std::unique_ptr<QueryNode> result;
     try {
         scanner = std::make_unique<SearchScanner>(&stream);

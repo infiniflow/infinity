@@ -919,6 +919,15 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
 Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
     switch (statement->show_type_) {
+        case ShowStmtType::kDatabase: {
+            return BuildShowDatabase(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kTable: {
+            return BuildShowTable(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kIndex: {
+            return BuildShowIndex(statement, bind_context_ptr);
+        }
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
         }
@@ -943,6 +952,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         }
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kBlocks: {
+            return BuildShowBlocks(statement, bind_context_ptr);
         }
         case ShowStmtType::kSessionStatus: {
             return BuildShowSessionStatus(statement, bind_context_ptr);
@@ -1014,6 +1026,18 @@ Status LogicalPlanner::BuildShowSegments(const ShowStatement *statement, SharedP
     return Status::OK();
 }
 
+Status LogicalPlanner::BuildShowBlocks(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowBlocks,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_);
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
 Status LogicalPlanner::BuildShowTables(const ShowStatement *, SharedPtr<BindContext> &bind_context_ptr) {
     String object_name;
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -1035,6 +1059,40 @@ Status LogicalPlanner::BuildShowViews(const ShowStatement *, SharedPtr<BindConte
                                                                   query_context_ptr_->schema_name(),
                                                                   object_name,
                                                                   bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowDatabase(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    String object_name;
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowDatabase,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  object_name,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTable,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowIndex(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndex,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  statement->index_name_);
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

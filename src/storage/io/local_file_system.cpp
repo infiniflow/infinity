@@ -138,7 +138,7 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
 
 void LocalFileSystem::Seek(FileHandler &file_handler, i64 pos) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    if (0 != lseek(fd, pos, SEEK_SET)) {
+    if ((off_t)-1 == lseek(fd, pos, SEEK_SET)) {
         UnrecoverableError(fmt::format("Can't seek file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
 }

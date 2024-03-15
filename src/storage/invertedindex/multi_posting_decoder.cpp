@@ -78,8 +78,8 @@ bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_row_id,
                                                       RowID &first_row_id,
                                                       RowID &last_row_id,
                                                       ttf_t &current_ttf) {
-    RowID next_seg_base_doc_id = GetSegmentBaseRowId(segment_cursor_);
-    if (next_seg_base_doc_id != INVALID_ROWID && start_row_id >= next_seg_base_doc_id) {
+    RowID next_seg_base_row_id = GetSegmentBaseRowId(segment_cursor_);
+    if (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
         // start docid not in current segment
         return false;
     }
@@ -118,7 +118,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     segment_cursor_ = locate_seg_cursor;
     SegmentPosting &cur_segment_posting = (*seg_postings_)[segment_cursor_];
     cur_segment_format_option_ = cur_segment_posting.GetPostingFormatOption();
-    base_row_id_ = cur_segment_posting.GetBaseDocId();
+    base_row_id_ = cur_segment_posting.GetBaseRowId();
     const PostingWriter *posting_writer = cur_segment_posting.GetInMemPostingWriter();
     if (posting_writer) {
         InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder(session_pool_);

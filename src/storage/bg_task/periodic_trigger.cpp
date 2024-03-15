@@ -28,7 +28,7 @@ import third_party;
 namespace infinity {
 
 void CleanupPeriodicTrigger::Trigger() {
-    TxnTimeStamp visible_ts = txn_mgr_->GetMinUncommitTs();
+    TxnTimeStamp visible_ts = txn_mgr_->GetMinUnflushedTS();
     // if (visible_ts == last_visible_ts_) {
     //     LOG_INFO(fmt::format("No need to cleanup visible timestamp: {}", visible_ts));
     //     return;
