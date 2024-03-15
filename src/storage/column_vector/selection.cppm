@@ -29,10 +29,16 @@ struct SelectionData {
             UnrecoverableError("Too large size for selection data.");
         }
         data_ = MakeUnique<u16[]>(count);
+#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount();
+#endif
     }
 
-    ~SelectionData() { GlobalResourceUsage::DecrObjectCount(); }
+    ~SelectionData() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount();
+#endif
+    }
 
     UniquePtr<u16[]> data_{};
     SizeT capacity_{};
@@ -40,9 +46,17 @@ struct SelectionData {
 
 export class Selection {
 public:
-    Selection() { GlobalResourceUsage::IncrObjectCount(); }
+    Selection() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount();
+#endif
+    }
 
-    ~Selection() { GlobalResourceUsage::DecrObjectCount(); }
+    ~Selection() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount();
+#endif
+    }
 
     void Initialize(SizeT count = DEFAULT_VECTOR_SIZE) {
         storage_ = MakeShared<SelectionData>(count);

@@ -29,16 +29,25 @@ import buffer_manager;
 import data_file_worker;
 
 namespace infinity {
-FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) { GlobalResourceUsage::IncrObjectCount(); }
+
+FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount();
+#endif
+}
 
 FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, u64 chunk_size)
     : current_chunk_size_(chunk_size), current_chunk_idx_(block_column_entry->OutlineBufferCount()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
+#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount();
+#endif
 }
 
 FixHeapManager::~FixHeapManager() {
+#ifdef INFINITY_DEBUG
     GlobalResourceUsage::DecrObjectCount();
+#endif
     // std::variant in `VectorHeapChunk` will call destructor automatically
 }
 

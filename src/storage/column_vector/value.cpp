@@ -18,7 +18,6 @@ module;
 
 module value;
 
-
 import stl;
 import global_resource_usage;
 import logger;
@@ -386,21 +385,35 @@ RowID Value::GetValue() const {
     return value_.row;
 }
 
-Value::~Value() { GlobalResourceUsage::DecrObjectCount(); }
+Value::~Value() {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount();
+#endif
+}
 
-Value::Value(const DataType &data_type) : type_(data_type) { GlobalResourceUsage::IncrObjectCount(); }
+Value::Value(const DataType &data_type) : type_(data_type) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount();
+#endif
+}
 
 Value::Value(LogicalType type, SharedPtr<TypeInfo> typeinfo_ptr) : type_(type, std::move(typeinfo_ptr)) {
+#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount();
+#endif
 }
 
 Value::Value(const Value &other) : type_(other.type_) {
+#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount();
+#endif
     CopyUnionValue(other);
 }
 
 Value::Value(Value &&other) noexcept : type_(other.type_) {
+#ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount();
+#endif
     MoveUnionValue(std::forward<Value>(other));
 }
 

@@ -84,7 +84,9 @@ protected:
 TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -140,9 +142,11 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
             txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     /*
     ////////////////////////////////

@@ -25,4 +25,8 @@ ai64 GlobalResourceUsage::object_count_ = 0;
 
 ai64 GlobalResourceUsage::raw_memory_count_ = 0;
 
+std::mutex GlobalResourceUsage::object_mutex_{};
+
+std::mutex GlobalResourceUsage::raw_memory_mutex_{};
+
 } // namespace infinity

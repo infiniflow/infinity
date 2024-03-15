@@ -29,9 +29,17 @@ export using ChunkId = u64;
 
 export struct VectorHeapChunk {
 public:
-    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(BufferObj *buffer_obj) : ptr_(buffer_obj->Load()) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount();
+#endif
+    }
 
-    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorHeapChunk(u64 capacity) : ptr_(MakeUniqueForOverwrite<char[]>(capacity)) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount();
+#endif
+    }
 
     VectorHeapChunk(const VectorHeapChunk &) = delete;
 
@@ -47,7 +55,11 @@ public:
 
     VectorHeapChunk &operator=(VectorHeapChunk &&) = delete;
 
-    ~VectorHeapChunk() { GlobalResourceUsage::DecrObjectCount(); }
+    ~VectorHeapChunk() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount();
+#endif
+    }
 
     const char *GetPtr() const { // Pattern Matching here
         if (std::holds_alternative<UniquePtr<char[]>>(ptr_)) {

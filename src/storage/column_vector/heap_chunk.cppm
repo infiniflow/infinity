@@ -25,7 +25,9 @@ namespace infinity {
 export struct HeapChunk {
 public:
     inline explicit HeapChunk(u64 capacity) : current_offset_(0), capacity_(capacity), object_count_(0) {
+#ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount();
+#endif
         ptr_ = Allocator::allocate(capacity);
     }
 
@@ -35,7 +37,9 @@ public:
         capacity_ = 0;
         current_offset_ = 0;
         object_count_ = 0;
+#ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount();
+#endif
     }
 
     ptr_t ptr_{nullptr};
@@ -49,9 +53,17 @@ export struct StringHeapMgr {
     static constexpr u64 CHUNK_SIZE = 4096;
 
 public:
-    inline explicit StringHeapMgr(u64 chunk_size = CHUNK_SIZE) : current_chunk_size_(chunk_size) { GlobalResourceUsage::IncrObjectCount(); }
+    inline explicit StringHeapMgr(u64 chunk_size = CHUNK_SIZE) : current_chunk_size_(chunk_size) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount();
+#endif
+    }
 
-    inline ~StringHeapMgr() { GlobalResourceUsage::DecrObjectCount(); }
+    inline ~StringHeapMgr() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount();
+#endif
+    }
 
     // return pointer of required size. Allocate new chunk if current chunk is not enough.
     ptr_t Allocate(SizeT nbytes);
