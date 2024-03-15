@@ -21,6 +21,12 @@ import third_party;
 
 namespace infinity {
 
+export enum class FlushOption {
+    kFlushAtOnce,
+    kOnlyWrite,
+    kFlushPerSecond,
+};
+
 export struct SessionOptions {
     inline bool enable_profiling() const { return enable_profiling_; }
     inline u64 profile_history_capacity() const { return profile_history_capacity_; }
@@ -80,6 +86,7 @@ export struct SystemOptions {
     u64 full_checkpoint_txn_interval_{};
     u64 delta_checkpoint_interval_sec_{};
     u64 delta_checkpoint_interval_wal_bytes_{};
+    FlushOption flush_at_commit_{FlushOption::kOnlyWrite}; // 0: flush_at_once, 1: only_write, 2: flush_per_second
 
     // Resource
     String resource_dict_path_{};

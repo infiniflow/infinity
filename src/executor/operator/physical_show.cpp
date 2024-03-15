@@ -350,8 +350,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(column_types);
 
@@ -428,8 +427,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(column_types);
 
@@ -551,8 +549,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type};
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
 
     output_block_ptr->Init(column_types);
 
@@ -2101,6 +2098,31 @@ void PhysicalShow::ExecuteShowVar(QueryContext *query_context, ShowOperatorState
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
+        }
+        case SysVar::kLogFlushPolicy: {
+            switch (query_context->global_config()->flush_at_commit()) {
+                case FlushOption::kFlushAtOnce: {
+                    Value value = Value::MakeVarchar("Write and flush log at each commit");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    break;
+                }
+                case FlushOption::kOnlyWrite: {
+                    Value value = Value::MakeVarchar("Only write log at each commit");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    break;
+                }
+                case FlushOption::kFlushPerSecond: {
+                    Value value = Value::MakeVarchar("Write log at each commit and commit log per second");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid log flush policy: {}");
+                }
+            }
         }
         default: {
             RecoverableError(Status::NoSysVar(object_name_));

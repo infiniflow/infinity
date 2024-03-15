@@ -59,7 +59,8 @@ void Storage::Init() {
                                       config_ptr_->wal_size_threshold(),
                                       config_ptr_->full_checkpoint_interval_sec(),
                                       config_ptr_->delta_checkpoint_interval_sec(),
-                                      config_ptr_->delta_checkpoint_interval_wal_bytes());
+                                      config_ptr_->delta_checkpoint_interval_wal_bytes(),
+                                      config_ptr_->flush_at_commit());
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
