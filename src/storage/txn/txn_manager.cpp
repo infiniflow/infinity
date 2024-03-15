@@ -180,7 +180,7 @@ void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
     }
 }
 
-TxnTimeStamp TxnManager::GetMinUncommitTs() {
+TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     std::shared_lock r_locker(rw_locker_);
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;

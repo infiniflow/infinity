@@ -357,7 +357,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
         Path parent_path = catalog_path.parent_path();
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->db_entry_list().emplace_front(std::move(db_entry));
@@ -471,9 +471,10 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
                 auto db_name = add_db_entry_op->db_name();
-
+                const auto &db_entry_dir = add_db_entry_op->db_entry_dir();
                 auto db_meta = catalog->db_meta_map().at(db_name).get();
-                auto db_entry = DBEntry::NewReplayDBEntry(db_meta, db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
+                auto db_entry =
+                    DBEntry::NewReplayDBEntry(db_meta, MakeShared<String>(db_entry_dir), db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
                 db_meta->db_entry_list().emplace_front(std::move(db_entry));
                 break;
             }
@@ -846,9 +847,7 @@ UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeSta
 // called by bg_task
 bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp max_commit_ts) {
     LOG_INFO("SAVING DELTA CATALOG");
-    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.",
-                         global_catalog_delta_entry_->commit_ts(),
-                         max_commit_ts));
+    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", global_catalog_delta_entry_->commit_ts(), max_commit_ts));
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);

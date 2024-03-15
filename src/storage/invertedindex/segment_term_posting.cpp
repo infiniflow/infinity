@@ -27,7 +27,7 @@ SegmentTermPostingQueue::SegmentTermPostingQueue(const String &index_dir,
                                                  const Vector<String> &base_names,
                                                  const Vector<RowID> &base_rowids,
                                                  optionflag_t flag)
-    : index_dir_(index_dir), base_names_(base_names), base_docids_(base_rowids) {
+    : index_dir_(index_dir), base_names_(base_names), base_rowids_(base_rowids) {
     for (u32 i = 0; i < base_names.size(); ++i) {
         SegmentTermPosting *segment_term_posting = new SegmentTermPosting(index_dir, base_names[i], base_rowids[i], flag);
         if (segment_term_posting->HasNext()) {
