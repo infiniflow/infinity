@@ -34,10 +34,10 @@ void InMemDocListDecoder::Init(df_t df, SkipListReader *skiplist_reader, Buffere
 
 bool InMemDocListDecoder::DecodeDocBuffer(docid_t start_doc_id,
                                           docid_t *doc_buffer,
-                                          docid_t &first_doc_id_,
-                                          docid_t &last_doc_id_,
+                                          docid_t &first_doc_id,
+                                          docid_t &last_doc_id,
                                           ttf_t &current_ttf) {
-    DocBufferInfo doc_buffer_info(doc_buffer, first_doc_id_, last_doc_id_, current_ttf);
+    DocBufferInfo doc_buffer_info(doc_buffer, first_doc_id, last_doc_id, current_ttf);
     if (skiplist_reader_ == nullptr) {
         current_ttf = 0;
         return DecodeDocBufferWithoutSkipList(0, 0, start_doc_id, doc_buffer_info);
@@ -47,7 +47,7 @@ bool InMemDocListDecoder::DecodeDocBuffer(docid_t start_doc_id,
     u32 record_len;
     u32 last_doc_id_in_prev_record;
 
-    auto ret = skiplist_reader_->SkipTo((u32)start_doc_id, (u32 &)last_doc_id_, last_doc_id_in_prev_record, offset, record_len);
+    auto ret = skiplist_reader_->SkipTo((u32)start_doc_id, (u32 &)last_doc_id, last_doc_id_in_prev_record, offset, record_len);
     if (!ret) {
         // we should decode buffer
         last_doc_id_in_prev_record = skiplist_reader_->GetLastKeyInBuffer();
@@ -64,7 +64,7 @@ bool InMemDocListDecoder::DecodeDocBuffer(docid_t start_doc_id,
     SizeT acutal_decode_count = 0;
     doc_list_reader_.Decode(doc_buffer, MAX_DOC_PER_RECORD, acutal_decode_count);
 
-    first_doc_id_ = doc_buffer[0] + last_doc_id_in_prev_record;
+    first_doc_id = doc_buffer[0] + last_doc_id_in_prev_record;
     return true;
 }
 
@@ -72,15 +72,12 @@ bool InMemDocListDecoder::DecodeDocBufferWithoutSkipList(docid_t last_doc_id_in_
                                                          u32 offset,
                                                          docid_t start_doc_id,
                                                          DocBufferInfo &doc_buffer_info) {
-    // only decode one time
     if (finish_decoded_) {
         return false;
     }
 
-    // TODO: seek return value
     doc_list_reader_.Seek(offset);
 
-    // short list when no skip
     SizeT decode_count;
     if (!doc_list_reader_.Decode(doc_buffer_info.doc_buffer_, MAX_DOC_PER_RECORD, decode_count)) {
         return false;

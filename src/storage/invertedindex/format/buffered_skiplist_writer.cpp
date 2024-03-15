@@ -24,7 +24,6 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
     last_value1_ = value1;
     PushBack(2, value2);
     EndPushBack();
-
     if (NeedFlush(SKIP_LIST_BUFFER_SIZE)) {
         Flush();
     }
@@ -52,74 +51,7 @@ void BufferedSkipListWriter::AddItem(u32 value_delta) {
     }
 }
 
-SizeT BufferedSkipListWriter::DoFlush() {
-    u32 flush_size = 0;
-    u8 size = buffer_.Size();
+void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file) { posting_writer_.Dump(file); }
 
-    const PostingValues *posting_values = GetPostingValues();
-    for (SizeT i = 0; i < posting_values->GetSize(); ++i) {
-        PostingValue *posting_value = posting_values->GetValue(i);
-        u8 *buffer = buffer_.GetRow(posting_value->location_);
-        flush_size += posting_value->Encode(posting_writer_, buffer, size * posting_value->GetSize());
-    }
-    return flush_size;
-}
-
-void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file) {
-    posting_writer_.Dump(file);
-    return;
-
-    u32 skiplist_size = GetTotalCount();
-    if (skiplist_size == 0) {
-        return;
-    }
-    if (GetPostingValues()->GetSize() != 3) {
-        posting_writer_.Dump(file);
-        return;
-    }
-
-    const ByteSliceList *skipList = posting_writer_.GetByteSliceList();
-    ByteSliceListIterator iter(skipList);
-    u32 start = 0;
-    const PostingValues *posting_values = GetPostingValues();
-    for (SizeT i = 0; i < posting_values->GetSize(); ++i) {
-        PostingValue *posting_value = posting_values->GetValue(i);
-        u32 len = posting_value->GetSize() * skiplist_size;
-        if (i > 0) {
-            // not encode last value after first row
-            len -= posting_value->GetSize();
-        }
-        if (len == 0) {
-            break;
-        }
-        bool ret = iter.SeekSlice(start);
-        assert(ret);
-        (void)ret;
-        while (iter.HasNext(start + len)) {
-            void *data = nullptr;
-            SizeT size = 0;
-            iter.Next(data, size);
-            assert(data);
-            assert(size);
-            file->Write((char *)data, size);
-        }
-        start += posting_value->GetSize() * skiplist_size;
-    }
-}
-
-SizeT BufferedSkipListWriter::EstimateDumpSize() const {
-    u32 skiplist_size = GetTotalCount();
-    if (skiplist_size == 0) {
-        return 0;
-    }
-    if (GetPostingValues()->GetSize() != 3) {
-        return posting_writer_.GetSize();
-    }
-
-    const PostingValues *posting_values = GetPostingValues();
-    assert(posting_values->GetSize() == 3);
-
-    SizeT opt_size = posting_values->GetValue(1)->GetSize() + posting_values->GetValue(1)->GetSize();
-    return posting_writer_.GetSize() - opt_size;
-}
+SizeT BufferedSkipListWriter::EstimateDumpSize() const { return posting_writer_.GetSize(); }
 } // namespace infinity

@@ -220,6 +220,9 @@ void MemoryIndexer::OfflineDump() {
         fread(buf, record_length, 1, f);
         TermTuple tuple(buf, record_length);
         if (tuple.term_ != last_term) {
+            if (last_doc_id != INVALID_DOCID) {
+                posting->EndDocument(last_doc_id, 0);
+            }
             term_buffer.push_back(String(tuple.term_));
             std::string_view view(term_buffer.back());
             last_term.swap(view);
@@ -231,15 +234,17 @@ void MemoryIndexer::OfflineDump() {
                 term_meta_offset = dict_file_writer->TotalWrittenBytes();
             }
             posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
-        }
-        if (last_doc_id != tuple.doc_id_) {
-            last_doc_id = tuple.doc_id_;
+        } else if (last_doc_id != tuple.doc_id_) {
             posting->EndDocument(last_doc_id, 0);
         }
+        last_doc_id = tuple.doc_id_;
         if (tuple.term_pos_ != last_term_pos) {
             last_term_pos = tuple.term_pos_;
             posting->AddPosition(last_term_pos);
         }
+    }
+    if (last_doc_id != INVALID_DOCID) {
+        posting->EndDocument(last_doc_id, 0);
     }
     if (posting->GetDF() > 0) {
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
