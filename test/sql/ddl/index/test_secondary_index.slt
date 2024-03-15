@@ -25,7 +25,6 @@ DROP INDEX idx_c1 ON test_secondary_index;
 #no such index
 statement error
 SHOW TABLE test_secondary_index INDEX idx_c1;
-----
 
 statement ok
 DROP TABLE test_secondary_index;
