@@ -25,7 +25,7 @@ import extra_ddl_info;
 import db_entry;
 import base_entry;
 import txn_manager;
-
+import meta_info;
 import entry_list;
 
 import meta_entry_interface;
@@ -66,17 +66,19 @@ private:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type = ConflictType::kError);
 
-    Tuple<DBEntry *, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                          TransactionID txn_id,
-                                          TxnTimeStamp begin_ts,
-                                          TxnManager *txn_mgr,
-                                          ConflictType conflict_type = ConflictType::kError);
+    Tuple<SharedPtr<DBEntry>, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   ConflictType conflict_type = ConflictType::kError);
 
     void DeleteNewEntry(TransactionID txn_id);
 
     Tuple<DBEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     }
+
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<DBEntry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) { return db_entry_list_.GetEntryNolock(txn_id, begin_ts); }
 

@@ -22,7 +22,7 @@ import table_meta;
 import base_entry;
 import table_entry;
 import third_party;
-import table_detail;
+import meta_info;
 import buffer_manager;
 import status;
 import extra_ddl_info;
@@ -46,7 +46,7 @@ public:
 
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &data_dir,
+                     const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
@@ -56,11 +56,10 @@ public:
                                          const SharedPtr<String> &data_dir,
                                          const SharedPtr<String> &db_name,
                                          TransactionID txn_id,
-                                         TxnTimeStamp begin_ts,
-                                         TxnManager *txn_mgr);
+                                         TxnTimeStamp begin_ts);
 
     static SharedPtr<DBEntry> NewReplayDBEntry(DBMeta *db_meta,
-                                               const SharedPtr<String> &data_dir,
+                                               const SharedPtr<String> &db_entry_dir,
                                                const SharedPtr<String> &db_name,
                                                TransactionID txn_id,
                                                TxnTimeStamp begin_ts,
@@ -89,10 +88,12 @@ private:
                                             TxnManager *txn_mgr,
                                             ConflictType conflict_type);
 
-    Tuple<TableEntry *, Status>
+    Tuple<SharedPtr<TableEntry>, Status>
     DropTable(const String &table_collection_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableEntry *, Status> GetTableCollection(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String& table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
@@ -100,11 +101,13 @@ private:
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
 
+
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));
     }
 
     friend void RecreateSegmentSealingTasksInStorageInit(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp system_start_ts);
+
 public:
     DBMeta *const db_meta_;
 

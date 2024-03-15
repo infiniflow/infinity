@@ -37,9 +37,17 @@ public:
     Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
 public:
-    explicit VectorBuffer() { GlobalResourceUsage::IncrObjectCount(); }
+    explicit VectorBuffer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("VectorBuffer");
+#endif
+    }
 
-    ~VectorBuffer() { GlobalResourceUsage::DecrObjectCount(); }
+    ~VectorBuffer() {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::DecrObjectCount("VectorBuffer");
+#endif
+    }
 
     void Initialize(SizeT type_size, SizeT capacity);
 

@@ -1082,6 +1082,11 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         UnrecoverableError("There should be one sink state in serial materialized fragment");
     }
 
+    if (tasks_[0]->sink_state_->Ignore()) {
+        SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
+        result_table->SetResultMsg(MakeUnique<String>("Ignore error"));
+        return result_table;
+    }
     if (tasks_[0]->sink_state_->Error()) {
         RecoverableError(tasks_[0]->sink_state_->status_);
     }

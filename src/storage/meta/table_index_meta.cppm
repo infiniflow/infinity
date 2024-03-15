@@ -26,6 +26,7 @@ import extra_ddl_info;
 import entry_list;
 import meta_entry_interface;
 import cleanup_scanner;
+import meta_info;
 
 namespace infinity {
 
@@ -60,11 +61,14 @@ public:
                                                            bool is_replay,
                                                            String replay_table_index_dir);
 
-    Tuple<TableIndexEntry *, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                         ConflictType conflict_type,
-                                                         TransactionID txn_id,
-                                                         TxnTimeStamp begin_ts,
-                                                         TxnManager *txn_mgr);
+    Tuple<SharedPtr<TableIndexEntry>, Status> DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                                  ConflictType conflict_type,
+                                                                  TransactionID txn_id,
+                                                                  TxnTimeStamp begin_ts,
+                                                                  TxnManager *txn_mgr);
+
+    Tuple<SharedPtr<TableIndexInfo>, Status>
+    GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);

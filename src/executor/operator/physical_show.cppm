@@ -41,9 +41,10 @@ public:
                           u64 table_index,
                           Optional<u32> segment_id,
                           Optional<u16> block_id,
+                          Optional<String> index_name,
                           SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
-          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id) {}
+          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), index_name_(index_name) {}
 
     ~PhysicalShow() override = default;
 
@@ -67,22 +68,27 @@ public:
     inline const String &object_name() const { return object_name_; };
 
 private:
-
-    void ExecuteShowTableDetail(QueryContext *query_context, const Vector<SharedPtr<ColumnDef>> &table_columns);
-
     void ExecuteShowViewDetail(QueryContext *query_context,
                                const SharedPtr<Vector<SharedPtr<DataType>>> &column_types,
                                const SharedPtr<Vector<String>> &column_names);
 
-    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
+    void ExecuteShowDatabase(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowTables(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowViews(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state);
+
+    void ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state);
 
     void ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *operator_state);
 
@@ -104,6 +110,7 @@ private:
 
     Optional<u32> segment_id_{};
     Optional<u16> block_id_{};
+    Optional<String> index_name_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

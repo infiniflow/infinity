@@ -64,13 +64,13 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shar
     return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                                     ConflictType conflict_type,
-                                                                     TransactionID txn_id,
-                                                                     TxnTimeStamp begin_ts,
-                                                                     TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                                              ConflictType conflict_type,
+                                                                              TransactionID txn_id,
+                                                                              TxnTimeStamp begin_ts,
+                                                                              TxnManager *txn_mgr) {
     auto init_drop_entry = [&]() {
-        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts, txn_mgr);
+        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
         drop_entry->deleted_ = true;
         return drop_entry;
     };
@@ -78,6 +78,22 @@ Tuple<TableIndexEntry *, Status> TableIndexMeta::DropTableIndexEntry(std::shared
 }
 
 void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = index_entry_list_.DeleteEntry(txn_id); }
+
+Tuple<SharedPtr<TableIndexInfo>, Status>
+TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_index_entry, status] = index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
+    table_index_info->index_name_ = index_name_;
+    table_index_info->index_entry_dir_ = table_index_entry->index_dir();
+    table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
+    table_index_info->index_info_ = MakeShared<String>(table_index_entry->index_base()->ToString());
+
+    return {table_index_info, status};
+}
 
 SharedPtr<String> TableIndexMeta::ToString() {
     UnrecoverableError("Not implemented");

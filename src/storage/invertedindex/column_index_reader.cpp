@@ -36,12 +36,12 @@ ColumnIndexReader::ColumnIndexReader() {}
 
 void ColumnIndexReader::Open(const String &index_dir,
                              const Vector<String> &base_names,
-                             const Vector<RowID> &base_docids,
+                             const Vector<RowID> &base_rowids,
                              optionflag_t flag,
                              MemoryIndexer *memory_indexer) {
     flag_ = flag;
     for (SizeT i = 0; i < base_names.size(); i++) {
-        SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir, base_names[i], base_docids[i], flag);
+        SharedPtr<DiskIndexSegmentReader> segment_reader = MakeShared<DiskIndexSegmentReader>(index_dir, base_names[i], base_rowids[i], flag);
         segment_readers_.push_back(segment_reader);
     }
     if (memory_indexer != nullptr && memory_indexer->GetDocCount() != 0) {
@@ -61,7 +61,7 @@ PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *sessi
     }
     if (seg_postings->empty())
         return nullptr;
-    PostingIterator *iter = new ((session_pool)->Allocate(sizeof(PostingIterator))) PostingIterator(PostingFormatOption(flag_), session_pool);
+    PostingIterator *iter = new PostingIterator(PostingFormatOption(flag_), session_pool);
     u32 state_pool_size = 0; // TODO
     iter->Init(seg_postings, state_pool_size);
     return iter;

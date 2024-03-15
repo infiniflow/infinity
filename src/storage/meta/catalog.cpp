@@ -36,7 +36,7 @@ import file_system_type;
 import file_system;
 import table_def;
 import table_entry_type;
-import table_detail;
+import meta_info;
 import index_base;
 import txn_store;
 import data_access_state;
@@ -82,7 +82,7 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
 // it will not record database in transaction, so when you commit transaction
 // it will lose operation
 // use Txn::DropDatabase instead
-Tuple<DBEntry *, Status>
+Tuple<SharedPtr<DBEntry>, Status>
 Catalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr, ConflictType conflict_type) {
     auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, conflict_type);
     if (db_meta == nullptr) {
@@ -97,6 +97,15 @@ Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, Transaction
         return {nullptr, status};
     }
     return db_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
+    if (db_meta == nullptr) {
+        return {nullptr, status};
+    }
+
+    return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {
@@ -138,12 +147,12 @@ Tuple<TableEntry *, Status> Catalog::CreateTable(const String &db_name,
         ->CreateTable(TableEntryType::kTableEntry, table_def->table_name(), table_def->columns(), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> Catalog::DropTableByName(const String &db_name,
-                                                     const String &table_name,
-                                                     ConflictType conflict_type,
-                                                     TransactionID txn_id,
-                                                     TxnTimeStamp begin_ts,
-                                                     TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableEntry>, Status> Catalog::DropTableByName(const String &db_name,
+                                                              const String &table_name,
+                                                              ConflictType conflict_type,
+                                                              TransactionID txn_id,
+                                                              TxnTimeStamp begin_ts,
+                                                              TxnManager *txn_mgr) {
     auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
     if (!status.ok()) {
         // Error
@@ -176,6 +185,18 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
+Tuple<SharedPtr<TableInfo>, Status>
+Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
+        return {nullptr, status};
+    }
+
+    return db_entry->GetTableInfo(table_name, txn_id, begin_ts);
+}
+
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
@@ -196,13 +217,13 @@ Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
     return table_entry->CreateIndex(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
 }
 
-Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
-                                                    const String &table_name,
-                                                    const String &index_name,
-                                                    ConflictType conflict_type,
-                                                    TransactionID txn_id,
-                                                    TxnTimeStamp begin_ts,
-                                                    TxnManager *txn_mgr) {
+Tuple<SharedPtr<TableIndexEntry>, Status> Catalog::DropIndex(const String &db_name,
+                                                             const String &table_name,
+                                                             const String &index_name,
+                                                             ConflictType conflict_type,
+                                                             TransactionID txn_id,
+                                                             TxnTimeStamp begin_ts,
+                                                             TxnManager *txn_mgr) {
     auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
         LOG_ERROR(fmt::format("Database: {}, Table: {} is invalid", db_name, table_name));
@@ -212,6 +233,24 @@ Tuple<TableIndexEntry *, Status> Catalog::DropIndex(const String &db_name,
     return table_entry->DropIndex(index_name, conflict_type, txn_id, begin_ts, txn_mgr);
 }
 
+Tuple<TableIndexEntry *, Status>
+Catalog::GetIndexByName(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetIndex(index_name, txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<TableIndexInfo>, Status>
+Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
+}
+
 Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {
     const TableIndexMeta *table_index_meta = table_index_entry->table_index_meta();
     TableEntry *table_entry = table_index_meta->GetTableEntry();
@@ -219,16 +258,18 @@ Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *tabl
     return Status::OK();
 }
 
-void Catalog::CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay) {
-    return TableEntry::CommitCreateIndex(txn_indexes_store_, is_replay);
+void Catalog::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {
+    auto *table_index_entry = txn_index_store->table_index_entry_;
+    table_index_entry->CommitCreateIndex(txn_index_store, commit_ts, is_replay);
 }
 
-void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr) {
-    return table_entry->Append(txn_id, txn_store, buffer_mgr);
+void Catalog::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
+    auto *table_index_entry = txn_index_store->table_index_entry_;
+    table_index_entry->RollbackCreateIndex(txn_index_store);
 }
 
-void Catalog::CommitAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr) {
-    return table_entry->CommitAppend(txn_id, commit_ts, append_state_ptr);
+void Catalog::Append(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+    return table_entry->Append(txn_id, txn_store, commit_ts, buffer_mgr);
 }
 
 void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
@@ -237,10 +278,6 @@ void Catalog::RollbackAppend(TableEntry *table_entry, TransactionID txn_id, TxnT
 
 Status Catalog::Delete(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     return table_entry->Delete(txn_id, txn_store, commit_ts, delete_state);
-}
-
-void Catalog::CommitDelete(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state) {
-    return table_entry->CommitDelete(txn_id, commit_ts, append_state);
 }
 
 Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr) {
@@ -256,8 +293,15 @@ Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, T
     return table_entry->RollbackCompact(txn_id, commit_ts, compact_store);
 }
 
-Status Catalog::CommitImport(TableEntry *table_entry, TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment) {
-    return table_entry->CommitImport(commit_ts, segment);
+Status Catalog::CommitWrite(TableEntry *table_entry,
+                            TransactionID txn_id,
+                            TxnTimeStamp commit_ts,
+                            const HashMap<SegmentID, TxnSegmentStore> &segment_stores) {
+    return table_entry->CommitWrite(txn_id, commit_ts, segment_stores);
+}
+
+Status Catalog::RollbackWrite(TableEntry *table_entry, TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores) {
+    return table_entry->RollbackWrite(commit_ts, segment_stores);
 }
 
 SegmentID Catalog::GetNextSegmentID(TableEntry *table_entry) { return table_entry->GetNextSegmentID(); }
@@ -343,7 +387,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> dir, bool create_defaul
         Path parent_path = catalog_path.parent_path();
         auto data_dir = MakeShared<String>(parent_path.string());
         UniquePtr<DBMeta> db_meta = MakeUnique<DBMeta>(data_dir, MakeShared<String>("default"));
-        UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
+        SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
         db_meta->db_entry_list().emplace_front(std::move(db_entry));
@@ -457,9 +501,10 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
                 auto db_name = add_db_entry_op->db_name();
-
+                const auto &db_entry_dir = add_db_entry_op->db_entry_dir();
                 auto db_meta = catalog->db_meta_map().at(db_name).get();
-                auto db_entry = DBEntry::NewReplayDBEntry(db_meta, db_meta->data_dir_, db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
+                auto db_entry =
+                    DBEntry::NewReplayDBEntry(db_meta, MakeShared<String>(db_entry_dir), db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
                 db_meta->db_entry_list().emplace_front(std::move(db_entry));
                 break;
             }
@@ -832,9 +877,7 @@ UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeSta
 // called by bg_task
 bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp max_commit_ts) {
     LOG_INFO("SAVING DELTA CATALOG");
-    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.",
-                         global_catalog_delta_entry_->commit_ts(),
-                         max_commit_ts));
+    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", global_catalog_delta_entry_->commit_ts(), max_commit_ts));
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);

@@ -449,6 +449,8 @@ export struct SinkState {
 
     inline bool Error() const { return !status_.ok(); }
 
+    bool Ignore() const { return status_.code() == ErrorCode::kIgnore; }
+
     u64 fragment_id_{};
     u64 task_id_{};
     OperatorState *prev_op_state_{};

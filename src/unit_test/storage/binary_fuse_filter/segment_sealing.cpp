@@ -56,7 +56,7 @@ protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+        auto [table_entry, status] = txn->GetTableByName("default", table_name);
         auto column_count = table_entry->ColumnCount();
         EXPECT_EQ(column_count, u32(1));
         while (row_cnt_input > 0) {
@@ -84,7 +84,9 @@ protected:
 TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -118,7 +120,7 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
         {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
-            auto [table_entry, status] = txn->GetTableEntry("default", table_name);
+            auto [table_entry, status] = txn->GetTableByName("default", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1
             int unsealed_cnt = 0, sealed_cnt = 0;
@@ -140,9 +142,11 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
             txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     /*
     ////////////////////////////////

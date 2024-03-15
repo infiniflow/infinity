@@ -28,16 +28,24 @@ module bitmask;
 
 namespace infinity {
 
-Bitmask::Bitmask() : data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) { GlobalResourceUsage::IncrObjectCount(); }
+Bitmask::Bitmask() : data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) {
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Bitmask");
+#endif
+}
 
 Bitmask::Bitmask(Bitmask &&right) : data_ptr_(right.data_ptr_), buffer_ptr(std::move(right.buffer_ptr)), count_(right.count_) {
     right.data_ptr_ = nullptr;
     right.count_ = 0;
-    GlobalResourceUsage::IncrObjectCount();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::IncrObjectCount("Bitmask");
+#endif
 }
 
 Bitmask::~Bitmask() {
-    GlobalResourceUsage::DecrObjectCount();
+#ifdef INFINITY_DEBUG
+    GlobalResourceUsage::DecrObjectCount("Bitmask");
+#endif
     //    Reset();
 }
 

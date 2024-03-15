@@ -244,7 +244,9 @@ class TestSelect:
             table_obj.insert(
                 [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
-    def test_select_embedding_int32(self):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_select_embedding_int32(self, check_data):
         """
 
         TestSelect.test_select_embedding()
@@ -272,6 +274,8 @@ class TestSelect:
 
         table_obj = db_obj.get_table("test_select_embedding")
 
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
         test_dir = "/tmp/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
@@ -342,7 +346,9 @@ class TestSelect:
                                           [0.3, 0.2, 0.1, 0.4], [0.4, 0.3, 0.2, 0.1])})
                                       .astype({'c1': dtype('float32'), 'c2': dtype('O')}))
 
-    def test_select_big_embedding(self):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_select_big_embedding(self, check_data):
         """
 
         Method: test_select_big_embedding
@@ -371,6 +377,8 @@ class TestSelect:
 
         table_obj = db_obj.get_table("test_select_big_embedding")
 
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
         test_dir = "/tmp/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)

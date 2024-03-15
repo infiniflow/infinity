@@ -38,16 +38,20 @@ class CatalogTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
         system("rm -rf /tmp/infinity/log /tmp/infinity/data /tmp/infinity/wal");
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
         BaseTest::TearDown();
     }
 };
@@ -93,7 +97,7 @@ TEST_F(CatalogTest, simple_test1) {
     {
         auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(base_entry, databases["db1"]);
+        EXPECT_EQ(base_entry.get(), databases["db1"]);
         // remove this entry
         databases.erase("db1");
 

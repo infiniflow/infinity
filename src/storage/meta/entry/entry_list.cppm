@@ -56,12 +56,12 @@ public:
                                     TxnManager *txn_mgr,
                                     ConflictType conflict_type);
 
-    Tuple<Entry *, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                     std::function<SharedPtr<Entry>()> &&init_func,
-                                     TransactionID txn_id,
-                                     TxnTimeStamp begin_ts,
-                                     TxnManager *txn_mgr,
-                                     ConflictType conflict_type);
+    Tuple<SharedPtr<Entry>, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                              std::function<SharedPtr<Entry>()> &&init_func,
+                                              TransactionID txn_id,
+                                              TxnTimeStamp begin_ts,
+                                              TxnManager *txn_mgr,
+                                              ConflictType conflict_type);
 
     Tuple<Entry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -176,16 +176,20 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore Add an existed entry."));
-                    return {nullptr, Status::OK()};
+                    return {nullptr, Status::Ignore()};
                 }
                 default: {
-                    UniquePtr<String> err_msg = MakeUnique<String>("Duplicated entry");
-                    LOG_ERROR(*err_msg);
                     if constexpr (std::is_same_v<Entry, DBEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated db entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateDatabaseName, std::move(err_msg))};
                     } else if constexpr (std::is_same_v<Entry, TableEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated table entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateTableName, std::move(err_msg))};
                     } else if constexpr (std::is_same_v<Entry, TableIndexEntry>) {
+                        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated table index entry");
+                        LOG_ERROR(*err_msg);
                         return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
                     } else {
                         UnrecoverableError("Unimplemented");
@@ -206,12 +210,12 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
 }
 
 template <EntryConcept Entry>
-Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_mutex> &&parent_r_lock,
-                                                   std::function<SharedPtr<Entry>()> &&init_func,
-                                                   TransactionID txn_id,
-                                                   TxnTimeStamp begin_ts,
-                                                   TxnManager *txn_mgr,
-                                                   ConflictType conflict_type) {
+Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_mutex> &&parent_r_lock,
+                                                            std::function<SharedPtr<Entry>()> &&init_func,
+                                                            TransactionID txn_id,
+                                                            TxnTimeStamp begin_ts,
+                                                            TxnManager *txn_mgr,
+                                                            ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
     parent_r_lock.unlock();
     FindResult find_res = FindEntry(txn_id, begin_ts, txn_mgr);
@@ -221,7 +225,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
             switch (conflict_type) {
                 case ConflictType::kIgnore: {
                     LOG_TRACE(fmt::format("Ignore drop a not existed entry."));
-                    return {nullptr, Status::OK()};
+                    return {nullptr, Status::Ignore()};
                 }
                 default: {
                     auto err_msg = MakeUnique<String>("Not existed entry.");
@@ -240,14 +244,14 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
         }
         case FindResult::kUncommitted: {
             SharedPtr<Entry> drop_entry = init_func();
-            Entry *drop_entry_ptr = entry_list_.front().get();
+            SharedPtr<Entry> uncommitted_entry = std::move(entry_list_.front());
             entry_list_.pop_front();
             if (txn_mgr != nullptr) {
                 auto op = MakeUnique<typename Entry::EntryOp>(drop_entry, true);
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }
-            return {drop_entry_ptr, Status::OK()};
+            return {uncommitted_entry, Status::OK()};
         }
         case FindResult::kFound: {
             SharedPtr<Entry> drop_entry = init_func();
@@ -257,7 +261,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntry(std::shared_lock<std::shared_
                 Txn *txn = txn_mgr->GetTxn(txn_id);
                 txn->AddCatalogDeltaOperation(std::move(op));
             }
-            return {drop_entry.get(), Status::OK()};
+            return {drop_entry, Status::OK()};
         }
         case FindResult::kConflict: {
             auto err_msg = MakeUnique<String>(

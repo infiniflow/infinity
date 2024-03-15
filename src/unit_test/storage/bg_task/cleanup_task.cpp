@@ -43,21 +43,34 @@ import index_secondary;
 using namespace infinity;
 
 class CleanupTaskTest : public BaseTest {
+protected:
     void SetUp() override { system("rm -rf /tmp/infinity"); }
 
-    void TearDown() override { system("tree /tmp/infinity"); }
+    void TearDown() override {}
+
+    void WaitCleanup(Catalog *catalog, TxnManager *txn_mgr, TxnTimeStamp last_commit_ts) {
+        TxnTimeStamp visible_ts = 0;
+        do {
+            visible_ts = txn_mgr->GetMinUnflushedTS();
+            // // sleep for 1s
+            // std::this_thread::sleep_for(std::chrono::seconds(1));
+        } while (visible_ts <= last_commit_ts);
+        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
+        cleanup_task->Execute();
+    }
 };
 
 TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
     {
@@ -71,13 +84,9 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
         txn->Begin();
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
-    {
-        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake visible ts here, get next ts
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-        cleanup_task->Execute();
-    }
+    WaitCleanup(catalog, txn_mgr, last_commit_ts);
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
@@ -85,19 +94,20 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Simple) {
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
     }
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("db1");
     {
@@ -123,18 +133,14 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
         txn->CreateDatabase(*db_name, ConflictType::kError);
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
         Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        {
-            TxnTimeStamp visible_ts = txn->BeginTS(); // Fake
-            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-            cleanup_task->Execute();
-        }
+        WaitCleanup(catalog, txn_mgr, last_commit_ts);
         txn_mgr->CommitTxn(txn);
     }
     {
@@ -144,19 +150,20 @@ TEST_F(CleanupTaskTest, TestDeleteDB_Complex) {
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
     }
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -182,36 +189,33 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Simple) {
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    {
-        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-        cleanup_task->Execute();
-    }
+    WaitCleanup(catalog, txn_mgr, last_commit_ts);
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
         txn_mgr->CommitTxn(txn);
     }
 
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -253,7 +257,7 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
         txn->Begin();
         auto status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
     {
@@ -262,23 +266,19 @@ TEST_F(CleanupTaskTest, TestDeleteTable_Complex) {
 
         Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
-        {
-            TxnTimeStamp visible_ts = txn->BeginTS(); // Fake
-            auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-            cleanup_task->Execute();
-        }
+        WaitCleanup(catalog, txn_mgr, last_commit_ts);
         txn_mgr->CommitTxn(txn);
     }
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_EQ(table_entry, nullptr);
 
         txn_mgr->CommitTxn(txn);
     }
 
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
@@ -288,13 +288,14 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     Vector<SharedPtr<ColumnDef>> column_defs;
     {
@@ -316,7 +317,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
 
@@ -350,8 +351,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -359,23 +359,19 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
         auto txn = txn_mgr->CreateTxn();
         txn->Begin();
 
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
 
         {
             auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn);
             compact_task->Execute();
         }
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    {
-        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-        cleanup_task->Execute();
-    }
+    WaitCleanup(catalog, txn_mgr, last_commit_ts);
 
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }
 
 TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
@@ -385,13 +381,14 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
     // close auto cleanup task
     auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
 
-    infinity::InfinityContext::instance().Init(config_path);
-    Storage *storage = infinity::InfinityContext::instance().storage();
+    InfinityContext::instance().Init(config_path);
+    Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
     TxnManager *txn_mgr = storage->txn_manager();
     BufferManager *buffer_mgr = storage->buffer_manager();
     Catalog *catalog = storage->catalog();
+    TxnTimeStamp last_commit_ts = 0;
 
     auto db_name = MakeShared<String>("default");
     auto table_name = MakeShared<String>("table1");
@@ -416,7 +413,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
     {
         auto *txn = txn_mgr->CreateTxn();
         txn->Begin();
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
         table_entry->SetCompactionAlg(nullptr);
 
@@ -450,8 +447,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            auto *txn_store = txn->GetTxnTableStore(table_entry);
-            PhysicalImport::SaveSegmentData(txn_store, segment_entry);
+            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -461,7 +457,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
 
         SharedPtr<IndexBase> index_base = IndexSecondary::Make(index_name, fmt::format("{}_{}", *table_name, *index_name), {*column_name});
 
-        auto [table_entry, status1] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
         TxnTimeStamp begin_ts = txn->BeginTS();
@@ -478,21 +474,17 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
         auto txn = txn_mgr->CreateTxn();
         txn->Begin();
 
-        auto [table_entry, status] = txn->GetTableEntry(*db_name, *table_name);
+        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(table_entry != nullptr);
 
         {
             auto compact_task = CompactSegmentsTask::MakeTaskWithWholeTable(table_entry, txn);
             compact_task->Execute();
         }
-        txn_mgr->CommitTxn(txn);
+        last_commit_ts = txn_mgr->CommitTxn(txn);
     }
 
-    {
-        TxnTimeStamp visible_ts = txn_mgr->GetTimestamp(); // Fake
-        auto cleanup_task = MakeShared<CleanupTask>(catalog, visible_ts);
-        cleanup_task->Execute();
-    }
+    WaitCleanup(catalog, txn_mgr, last_commit_ts);
 
-    infinity::InfinityContext::instance().UnInit();
+    InfinityContext::instance().UnInit();
 }

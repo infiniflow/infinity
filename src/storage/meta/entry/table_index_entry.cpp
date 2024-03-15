@@ -75,8 +75,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
         SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
         auto table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
 
-        txn->AddIndexStore(*index_base->index_name_, table_index_entry.get());
-
         TableIndexEntry *table_index_entry_ptr = table_index_entry.get();
 
         {
@@ -124,15 +122,8 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexM
     return table_index_entry;
 }
 
-
-SharedPtr<TableIndexEntry>
-TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
-    if (txn_mgr) {
-        auto *txn = txn_mgr->GetTxn(txn_id);
-        auto &index_name = *table_index_meta->index_name();
-        txn->DropIndexStore(index_name, dropped_index_entry.get());
-    }
     return dropped_index_entry;
 }
 
@@ -142,20 +133,37 @@ TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, 
 }
 
 // For segment_index_entry
-void TableIndexEntry::CommitCreateIndex(u32 segment_id, SharedPtr<SegmentIndexEntry> segment_index_entry, bool is_replay) {
-    if (!is_replay) {
-        // Save index file.
-        segment_index_entry->SaveIndexFile();
-    }
+void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay) {
     {
-        std::unique_lock<std::shared_mutex> w_locker(this->rw_locker_);
-        index_by_segment_.emplace(segment_id, segment_index_entry);
+        std::unique_lock w_lock(rw_locker_);
+        for (const auto &[segment_id, segment_index_entry] : txn_index_store->index_entry_map_) {
+            if (!is_replay) {
+                // Save index file.
+                segment_index_entry->SaveIndexFile();
+            }
+            segment_index_entry->Commit(commit_ts);
+        }
+        if (txn_index_store->fulltext_index_entry_ != nullptr) {
+            txn_index_store->fulltext_index_entry_->Commit(commit_ts);
+        }
     }
 }
 
 // For fulltext_index_entry
-void TableIndexEntry::CommitCreateIndex(const SharedPtr<FulltextIndexEntry> &fulltext_index_entry) {
-    this->fulltext_index_entry_ = fulltext_index_entry;
+void TableIndexEntry::RollbackCreateIndex(TxnIndexStore *txn_index_store) {
+    {
+        std::unique_lock w_lock(rw_locker_);
+        for (const auto &[segment_id, segment_index_entry] : txn_index_store->index_entry_map_) {
+            segment_index_entry->Cleanup();
+            if (index_by_segment_.erase(segment_id) == 0) {
+                UnrecoverableError("Failed to erase segment index entry");
+            }
+        }
+        if (txn_index_store->fulltext_index_entry_ != nullptr) {
+            txn_index_store->fulltext_index_entry_->Cleanup();
+            fulltext_index_entry_.reset();
+        }
+    }
 }
 
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
@@ -233,7 +241,8 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     return table_index_entry;
 }
 
-Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
+Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
+TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
         auto *buffer_mgr = txn->GetBufferMgr();
@@ -242,11 +251,11 @@ Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *
         }
         fulltext_index_entry->irs_index_->Commit();
         fulltext_index_entry->irs_index_->StopSchedule();
-        return Status::OK();
+        return {fulltext_index_entry, Vector<SegmentIndexEntry *>{}, Status::OK()};
     }
     const String &column_name = this->index_base()->column_name();
     const auto *column_def = table_entry->GetColumnDefByName(column_name);
-    auto *txn_store = txn->GetTxnTableStore(table_entry);
+    Vector<SegmentIndexEntry *> segment_index_entries;
     for (const auto *segment_entry : block_index->segments_) {
         auto create_index_param = SegmentIndexEntry::GetCreateIndexParam(index_base_.get(), segment_entry->row_count(), column_def);
         SegmentID segment_id = segment_entry->segment_id();
@@ -254,10 +263,10 @@ Status TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *
         if (!is_replay) {
             segment_index_entry->CreateIndexPrepare(index_base_.get(), column_def, segment_entry, txn, prepare, check_ts);
         }
-        txn_store->CreateIndexFile(this, segment_id, segment_index_entry);
         index_by_segment_.emplace(segment_id, segment_index_entry);
+        segment_index_entries.push_back(segment_index_entry.get());
     }
-    return Status::OK();
+    return {nullptr, segment_index_entries, Status::OK()};
 }
 
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {

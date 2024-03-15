@@ -33,6 +33,7 @@ import third_party;
 import status;
 import infinity_exception;
 import column_def;
+import block_index;
 
 namespace infinity {
 
@@ -62,25 +63,17 @@ Tuple<TableEntry *, Status> TableMeta::CreateNewEntry(std::shared_lock<std::shar
                                                       TxnManager *txn_mgr,
                                                       ConflictType conflict_type) {
     auto init_table_entry = [&]() {
-        return TableEntry::NewTableEntry(false,
-                                         this->db_entry_dir_,
-                                         table_collection_name_ptr,
-                                         columns,
-                                         table_entry_type,
-                                         this,
-                                         txn_id,
-                                         begin_ts,
-                                         txn_mgr);
+        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_collection_name_ptr, columns, table_entry_type, this, txn_id, begin_ts);
     };
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                    TransactionID txn_id,
-                                                    TxnTimeStamp begin_ts,
-                                                    TxnManager *txn_mgr,
-                                                    const String &table_name,
-                                                    ConflictType conflict_type) {
+Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                             TransactionID txn_id,
+                                                             TxnTimeStamp begin_ts,
+                                                             TxnManager *txn_mgr,
+                                                             const String &table_name,
+                                                             ConflictType conflict_type) {
     auto init_drop_entry = [&]() {
         Vector<SharedPtr<ColumnDef>> dummy_columns;
         return TableEntry::NewTableEntry(true,
@@ -90,10 +83,28 @@ Tuple<TableEntry *, Status> TableMeta::DropNewEntry(std::shared_lock<std::shared
                                          TableEntryType::kTableEntry,
                                          this,
                                          txn_id,
-                                         begin_ts,
-                                         txn_mgr);
+                                         begin_ts);
     };
     return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+}
+
+Tuple<SharedPtr<TableInfo>, Status>
+TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, status] = table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
+    table_info->table_name_ = table_name_;
+    table_info->table_entry_dir_ = table_entry->TableEntryDir();
+    table_info->column_count_ = table_entry->ColumnCount();
+    table_info->row_count_ = table_entry->row_count();
+
+    SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
+    table_info->segment_count_ = segment_index->SegmentCount();
+
+    return {table_info, status};
 }
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }

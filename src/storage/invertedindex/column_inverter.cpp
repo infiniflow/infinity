@@ -15,6 +15,7 @@
 module;
 
 #include <arpa/inet.h>
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -73,19 +74,21 @@ u32 ColumnInverter::AddTerm(StringRef term) {
     return term_ref;
 }
 
-void ColumnInverter::Merge(ColumnInverter &rhs) {
-    if (positions_.empty()) {
-        for (auto &doc_terms : terms_per_doc_) {
-            u32 doc_id = doc_terms.first;
-            auto &terms_once = doc_terms.second;
-            for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
-                StringRef term(it->text_);
-                u32 term_ref = AddTerm(term);
-                positions_.emplace_back(term_ref, doc_id, it->word_offset_);
-            }
+void ColumnInverter::MergePrepare() {
+    for (auto &doc_terms : terms_per_doc_) {
+        u32 doc_id = doc_terms.first;
+        auto &terms_once = doc_terms.second;
+        for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
+            StringRef term(it->text_);
+            u32 term_ref = AddTerm(term);
+            positions_.emplace_back(term_ref, doc_id, it->word_offset_);
         }
-        terms_per_doc_.clear();
     }
+    terms_per_doc_.clear();
+}
+
+void ColumnInverter::Merge(ColumnInverter &rhs) {
+    MergePrepare();
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;
         auto &terms_once = doc_terms.second;
@@ -98,26 +101,36 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
     rhs.terms_per_doc_.clear();
 }
 
+void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
+    assert(!inverters.empty());
+    inverters[0]->MergePrepare();
+    SizeT end = inverters.size();
+    for (SizeT i = 1; i < end; i++) {
+        SharedPtr<ColumnInverter> &rhs = inverters[i];
+        inverters[0]->Merge(*rhs);
+    }
+}
+
 struct TermRefRadix {
     u32 operator()(const u64 v) { return v >> 32; }
 };
 
 void ColumnInverter::SortTerms() {
     Vector<u64> first_four_bytes(term_refs_.size());
-    for (u32 i = 1; i < term_refs_.size(); ++i) {
+    for (u32 i = 0; i < term_refs_.size(); ++i) {
         u64 first_four = ntohl(*reinterpret_cast<const u32 *>(GetTermFromRef(term_refs_[i])));
         first_four_bytes[i] = (first_four << 32) | term_refs_[i];
     }
     ShiftBasedRadixSorter<u64, TermRefRadix, CompareTermRef, 24, true>::RadixSort(TermRefRadix(),
                                                                                   CompareTermRef(terms_),
-                                                                                  &first_four_bytes[1],
-                                                                                  first_four_bytes.size() - 1,
+                                                                                  &first_four_bytes[0],
+                                                                                  first_four_bytes.size(),
                                                                                   16);
-    for (u32 i(1); i < first_four_bytes.size(); i++) {
+    for (u32 i(0); i < first_four_bytes.size(); i++) {
         term_refs_[i] = first_four_bytes[i] & 0xffffffffl;
     }
-    auto term_ref_begin(term_refs_.begin() + 1);
-    uint32_t term_num = 1; // First valid term number
+    auto term_ref_begin(term_refs_.begin());
+    uint32_t term_num = 0; // First valid term number
     const char *last_term = GetTermFromRef(*term_ref_begin);
     UpdateTermNum(*term_ref_begin, term_num);
     for (++term_ref_begin; term_ref_begin != term_refs_.end(); ++term_ref_begin) {
@@ -155,23 +168,35 @@ void ColumnInverter::Sort() {
 void ColumnInverter::GeneratePosting() {
     u32 last_term_num = std::numeric_limits<u32>::max();
     u32 last_doc_id = INVALID_DOCID;
-    StringRef term;
+    StringRef last_term, term;
     SharedPtr<PostingWriter> posting = nullptr;
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
+            if (last_doc_id != INVALID_DOCID) {
+                assert(posting.get() != nullptr);
+                posting->EndDocument(last_doc_id, 0);
+                // printf(" EndDocument1-%u\n", last_doc_id);
+            }
             term = GetTermFromNum(i.term_num_);
             posting = posting_writer_provider_(String(term.data()));
+            // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
             last_term_num = i.term_num_;
-            last_doc_id = INVALID_DOCID;
-        }
-        if (last_doc_id != INVALID_DOCID && last_doc_id != i.doc_id_) {
+            assert(last_term < term);
+            last_term = term;
+        } else if (last_doc_id != i.doc_id_) {
+            assert(last_doc_id != INVALID_DOCID);
+            assert(last_doc_id < i.doc_id_);
+            assert(posting.get() != nullptr);
             posting->EndDocument(last_doc_id, 0);
+            // printf(" EndDocument2-%u\n", last_doc_id);
         }
         last_doc_id = i.doc_id_;
         posting->AddPosition(i.term_pos_);
+        // printf(" pos-%u", i.term_pos_);
     }
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
+        // printf(" EndDocument3-%u\n", last_doc_id);
     }
 }
 

@@ -58,19 +58,6 @@ import drop_table_info;
 
 namespace infinity {
 
-SharedPtr<Infinity> Infinity::RemoteConnect() {
-    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
-    SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
-    return infinity_ptr;
-}
-
-void Infinity::RemoteDisconnect() {
-    SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    session_mgr->RemoveSessionByID(session_->session_id());
-    session_.reset();
-}
-
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
 void Infinity::LocalInit(const String &path) {
@@ -97,6 +84,19 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
 
 void Infinity::LocalDisconnect() {
     //    fmt::print("To disconnect the database.\n");
+}
+
+SharedPtr<Infinity> Infinity::RemoteConnect() {
+    SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
+    return infinity_ptr;
+}
+
+void Infinity::RemoteDisconnect() {
+    SessionManager *session_mgr = InfinityContext::instance().session_manager();
+    session_mgr->RemoveSessionByID(session_->session_id());
+    session_.reset();
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {

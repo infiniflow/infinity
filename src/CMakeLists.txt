@@ -212,6 +212,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/mlas")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
         message("Compiled by AVX2 or AVX512")
@@ -227,6 +228,8 @@ endif()
 add_executable(infinity
         ${main_cpp}
         ${network_cpp}
+        network/http_server.cppm
+        network/http_server.cpp
 )
 
 target_sources(infinity
@@ -234,6 +237,8 @@ target_sources(infinity
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
         ${network_cppm}
 )
+
+add_dependencies(infinity oatpp)
 
 target_link_libraries(infinity
         infinity_core
@@ -251,9 +256,11 @@ target_link_libraries(infinity
         lz4.a
         atomic.a
         event.a
+        oatpp.a
 #        profiler
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")

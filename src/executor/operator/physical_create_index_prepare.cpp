@@ -60,10 +60,8 @@ void PhysicalCreateIndexPrepare::Init() {}
 
 bool PhysicalCreateIndexPrepare::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *txn = query_context->GetTxn();
-    auto result = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_);
-    auto *table_index_entry = std::get<0>(result);
-    auto status = std::get<1>(result);
-    if (!status.ok() || table_index_entry == nullptr) {
+    auto [table_index_entry, status] = txn->CreateIndexDef(base_table_ref_->table_entry_ptr_, index_def_ptr_, conflict_type_);
+    if (!status.ok()) {
         operator_state->status_ = status;
     } else {
         txn->CreateIndexPrepare(table_index_entry, base_table_ref_.get(), prepare_);

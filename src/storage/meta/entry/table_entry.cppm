@@ -40,6 +40,7 @@ import meta_entry_interface;
 import cleanup_scanner;
 import random;
 import memory_pool;
+import meta_info;
 
 namespace infinity {
 
@@ -59,7 +60,7 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
-                        const SharedPtr<String> &db_entry_dir,
+                        const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
@@ -74,11 +75,10 @@ public:
                                                TableEntryType table_entry_type,
                                                TableMeta *table_meta,
                                                TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr);
+                                               TxnTimeStamp begin_ts);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
-                                                     SharedPtr<String> db_entry_dir,
+                                                     SharedPtr<String> table_entry_dir,
                                                      SharedPtr<String> table_name,
                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
                                                      TableEntryType table_entry_type,
@@ -97,31 +97,29 @@ public:
                                                  bool is_replay = false,
                                                  String replay_table_index_dir = "");
 
-    Tuple<TableIndexEntry *, Status>
+    Tuple<SharedPtr<TableIndexEntry>, Status>
     DropIndex(const String &index_name, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
 
 public:
-    static void CommitCreateIndex(HashMap<String, TxnIndexStore> &txn_indexes_store_, bool is_replay);
-
     TableMeta *GetTableMeta() const { return table_meta_; }
 
-    void Append(TransactionID txn_id, void *txn_store, BufferManager *buffer_mgr);
+    void Import(SharedPtr<SegmentEntry> segment_entry);
 
-    void SetSegmentSealedForAppend(const Vector<SegmentID> &set_sealed_segments);
+    void AddCompactNew(SharedPtr<SegmentEntry> segment_entry);
 
-    void CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, const AppendState *append_state_ptr);
+    void Append(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
     void RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store);
 
     Status Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state);
-
-    void CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const DeleteState &append_state);
 
     Status RollbackDelete(TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
@@ -129,10 +127,9 @@ public:
 
     Status RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_state);
 
-    Status CommitImport(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> segment);
+    Status CommitWrite(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<SegmentID, TxnSegmentStore> &segment_stores);
 
-    // This is private, **DO NOT** use by catalog
-    Status CommitSegment(TxnTimeStamp commit_ts, SharedPtr<SegmentEntry> &segment);
+    Status RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegmentStore> &segment_stores);
 
     SegmentID GetNextSegmentID() { return next_segment_id_++; }
 

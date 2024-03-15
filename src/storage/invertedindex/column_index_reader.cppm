@@ -35,7 +35,7 @@ public:
 
     void Open(const String &index_dir,
               const Vector<String> &base_names,
-              const Vector<RowID> &base_docids,
+              const Vector<RowID> &base_rowids,
               optionflag_t flag,
               MemoryIndexer *memory_indexer);
 

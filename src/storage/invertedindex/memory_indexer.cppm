@@ -14,6 +14,7 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <cstdio>
 
 export module memory_indexer;
@@ -40,7 +41,7 @@ public:
 
     MemoryIndexer(const String &index_dir,
                   const String &base_name,
-                  docid_t base_doc_id,
+                  RowID base_row_id,
                   optionflag_t flag,
                   const String &analyzer,
                   MemoryPool &byte_slice_pool,
@@ -56,11 +57,19 @@ public:
     // Other threads can also call this method.
     void Commit();
 
+    // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
+    SizeT CommitSync();
+
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
     void Dump();
 
-    docid_t GetBaseDocId() const { return base_doc_id_; }
+    SizeT GetInflightTasks() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return inflight_tasks_;
+    }
+
+    RowID GetBaseRowId() const { return base_row_id_; }
 
     u32 GetDocCount() const { return doc_count_; }
 
@@ -87,7 +96,7 @@ private:
 private:
     String index_dir_;
     String base_name_;
-    docid_t base_doc_id_{INVALID_DOCID};
+    RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
     String analyzer_;
     MemoryPool &byte_slice_pool_;

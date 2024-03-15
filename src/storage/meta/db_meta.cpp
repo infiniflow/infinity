@@ -44,20 +44,34 @@ Tuple<DBEntry *, Status> DBMeta::CreateNewEntry(std::shared_lock<std::shared_mut
                                                 TxnTimeStamp begin_ts,
                                                 TxnManager *txn_mgr,
                                                 ConflictType conflict_type) {
-    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts, txn_mgr); };
+    auto init_db_entry = [&]() { return DBEntry::NewDBEntry(this, false, this->data_dir_, this->db_name_, txn_id, begin_ts); };
     return db_entry_list_.AddEntry(std::move(r_lock), std::move(init_db_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<DBEntry *, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                              TransactionID txn_id,
-                                              TxnTimeStamp begin_ts,
-                                              TxnManager *txn_mgr,
-                                              ConflictType conflict_type) {
-    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts, txn_mgr); };
+Tuple<SharedPtr<DBEntry>, Status> DBMeta::DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                       TransactionID txn_id,
+                                                       TxnTimeStamp begin_ts,
+                                                       TxnManager *txn_mgr,
+                                                       ConflictType conflict_type) {
+    auto init_drop_entry = [&]() { return DBEntry::NewDBEntry(this, true, this->data_dir_, this->db_name_, txn_id, begin_ts); };
     return db_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
 void DBMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = db_entry_list_.DeleteEntry(txn_id); }
+
+Tuple<SharedPtr<DatabaseInfo>, Status> DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
+    auto [db_entry, status] = db_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", *db_name_));
+        return {db_info, status};
+    }
+    db_info->db_name_ = db_entry->db_name_ptr();
+    db_info->db_entry_dir_ = db_entry->db_entry_dir();
+
+    return {db_info, Status::OK()};
+}
 
 SharedPtr<String> DBMeta::ToString() {
     std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());

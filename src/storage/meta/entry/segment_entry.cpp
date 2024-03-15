@@ -46,7 +46,7 @@ import wal_entry;
 
 namespace infinity {
 
-SegmentEntry::SegmentEntry(const TableEntry *table_entry,
+SegmentEntry::SegmentEntry(TableEntry *table_entry,
                            SharedPtr<String> segment_dir,
                            SegmentID segment_id,
                            SizeT row_capacity,
@@ -55,7 +55,7 @@ SegmentEntry::SegmentEntry(const TableEntry *table_entry,
     : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
       column_count_(column_count), status_(status) {}
 
-SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status) {
+SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
                                                                      segment_id,
@@ -69,30 +69,28 @@ SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(const TableEntry *tab
     return segment_entry;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::NewAppendSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+SharedPtr<SegmentEntry> SegmentEntry::NewAppendSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kUnsealed);
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::NewImportSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+SharedPtr<SegmentEntry> SegmentEntry::NewImportSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::NewCompactSegmentEntry(const TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
+SharedPtr<SegmentEntry> SegmentEntry::NewCompactSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
 }
 
 // used by import and compact, add a new segment, status:kSealed
-SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(const TableEntry *table_entry,
-                                                            SegmentID segment_id,
-                                                            const SharedPtr<String> &segment_dir,
-                                                            TxnTimeStamp commit_ts) {
+SharedPtr<SegmentEntry>
+SegmentEntry::NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts) {
     auto segment_entry =
         MakeShared<SegmentEntry>(table_entry, segment_dir, segment_id, DEFAULT_SEGMENT_CAPACITY, table_entry->ColumnCount(), SegmentStatus::kSealed);
     segment_entry->min_row_ts_ = commit_ts;
     return segment_entry;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEntry *table_entry,
+SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *table_entry,
                                                                    SegmentID segment_id,
                                                                    const SharedPtr<String> &segment_dir,
                                                                    SegmentStatus status,
@@ -119,7 +117,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(const TableEn
 void SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("SetSealing only accept unsealed segment");
+        UnrecoverableError("SetSealed failed");
     }
     status_ = SegmentStatus::kSealed;
 }
@@ -253,7 +251,9 @@ void SegmentEntry::SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entr
 }
 
 // One writer
-u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
+u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
     if (this->status_ != SegmentStatus::kUnsealed) {
         UnrecoverableError("AppendData to sealed/compacting/no_delete/deprecated segment");
@@ -264,6 +264,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
     //    SizeT start_row = this->row_count_;
     SizeT append_block_count = append_state_ptr->blocks_.size();
     u64 total_copied{0};
+    Vector<BlockEntry *> mut_blocks;
 
     while (append_state_ptr->current_block_ < append_block_count && this->row_count_ < this->row_capacity_) {
         DataBlock *input_block = append_state_ptr->blocks_[append_state_ptr->current_block_].get();
@@ -276,6 +277,10 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
                 this->block_entries_.emplace_back(BlockEntry::NewBlockEntry(this, new_block_id, 0, this->column_count_, txn));
             }
             BlockEntry *last_block_entry = this->block_entries_.back().get();
+            if (mut_blocks.empty() || last_block_entry->block_id() != mut_blocks.back()->block_id()) {
+                mut_blocks.push_back(last_block_entry);
+            }
+
             auto add_block_entry_op = MakeUnique<AddBlockEntryOp>(last_block_entry);
             txn->AddCatalogDeltaOperation(std::move(add_block_entry_op));
             for (auto &column_block_entry : last_block_entry->columns()) {
@@ -288,7 +293,7 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             u16 range_block_start_row = last_block_entry->row_count();
 
             u16 actual_appended =
-                last_block_entry->AppendData(txn_id, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
+                last_block_entry->AppendData(txn_id, commit_ts, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
             if (to_append_rows < actual_appended) {
                 UnrecoverableError(fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
             }
@@ -308,6 +313,10 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, AppendState *append_state_ptr
             append_state_ptr->current_block_offset_ = 0;
         }
     }
+
+    for (auto *block_entry : mut_blocks) {
+        txn_store->AddBlockStore(this, block_entry);
+    }
     return total_copied;
 }
 
@@ -316,6 +325,8 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
                               TxnTimeStamp commit_ts,
                               const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
                               Txn *txn) {
+    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {
         BlockEntry *block_entry = nullptr;
         {
@@ -330,33 +341,14 @@ void SegmentEntry::DeleteData(TransactionID txn_id,
         }
 
         block_entry->DeleteData(txn_id, commit_ts, delete_rows);
-    }
-}
-
-// One writer
-void SegmentEntry::CommitAppend(TransactionID txn_id, TxnTimeStamp commit_ts, u16 block_id, u16, u16) {
-    BlockEntry *block_entry = nullptr;
-    {
-        std::unique_lock lck(this->rw_locker_);
-        if (this->status_ != SegmentStatus::kUnsealed) {
-            UnrecoverableError("Assert: Should not commit append to sealed segment.");
+        txn_store->AddBlockStore(this, block_entry);
+        if (delete_rows.size() > block_entry->row_capacity()) {
+            UnrecoverableError("Delete rows exceed block capacity");
         }
-        if (this->min_row_ts_ == UNCOMMIT_TS) {
-            this->min_row_ts_ = commit_ts;
-        }
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
-        block_entry = this->block_entries_.at(block_id).get();
+        this->DecreaseRemainRow(delete_rows.size());
     }
-    block_entry->CommitAppend(txn_id, commit_ts);
-}
-
-// One writer
-void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, const HashMap<u16, Vector<BlockOffset>> &block_row_hashmap) {
-    Vector<BlockEntry *> delete_blocks;
-    delete_blocks.reserve(block_row_hashmap.size());
     {
-        std::unique_lock lck(this->rw_locker_);
-        this->max_row_ts_ = std::max(this->max_row_ts_, commit_ts);
+        std::unique_lock w_lock(rw_locker_);
         if (this->first_delete_ts_ == UNCOMMIT_TS) {
             this->first_delete_ts_ = commit_ts;
         }
@@ -382,18 +374,34 @@ void SegmentEntry::CommitDelete(TransactionID txn_id, TxnTimeStamp commit_ts, co
                 no_delete_complete_cv_.notify_one();
             }
         }
-        for (const auto &[block_id, delete_rows] : block_row_hashmap) {
-            BlockEntry *block_entry = block_entries_.at(block_id).get();
-            if (delete_rows.size() > block_entry->row_capacity()) {
-                UnrecoverableError("Delete rows exceed block capacity");
-            }
-            DecreaseRemainRow(delete_rows.size());
-            delete_blocks.push_back(block_entry);
-        }
     }
+}
 
-    for (auto *block_entry : delete_blocks) {
-        block_entry->CommitDelete(txn_id, commit_ts);
+void SegmentEntry::CommitSegment(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    min_row_ts_ = std::min(min_row_ts_, commit_ts);
+    if (commit_ts < max_row_ts_) {
+        UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));
+    }
+    max_row_ts_ = commit_ts;
+    if (!this->Committed()) {
+        this->Commit(commit_ts);
+    }
+}
+
+void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const Vector<BlockEntry *> &block_entry) {
+    {
+        std::unique_lock w_lock(rw_locker_);
+        for (auto iter = block_entry.rbegin(); iter != block_entry.rend(); ++iter) {
+            BlockEntry *block = *iter;
+            if (!block->Committed()) {
+                if (block_entries_.empty() || block_entries_.back()->block_id() != block->block_id()) {
+                    UnrecoverableError("BlockEntry rollback order is not correct");
+                }
+                auto &rollback_block = block_entries_.back();
+                rollback_block->Cleanup();
+                block_entries_.pop_back();
+            }
+        }
     }
 }
 

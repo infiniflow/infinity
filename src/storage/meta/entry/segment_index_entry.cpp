@@ -267,7 +267,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
             RowID base_row_id(segment_entry->segment_id(), 0);
             memory_indexer_ = MakeUnique<MemoryIndexer>(*table_index_entry_->index_dir(),
                                                         base_name,
-                                                        ToDocID(base_row_id),
+                                                        base_row_id,
                                                         index_fulltext->flag_,
                                                         index_fulltext->analyzer_,
                                                         table_index_entry_->GetFulltextByteSlicePool(),
