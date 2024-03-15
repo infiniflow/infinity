@@ -11,7 +11,7 @@ statement ok
 CREATE INDEX idx_c1 ON test_secondary_index (c1);
 
 statement ok
-DESCRIBE INDEX test_secondary_index;
+SHOW TABLE test_secondary_index INDEX idx_c1;
 
 # need regex match
 #query I
@@ -22,9 +22,9 @@ DESCRIBE INDEX test_secondary_index;
 statement ok
 DROP INDEX idx_c1 ON test_secondary_index;
 
-#empty now
-query II
-DESCRIBE INDEX test_secondary_index;
+#no such index
+statement error
+SHOW TABLE test_secondary_index INDEX idx_c1;
 ----
 
 statement ok
