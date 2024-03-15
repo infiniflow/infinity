@@ -75,7 +75,7 @@ public:
 
     void RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids);
 
-    TxnTimeStamp GetMinUncommitTs();
+    TxnTimeStamp GetMinUnflushedTS();
 
 private:
     TransactionID GetNewTxnID();
