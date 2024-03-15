@@ -17,6 +17,7 @@
 import stl;
 import search_driver;
 import query_node;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -41,15 +42,22 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
             std::cerr << "---parser output tree:" << std::endl;
             parser_result->PrintTree(std::cerr);
             std::cerr << std::endl;
-            auto optimizer_result = QueryNode::GetOptimizedQueryTree(std::move(parser_result));
-            if (!optimizer_result) {
-                std::cerr << "---optimizer failed" << std::endl;
-                return -1;
-            } else {
+            std::unique_ptr<QueryNode> optimizer_result;
+            bool recoverable_exception = false;
+            try {
+                optimizer_result = QueryNode::GetOptimizedQueryTree(std::move(parser_result));
+            } catch (const RecoverableException &e) {
+                recoverable_exception = true;
+                std::cerr << "---optimizer failed with recoverable exception:\n---" << e.what() << '\n' << std::endl;
+            }
+            if (optimizer_result) {
                 std::cerr << "---optimizer accepted" << std::endl;
                 std::cerr << "---optimizer output tree:" << std::endl;
                 optimizer_result->PrintTree(std::cerr);
                 std::cerr << std::endl;
+            } else if (!recoverable_exception) {
+                std::cerr << "---optimizer failed" << std::endl;
+                return -1;
             }
         }
     }
@@ -96,10 +104,20 @@ name:star OR name:duna
 _exists_:"author" AND page_count:yyy AND (name:star OR name:duna)
 _exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.2
 
-#test
+#test invalid not query
+NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2
+(NOT name:god^2 OR NOT kddd:ss^4) OR ee:ff^1.2
+(NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2
+(NOT name:god^2 AND NOT kddd:ss^4) OR NOT ee:ff^1.2
+
+#test optimization rules
 (dune^1.2 AND NOT name:god^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
 (dune^1.2 AND NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
 (dune^1.2 AND (NOT name:god^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) OR NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) AND NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     )##";
 
     Map<String, String> column2analyzer;
