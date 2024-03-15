@@ -15,8 +15,8 @@
 #include "type/complex/row_id.h"
 #include "type/logical_type.h"
 #include "unit_test/base_test.h"
+#include <iostream>
 #include <unistd.h>
-
 import stl;
 import analyzer;
 import analyzer_pool;
@@ -77,14 +77,16 @@ TEST_F(MemoryIndexerTest, Insert) {
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
     MemoryIndexer
-        indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
-    indexer1.Insert(*column, 0, 3);
-    indexer1.Insert(*column, 3, 1);
-    indexer1.Dump();
+        indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    indexer2.Insert(*column, 0, 5);
+    // indexer1.Insert(*column, 3, 1);
+    indexer2.Dump();
 
+    /*
     MemoryIndexer
         indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk2", RowID(0U, 4U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
     indexer2.Insert(*column, 4, 1);
+    */
     while (indexer2.GetInflightTasks() > 0) {
         sleep(1);
         indexer2.CommitSync();
@@ -102,13 +104,13 @@ TEST_F(MemoryIndexerTest, Insert) {
         RowID doc_id = INVALID_ROWID;
         for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
             doc_id = post_iter->SeekDoc(expected.doc_ids[j]);
-            // ASSERT_EQ(doc_id, expected.doc_ids[j]);
-            // u32 tf = post_iter->GetCurrentTF();
-            // ASSERT_EQ(tf, expected.tfs[j]);
+            ASSERT_EQ(doc_id, expected.doc_ids[j]);
+            u32 tf = post_iter->GetCurrentTF();
+            ASSERT_EQ(tf, expected.tfs[j]);
         }
         if (doc_id != INVALID_ROWID) {
             doc_id = post_iter->SeekDoc(doc_id + 1);
-            // ASSERT_EQ(doc_id, INVALID_ROWID);
+            ASSERT_EQ(doc_id, INVALID_ROWID);
         }
     }
 }

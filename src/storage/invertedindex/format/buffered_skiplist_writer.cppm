@@ -24,9 +24,6 @@ public:
 
     SizeT EstimateDumpSize() const override;
 
-protected:
-    SizeT DoFlush() override;
-
 private:
     static const u32 INVALID_LAST_KEY = (u32)-1;
 
