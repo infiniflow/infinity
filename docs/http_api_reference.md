@@ -7,7 +7,7 @@ create a new database.
 #### Request
 ```http request
 curl --request POST \
-     --url localhost:23810/databases/{database_name} \
+     --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -42,7 +42,7 @@ Drop a database.
 #### Request
 ```http request
 curl --request DELETE \
-     --url localhost:23810/databases/{database_name} \
+     --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -77,7 +77,7 @@ Retrieve a database.
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/databases/{database_name} \
+     --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json'
 ```
 
@@ -108,7 +108,7 @@ Retrieve all databases of the system.
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/databases \
+     --url localhost:23820/databases \
      --header 'accept: application/json'
 ```
 
@@ -134,7 +134,7 @@ create a new table.
 #### Request
 ```http request
 curl --request POST \
-     --url localhost:23810/databases/{database_name}/tables/{table_name} \
+     --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -196,7 +196,7 @@ drop a table.
 #### Request
 ```http request
 curl --request DELETE \
-     --url localhost:23810/databases/{database_name}/tables/{table_name} \
+     --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -231,7 +231,7 @@ list tables of the database.
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/databases/{database_name}/tables \
+     --url localhost:23820/databases/{database_name}/tables \
      --header 'accept: application/json'
 ```
 
@@ -274,7 +274,7 @@ Retrieve a table from a database
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/databases/{database_name}/tables/{table_name} \
+     --url localhost:23820/databases/{database_name}/tables/{table_name} \
      --header 'accept: application/json'
 ```
 
@@ -321,7 +321,7 @@ create an index on the table.
 #### Request
 ```http request
 curl --request POST \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data ' \
@@ -367,7 +367,7 @@ Drop index
 #### Request
 ```http request
 curl --request DELETE \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name} \
      --header 'accept: application/json'
 ```
 
@@ -397,7 +397,7 @@ Insert data into table
 #### Request
 ```http request
 curl --request POST \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/docs \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -443,7 +443,7 @@ delete data from table
 #### Request
 ```http request
 curl --request DELETE \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/docs \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -479,7 +479,7 @@ update data in table
 #### Request
 ```http request
 curl --request PUT \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/docs \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -519,7 +519,7 @@ select data from table
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/databases/{database_name}/tables/{table_name}/docs \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/docs \
      --header 'accept: application/json' \
     --header 'content-type: application/json' \
     --data ' \
@@ -598,7 +598,7 @@ Get variables
 #### Request
 ```http request
 curl --request GET \
-     --url localhost:23810/variables/{variable_name} \
+     --url localhost:23820/variables/{variable_name} \
      --header 'accept: application/json'
 ```
 

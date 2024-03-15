@@ -59,7 +59,7 @@ DROP INDEX [IF EXISTS] name ON table_name;
 #### Synopsis
 
 ```sql
-DESCRIBE INDEX table_name;
+SHOW TABLE table_name INDEX index_name;
 ```
 
 ### KNN SCAN

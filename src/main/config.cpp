@@ -138,7 +138,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     // Default network config
     String default_listen_address = "0.0.0.0";
     u32 default_pg_port = 5432;
-    u32 default_http_port = 23810;
+    u32 default_http_port = 23820;
     u32 default_sdk_port = 23817;
     i32 default_connection_limit = 128;
 

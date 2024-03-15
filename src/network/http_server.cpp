@@ -59,7 +59,7 @@ public:
             json_response["error_message"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(HTTPStatus::CODE_500, json_response.dump());
+        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 

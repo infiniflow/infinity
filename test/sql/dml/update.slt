@@ -63,6 +63,9 @@ statement ok
 DROP TABLE products;
 
 statement ok
+DROP TABLE IF EXISTS T2;
+
+statement ok
 CREATE TABLE T2 (c1 boolean, c2 boolean);
 
 statement error

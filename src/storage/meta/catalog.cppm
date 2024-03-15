@@ -27,7 +27,7 @@ import buffer_manager;
 import profiler;
 import status;
 import default_values;
-import table_detail;
+import meta_info;
 import index_base;
 import txn_store;
 import data_access_state;
@@ -121,6 +121,8 @@ public:
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
     // List databases
@@ -145,6 +147,8 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 
     // Index Related methods
@@ -167,6 +171,9 @@ public:
 
     Tuple<TableIndexEntry *, Status>
     GetIndexByName(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableIndexInfo>, Status>
+    GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static Status RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id);
 

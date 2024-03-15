@@ -42,13 +42,15 @@ BITMAP          { return BITMAP; }
 BOOLEAN         { return BOOLEAN; }
 BOX             { return BOX; }
 BLOB            { return BLOB; }
-BLOCK          { return BLOCK; }
+BLOCK           { return BLOCK; }
+BLOCKS          { return BLOCKS; }
 BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
+COLUMNS         { return COLUMNS; }
 COMPACT         { return COMPACT; }
 CONFIGS         { return CONFIGS; }
 COPY            { return COPY; }
@@ -66,7 +68,6 @@ DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
@@ -96,6 +97,7 @@ HUGEINT         { return HUGEINT; }
 IF              { return IF; }
 IN              { return IN; }
 INDEX           { return INDEX; }
+INDEXES         { return INDEXES; }
 INNER           { return INNER; }
 INSERT          { return INSERT; }
 INTEGER         { return INTEGER; }

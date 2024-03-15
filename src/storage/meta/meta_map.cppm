@@ -110,13 +110,18 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
         LOG_TRACE(fmt::format("Ignore drop a non-exist meta: {}", name));
         return {nullptr, Status::OK(), std::move(r_lock)};
     }
-    auto err_msg = MakeUnique<String>(fmt::format("Not exist entry {}", name));
-    LOG_ERROR(*err_msg);
+
     if constexpr (std::is_same_v<Meta, TableMeta>) {
+        auto err_msg = MakeUnique<String>(fmt::format("Table {} doesn't exist", name));
+        LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kTableNotExist, std::move(err_msg)), std::move(r_lock)};
     } else if constexpr (std::is_same_v<Meta, DBMeta>) {
+        auto err_msg = MakeUnique<String>(fmt::format("Database {} doesn't exist", name));
+        LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kDBNotExist, std::move(err_msg)), std::move(r_lock)};
     } else if constexpr (std::is_same_v<Meta, TableIndexMeta>) {
+        auto err_msg = MakeUnique<String>(fmt::format("Index {} doesn't exist", name));
+        LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg)), std::move(r_lock)};
     } else {
         UnrecoverableError("Unimplemented");
