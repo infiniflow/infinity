@@ -25,7 +25,7 @@ export class Allocator {
 public:
     static ptr_t allocate(SizeT bytes) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrRawMemCount();
+        GlobalResourceUsage::IncrRawMemCount("Allocator");
 #endif
         return new char[bytes]{};
     }
@@ -33,7 +33,7 @@ public:
     static void deallocate(ptr_t ptr) {
         delete[] ptr;
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrRawMemCount();
+        GlobalResourceUsage::DecrRawMemCount("Allocator");
 #endif
     }
 };

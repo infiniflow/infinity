@@ -37,13 +37,13 @@ SharedPtr<BitmaskBuffer> BitmaskBuffer::Make(const u64 *input_ptr, SizeT count) 
 
 BitmaskBuffer::BitmaskBuffer() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount();
+    GlobalResourceUsage::IncrObjectCount("BitmaskBuffer");
 #endif
 }
 
 BitmaskBuffer::~BitmaskBuffer() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount();
+    GlobalResourceUsage::DecrObjectCount("BitmaskBuffer");
 #endif
 }
 

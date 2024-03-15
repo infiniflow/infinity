@@ -30,7 +30,7 @@ namespace infinity {
 
 Bitmask::Bitmask() : data_ptr_(nullptr), buffer_ptr(nullptr), count_(0) {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount();
+    GlobalResourceUsage::IncrObjectCount("Bitmask");
 #endif
 }
 
@@ -38,13 +38,13 @@ Bitmask::Bitmask(Bitmask &&right) : data_ptr_(right.data_ptr_), buffer_ptr(std::
     right.data_ptr_ = nullptr;
     right.count_ = 0;
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount();
+    GlobalResourceUsage::IncrObjectCount("Bitmask");
 #endif
 }
 
 Bitmask::~Bitmask() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount();
+    GlobalResourceUsage::DecrObjectCount("Bitmask");
 #endif
     //    Reset();
 }

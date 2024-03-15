@@ -39,13 +39,15 @@ public:
         }
     }
 
-    static inline void IncrObjectCount() {
+    static inline void IncrObjectCount(const String &key) {
         std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        ++object_map_[key];
         ++object_count_;
     }
 
-    static void DecrObjectCount() {
+    static void DecrObjectCount(const String &key) {
         std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        --object_map_[key];
         --object_count_;
     }
 
@@ -54,14 +56,21 @@ public:
         return object_count_;
     }
 
-    static void IncrRawMemCount() {
-        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
-        ++raw_memory_count_;
+    static i64 GetObjectCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(object_mutex_);
+        return object_map_[key];
     }
 
-    static void DecrRawMemCount() {
+    static void IncrRawMemCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
+        ++raw_memory_count_;
+        ++raw_memory_map_[key];
+    }
+
+    static void DecrRawMemCount(const String &key) {
         std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
         --raw_memory_count_;
+        --raw_memory_map_[key];
     }
 
     static i64 GetRawMemoryCount() {
@@ -69,14 +78,21 @@ public:
         return raw_memory_count_;
     }
 
+    static i64 GetRawMemoryCount(const String &key) {
+        std::unique_lock<std::mutex> unique_locker(raw_memory_mutex_);
+        return raw_memory_map_[key];
+    }
+
 private:
     static atomic_bool initialized_;
 
     static std::mutex object_mutex_;
-    static ai64 object_count_;
+    static i64 object_count_;
+    static HashMap<String, i64> object_map_;
 
     static std::mutex raw_memory_mutex_;
-    static ai64 raw_memory_count_;
+    static i64 raw_memory_count_;
+    static HashMap<String, i64> raw_memory_map_;
 };
 
 } // namespace infinity

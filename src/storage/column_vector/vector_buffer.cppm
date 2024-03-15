@@ -39,13 +39,13 @@ public:
 public:
     explicit VectorBuffer() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("VectorBuffer");
 #endif
     }
 
     ~VectorBuffer() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("VectorBuffer");
 #endif
     }
 

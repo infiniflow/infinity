@@ -30,13 +30,13 @@ struct SelectionData {
         }
         data_ = MakeUnique<u16[]>(count);
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("SelectionData");
 #endif
     }
 
     ~SelectionData() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("SelectionData");
 #endif
     }
 
@@ -48,13 +48,13 @@ export class Selection {
 public:
     Selection() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("Selection");
 #endif
     }
 
     ~Selection() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("Selection");
 #endif
     }
 

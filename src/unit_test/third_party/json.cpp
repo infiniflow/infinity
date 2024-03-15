@@ -39,7 +39,7 @@ class JsonTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
-#ifdef INFINITY_DEBUG
+#endif
     }
 };
 

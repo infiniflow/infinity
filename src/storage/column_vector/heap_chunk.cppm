@@ -26,7 +26,7 @@ export struct HeapChunk {
 public:
     inline explicit HeapChunk(u64 capacity) : current_offset_(0), capacity_(capacity), object_count_(0) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("HeapChunk");
 #endif
         ptr_ = Allocator::allocate(capacity);
     }
@@ -38,7 +38,7 @@ public:
         current_offset_ = 0;
         object_count_ = 0;
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("HeapChunk");
 #endif
     }
 
@@ -55,13 +55,13 @@ export struct StringHeapMgr {
 public:
     inline explicit StringHeapMgr(u64 chunk_size = CHUNK_SIZE) : current_chunk_size_(chunk_size) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("StringHeapMgr");
 #endif
     }
 
     inline ~StringHeapMgr() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("StringHeapMgr");
 #endif
     }
 

@@ -85,7 +85,7 @@ public:
     // Construct a column vector without initialization;
     explicit ColumnVector(SharedPtr<DataType> data_type) : vector_type_(ColumnVectorType::kInvalid), data_type_(std::move(data_type)) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("ColumnVector");
 #endif
     }
 
@@ -95,7 +95,7 @@ public:
           vector_type_(right.vector_type_), data_type_(right.data_type_), data_ptr_(right.data_ptr_), capacity_(right.capacity_),
           tail_index_(right.tail_index_) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("ColumnVector");
 #endif
     }
 
@@ -105,14 +105,14 @@ public:
           initialized(right.initialized), vector_type_(right.vector_type_), data_type_(std::move(right.data_type_)), data_ptr_(right.data_ptr_),
           capacity_(right.capacity_), tail_index_(right.tail_index_) {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::IncrObjectCount();
+        GlobalResourceUsage::IncrObjectCount("ColumnVector");
 #endif
     }
 
     ~ColumnVector() {
         // Reset(); // TODO: overload copy constructor and move constructor TO PREVENT USING `Reset`
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount();
+        GlobalResourceUsage::DecrObjectCount("ColumnVector");
 #endif
     }
 

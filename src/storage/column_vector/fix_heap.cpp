@@ -32,7 +32,7 @@ namespace infinity {
 
 FixHeapManager::FixHeapManager(u64 chunk_size) : current_chunk_size_(chunk_size) {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount();
+    GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
 }
 
@@ -40,13 +40,13 @@ FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *bloc
     : current_chunk_size_(chunk_size), current_chunk_idx_(block_column_entry->OutlineBufferCount()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount();
+    GlobalResourceUsage::IncrObjectCount("FixHeapManager");
 #endif
 }
 
 FixHeapManager::~FixHeapManager() {
 #ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount();
+    GlobalResourceUsage::DecrObjectCount("FixHeapManager");
 #endif
     // std::variant in `VectorHeapChunk` will call destructor automatically
 }
