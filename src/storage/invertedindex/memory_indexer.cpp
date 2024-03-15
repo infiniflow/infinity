@@ -26,6 +26,7 @@ module;
 
 #include <filesystem>
 #include <string.h>
+#include <unistd.h>
 
 module memory_indexer;
 
@@ -72,7 +73,10 @@ MemoryIndexer::MemoryIndexer(const String &index_dir,
     spill_full_path_ = path.string();
 }
 
-MemoryIndexer::~MemoryIndexer() { Reset(); }
+MemoryIndexer::~MemoryIndexer() {
+    WaitInflightTasks();
+    Reset();
+}
 
 void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count) {
     {
@@ -82,8 +86,8 @@ void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u3
     u64 seq_inserted = seq_inserted_++;
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count_);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    auto func = [this, &task, &provider](int id) {
-        auto inverter = MakeShared<ColumnInverter>(analyzer_, &byte_slice_pool_, provider);
+    auto func = [this, task, provider](int id) {
+        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
         inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
         this->ring_inverted_.Put(task->task_seq_, inverter);
     };
@@ -91,28 +95,34 @@ void MemoryIndexer::Insert(const ColumnVector &column_vector, u32 row_offset, u3
 }
 
 void MemoryIndexer::Commit() {
-    thread_pool_.push([this](int id) {
-        Vector<SharedPtr<ColumnInverter>> inverters;
-        u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
-        SizeT num = inverters.size();
-        for (SizeT i = 1; i < num; i++) {
-            inverters[0]->Merge(*inverters[i]);
+    thread_pool_.push([this](int id) { this->CommitSync(); });
+}
+
+SizeT MemoryIndexer::CommitSync() {
+    Vector<SharedPtr<ColumnInverter>> inverters;
+    u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
+    SizeT num = inverters.size();
+    if (num == 0)
+        return 0;
+    ColumnInverter::Merge(inverters);
+    inverters[0]->Sort();
+    this->ring_sorted_.Put(seq_commit, inverters[0]);
+    this->ring_sorted_.Iterate([](SharedPtr<ColumnInverter> &inverter) { inverter->GeneratePosting(); });
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_ -= num;
+        if (inflight_tasks_ == 0) {
+            cv_.notify_all();
         }
-        inverters[0]->Sort();
-        this->ring_sorted_.Put(seq_commit, inverters[0]);
-        this->ring_sorted_.Iterate([](SharedPtr<ColumnInverter> &inverter) { inverter->GeneratePosting(); });
-        {
-            std::unique_lock<std::mutex> lock(mutex_);
-            inflight_tasks_ -= num;
-            if (inflight_tasks_ == 0) {
-                cv_.notify_all();
-            }
-        }
-    });
+    }
+    return num;
 }
 
 void MemoryIndexer::Dump() {
-    WaitInflightTasks();
+    while (GetInflightTasks() > 0) {
+        sleep(1);
+        CommitSync();
+    }
 
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
@@ -140,6 +150,7 @@ void MemoryIndexer::Dump() {
             fst_builder.Insert((u8 *)term.c_str(), term.length(), term_meta_offset);
             term_meta_offset = dict_file_writer->TotalWrittenBytes();
         }
+        posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
         fs.AppendFile(dict_file, fst_file);

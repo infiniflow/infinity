@@ -46,20 +46,20 @@ private:
         if (seg_cursor >= segment_count_) {
             return INVALID_ROWID;
         }
-        return (*seg_postings_)[seg_cursor].GetBaseDocId();
+        return (*seg_postings_)[seg_cursor].GetBaseRowId();
     }
 
     inline u32 LocateSegment(u32 start_seg_cursor, RowID start_row_id) {
-        RowID cur_seg_base_doc_id = GetSegmentBaseRowId(start_seg_cursor);
-        if (cur_seg_base_doc_id == INVALID_ROWID) {
+        RowID cur_seg_base_row_id = GetSegmentBaseRowId(start_seg_cursor);
+        if (cur_seg_base_row_id == INVALID_ROWID) {
             return start_seg_cursor;
         }
 
         u32 cur_seg_cursor = start_seg_cursor;
-        RowID next_seg_base_doc_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
-        while (next_seg_base_doc_id != INVALID_ROWID && start_row_id >= next_seg_base_doc_id) {
+        RowID next_seg_base_row_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
+        while (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
             ++cur_seg_cursor;
-            next_seg_base_doc_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
+            next_seg_base_row_id = GetSegmentBaseRowId(cur_seg_cursor + 1);
         }
         return cur_seg_cursor;
     }

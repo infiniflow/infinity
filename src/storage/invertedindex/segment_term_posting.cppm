@@ -58,7 +58,7 @@ private:
     using PriorityQueue = Heap<SegmentTermPosting *, SegmentTermPostingComparator>;
     const String &index_dir_;
     const Vector<String> &base_names_;
-    const Vector<RowID> &base_docids_;
+    const Vector<RowID> &base_rowids_;
 
     PriorityQueue segment_term_postings_;
     Vector<SegmentTermPosting *> merging_term_postings_;

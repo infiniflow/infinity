@@ -45,6 +45,8 @@ public:
 
     void Merge(ColumnInverter &rhs);
 
+    static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
+
     void Sort();
 
     void GeneratePosting();
@@ -99,6 +101,8 @@ private:
     u32 AddTerm(StringRef term);
 
     void SortTerms();
+
+    void MergePrepare();
 
     UniquePtr<Analyzer> analyzer_{nullptr};
     PoolAllocator<char> alloc_;
