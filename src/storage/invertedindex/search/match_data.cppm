@@ -42,8 +42,6 @@ public:
 
     ~Scorer() = default;
 
-    void InitRanker(const Map<u64, double> &weight_map);
-
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
     float Score(RowID doc_id);
@@ -62,7 +60,6 @@ private:
     FlatHashMap<u64, u32, Hash> column_index_map_;
     Vector<u64> column_ids_;
     Vector<Vector<TermDocIterator *>> iterators_;
-    Vector<double> column_weights_;
     Vector<double> avg_column_length_;
     UniquePtr<ColumnLengthReader> column_length_reader_;
     MatchData match_data_;
