@@ -60,7 +60,7 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
-                        const SharedPtr<String> &db_entry_dir,
+                        const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
                         TableEntryType table_entry_type,
@@ -78,7 +78,7 @@ public:
                                                TxnTimeStamp begin_ts);
 
     static SharedPtr<TableEntry> NewReplayTableEntry(TableMeta *table_meta,
-                                                     SharedPtr<String> db_entry_dir,
+                                                     SharedPtr<String> table_entry_dir,
                                                      SharedPtr<String> table_name,
                                                      Vector<SharedPtr<ColumnDef>> &column_defs,
                                                      TableEntryType table_entry_type,

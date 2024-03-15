@@ -51,15 +51,14 @@ import build_fast_rough_filter_task;
 namespace infinity {
 
 TableEntry::TableEntry(bool is_delete,
-                       const SharedPtr<String> &db_entry_dir,
+                       const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_collection_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
                        TransactionID txn_id,
                        TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta),
-      table_entry_dir_(is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_collection_name)),
+    : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(table_entry_dir),
       table_name_(std::move(table_collection_name)), columns_(columns), table_entry_type_(table_entry_type) {
     SizeT column_count = columns.size();
     for (SizeT idx = 0; idx < column_count; ++idx) {
@@ -84,14 +83,14 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-
+    auto table_entry_dir = is_delete ? nullptr : TableEntry::DetermineTableDir(*db_entry_dir, *table_collection_name);
     auto table_entry =
-        MakeShared<TableEntry>(is_delete, db_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+        MakeShared<TableEntry>(is_delete, table_entry_dir, table_collection_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
     return table_entry;
 }
 
 SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
-                                                      SharedPtr<String> db_entry_dir,
+                                                      SharedPtr<String> table_entry_dir,
                                                       SharedPtr<String> table_name,
                                                       Vector<SharedPtr<ColumnDef>> &column_defs,
                                                       TableEntryType table_entry_type,
@@ -100,7 +99,7 @@ SharedPtr<TableEntry> TableEntry::NewReplayTableEntry(TableMeta *table_meta,
                                                       TxnTimeStamp commit_ts,
                                                       bool is_delete,
                                                       SizeT row_count) noexcept {
-    auto table_entry = MakeShared<TableEntry>(is_delete, db_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
+    auto table_entry = MakeShared<TableEntry>(is_delete, table_entry_dir, table_name, column_defs, table_entry_type, table_meta, txn_id, begin_ts);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
