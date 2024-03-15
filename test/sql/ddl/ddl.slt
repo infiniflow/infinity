@@ -57,7 +57,7 @@ CREATE TABLE descr1 (i INTEGER, t TIME, d DATE, ts TIMESTAMP, dt DATETIME, vc VA
 
 # check table description
 query I
-DESCRIBE descr1;
+SHOW TABLE descr1;
 ----
 i Integer (empty)
 t Time (empty)

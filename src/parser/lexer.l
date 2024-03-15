@@ -68,7 +68,6 @@ DOUBLE          { return DOUBLE; }
 DECIMAL         { return DECIMAL; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
-DESCRIBE        { return DESCRIBE; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
