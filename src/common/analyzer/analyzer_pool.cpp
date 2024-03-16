@@ -36,45 +36,28 @@ constexpr u64 prime = 0x100000001B3ull;
 
 constexpr u64 Str2Int(char const *str, u64 last_value = basis) { return *str ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value; }
 
-void AnalyzerPool::Set(const std::string_view &name) {
-    Analyzer *try_analyzer = cache_[name].get();
-    if (!try_analyzer) {
-        switch (Str2Int(name.data())) {
-            case Str2Int(CHINESE.data()): {
-                String path = InfinityContext::instance().config()->resource_dict_path();
-                UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
-                if (analyzer->Load())
-                    cache_[CHINESE] = std::move(analyzer);
-            } break;
-            case Str2Int(STANDARD.data()): {
-                UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();
-                cache_[STANDARD] = std::move(analyzer);
-            } break;
-            case Str2Int(NGRAM.data()): {
-                u32 ngram = 2; /// TODO config
-                UniquePtr<NGramAnalyzer> analyzer = MakeUnique<NGramAnalyzer>(ngram);
-                cache_[NGRAM] = std::move(analyzer);
-            } break;
-            default:
-                break;
-        }
-    }
-}
-
 UniquePtr<Analyzer> AnalyzerPool::Get(const std::string_view &name) {
-    Analyzer *analyzer = cache_[name].get();
-    if (!analyzer)
-        return nullptr;
     switch (Str2Int(name.data())) {
         case Str2Int(CHINESE.data()): {
-            return MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(analyzer));
+            Analyzer *prototype = cache_[CHINESE].get();
+            if (prototype == nullptr) {
+                String path = InfinityContext::instance().config()->resource_dict_path();
+                UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
+                if (!analyzer->Load()) {
+                    return nullptr;
+                }
+                prototype = analyzer.get();
+                cache_[CHINESE] = std::move(analyzer);
+            }
+            return MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
         } break;
         case Str2Int(STANDARD.data()): {
             return MakeUnique<StandardAnalyzer>();
-        } break;
+        }
         case Str2Int(NGRAM.data()): {
-            return MakeUnique<NGramAnalyzer>(*reinterpret_cast<NGramAnalyzer *>(analyzer));
-        } break;
+            u32 ngram = 2; /// TODO config
+            return MakeUnique<NGramAnalyzer>(ngram);
+        }
         default:
             return nullptr;
     }

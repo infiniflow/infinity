@@ -287,12 +287,18 @@ Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<Seg
 }
 
 Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndexParam *param, u32 segment_id) {
-    Vector<UniquePtr<IndexFileWorker>> vector_file_worker(1);
+    Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
     // reference file_worker will be invalidated when vector_file_worker is resized
-    auto &file_worker = vector_file_worker[0];
     const auto *index_base = param->index_base_;
     const auto *column_def = param->column_def_;
+    if (index_base->index_type_ == IndexType::kFullText) {
+        // fulltext doesn't use BufferManager
+        return vector_file_worker;
+    }
+
     auto file_name = MakeShared<String>(IndexFileName(segment_id));
+    vector_file_worker.resize(1);
+    auto &file_worker = vector_file_worker[0];
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             auto create_annivfflat_param = static_cast<CreateAnnIVFFlatParam *>(param);
@@ -318,11 +324,7 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
             break;
         }
         case IndexType::kFullText: {
-            //            auto create_fulltext_param = static_cast<CreateFullTextParam *>(param);
-            UniquePtr<String> err_msg =
-                MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
-            UnrecoverableError(*err_msg);
+            // fulltext doesn't use BufferManager
             break;
         }
         case IndexType::kSecondary: {
