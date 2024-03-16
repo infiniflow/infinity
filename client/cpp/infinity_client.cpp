@@ -22,24 +22,25 @@ Client Client::Connect(const std::string &ip_address, uint16_t port) {
     std::shared_ptr<TBufferedTransport> transport = std::make_shared<TBufferedTransport>(socket);
     std::shared_ptr<TBinaryProtocol> protocol = std::make_shared<TBinaryProtocol>(transport);
     std::unique_ptr<InfinityServiceClient> client = std::make_unique<InfinityServiceClient>(protocol);
+    transport->open();
     CommonResponse response;
     client->Connect(response);
     return {socket, transport, protocol, std::move(client), response.session_id};
 }
 
 /// TODO: comment
-Status Client::Disconnect() {
+ClientStatus Client::Disconnect() {
     CommonRequest request;
     CommonResponse response;
 
     request.session_id = session_id_;
     client_->Disconnect(response, request);
     transport_->close();
-    return Status::OK();
+    return ClientStatus::OK();
 }
 
 /// TODO: comment
-Status Client::CreateDatabase(const std::string &db_name, bool ignore_if_exists) {
+ClientStatus Client::CreateDatabase(const std::string &db_name, bool ignore_if_exists) {
     CreateDatabaseRequest request;
     CommonResponse response;
 
@@ -47,11 +48,15 @@ Status Client::CreateDatabase(const std::string &db_name, bool ignore_if_exists)
     request.session_id = session_id_;
 
     client_->CreateDatabase(response, request);
-    return Status::OK();
+    if(response.error_code == 0) {
+        return ClientStatus::OK();
+    } else {
+        return {static_cast<ClientErrorCode>(response.error_code), response.error_msg};
+    }
 }
 
 /// TODO: comment
-Status Client::DropDatabase(const std::string &db_name, bool ignore_if_exists) {
+ClientStatus Client::DropDatabase(const std::string &db_name, bool ignore_if_exists) {
     DropDatabaseRequest request;
     CommonResponse response;
 
@@ -59,11 +64,19 @@ Status Client::DropDatabase(const std::string &db_name, bool ignore_if_exists) {
     request.session_id = session_id_;
 
     client_->DropDatabase(response, request);
-    return Status::OK();
+    return ClientStatus::OK();
 }
 
 /// TODO: comment
-std::vector<std::string> Client::ListDatabases() const { return std::vector<std::string>(); }
+std::vector<std::string> Client::ListDatabases() const {
+    ListDatabaseRequest request;
+    ListDatabaseResponse response;
+
+    request.session_id = session_id_;
+
+    client_->ListDatabase(response, request);
+    return response.db_names;
+}
 
 /// Describe database
 DatabaseInfo Client::ShowDatabase(const std::string &db_name) const { return DatabaseInfo{}; }

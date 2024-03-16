@@ -29,7 +29,7 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace infinity_thrift_rpc;
 
-enum class ErrorCode : long {
+enum ClientErrorCode : int64_t {
 
     kOk = 0, // success
     kIgnore = 1,
@@ -149,11 +149,14 @@ enum class ErrorCode : long {
     kEmptyEntryList = 8003,
 };
 
-struct Status {
-    inline static Status OK() { return {ErrorCode::kOk, nullptr}; }
+struct ClientStatus {
+    inline static ClientStatus OK() { return {ClientErrorCode::kOk, {}}; }
+    inline bool IsOK() { return error_code_ == ClientErrorCode::kOk; }
+    ClientErrorCode ErrorCode() const { return error_code_; }
+    const std::string& ErrorMessage() const { return msg_; }
 
-    ErrorCode error_code_{ErrorCode::kOk};
-    std::unique_ptr<std::string> msg_{};
+    ClientErrorCode error_code_{0};
+    std::string msg_{};
 };
 
 struct DatabaseInfo {
@@ -174,13 +177,13 @@ public:
         : socket_(socket), transport_(transport), protocol_(protocol), client_(std::move(client)), session_id_(session_id) {}
 
     /// TODO: comment
-    Status Disconnect();
+    ClientStatus Disconnect();
 
     /// TODO: comment
-    Status CreateDatabase(const std::string &db_name, bool ignore_if_exists);
+    ClientStatus CreateDatabase(const std::string &db_name, bool ignore_if_exists);
 
     /// TODO: comment
-    Status DropDatabase(const std::string &db_name, bool ignore_if_exists);
+    ClientStatus DropDatabase(const std::string &db_name, bool ignore_if_exists);
 
     /// TODO: comment
     std::vector<std::string> ListDatabases() const;

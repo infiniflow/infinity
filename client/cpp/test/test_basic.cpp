@@ -13,9 +13,33 @@
 // limitations under the License.
 
 #include "infinity_client.h"
+#include "iostream"
 
 int main() {
     infinity::client::Client infinity_client = infinity::client::Client::Connect("127.0.0.1", 23817);
+
+    infinity::client::ClientStatus status = infinity_client.CreateDatabase("db1", true);
+    if(!status.IsOK()) {
+        std::cerr << status.ErrorMessage() << std::endl;
+        return static_cast<int>(status.ErrorCode());
+    }
+
+    std::vector<std::string> db_names = infinity_client.ListDatabases();
+    for(auto& db_name: db_names) {
+        std::cout << db_name << std::endl;
+    }
+
+    status = infinity_client.DropDatabase("db1", true);
+    if(!status.IsOK()) {
+        std::cerr << status.ErrorMessage() << std::endl;
+        return static_cast<int>(status.ErrorCode());
+    }
+
+    db_names = infinity_client.ListDatabases();
+    for(auto& db_name: db_names) {
+        std::cout << db_name << std::endl;
+    }
+
     infinity_client.Disconnect();
     return 0;
 }
