@@ -51,7 +51,7 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count);
+    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count);
 
     // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
     // Other threads can also call this method.

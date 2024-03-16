@@ -250,8 +250,8 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
         };
         list_dir(p);
 
-        LOG_CRITICAL(fmt::format("ListDirectory: {} is not empty, files: {}", path, ss.str()));
-        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+        u64 removed_count = DeleteDirectory(path);
+        LOG_ERROR(fmt::format("DeleteEmptyDirectory: {} is not empty, files: {}, force deleted: {}", path, ss.str(), removed_count));
     }
 }
 
