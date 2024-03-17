@@ -17,7 +17,7 @@ import os
 
 def run():
     os.system("cd test")
-    os.system("python3 -m pytest test")
+    os.system("python3 -m pytest -m 'not complex and not slow' test")
 
 
 if __name__ == '__main__':

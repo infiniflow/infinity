@@ -18,17 +18,23 @@ Embedding,
 Invalid
 }
 
-enum ConflictType {
-Invalid,
+enum CreateConflict {
 Ignore,
 Error,
 Replace,
 }
 
-struct Option {}
+enum DropConflict {
+Ignore,
+Error,
+}
 
-struct DropTableOptions {
-1:  ConflictType conflict_type,
+struct CreateOption {
+1:  CreateConflict conflict_type,
+}
+
+struct DropOption {
+1:  DropConflict conflict_type,
 }
 
 struct NumberType {}
@@ -315,7 +321,7 @@ struct CreateIndexRequest {
 3: string index_name,
 5: list<IndexInfo> index_info_list = [],
 6: i64 session_id,
-7: optional Option option,
+7: CreateOption create_option,
 }
 
 struct DropIndexRequest {
@@ -323,6 +329,7 @@ struct DropIndexRequest {
 2: string table_name,
 3: string index_name,
 4: i64 session_id,
+5: DropOption drop_option,
 }
 
 struct GetDatabaseRequest {
@@ -333,13 +340,13 @@ struct GetDatabaseRequest {
 struct CreateDatabaseRequest {
 1:  string db_name,
 2:  i64 session_id,
-3:  Option option,
+3:  CreateOption create_option,
 }
 
 struct DropDatabaseRequest {
 1:  string db_name,
 2:  i64 session_id,
-3:  Option option,
+3:  DropOption drop_option,
 }
 
 struct CreateTableRequest {
@@ -347,14 +354,14 @@ struct CreateTableRequest {
 2:  string table_name,
 3:  list<ColumnDef> column_defs = [],
 6:  i64 session_id,
-7:  Option option,
+7:  CreateOption create_option,
 }
 
 struct DropTableRequest {
 1:  string db_name,
 2:  string table_name,
 3:  i64 session_id,
-4:  DropTableOptions options,
+4:  DropOption drop_option,
 }
 
 struct InsertRequest {

@@ -18,6 +18,7 @@ import pytest
 from common import common_values
 import infinity
 from infinity.table import ExplainType
+from infinity.common import ConflictType
 
 
 class TestExplain:
@@ -36,7 +37,7 @@ class TestExplain:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_explain_default", True)
         table = db_obj.create_table("test_explain_default", {
-            "c1": "varchar, primary key", "c2": "float"}, None)
+            "c1": "varchar, primary key", "c2": "float"}, ConflictType.Error)
         assert table
 
         table.insert({"c1": "hello", "c2": 1.0})

@@ -14,6 +14,7 @@
 import polars as pl
 
 from common import common_values
+from infinity.common import ConflictType
 import infinity
 
 
@@ -25,7 +26,7 @@ class TestDescribe:
         db = infinity_obj.get_database("default")
         db.drop_table("test_describe_table")
         db.create_table(
-            "test_describe_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
+            "test_describe_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
             res = db.describe_table("test_describe_table")
             print(res)

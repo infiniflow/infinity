@@ -17,6 +17,7 @@ import pytest
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 
 from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs
 
@@ -47,7 +48,7 @@ class TestImport:
             copy_data("embedding_int_dim3.csv")
         db_obj.drop_table("test_import", True)
         table_obj = db_obj.create_table(
-            "test_import", {"c1": "int", "c2": "vector,3,int"}, None)
+            "test_import", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
         assert os.path.exists(test_csv_dir)
@@ -71,12 +72,12 @@ class TestImport:
 
         db_obj.drop_table("test_import_different_file_format_data")
         table_obj = db_obj.create_table("test_import_different_file_format_data",
-                                        {"c1": "int", "c2": "vector,3,int"}, None)
+                                        {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         if file_format == "fvecs":
             db_obj.drop_table("test_import_different_file_format_data_fvecs")
             table_obj = db_obj.create_table("test_import_different_file_format_data_fvecs",
-                                            {"c1": "vector,128,float"}, None)
+                                            {"c1": "vector,128,float"}, ConflictType.Error)
             table_obj.import_data(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
             res = table_obj.output(["*"]).to_df()
             print(res)
@@ -98,7 +99,7 @@ class TestImport:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_import_empty_file_fvecs")
         table_obj = db_obj.create_table("test_import_empty_file_fvecs",
-                                        {"c1": "vector,128,float"}, None)
+                                        {"c1": "vector,128,float"}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
@@ -116,7 +117,7 @@ class TestImport:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_import_empty_file_csv")
         table_obj = db_obj.create_table("test_import_empty_file_csv",
-                                        {"c1": "int", "c2": "vector,3,int"}, None)
+                                        {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
@@ -134,7 +135,7 @@ class TestImport:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_import_empty_file_jsonl")
         table_obj = db_obj.create_table("test_import_empty_file_jsonl",
-                                        {"c1": "int", "c2": "vector,3,int"}, None)
+                                        {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
         res = table_obj.output(["*"]).to_df()
@@ -151,7 +152,7 @@ class TestImport:
         db_obj = get_infinity_db
 
         db_obj.drop_table("test_import_format_unrecognized_data")
-        table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int"}, None)
+        table_obj = db_obj.create_table("test_import_format_unrecognized_data", {"c1": "int"}, ConflictType.Error)
         table_obj.import_data(
             os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_multi_test." + file_format)
 
@@ -168,7 +169,7 @@ class TestImport:
     def test_with_blank_space_delimiter_data(self, get_infinity_db, types):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_blank_space_delimiter_data")
-        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, None)
+        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_blankspace.csv")
 
         res = table_obj.output(["*"]).to_df()
@@ -183,7 +184,7 @@ class TestImport:
     def test_with_semicolons_delimiter_data(self, get_infinity_db, types):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_blank_space_delimiter_data")
-        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, None)
+        table_obj = db_obj.create_table("test_with_blank_space_delimiter_data", {"c1": types}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_semicolons.csv")
 
         res = table_obj.output(["*"]).to_df()
@@ -208,7 +209,7 @@ class TestImport:
             copy_data("pysdk_test_" + delimiter + ".csv")
         db_obj = get_infinity_db
         db_obj.drop_table("test_csv_with_different_delimiter")
-        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": "int", "c2": "int"}, None)
+        table_obj = db_obj.create_table("test_csv_with_different_delimiter", {"c1": "int", "c2": "int"}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + "csv/pysdk_test_" + delimiter + ".csv")
 
         res = table_obj.output(["*"]).to_df()

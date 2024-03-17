@@ -36,14 +36,15 @@ class ThriftInfinityClient:
         res = self.client.Connect()
         self.session_id = res.session_id
 
-    def create_database(self, db_name: str):
+    def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
-                                                                option=None))
+                                                                create_option=CreateOption(conflict_type)))
 
-    def drop_database(self, db_name: str):
+    def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
-                                                            db_name=db_name))
+                                                            db_name=db_name,
+                                                            drop_option=DropOption(conflict_type)))
 
     def list_databases(self):
         return self.client.ListDatabase(ListDatabaseRequest(session_id=self.session_id))
@@ -56,18 +57,19 @@ class ThriftInfinityClient:
         return self.client.GetDatabase(GetDatabaseRequest(session_id=self.session_id,
                                                           db_name=db_name))
 
-    def create_table(self, db_name: str, table_name: str, column_defs, option):
+    def create_table(self, db_name: str, table_name: str, column_defs,
+                     conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateTable(CreateTableRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           column_defs=column_defs,
-                                                          option=option))
+                                                          create_option=CreateOption(conflict_type)))
 
-    def drop_table(self, db_name: str, table_name: str, if_exists: bool):
+    def drop_table(self, db_name: str, table_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropTable(DropTableRequest(session_id=self.session_id,
                                                       db_name=db_name,
                                                       table_name=table_name,
-                                                      options=DropTableOptions(conflict_type=ConflictType.Ignore if if_exists else ConflictType.Error,)))
+                                                      drop_option=DropOption(conflict_type)))
 
     def list_tables(self, db_name: str):
         return self.client.ListTable(ListTableRequest(session_id=self.session_id,
@@ -83,19 +85,22 @@ class ThriftInfinityClient:
                                                     db_name=db_name,
                                                     table_name=table_name))
 
-    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list, option):
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list,
+                     conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
                                                           index_name=index_name,
                                                           index_info_list=index_info_list,
-                                                          option=option))
+                                                          create_option=CreateOption(conflict_type)))
 
-    def drop_index(self, db_name: str, table_name: str, index_name: str):
+    def drop_index(self, db_name: str, table_name: str, index_name: str,
+                   conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropIndex(DropIndexRequest(session_id=self.session_id,
                                                       db_name=db_name,
                                                       table_name=table_name,
-                                                      index_name=index_name))
+                                                      index_name=index_name,
+                                                      drop_option=DropOption(conflict_type)))
 
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields: list[Field]):
         return self.client.Insert(InsertRequest(session_id=self.session_id,

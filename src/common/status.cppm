@@ -105,6 +105,7 @@ export enum class ErrorCode : long {
     kInvalidFilterExpression = 3063,
     kMultipleFunctionMatched = 3064,
     kInsertWithoutValues = 3065,
+    kInvalidConflictType = 3066,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -223,9 +224,10 @@ public:
     static Status InvalidIndexType();
     static Status InvalidIndexParam(const String &param_name);
     static Status LackIndexParam();
-    static Status InvalidFilterExpression(const String& expr);
-    static Status MultipleFunctionMatched(const String& function, const String& matched_functions);
+    static Status InvalidFilterExpression(const String &expr);
+    static Status MultipleFunctionMatched(const String &function, const String &matched_functions);
     static Status InsertWithoutValues();
+    static Status InvalidConflictType();
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

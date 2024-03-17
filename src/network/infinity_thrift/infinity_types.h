@@ -44,20 +44,32 @@ std::ostream& operator<<(std::ostream& out, const LogicType::type& val);
 
 std::string to_string(const LogicType::type& val);
 
-struct ConflictType {
+struct CreateConflict {
   enum type {
-    Invalid = 0,
-    Ignore = 1,
-    Error = 2,
-    Replace = 3
+    Ignore = 0,
+    Error = 1,
+    Replace = 2
   };
 };
 
-extern const std::map<int, const char*> _ConflictType_VALUES_TO_NAMES;
+extern const std::map<int, const char*> _CreateConflict_VALUES_TO_NAMES;
 
-std::ostream& operator<<(std::ostream& out, const ConflictType::type& val);
+std::ostream& operator<<(std::ostream& out, const CreateConflict::type& val);
 
-std::string to_string(const ConflictType::type& val);
+std::string to_string(const CreateConflict::type& val);
+
+struct DropConflict {
+  enum type {
+    Ignore = 0,
+    Error = 1
+  };
+};
+
+extern const std::map<int, const char*> _DropConflict_VALUES_TO_NAMES;
+
+std::ostream& operator<<(std::ostream& out, const DropConflict::type& val);
+
+std::string to_string(const DropConflict::type& val);
 
 struct ElementType {
   enum type {
@@ -195,9 +207,9 @@ std::ostream& operator<<(std::ostream& out, const ExplainType::type& val);
 
 std::string to_string(const ExplainType::type& val);
 
-class Option;
+class CreateOption;
 
-class DropTableOptions;
+class DropOption;
 
 class NumberType;
 
@@ -307,73 +319,42 @@ class ShowVariableRequest;
 
 class ShowTablesRequest;
 
-
-class Option : public virtual ::apache::thrift::TBase {
- public:
-
-  Option(const Option&) noexcept;
-  Option& operator=(const Option&) noexcept;
-  Option() noexcept {
-  }
-
-  virtual ~Option() noexcept;
-
-  bool operator == (const Option & /* rhs */) const
-  {
-    return true;
-  }
-  bool operator != (const Option &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const Option & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(Option &a, Option &b);
-
-std::ostream& operator<<(std::ostream& out, const Option& obj);
-
-typedef struct _DropTableOptions__isset {
-  _DropTableOptions__isset() : conflict_type(false) {}
+typedef struct _CreateOption__isset {
+  _CreateOption__isset() : conflict_type(false) {}
   bool conflict_type :1;
-} _DropTableOptions__isset;
+} _CreateOption__isset;
 
-class DropTableOptions : public virtual ::apache::thrift::TBase {
+class CreateOption : public virtual ::apache::thrift::TBase {
  public:
 
-  DropTableOptions(const DropTableOptions&) noexcept;
-  DropTableOptions& operator=(const DropTableOptions&) noexcept;
-  DropTableOptions() noexcept
-                   : conflict_type(static_cast<ConflictType::type>(0)) {
+  CreateOption(const CreateOption&) noexcept;
+  CreateOption& operator=(const CreateOption&) noexcept;
+  CreateOption() noexcept
+               : conflict_type(static_cast<CreateConflict::type>(0)) {
   }
 
-  virtual ~DropTableOptions() noexcept;
+  virtual ~CreateOption() noexcept;
   /**
    * 
-   * @see ConflictType
+   * @see CreateConflict
    */
-  ConflictType::type conflict_type;
+  CreateConflict::type conflict_type;
 
-  _DropTableOptions__isset __isset;
+  _CreateOption__isset __isset;
 
-  void __set_conflict_type(const ConflictType::type val);
+  void __set_conflict_type(const CreateConflict::type val);
 
-  bool operator == (const DropTableOptions & rhs) const
+  bool operator == (const CreateOption & rhs) const
   {
     if (!(conflict_type == rhs.conflict_type))
       return false;
     return true;
   }
-  bool operator != (const DropTableOptions &rhs) const {
+  bool operator != (const CreateOption &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const DropTableOptions & ) const;
+  bool operator < (const CreateOption & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
@@ -381,9 +362,56 @@ class DropTableOptions : public virtual ::apache::thrift::TBase {
   virtual void printTo(std::ostream& out) const;
 };
 
-void swap(DropTableOptions &a, DropTableOptions &b);
+void swap(CreateOption &a, CreateOption &b);
 
-std::ostream& operator<<(std::ostream& out, const DropTableOptions& obj);
+std::ostream& operator<<(std::ostream& out, const CreateOption& obj);
+
+typedef struct _DropOption__isset {
+  _DropOption__isset() : conflict_type(false) {}
+  bool conflict_type :1;
+} _DropOption__isset;
+
+class DropOption : public virtual ::apache::thrift::TBase {
+ public:
+
+  DropOption(const DropOption&) noexcept;
+  DropOption& operator=(const DropOption&) noexcept;
+  DropOption() noexcept
+             : conflict_type(static_cast<DropConflict::type>(0)) {
+  }
+
+  virtual ~DropOption() noexcept;
+  /**
+   * 
+   * @see DropConflict
+   */
+  DropConflict::type conflict_type;
+
+  _DropOption__isset __isset;
+
+  void __set_conflict_type(const DropConflict::type val);
+
+  bool operator == (const DropOption & rhs) const
+  {
+    if (!(conflict_type == rhs.conflict_type))
+      return false;
+    return true;
+  }
+  bool operator != (const DropOption &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DropOption & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(DropOption &a, DropOption &b);
+
+std::ostream& operator<<(std::ostream& out, const DropOption& obj);
 
 
 class NumberType : public virtual ::apache::thrift::TBase {
@@ -2469,13 +2497,13 @@ void swap(IndexInfo &a, IndexInfo &b);
 std::ostream& operator<<(std::ostream& out, const IndexInfo& obj);
 
 typedef struct _CreateIndexRequest__isset {
-  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info_list(true), session_id(false), option(false) {}
+  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info_list(true), session_id(false), create_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
   bool index_info_list :1;
   bool session_id :1;
-  bool option :1;
+  bool create_option :1;
 } _CreateIndexRequest__isset;
 
 class CreateIndexRequest : public virtual ::apache::thrift::TBase {
@@ -2497,7 +2525,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
   std::string index_name;
   std::vector<IndexInfo>  index_info_list;
   int64_t session_id;
-  Option option;
+  CreateOption create_option;
 
   _CreateIndexRequest__isset __isset;
 
@@ -2511,7 +2539,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  void __set_option(const Option& val);
+  void __set_create_option(const CreateOption& val);
 
   bool operator == (const CreateIndexRequest & rhs) const
   {
@@ -2525,9 +2553,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(session_id == rhs.session_id))
       return false;
-    if (__isset.option != rhs.__isset.option)
-      return false;
-    else if (__isset.option && !(option == rhs.option))
+    if (!(create_option == rhs.create_option))
       return false;
     return true;
   }
@@ -2548,11 +2574,12 @@ void swap(CreateIndexRequest &a, CreateIndexRequest &b);
 std::ostream& operator<<(std::ostream& out, const CreateIndexRequest& obj);
 
 typedef struct _DropIndexRequest__isset {
-  _DropIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
+  _DropIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false), drop_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
   bool session_id :1;
+  bool drop_option :1;
 } _DropIndexRequest__isset;
 
 class DropIndexRequest : public virtual ::apache::thrift::TBase {
@@ -2572,6 +2599,7 @@ class DropIndexRequest : public virtual ::apache::thrift::TBase {
   std::string table_name;
   std::string index_name;
   int64_t session_id;
+  DropOption drop_option;
 
   _DropIndexRequest__isset __isset;
 
@@ -2583,6 +2611,8 @@ class DropIndexRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
+  void __set_drop_option(const DropOption& val);
+
   bool operator == (const DropIndexRequest & rhs) const
   {
     if (!(db_name == rhs.db_name))
@@ -2592,6 +2622,8 @@ class DropIndexRequest : public virtual ::apache::thrift::TBase {
     if (!(index_name == rhs.index_name))
       return false;
     if (!(session_id == rhs.session_id))
+      return false;
+    if (!(drop_option == rhs.drop_option))
       return false;
     return true;
   }
@@ -2662,10 +2694,10 @@ void swap(GetDatabaseRequest &a, GetDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const GetDatabaseRequest& obj);
 
 typedef struct _CreateDatabaseRequest__isset {
-  _CreateDatabaseRequest__isset() : db_name(false), session_id(false), option(false) {}
+  _CreateDatabaseRequest__isset() : db_name(false), session_id(false), create_option(false) {}
   bool db_name :1;
   bool session_id :1;
-  bool option :1;
+  bool create_option :1;
 } _CreateDatabaseRequest__isset;
 
 class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
@@ -2681,7 +2713,7 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
   virtual ~CreateDatabaseRequest() noexcept;
   std::string db_name;
   int64_t session_id;
-  Option option;
+  CreateOption create_option;
 
   _CreateDatabaseRequest__isset __isset;
 
@@ -2689,7 +2721,7 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  void __set_option(const Option& val);
+  void __set_create_option(const CreateOption& val);
 
   bool operator == (const CreateDatabaseRequest & rhs) const
   {
@@ -2697,7 +2729,7 @@ class CreateDatabaseRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(session_id == rhs.session_id))
       return false;
-    if (!(option == rhs.option))
+    if (!(create_option == rhs.create_option))
       return false;
     return true;
   }
@@ -2718,10 +2750,10 @@ void swap(CreateDatabaseRequest &a, CreateDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const CreateDatabaseRequest& obj);
 
 typedef struct _DropDatabaseRequest__isset {
-  _DropDatabaseRequest__isset() : db_name(false), session_id(false), option(false) {}
+  _DropDatabaseRequest__isset() : db_name(false), session_id(false), drop_option(false) {}
   bool db_name :1;
   bool session_id :1;
-  bool option :1;
+  bool drop_option :1;
 } _DropDatabaseRequest__isset;
 
 class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
@@ -2737,7 +2769,7 @@ class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
   virtual ~DropDatabaseRequest() noexcept;
   std::string db_name;
   int64_t session_id;
-  Option option;
+  DropOption drop_option;
 
   _DropDatabaseRequest__isset __isset;
 
@@ -2745,7 +2777,7 @@ class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  void __set_option(const Option& val);
+  void __set_drop_option(const DropOption& val);
 
   bool operator == (const DropDatabaseRequest & rhs) const
   {
@@ -2753,7 +2785,7 @@ class DropDatabaseRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(session_id == rhs.session_id))
       return false;
-    if (!(option == rhs.option))
+    if (!(drop_option == rhs.drop_option))
       return false;
     return true;
   }
@@ -2774,12 +2806,12 @@ void swap(DropDatabaseRequest &a, DropDatabaseRequest &b);
 std::ostream& operator<<(std::ostream& out, const DropDatabaseRequest& obj);
 
 typedef struct _CreateTableRequest__isset {
-  _CreateTableRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false), option(false) {}
+  _CreateTableRequest__isset() : db_name(false), table_name(false), column_defs(true), session_id(false), create_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool column_defs :1;
   bool session_id :1;
-  bool option :1;
+  bool create_option :1;
 } _CreateTableRequest__isset;
 
 class CreateTableRequest : public virtual ::apache::thrift::TBase {
@@ -2799,7 +2831,7 @@ class CreateTableRequest : public virtual ::apache::thrift::TBase {
   std::string table_name;
   std::vector<ColumnDef>  column_defs;
   int64_t session_id;
-  Option option;
+  CreateOption create_option;
 
   _CreateTableRequest__isset __isset;
 
@@ -2811,7 +2843,7 @@ class CreateTableRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  void __set_option(const Option& val);
+  void __set_create_option(const CreateOption& val);
 
   bool operator == (const CreateTableRequest & rhs) const
   {
@@ -2823,7 +2855,7 @@ class CreateTableRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(session_id == rhs.session_id))
       return false;
-    if (!(option == rhs.option))
+    if (!(create_option == rhs.create_option))
       return false;
     return true;
   }
@@ -2844,11 +2876,11 @@ void swap(CreateTableRequest &a, CreateTableRequest &b);
 std::ostream& operator<<(std::ostream& out, const CreateTableRequest& obj);
 
 typedef struct _DropTableRequest__isset {
-  _DropTableRequest__isset() : db_name(false), table_name(false), session_id(false), options(false) {}
+  _DropTableRequest__isset() : db_name(false), table_name(false), session_id(false), drop_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool session_id :1;
-  bool options :1;
+  bool drop_option :1;
 } _DropTableRequest__isset;
 
 class DropTableRequest : public virtual ::apache::thrift::TBase {
@@ -2866,7 +2898,7 @@ class DropTableRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   int64_t session_id;
-  DropTableOptions options;
+  DropOption drop_option;
 
   _DropTableRequest__isset __isset;
 
@@ -2876,7 +2908,7 @@ class DropTableRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  void __set_options(const DropTableOptions& val);
+  void __set_drop_option(const DropOption& val);
 
   bool operator == (const DropTableRequest & rhs) const
   {
@@ -2886,7 +2918,7 @@ class DropTableRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(session_id == rhs.session_id))
       return false;
-    if (!(options == rhs.options))
+    if (!(drop_option == rhs.drop_option))
       return false;
     return true;
   }

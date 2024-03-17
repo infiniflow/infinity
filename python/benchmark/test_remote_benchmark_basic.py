@@ -131,7 +131,7 @@ class TestBenchmark:
         @trace_unhandled_exceptions
         def create_database(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.create_database(
-                f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}", None)
+                f"my_database_{port}_{process_id}_{thread_id}_{num_iteration}")
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_database failed: {res.error_msg}")
 
@@ -158,7 +158,7 @@ class TestBenchmark:
         def create_table(infinity_obj, port, process_id, thread_id, num_iteration):
             res = infinity_obj.get_database(f"default").create_table(
                 f"table_{port}_{process_id}_{thread_id}_{num_iteration}",
-                {"c1": "int, primary key", "c2": "float"}, None)
+                {"c1": "int, primary key", "c2": "float"})
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_table failed: {res.error_msg}")
 
@@ -201,7 +201,7 @@ class TestBenchmark:
             res = (infinity_obj
                    .get_database(f"default")
                    .get_table(f"table_{port}_{process_id}_{thread_id}_{num_iteration}")
-                   .create_index("my_index", ["c1"], "IVF_FLAT", None, None))
+                   .create_index("my_index", ["c1"], "IVF_FLAT", None))
             if res.error_code != ErrorCode.OK:
                 raise Exception(f"create_index failed: {res.error_msg}")
 

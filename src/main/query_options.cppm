@@ -25,7 +25,10 @@ public:
     ConflictType conflict_type_{ConflictType::kError};
 };
 
-export class DropDatabaseOptions {};
+export class DropDatabaseOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class CreateTableOptions {
 public:
@@ -37,9 +40,15 @@ public:
     ConflictType conflict_type_{ConflictType::kError};
 };
 
-export class CreateIndexOptions {};
+export class CreateIndexOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
-export class DropIndexOptions {};
+export class DropIndexOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class ImportOptions {
 public:

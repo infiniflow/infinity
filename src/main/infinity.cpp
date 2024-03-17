@@ -116,7 +116,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     return query_result;
 }
 
-QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOptions &) {
+QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOptions &drop_database_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -127,6 +127,7 @@ QueryResult Infinity::DropDatabase(const String &db_name, const DropDatabaseOpti
     SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
     drop_schema_info->schema_name_ = db_name;
     drop_statement->drop_info_ = drop_schema_info;
+    drop_statement->drop_info_->conflict_type_ = drop_database_options.conflict_type_;
     QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;
 }
@@ -214,6 +215,7 @@ QueryResult Infinity::CreateTable(const String &db_name,
     create_table_info->table_name_ = table_name;
     create_table_info->column_defs_ = std::move(column_defs);
     create_table_info->constraints_ = std::move(constraints);
+    create_table_info->conflict_type_ = create_table_options.conflict_type_;
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
@@ -297,7 +299,7 @@ QueryResult Infinity::CreateIndex(const String &db_name,
                                   const String &table_name,
                                   const String &index_name,
                                   Vector<IndexInfo *> *index_info_list,
-                                  CreateIndexOptions) {
+                                  const CreateIndexOptions &create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -314,13 +316,14 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     create_index_info->index_info_list_ = index_info_list;
 
     create_statement->create_info_ = create_index_info;
-    create_statement->create_info_->conflict_type_ = ConflictType::kIgnore;
+    create_statement->create_info_->conflict_type_ = create_index_options.conflict_type_;
 
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
 }
 
-QueryResult Infinity::DropIndex(const String &db_name, const String &table_name, const String &index_name) {
+QueryResult
+Infinity::DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -335,7 +338,7 @@ QueryResult Infinity::DropIndex(const String &db_name, const String &table_name,
     drop_index_info->index_name_ = index_name;
     drop_statement->drop_info_ = drop_index_info;
 
-    drop_statement->drop_info_->conflict_type_ = ConflictType::kIgnore;
+    drop_statement->drop_info_->conflict_type_ = drop_index_options.conflict_type_;
 
     QueryResult result = query_context_ptr->QueryStatement(drop_statement.get());
     return result;

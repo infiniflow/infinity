@@ -20,6 +20,7 @@ from common import common_values
 import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 from utils import copy_data
 
 
@@ -85,7 +86,7 @@ class TestSelect:
         # infinity
         db_obj.drop_table("test_infinity_select", True)
         table_obj = db_obj.create_table(
-            "test_infinity_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, None)
+            "test_infinity_select", {"c1": "int, primary key, not null", "c2": "int, not null"}, ConflictType.Error)
 
         assert table_obj is not None
 
@@ -205,7 +206,7 @@ class TestSelect:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_select_varchar", True)
         db_obj.create_table("test_select_varchar", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
-                            None)
+                            ConflictType.Error)
         table_obj = db_obj.get_table("test_select_varchar")
         table_obj.insert(
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
@@ -236,7 +237,7 @@ class TestSelect:
         db_obj = infinity_obj.get_database("default")
         res = db_obj.drop_table("test_select_big", True)
         db_obj.create_table("test_select_big", {"c1": "varchar, primary key, not null", "c2": "varchar, not null"},
-                            None)
+                            ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_big")
 
@@ -270,7 +271,7 @@ class TestSelect:
         db_obj.drop_table("test_select_embedding", True)
 
         res = db_obj.create_table("test_select_embedding", {
-            "c1": "int", "c2": "vector,3,int"}, None)
+            "c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_embedding")
 
@@ -317,7 +318,7 @@ class TestSelect:
         db_obj.drop_table("test_select_embedding_float", True)
 
         res = db_obj.create_table("test_select_embedding_float", {
-            "c1": "float", "c2": "vector,4,float"}, None)
+            "c1": "float", "c2": "vector,4,float"}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_embedding_float")
 
@@ -373,7 +374,7 @@ class TestSelect:
         db_obj.drop_table("test_select_big_embedding", True)
 
         db_obj.create_table("test_select_big_embedding", {
-            "c1": "int", "c2": "vector,3,int"}, None)
+            "c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_big_embedding")
 
@@ -393,7 +394,7 @@ class TestSelect:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_select_same_output", True)
         db_obj.create_table("test_select_same_output", {
-            "c1": "int", "c2": "int"}, None)
+            "c1": "int", "c2": "int"}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_select_same_output")
         table_obj.insert([{"c1": 1, "c2": 2}])
@@ -410,7 +411,7 @@ class TestSelect:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_empty_table", True)
         db_obj.create_table("test_empty_table", {
-            "c1": "int", "c2": "int"}, None)
+            "c1": "int", "c2": "int"}, ConflictType.Error)
 
         table_obj = db_obj.get_table("test_empty_table")
         print()
@@ -446,7 +447,7 @@ class TestSelect:
         db_obj = infinity_obj.get_database("default")
         db_obj.drop_table("test_output_filter_function", True)
         table_obj = db_obj.create_table("test_output_filter_function", {
-            "c1": "int", "c2": "float"}, None)
+            "c1": "int", "c2": "float"}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
                           {"c1": 100, "c2": 2.0},

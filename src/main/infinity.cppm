@@ -48,7 +48,6 @@ public:
 
     // Infinity API
 public:
-
     static SharedPtr<Infinity> RemoteConnect();
 
     void RemoteDisconnect();
@@ -94,9 +93,9 @@ public:
                             const String &table_name,
                             const String &index_name,
                             Vector<IndexInfo *> *index_info_list,
-                            CreateIndexOptions create_index_options);
+                            const CreateIndexOptions &create_index_options);
 
-    QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name);
+    QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_option);
 
     QueryResult Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values);
 
