@@ -18,7 +18,7 @@
 int main() {
     infinity::client::Client infinity_client = infinity::client::Client::Connect("127.0.0.1", 23817);
 
-    infinity::client::ClientStatus status = infinity_client.CreateDatabase("db1", true);
+    infinity::client::ClientStatus status = infinity_client.CreateDatabase("db1");
     if(!status.IsOK()) {
         std::cerr << status.ErrorMessage() << std::endl;
         return static_cast<int>(status.ErrorCode());
@@ -29,7 +29,7 @@ int main() {
         std::cout << db_name << std::endl;
     }
 
-    status = infinity_client.DropDatabase("db1", true);
+    status = infinity_client.DropDatabase("db1");
     if(!status.IsOK()) {
         std::cerr << status.ErrorMessage() << std::endl;
         return static_cast<int>(status.ErrorCode());

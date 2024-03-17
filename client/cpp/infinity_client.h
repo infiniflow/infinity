@@ -113,6 +113,7 @@ enum ClientErrorCode : int64_t {
     kInvalidFilterExpression = 3063,
     kMultipleFunctionMatched = 3064,
     kInsertWithoutValues = 3065,
+    kInvalidConflictType = 3066,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -159,6 +160,17 @@ struct ClientStatus {
     std::string msg_{};
 };
 
+enum CreateOption : int8_t {
+    kErrorIfExists = 0,
+    kIgnoreIfExists = 1,
+    kReplaceIfExists = 2
+};
+
+enum class DropOption {
+    kErrorIfNotExists,
+    kIgnoreIfNotExists
+};
+
 struct DatabaseInfo {
     std::string name_;
     std::string storage_path_;
@@ -180,10 +192,10 @@ public:
     ClientStatus Disconnect();
 
     /// TODO: comment
-    ClientStatus CreateDatabase(const std::string &db_name, bool ignore_if_exists);
+    ClientStatus CreateDatabase(const std::string &db_name, CreateOption create_option = CreateOption::kErrorIfExists);
 
     /// TODO: comment
-    ClientStatus DropDatabase(const std::string &db_name, bool ignore_if_exists);
+    ClientStatus DropDatabase(const std::string &db_name, DropOption drop_option = DropOption::kErrorIfNotExists);
 
     /// TODO: comment
     std::vector<std::string> ListDatabases() const;

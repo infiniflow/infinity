@@ -40,31 +40,59 @@ ClientStatus Client::Disconnect() {
 }
 
 /// TODO: comment
-ClientStatus Client::CreateDatabase(const std::string &db_name, bool ignore_if_exists) {
+ClientStatus Client::CreateDatabase(const std::string &db_name, CreateOption create_option) {
     CreateDatabaseRequest request;
     CommonResponse response;
+
+    switch (create_option) {
+        case CreateOption::kErrorIfExists: {
+            request.create_option.conflict_type = infinity_thrift_rpc::CreateConflict::type::Error;
+            break;
+        }
+        case CreateOption::kIgnoreIfExists: {
+            request.create_option.conflict_type = infinity_thrift_rpc::CreateConflict::type::Ignore;
+            break;
+        }
+        case CreateOption::kReplaceIfExists: {
+            request.create_option.conflict_type = infinity_thrift_rpc::CreateConflict::type::Replace;
+            break;
+        }
+        default: {
+            return ClientStatus{ClientErrorCode::kInvalidConflictType, "Invalid conflict type"};
+        }
+    }
 
     request.db_name = db_name;
     request.session_id = session_id_;
 
     client_->CreateDatabase(response, request);
-    if(response.error_code == 0) {
-        return ClientStatus::OK();
-    } else {
-        return {static_cast<ClientErrorCode>(response.error_code), response.error_msg};
-    }
+    return ClientStatus{static_cast<ClientErrorCode>(response.error_code), response.error_msg};
 }
 
 /// TODO: comment
-ClientStatus Client::DropDatabase(const std::string &db_name, bool ignore_if_exists) {
+ClientStatus Client::DropDatabase(const std::string &db_name, DropOption drop_option) {
     DropDatabaseRequest request;
     CommonResponse response;
+
+    switch (drop_option) {
+        case DropOption::kErrorIfNotExists: {
+            request.drop_option.conflict_type = infinity_thrift_rpc::DropConflict::type::Error;
+            break;
+        }
+        case DropOption::kIgnoreIfNotExists: {
+            request.drop_option.conflict_type = infinity_thrift_rpc::DropConflict::type::Ignore;
+            break;
+        }
+        default: {
+            return ClientStatus{ClientErrorCode::kInvalidConflictType, "Invalid conflict type"};
+        }
+    }
 
     request.db_name = db_name;
     request.session_id = session_id_;
 
     client_->DropDatabase(response, request);
-    return ClientStatus::OK();
+    return ClientStatus{static_cast<ClientErrorCode>(response.error_code), response.error_msg};
 }
 
 /// TODO: comment
