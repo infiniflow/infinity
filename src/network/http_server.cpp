@@ -11,8 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
+
+// #include "oatpp/core/Types.hpp"
+// #include "oatpp/core/macro/codegen.hpp"
+// #include "oatpp/parser/json/mapping/ObjectMapper.hpp"
+
+// #include OATPP_CODEGEN_BEGIN(DTO) ///< Begin DTO codegen section
+
+// class DatabaseDto : public oatpp::DTO {
+
+//   DTO_INIT(DatabaseDto, DTO)
+
+//   DTO_FIELD(String, database_name);
+//   DTO_FIELD(infinity::CreateDatabaseOptions, options);
+
+// };
+
+// #include OATPP_CODEGEN_END(DTO) ///< End DTO codegen section
 
 module http_server;
 
@@ -21,6 +37,8 @@ import third_party;
 import defer_op;
 import data_block;
 import value;
+import query_options;
+
 
 namespace {
 
@@ -59,7 +77,86 @@ public:
             json_response["error_message"] = result.ErrorMsg();
             http_status = HTTPStatus::CODE_500;
         }
-        return ResponseFactory::createResponse(HTTPStatus::CODE_500, json_response.dump());
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class CreateDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String body_info = request->readBodyToString();
+        
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String database_name = body_info_json["database_name"];
+        CreateDatabaseOptions options;
+        auto result = infinity->CreateDatabase(database_name, options);
+        
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DropDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+        
+        String body_info = request->readBodyToString();
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String database_name = body_info_json["database_name"];
+        DropDatabaseOptions options;
+        auto result = infinity->DropDatabase(database_name,options);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+         if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class RetrieveDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto db_name = request->getPathVariable("db_name");
+        auto result = infinity->GetDatabase(db_name);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+         if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
 
@@ -74,6 +171,9 @@ void HTTPServer::Start(u16 port) {
     SharedPtr<HttpRouter> router = HttpRouter::createShared();
     router->route("GET", "/hello", MakeShared<HttpHandler>());
     router->route("GET", "/databases", MakeShared<ListDatabaseHandler>());
+    router->route("POST", "/databases", MakeShared<CreateDatabaseHandler>());
+    router->route("DELETE", "/databases", MakeShared<DropDatabaseHandler>());
+    router->route("GET", "/databases/{db_name}", MakeShared<RetrieveDatabaseHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler =  HttpConnectionHandler::createShared(router);
