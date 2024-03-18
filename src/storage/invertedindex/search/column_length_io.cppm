@@ -21,7 +21,9 @@ import index_defines;
 import internal_types;
 import table_entry;
 import buffer_handle;
+import fulltext_file_worker;
 import third_party;
+import infinity_exception;
 
 namespace infinity {
 
@@ -48,7 +50,18 @@ public:
 
     void UpdateAvgColumnLength(Vector<float> &avg_column_length);
 
-    u32 GetColumnLength(u32 scorer_column_idx, RowID doc_id);
+    inline u32 GetColumnLength(u32 scorer_column_idx, RowID doc_id) {
+        SegmentID segment_id = doc_id.segment_id_;
+        SegmentOffset segment_offset = doc_id.segment_offset_;
+        if (auto iter = column_length_data_buffer_handles_.find(segment_id); iter != column_length_data_buffer_handles_.end()) {
+            auto &buffer_handle = (iter->second)[scorer_column_idx];
+            auto &column_length_data = *static_cast<const FullTextColumnLengthData *>(buffer_handle.GetData());
+            return column_length_data.column_length_[segment_offset];
+        } else {
+            UnrecoverableError(fmt::format("Segment {} is not found in column length data", segment_id));
+            return -1;
+        }
+    }
 };
 
 } // namespace infinity
