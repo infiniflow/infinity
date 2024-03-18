@@ -406,6 +406,7 @@ public:
                         knn_expr = nullptr;
                     }
 
+                    delete search_expr;
                     ProcessStatus(response, knn_expr_status);
                     return;
                 }
@@ -1165,6 +1166,13 @@ private:
         }
 
         knn_expr->topn_ = expr.topn;
+        if (knn_expr->topn_ <= 0) {
+            delete knn_expr;
+            knn_expr = nullptr;
+            String topn = std::to_string(expr.topn);
+            return {nullptr, Status::InvalidParameterValue("topn", topn, "topn should be greater than 0")};
+        }
+
         knn_expr->opt_params_ = new Vector<InitParameter *>();
         for (auto &param : expr.opt_params) {
             auto init_parameter = new InitParameter();

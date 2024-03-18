@@ -454,6 +454,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("Knn expression expect a column expression");
     }
+    if (parsed_knn_expr.topn_ <= 0) {
+        String topn = std::to_string(parsed_knn_expr.topn_);
+        RecoverableError(Status::InvalidParameterValue("topn", topn, "topn should be greater than 0"));
+    }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
     if (type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
