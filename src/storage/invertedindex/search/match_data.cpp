@@ -21,24 +21,26 @@ import term_doc_iterator;
 import index_defines;
 import bm25_ranker;
 import internal_types;
+import table_entry;
 
 namespace infinity {
 
 Scorer::Scorer(u64 num_of_docs) : total_df_(num_of_docs) { column_length_reader_ = MakeUnique<ColumnLengthReader>(); }
 
 u32 Scorer::GetOrSetColumnIndex(u64 column_id) {
-    if (column_index_map_.find(column_id) == column_index_map_.end()) {
+    if (auto iter = column_index_map_.find(column_id); iter == column_index_map_.end()) {
         column_index_map_[column_id] = column_counter_;
         match_data_.term_columns_.resize(column_counter_ + 1);
+        column_ids_.push_back(column_id);
         return column_counter_++;
-    } else
-        return column_index_map_[column_id];
+    } else {
+        return iter->second;
+    }
 }
 
-double Scorer::GetAvgColumnLength(u64 column_id) {
-    double length = 0.0F;
-    //  TODO
-    return length;
+void Scorer::LoadColumnLength(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    column_length_reader_->LoadColumnLength(column_counter_, column_index_map_, table_entry, txn_id, begin_ts);
+    column_length_reader_->UpdateAvgColumnLength(avg_column_length_);
 }
 
 void Scorer::AddDocIterator(TermDocIterator *iter, u64 column_id) {
@@ -51,7 +53,7 @@ float Scorer::Score(RowID doc_id) {
     float score = 0.0F;
     for (u32 i = 0; i < column_counter_; i++) {
         BM25Ranker ranker(total_df_);
-        u32 column_len = column_length_reader_->GetColumnLength(column_ids_[i], doc_id);
+        u32 column_len = column_length_reader_->GetColumnLength(i, doc_id);
         Vector<TermDocIterator *> &column_iters = iterators_[i];
         TermColumnMatchData &column_match_data = match_data_.term_columns_[i];
         for (u32 j = 0; j < column_iters.size(); j++) {

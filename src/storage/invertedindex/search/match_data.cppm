@@ -21,6 +21,7 @@ import third_party;
 import index_defines;
 import column_length_io;
 import internal_types;
+import table_entry;
 
 namespace infinity {
 export struct TermColumnMatchData {
@@ -44,12 +45,12 @@ public:
 
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
+    void LoadColumnLength(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     float Score(RowID doc_id);
 
 private:
     u32 GetOrSetColumnIndex(u64 column_id);
-
-    double GetAvgColumnLength(u64 column_id);
 
     struct Hash {
         inline u64 operator()(const u64 &val) const { return val; }
@@ -60,9 +61,12 @@ private:
     FlatHashMap<u64, u32, Hash> column_index_map_;
     Vector<u64> column_ids_;
     Vector<Vector<TermDocIterator *>> iterators_;
-    Vector<double> avg_column_length_;
+    Vector<float> avg_column_length_;
     UniquePtr<ColumnLengthReader> column_length_reader_;
     MatchData match_data_;
+
+public:
+    using ColumnIndexMapType = decltype(column_index_map_);
 };
 
 } // namespace infinity

@@ -19,15 +19,32 @@ export module column_length_io;
 import stl;
 import index_defines;
 import internal_types;
+import table_entry;
+import buffer_handle;
 
 namespace infinity {
+
 export class ColumnLengthWriter {};
 
 export class ColumnLengthReader {
+    u32 column_counter_{};
+    // all available data in the table
+    Map<SegmentID, Vector<BufferHandle>> column_length_data_buffer_handles_;
+
 public:
     ColumnLengthReader() = default;
     ~ColumnLengthReader() = default;
 
-    u32 GetColumnLength(u64 column_id, RowID doc_id) { return 0; }
+    template <typename ScorerColumnIndexMapType>
+    void LoadColumnLength(u32 column_counter,
+                          ScorerColumnIndexMapType &column_index_map,
+                          TableEntry *table_entry,
+                          TransactionID txn_id,
+                          TxnTimeStamp begin_ts);
+
+    void UpdateAvgColumnLength(Vector<float> &avg_column_length);
+
+    u32 GetColumnLength(u32 scorer_column_idx, RowID doc_id);
 };
+
 } // namespace infinity
