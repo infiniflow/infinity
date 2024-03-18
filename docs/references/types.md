@@ -1,3 +1,8 @@
+---
+sidebar_position: 5
+slug: /types
+---
+
 # Types
 
 ## Numeric types

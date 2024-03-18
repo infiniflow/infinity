@@ -1,6 +1,10 @@
-# Python API Reference
+---
+sidebar_position: 3
+slug: /python_api_reference
+---
+# API Reference
 
-# connect
+## connect
 
 Connects to the Infinity server and gets an Infinity object.
 
@@ -8,22 +12,22 @@ Connects to the Infinity server and gets an Infinity object.
 infinity_obj = infinity.connect(REMOTE_HOST)
 ```
 
-## Details
+### Details
 
 This method connect to the Infinity server and return a infinity object. 
 
-## Parameters
+### Parameters
 
 - `REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)`
 
-## Returns
+### Returns
 
 - success: An Infinity object.
 - failure: `Exception`
 
 ---
 
-# infinity_obj.disconnect
+## infinity_obj.disconnect
 
 Disconnects from the Infinity server.
 
@@ -31,19 +35,19 @@ Disconnects from the Infinity server.
 infinity_obj.disconnect()
 ```
 
-## Details
+### Details
 
 This method disconnects the current Infinity object from the server.
 
 > It is automatically called when an Infinity object is destructed.
 
-## Returns
+#### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# infinity_obj.create_database
+## infinity_obj.create_database
 
 Creates a database.
 
@@ -51,21 +55,21 @@ Creates a database.
 infinity_obj.create_database("my_database")
 ```
 
-## Details
+### Details
 
 This method creates a database by name. 
 
-## Parameters
+### Parameters
 
 - `db_name` : `str`
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# infinity_obj.drop_database
+## infinity_obj.drop_database
 
 Drops a database.
 
@@ -73,21 +77,21 @@ Drops a database.
 infinity_obj.drop_database("my_database")
 ```
 
-## Details
+### Details
 
 This method drops a database by name.
 
-## Parameters
+### Parameters
 
 - `db_name` : `str` Name of the database to drop.
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# infinity_obj.list_databases
+## infinity_obj.list_databases
 
 Lists all databases.
 
@@ -95,18 +99,18 @@ Lists all databases.
 infinity_obj.list_databases()
 ```
 
-## Details
+### Details
 
 This method lists all databases.
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`.
     - response `db_names` `list[str]`
 - failure: `Exception`
 
-# infinity_obj.get_database
+## infinity_obj.get_database
 
 Gets a database object.
 
@@ -114,15 +118,15 @@ Gets a database object.
 db_obj=infinity_obj.get_database("default")
 ```
 
-## Details
+### Details
 
 This method retrieves a database object by name.
 
-## Parameters
+### Parameters
 
 - `db_name` : `str` The name of the database to retrieve.
 
-## Returns
+### Returns
 
 - success:
     - A database object. 
@@ -130,7 +134,7 @@ This method retrieves a database object by name.
 
 ---
 
-# db_obj.create_table
+## db_obj.create_table
 
 Creates a table.
 
@@ -143,33 +147,33 @@ db_obj.create_table("test_create_embedding_table",
 
 ```
 
-## Details
+### Details
 
-### numeric or varchar
-
-- `columns_definition` : `dict`
-    - key: `column name`: `str`
-    - value: <`datatype`>,<`constraint`>,<`constraint`> :`str`
-
-### embedding
+#### numeric or varchar
 
 - `columns_definition` : `dict`
     - key: `column name`: `str`
-    - value: vector,<`dimension`>,<`element_type`> :`str`
+    - value: `<datatype>`,`<constraint>`,`<constraint>` :`str`
 
-## Parameters
+#### embedding
+
+- `columns_definition` : `dict`
+    - key: `column name`: `str`
+    - value: vector,`<dimension>`,`<element_type>` :`str`
+
+### Parameters
 
 - `table_name` : `str`
 - `columns_definition` : `dict[str, str]`
 - `options` : None
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# db_obj.drop_table
+## db_obj.drop_table
 
 Drops a table.
 
@@ -177,22 +181,22 @@ Drops a table.
 db_obj.drop_table("test_create_varchar_table", if_exists=True)
 ```
 
-## Details
+### Details
 
 Drops a table by name.
 
-## Parameters
+### Parameters
 
 - `table_name` : `str` The name of the table to drop.
 - `if_exists` : `bool`
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# db_obj.get_table
+## db_obj.get_table
 
 Gets a table object.
 
@@ -200,21 +204,21 @@ Gets a table object.
 table_obj = db_obj.get_table("test_create_varchar_table")
 ```
 
-## Details
+### Details
 
 This method retrieves a table object by name.
 
-## Parameters
+### Parameters
 
 - `table_name` : `str` The name of the intended table.
 
-## Returns
+### Returns
 
 - success:
     - A table object
 - failure: `Exception`
 
-# db_obj.list_tables
+## db_obj.list_tables
 
 Lists all tables.
 
@@ -222,11 +226,11 @@ Lists all tables.
 db_obj.list_tables()
 ```
 
-## Details
+### Details
 
 This method lists all tables in the database.
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
@@ -235,7 +239,7 @@ This method lists all tables in the database.
 
 ---
 
-# table_obj.create_index
+## table_obj.create_index
 
 Creates an index by `IndexInfo` list.
 
@@ -284,7 +288,7 @@ table_obj.create_index("my_index",
                               ], None)
 ```
 
-## Details
+### Details
 
 This method uses `indexInfo` to create an index.
 
@@ -305,19 +309,19 @@ This method uses `indexInfo` to create an index.
             - `InitParameter("metric", "l2")`
             - `InitParameter("centroids_count", "128")`
 
-## Parameters
+### Parameters
 
 - `index_name` : `str`
 - `index_infos` : `list[IndexInfo]`
 - `options` : None
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.drop_index
+## table_obj.drop_index
 
 Drops an index.
 
@@ -325,21 +329,21 @@ Drops an index.
 table_obj.drop_index("my_index")
 ```
 
-## Details
+### Details
 
 This method drops an index by index name.
 
-## Parameters
+### Parameters
 
 - `index_name` : `str` The name of the index to drop.
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.insert
+## table_obj.insert
 
 Inserts a record into the table.
 
@@ -351,7 +355,7 @@ table_obj.insert([{"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"}])
 table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
 ```
 
-## Details
+### Details
 
 This method inserts a record into a table. The inserted record is a list of `dict`.
 
@@ -359,17 +363,17 @@ This method inserts a record into a table. The inserted record is a list of `dic
     - key: `column name` :str
     - value: `str` ,`int` , `float` ,`list`
 
-## Parameters
+### Parameters
 
 - `data` : list[dict[str, Union[str, int, float, list[Union[int, float]]]]]
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.import
+## table_obj.import
 
 Imports data into the table.
 
@@ -377,7 +381,7 @@ Imports data into the table.
 table_obj.import_data(test_csv_dir, None)
 ```
 
-## Details
+### Details
 
 This method imports data into the table object. Supported file types:
 
@@ -385,18 +389,18 @@ This method imports data into the table object. Supported file types:
 - `fvecs` 
 - `json`
 
-## Parameters
+### Parameters
 
 - `file_path` : str
 - `options` : `None`
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.delete
+## table_obj.delete
 
 Delete rows by condition.
 
@@ -405,22 +409,22 @@ table_obj.delete("c1 = 1")
 table_obj.delete()
 ```
 
-## Details
+### Details
 
 The condition is similar to the WHERE conditions in SQL. If  condition is not specified, this method deletes all data in the table object.
 
-## Parameters
+### Parameters
 
 - `cond` :  Optional[str]
 - `options` : None
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-# table_obj.update
+## table_obj.update
 
 Updates rows by condition.
 
@@ -428,26 +432,25 @@ Updates rows by condition.
 table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
 ```
 
-## Details
+### Details
 
 This method searches for rows that satisfy the search condition and updates them using the provided values.
 
 - The search condition is similar to the WHERE conditions in SQL.
 - Data is what needs to be updated.
 
-## Parameters
+### Parameters
 
 - `cond` : `str`
 - `data` : list[dict[str, Union[str, int, float]]]
 
-## Returns
+### Returns
 
 - success:
     - response `success` is `True`
 - failure: `Exception`
 
-
-# table_obj.output
+## table_obj.output
 
 Specifies the columns to display in the search output. 
 
@@ -458,7 +461,9 @@ table_obj.output(["*"])
 # To display row ID
 table_obj.output(["_row_id"])
 ```
-Convert output to different display types.
+
+Converts the output to different display types.
+
 ```python
 # Returns a data result
 table_obj.output(["*"]).to_result()
@@ -470,22 +475,22 @@ table_obj.output(["*"]).to_pl()
 table_obj.output(["*"]).to_arrow()
 ```
 
-## Details
+### Details
 
 This method specifies the columns to display in the search output. You must input a  list of `str` 
 
 - To display all columns:`["*"]`
 - To display row ID: `["_row_id"]`
 
-## Parameters
+### Parameters
 
 - `columns` : Optional[list[str]]
 
-## Returns
+### Returns
 
 - self : `InfinityThriftQueryBuilder`
 
-# table_obj.filter
+## table_obj.filter
 
 Builds a filtering condition expression.
 
@@ -493,21 +498,21 @@ Builds a filtering condition expression.
 table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ```
 
-## Details
+### Details
 
 This method builds a filtering expression. 
 
 `str`:  Similar to the WHERE condition in SQL.
 
-## Parameters
+### Parameters
 
 - `where` : Optional[str]
 
-## Returns
+### Returns
 
 - self : `InfinityThriftQueryBuilder`
 
-# table_obj.knn
+## table_obj.knn
 
 Builds a KNN search expression.
 
@@ -516,11 +521,11 @@ table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
-## Details
+### Details
 
 VEC supports list or np.ndarray.
 
-## Parameters
+### Parameters
 
 - `vector_column_name` : `str`
 - `embedding_data` : VEC
@@ -536,11 +541,11 @@ VEC supports list or np.ndarray.
 
 - `topn` : `int`
 
-## Returns
+### Returns
 
 - self : `InfinityThriftQueryBuilder`
 
-# table_obj.match
+## table_obj.match
 
 Builds a full-text search expression.
 
@@ -548,21 +553,21 @@ Builds a full-text search expression.
 table_obj.match('body', 'harmful', 'topn=2')
 ```
 
-## Details
+### Details
 
 This method builds a full-text search expression. 
 
-## Parameters
+### Parameters
 
 - `fields` : `str` The text’s body
 - `matching_text` : `str` The text to match.
 - `options_text` : `str` `'topn=2'`: The display count is 2.
 
-## Returns
+### Returns
 
 - self : `InfinityThriftQueryBuilder`
 
-# table_obj.fusion
+## table_obj.fusion
 
 Builds a fusion expression.
 
@@ -570,21 +575,21 @@ Builds a fusion expression.
 table_obj.fusion('rrf')
 ```
 
-## Details
+### Details
 
 `rrf`:  Reciprocal rank fusion method.
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
 
-## Parameters
+### Parameters
 
 - `method` : `str`
 
-## Returns
+### Returns
 
 - self : `InfinityThriftQueryBuilder`
 
-# table_obj.output.to_result
+## table_obj.output.to_result
 
 Returns a data result.
 
@@ -592,17 +597,17 @@ Returns a data result.
 table_obj.output(["*"]).to_result()
 ```
 
-## Details
+### Details
 
 This method returns a data result of Python's built-in type.
 
 (data_dict, data_type_dict)
 
-## Returns
+### Returns
 
 - `tuple[dict[str, list[Any]], dict[str, Any]]`
 
-# table_obj.output.to_df
+## table_obj.output.to_df
 
 Returns a pandas result.
 
@@ -610,15 +615,15 @@ Returns a pandas result.
 table_obj.output(["*"]).to_df()
 ```
 
-## Details
+### Details
 
 This method returns a data result in pandas `DataFrame`.
 
-## Returns
+### Returns
 
 - `pandas.DataFrame`
 
-# table_obj.output.to_pl
+## table_obj.output.to_pl
 
 Returns a polars result.
 
@@ -626,15 +631,15 @@ Returns a polars result.
 table_obj.output(["*"]).to_pl()
 ```
 
-## Details
+### Details
 
 This method returns a data result in polars `DataFrame`
 
-## Returns
+### Returns
 
 - `polars.DataFrame`
 
-# table_obj.output.to_arrow
+## table_obj.to_arrow
 
 Returns a pyarrow result.
 
@@ -642,10 +647,10 @@ Returns a pyarrow result.
 table_obj.output(["*"]).to_arrow()
 ```
 
-## Details
+### Details
 
 The method returns a data result in arrow `Table`.
 
-## Returns
+### Returns
 
 - pyarrow.`Table`
