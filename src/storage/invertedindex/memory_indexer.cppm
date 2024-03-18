@@ -51,18 +51,18 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count);
+    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
     // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
     // Other threads can also call this method.
-    void Commit();
+    void Commit(bool offline = false);
 
     // CommitSync wait at max 100ms to get a batch of insertions and commit them. Returens the size of the batch.
     SizeT CommitSync();
 
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
-    void Dump();
+    void Dump(bool offline = false);
 
     SizeT GetInflightTasks() {
         std::unique_lock<std::mutex> lock(mutex_);

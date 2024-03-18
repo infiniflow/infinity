@@ -43,6 +43,8 @@ public:
 
     void InvertColumn(u32 doc_id, const String &val);
 
+    void SortForOfflineDump();
+
     void Merge(ColumnInverter &rhs);
 
     static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
