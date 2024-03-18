@@ -15,6 +15,7 @@
 #pragma once
 
 #include "InfinityService.h"
+#include "table_info.h"
 #include <memory>
 #include <string>
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -154,22 +155,15 @@ struct ClientStatus {
     inline static ClientStatus OK() { return {ClientErrorCode::kOk, {}}; }
     inline bool IsOK() { return error_code_ == ClientErrorCode::kOk; }
     ClientErrorCode ErrorCode() const { return error_code_; }
-    const std::string& ErrorMessage() const { return msg_; }
+    const std::string &ErrorMessage() const { return msg_; }
 
     ClientErrorCode error_code_{0};
     std::string msg_{};
 };
 
-enum CreateOption : int8_t {
-    kErrorIfExists = 0,
-    kIgnoreIfExists = 1,
-    kReplaceIfExists = 2
-};
+enum CreateOption : int8_t { kErrorIfExists = 0, kIgnoreIfExists = 1, kReplaceIfExists = 2 };
 
-enum class DropOption {
-    kErrorIfNotExists,
-    kIgnoreIfNotExists
-};
+enum class DropOption { kErrorIfNotExists, kIgnoreIfNotExists };
 
 struct DatabaseInfo {
     std::string name_;

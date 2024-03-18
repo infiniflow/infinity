@@ -4,6 +4,7 @@ add_library(infinity_client
         infinity_client.h
         ${CMAKE_SOURCE_DIR}/src/network/infinity_thrift/InfinityService.cpp
         ${CMAKE_SOURCE_DIR}/src/network/infinity_thrift/infinity_types.cpp
+        table_info.h
 )
 
 target_include_directories(infinity_client PUBLIC "${CMAKE_SOURCE_DIR}/src")
