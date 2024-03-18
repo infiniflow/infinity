@@ -31,6 +31,7 @@ module;
 #include "infinity_thrift/infinity_types.h"
 #include "statement/explain_statement.h"
 #include "statement/extra/extra_ddl_info.h"
+#include "statement/statement_common.h"
 
 module thrift_server;
 
@@ -195,6 +196,15 @@ public:
                 ProcessStatus(response, Status::InvalidConflictType());
                 return;
             }
+        }
+
+        SizeT properties_count = request.create_option.properties.size();
+        create_table_opts.properties_.reserve(properties_count);
+        for(SizeT idx = 0; idx < properties_count; ++ idx) {
+            InitParameter* property = new InitParameter();
+            property->param_name_ = request.create_option.properties[idx].key;
+            property->param_value_ = request.create_option.properties[idx].value;
+            create_table_opts.properties_.emplace_back(property);
         }
 
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);

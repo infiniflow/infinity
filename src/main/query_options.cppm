@@ -14,7 +14,7 @@
 
 export module query_options;
 
-
+import stl;
 import extra_ddl_info;
 import statement_common;
 
@@ -33,6 +33,7 @@ public:
 export class CreateTableOptions {
 public:
     ConflictType conflict_type_{ConflictType::kError};
+    Vector<InitParameter *> properties_;
 };
 
 export class DropTableOptions {

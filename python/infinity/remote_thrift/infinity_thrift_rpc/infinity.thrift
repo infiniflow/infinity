@@ -29,8 +29,14 @@ Ignore,
 Error,
 }
 
+struct Property {
+1:  string key,
+2:  string value
+}
+
 struct CreateOption {
 1:  CreateConflict conflict_type,
+2:  list<Property> properties = [],
 }
 
 struct DropOption {

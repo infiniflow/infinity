@@ -207,6 +207,8 @@ std::ostream& operator<<(std::ostream& out, const ExplainType::type& val);
 
 std::string to_string(const ExplainType::type& val);
 
+class Property;
+
 class CreateOption;
 
 class DropOption;
@@ -319,18 +321,70 @@ class ShowVariableRequest;
 
 class ShowTablesRequest;
 
+typedef struct _Property__isset {
+  _Property__isset() : key(false), value(false) {}
+  bool key :1;
+  bool value :1;
+} _Property__isset;
+
+class Property : public virtual ::apache::thrift::TBase {
+ public:
+
+  Property(const Property&);
+  Property& operator=(const Property&);
+  Property() noexcept
+           : key(),
+             value() {
+  }
+
+  virtual ~Property() noexcept;
+  std::string key;
+  std::string value;
+
+  _Property__isset __isset;
+
+  void __set_key(const std::string& val);
+
+  void __set_value(const std::string& val);
+
+  bool operator == (const Property & rhs) const
+  {
+    if (!(key == rhs.key))
+      return false;
+    if (!(value == rhs.value))
+      return false;
+    return true;
+  }
+  bool operator != (const Property &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const Property & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(Property &a, Property &b);
+
+std::ostream& operator<<(std::ostream& out, const Property& obj);
+
 typedef struct _CreateOption__isset {
-  _CreateOption__isset() : conflict_type(false) {}
+  _CreateOption__isset() : conflict_type(false), properties(true) {}
   bool conflict_type :1;
+  bool properties :1;
 } _CreateOption__isset;
 
 class CreateOption : public virtual ::apache::thrift::TBase {
  public:
 
-  CreateOption(const CreateOption&) noexcept;
-  CreateOption& operator=(const CreateOption&) noexcept;
+  CreateOption(const CreateOption&);
+  CreateOption& operator=(const CreateOption&);
   CreateOption() noexcept
                : conflict_type(static_cast<CreateConflict::type>(0)) {
+
   }
 
   virtual ~CreateOption() noexcept;
@@ -339,14 +393,19 @@ class CreateOption : public virtual ::apache::thrift::TBase {
    * @see CreateConflict
    */
   CreateConflict::type conflict_type;
+  std::vector<Property>  properties;
 
   _CreateOption__isset __isset;
 
   void __set_conflict_type(const CreateConflict::type val);
 
+  void __set_properties(const std::vector<Property> & val);
+
   bool operator == (const CreateOption & rhs) const
   {
     if (!(conflict_type == rhs.conflict_type))
+      return false;
+    if (!(properties == rhs.properties))
       return false;
     return true;
   }

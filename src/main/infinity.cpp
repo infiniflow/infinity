@@ -216,6 +216,7 @@ QueryResult Infinity::CreateTable(const String &db_name,
     create_table_info->column_defs_ = std::move(column_defs);
     create_table_info->constraints_ = std::move(constraints);
     create_table_info->conflict_type_ = create_table_options.conflict_type_;
+    create_table_info->properties_ = create_table_options.properties_;
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
