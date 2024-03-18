@@ -162,8 +162,11 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
                            BufferManager *buffer_mgr) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        UnrecoverableError(
-            fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}", this->segment_entry_->segment_id(), this->block_id_));
+        UnrecoverableError(fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}, using_txn_id_: {}, txn_id: {}",
+                                       this->segment_entry_->segment_id(),
+                                       this->block_id_,
+                                       this->using_txn_id_,
+                                       txn_id));
     }
 
     this->using_txn_id_ = txn_id;

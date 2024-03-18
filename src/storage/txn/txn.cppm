@@ -146,8 +146,6 @@ public:
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
 
     // Getter
-    BufferManager *GetBufferMgr() const;
-
     BufferManager *buffer_manager() const { return buffer_mgr_; }
 
     Catalog *GetCatalog() { return catalog_; }
@@ -192,6 +190,8 @@ private:
 
 public:
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+
+    void SetTableStore(const String &table_name, SharedPtr<TxnTableStore> txn_table_store);
 
 private:
     void CheckTxnStatus();

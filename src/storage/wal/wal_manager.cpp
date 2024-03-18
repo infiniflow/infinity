@@ -743,6 +743,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
+    fake_txn->SetTableStore(cmd.table_name_, table_store);
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
     Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store.get(), fake_txn->CommitTS(), table_store->delete_state_);
@@ -779,6 +780,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
     auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
+    fake_txn->SetTableStore(cmd.table_name_, table_store);
     table_store->Append(cmd.block_);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
