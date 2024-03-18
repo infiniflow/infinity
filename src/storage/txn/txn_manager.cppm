@@ -35,7 +35,8 @@ public:
                         BGTaskProcessor *task_processor,
                         PutWalEntryFn put_wal_entry_fn,
                         TransactionID start_txn_id,
-                        TxnTimeStamp start_ts);
+                        TxnTimeStamp start_ts,
+                        bool enable_compaction);
 
     ~TxnManager() { Stop(); }
 
@@ -77,6 +78,8 @@ public:
 
     TxnTimeStamp GetMinUnflushedTS();
 
+    bool enable_compaction() const { return enable_compaction_; }
+
 private:
     TransactionID GetNewTxnID();
 
@@ -92,7 +95,7 @@ private:
     TransactionID start_txn_id_{};
     // Use a variant of priority queue to ensure entries are putted to WalManager in the same order as commit_ts allocation.
     std::mutex mutex_;
-    TxnTimeStamp start_ts_{};        // The next txn ts
+    TxnTimeStamp start_ts_{}; // The next txn ts
     // Deque<TxnTimeStamp> ts_queue_{}; // the ts queue
     Map<TxnTimeStamp, TransactionID> ts_map_{};
     HashSet<TransactionID> wait_flush_txns_{};
@@ -100,6 +103,7 @@ private:
     Map<TxnTimeStamp, SharedPtr<WalEntry>> priority_que_; // TODO: use C++23 std::flat_map?
     // For stop the txn manager
     atomic_bool is_running_{false};
+    bool enable_compaction_{};
 };
 
 } // namespace infinity

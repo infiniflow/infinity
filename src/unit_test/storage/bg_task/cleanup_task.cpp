@@ -335,7 +335,7 @@ TEST_F(CleanupTaskTest, TestCompactAndCleanup) {
             SizeT column_count = column_vectors.size();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
@@ -431,7 +431,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
             SizeT column_count = column_vectors.size();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {

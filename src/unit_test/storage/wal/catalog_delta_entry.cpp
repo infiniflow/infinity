@@ -22,10 +22,106 @@ import stl;
 import catalog_delta_entry;
 import column_def;
 import segment_entry;
+import index_secondary;
+import infinity_context;
+import data_type;
+import logical_type;
 
-class CatalogDeltaEntryTest : public BaseTest {};
+class CatalogDeltaEntryTest : public BaseTest {
+protected:
+    void SetUp() override { system("rm -rf /tmp/infinity"); }
+};
 
 using namespace infinity;
+
+TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
+    std::shared_ptr<std::string> config_path = nullptr;
+    InfinityContext::instance().Init(config_path);
+
+    auto db_name = MakeShared<String>("db_test");
+    auto db_dir = MakeShared<String>("data");
+    auto table_name = MakeShared<String>("table_test");
+    auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
+    Vector<SharedPtr<ColumnDef>> column_defs{};
+    {
+        auto column_def1 =
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
+        auto column_def2 =
+            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
+        column_defs.push_back(column_def1);
+        column_defs.push_back(column_def2);
+    }
+    SegmentID segment_id = 0;
+    BlockID block_id = 0;
+    ColumnID column_id = 0;
+    auto index_name = MakeShared<String>("index_test");
+    auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
+    auto index_base = IndexSecondary::Make(index_name, "file_name", Vector<String>{"col1", "col2"});
+    String segment_filter_binary_data = "abcde";
+    auto block_filter_binary_data = Vector<Pair<BlockID, String>>{{0, "abcde"}, {1, "fghij"}};
+
+    UniquePtr<char[]> buffer;
+    i32 buffer_size = 0;
+    UniquePtr<CatalogDeltaEntry> catalog_delta_entry1;
+    {
+        catalog_delta_entry1 = std::make_unique<CatalogDeltaEntry>();
+
+        auto op0 = MakeUnique<AddDBEntryOp>(0, false, 0, 0, db_name, db_dir);
+        catalog_delta_entry1->operations().push_back(std::move(op0));
+
+        auto op1 = MakeUnique<AddTableEntryOp>(1, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0);
+        catalog_delta_entry1->operations().push_back(std::move(op1));
+
+        auto op2 = MakeUnique<AddSegmentEntryOp>(2, false, 0, 0, db_name, table_name, segment_id, SegmentStatus::kSealed, 0, 0, 0, 0, 0, 0);
+        catalog_delta_entry1->operations().push_back(std::move(op2));
+
+        auto op3 = MakeUnique<AddBlockEntryOp>(3, false, 0, 0, db_name, table_name, segment_id, block_id, 0, 0, 0, 0, 0, 0);
+        catalog_delta_entry1->operations().push_back(std::move(op3));
+
+        auto op4 = MakeUnique<AddColumnEntryOp>(4, false, 0, 0, db_name, table_name, segment_id, block_id, column_id, 0);
+        catalog_delta_entry1->operations().push_back(std::move(op4));
+
+        auto op5 = MakeUnique<AddTableIndexEntryOp>(5, false, 0, 0, db_name, table_name, index_name, index_dir, index_base);
+        catalog_delta_entry1->operations().push_back(std::move(op5));
+
+        auto op6 = MakeUnique<AddFulltextIndexEntryOp>(6, false, 0, 0, db_name, table_name, index_name);
+        catalog_delta_entry1->operations().push_back(std::move(op6));
+
+        auto op7 = MakeUnique<AddSegmentIndexEntryOp>(7, false, 0, 0, db_name, table_name, index_name, segment_id, 0, 14);
+        catalog_delta_entry1->operations().push_back(std::move(op7));
+
+        auto op8 = MakeUnique<SetSegmentStatusSealedOp>(8,
+                                                        false,
+                                                        0,
+                                                        0,
+                                                        db_name,
+                                                        table_name,
+                                                        segment_id,
+                                                        std::move(segment_filter_binary_data),
+                                                        std::move(block_filter_binary_data));
+        catalog_delta_entry1->operations().push_back(std::move(op8));
+
+        buffer_size = catalog_delta_entry1->GetSizeInBytes();
+        buffer = MakeUnique<char[]>(buffer_size);
+        auto *ptr = buffer.get();
+        catalog_delta_entry1->WriteAdv(ptr);
+        EXPECT_EQ(ptr - buffer.get(), buffer_size);
+    }
+
+    {
+        char *ptr = buffer.get();
+        auto catalog_delta_entry2 = CatalogDeltaEntry::ReadAdv(ptr, buffer_size);
+
+        size_t op_size = catalog_delta_entry1->operations().size();
+        EXPECT_EQ(op_size, catalog_delta_entry2->operations().size());
+        for (size_t i = 0; i < op_size; ++i) {
+            const auto &op1 = *catalog_delta_entry1->operations()[i];
+            const auto &op2 = *catalog_delta_entry2->operations()[i];
+            EXPECT_EQ(op1, op2);
+        }
+    }
+    infinity::InfinityContext::instance().UnInit();
+}
 
 TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
@@ -42,7 +138,6 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     ColumnID column_id = 0;
     auto index_name = MakeShared<String>("index_test");
     auto index_dir = MakeShared<String>("data/db_test/table_test/0/0/index_test");
-    String col_index_dir{"data/db_test/table_test/0/0/index_test"};
     Vector<SharedPtr<ColumnDef>> column_defs{};
     SharedPtr<IndexBase> index_base{nullptr};
 

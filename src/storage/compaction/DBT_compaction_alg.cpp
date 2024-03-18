@@ -147,9 +147,6 @@ void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments,
     for (auto &segment_layer : segment_layers_) {
         segment_layer.CommitCompact(commit_txn_id);
     }
-    for (auto *new_segment : new_segments) {
-        this->AddSegmentNoCheckInner(new_segment);
-    }
     if (--running_task_n_ == 0) {
         status_ = CompactionStatus::kEnable;
         cv_.notify_one();

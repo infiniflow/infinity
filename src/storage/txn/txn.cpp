@@ -68,8 +68,6 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
     this->CheckTxn(db_name);
 
-    String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
-    Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
     const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
     // build WalCmd
     wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name,
@@ -78,10 +76,7 @@ Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<Se
                                                                         segment_entry->segment_id(),
                                                                         static_cast<u16>(block_cnt),
                                                                         DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
-                                                                        last_block_row_count,
-                                                                        u8(1), // have_rough_filter_: true
-                                                                        segment_filter_binary_data,
-                                                                        block_filter_binary_data}));
+                                                                        last_block_row_count}));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_name);
     table_store->Import(std::move(segment_entry));
@@ -430,6 +425,7 @@ void Txn::CommitBottom() noexcept {
     // prepare to commit txn local data into table
     TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
 
+    // Append data, trigger compaction
     txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
 
     txn_context_.SetTxnCommitted();

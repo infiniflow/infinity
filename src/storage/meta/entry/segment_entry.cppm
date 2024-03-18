@@ -59,18 +59,7 @@ public:
                           SizeT column_count,
                           SegmentStatus status);
 
-private:
-    static SharedPtr<SegmentEntry> InnerNewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status);
-
-public:
-    // create unsealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewAppendSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
-
-    // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewImportSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
-
-    // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewCompactSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
@@ -85,6 +74,7 @@ public:
                                                                 TxnTimeStamp min_row_ts,
                                                                 TxnTimeStamp max_row_ts,
                                                                 TxnTimeStamp commit_ts,
+                                                                TxnTimeStamp deprecate_ts,
                                                                 TxnTimeStamp begin_ts,
                                                                 TransactionID txn_id);
 
@@ -178,6 +168,11 @@ public:
     TxnTimeStamp max_row_ts() const {
         std::shared_lock lock(rw_locker_);
         return max_row_ts_;
+    }
+
+    TxnTimeStamp deprecate_ts() const {
+        std::shared_lock lock(rw_locker_);
+        return deprecate_ts_;
     }
 
     BlockEntry *GetBlockEntryByID(BlockID block_id) const;

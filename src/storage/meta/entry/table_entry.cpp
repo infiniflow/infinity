@@ -250,7 +250,6 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
 
 void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     SizeT row_count = 0;
-    Vector<SegmentEntry *> set_sealed_segments;
 
     if (this->deleted_) {
         UnrecoverableError("table is deleted");
@@ -270,18 +269,13 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
             if (!this->unsealed_segment_ || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_) {
-                    set_sealed_segments.push_back(unsealed_segment_.get());
-
-                    // Add a catalog delta operation to set the unsealed_segment to sealed
-                    // build minmax filter and optional bloom filter
-                    // TODO: skip rebuild in wal?
-                    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(unsealed_segment_.get(), buffer_mgr, txn->BeginTS());
+                    unsealed_segment_->SetSealed();
                     txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
                 }
 
                 SegmentID new_segment_id = this->next_segment_id_++;
 
-                this->unsealed_segment_ = SegmentEntry::NewAppendSegmentEntry(this, new_segment_id, txn);
+                this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
                 this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
@@ -292,17 +286,8 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
         row_count += actual_appended;
     }
 
-    for (auto *set_sealed_segment : set_sealed_segments) {
-        set_sealed_segment->SetSealed();
-    }
     this->row_count_ += row_count;
 }
-
-// void TableEntry::SetSegmentSealedForAppend(const Vector<SegmentEntry *> &set_sealed_segments) {
-//     for (auto *set_sealed_segment : set_sealed_segments) {
-//         set_sealed_segment->SetSealed();
-//     }
-// }
 
 Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, DeleteState &delete_state) {
     SizeT row_count = 0;

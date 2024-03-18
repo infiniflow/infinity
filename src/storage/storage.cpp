@@ -73,7 +73,8 @@ void Storage::Init() {
                                       bg_processor_.get(),
                                       std::bind(&WalManager::PutEntry, wal_mgr_.get(), std::placeholders::_1),
                                       new_catalog_->next_txn_id_,
-                                      system_start_ts);
+                                      system_start_ts,
+                                      config_ptr_->enable_compaction());
 
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.

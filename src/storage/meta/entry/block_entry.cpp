@@ -76,7 +76,8 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        block_entry->columns_.emplace_back(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr));
+        block_entry->columns_.emplace_back(
+            BlockColumnEntry::NewReplayBlockColumnEntry(block_entry.get(), column_id, buffer_mgr, 0 /*init with 0 outline*/));
     }
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
@@ -241,7 +242,7 @@ void BlockEntry::FlushData(int64_t checkpoint_row_count) {
 
 void BlockEntry::FlushVersion(BlockVersion &checkpoint_version) { checkpoint_version.SaveToFile(this->VersionFilePath()); }
 
-void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
+void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
     LOG_TRACE(fmt::format("Segment: {}, Block: {} is being flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
         UnrecoverableError(
@@ -252,9 +253,12 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     BlockVersion checkpoint_version(this->block_version_->deleted_.size());
     {
         std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
-        // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
-        if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)
-            return;
+
+        if (check_commit) {
+            // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
+            if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)
+                return;
+        }
 
         checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
@@ -293,6 +297,8 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     return;
 }
 
+void BlockEntry::FlushForImport(TxnTimeStamp checkpoint_ts) { this->Flush(checkpoint_ts, false); }
+
 void BlockEntry::Cleanup() {
     for (auto &block_column_entry : columns_) {
         block_column_entry->Cleanup();
@@ -317,7 +323,7 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["columns"].emplace_back(block_column_entry->Serialize());
     }
     json_res["min_row_ts"] = this->min_row_ts_;
-    json_res["max_row_ts"] = this->checkpoint_ts_;
+    json_res["max_row_ts"] = this->max_row_ts_;
     json_res["version_file"] = this->VersionFilePath();
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);

@@ -80,6 +80,8 @@ public:
 
     inline ~ColumnDef() override = default;
 
+    bool operator==(const ColumnDef &other) const;
+
     std::string ToString() const;
 
     inline const std::string &name() const { return name_; }

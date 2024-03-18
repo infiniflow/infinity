@@ -36,6 +36,7 @@ import data_type;
 import background_process;
 import bg_task;
 import compact_segments_task;
+import build_fast_rough_filter_task;
 
 namespace infinity {
 
@@ -81,7 +82,13 @@ TxnCompactStore::TxnCompactStore() : task_type_(CompactSegmentsTaskType::kInvali
 TxnCompactStore::TxnCompactStore(CompactSegmentsTaskType type) : task_type_(type) {}
 
 void TxnCompactStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
-    //
+    if (task_type_ != CompactSegmentsTaskType::kInvalid) {
+        for (const auto &[new_segment, old_segments] : compact_data_) {
+            for (auto *old_segment : old_segments) {
+                local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(old_segment));
+            }
+        }
+    }
 }
 
 ///-----------------------------------------------------------------------------
@@ -206,7 +213,10 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
         compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), std::move(old_segments));
 
+        new_segment->SetSealed();
+
         this->AddSegmentStore(new_segment.get());
+        this->AddSealedSegment(new_segment.get());
         table_entry_->AddCompactNew(std::move(new_segment));
     }
     return {nullptr, Status::OK()};
@@ -255,8 +265,6 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
  */
 void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_);
-    // Catalog::CommitAppend(table_entry_, txn_id, commit_ts, append_state_.get());
-    // Catalog::CommitDelete(table_entry_, txn_id, commit_ts, delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
     }
@@ -307,6 +315,7 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
 void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace_back(segment_entry); }
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
+    TxnTimeStamp commit_ts = txn_->CommitTS();
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
         index_store->AddDeltaOp(local_delta_ops);
     }
@@ -314,10 +323,17 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
         segment_store.AddDeltaOp(local_delta_ops, append_state_.get());
     }
     for (auto *sealed_segment : set_sealed_segments_) {
+        // build minmax filter
+        BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(sealed_segment, txn_->buffer_manager(), commit_ts);
+        // now have minmax filter and optional bloom filter
+        // serialize filter
         String segment_filter_binary_data = sealed_segment->GetFastRoughFilter()->SerializeToString();
         Vector<Pair<BlockID, String>> block_filter_binary_data = sealed_segment->GetBlockFilterBinaryDataVector();
         local_delta_ops->AddOperation(
             MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data)));
+    }
+    if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
+        compact_state_.AddDeltaOp(local_delta_ops);
     }
 }
 
@@ -369,7 +385,6 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const {
     }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         table_store->AddDeltaOp(local_delta_ops);
-        // this->AddDeltaOp(MakeUnique<AddTxnTableStoreOp>(table_name));
     }
 }
 
@@ -384,7 +399,10 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts, BGTask
     for (const auto &name_table_pair : txn_tables_store_) {
         TxnTableStore *table_local_store = name_table_pair.second.get();
         table_local_store->Commit(txn_id, commit_ts);
-        table_local_store->TryTriggerCompaction(bg_task_processor, txn_mgr);
+        bool enable_compaction = txn_->txn_mgr()->enable_compaction();
+        if (enable_compaction) {
+            table_local_store->TryTriggerCompaction(bg_task_processor, txn_mgr);
+        }
     }
 
     // Commit databases to memory catalog

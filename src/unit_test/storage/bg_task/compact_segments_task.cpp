@@ -60,7 +60,7 @@ protected:
             auto column_count = table_entry->ColumnCount();
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {

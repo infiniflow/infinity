@@ -477,7 +477,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
         auto type = op->GetType();
-        LOG_TRACE(fmt::format("Catalog Delta Op is {}", op->ToString()));
+        LOG_INFO(fmt::format("Catalog Delta Op is {}", op->ToString()));
         auto commit_ts = op->commit_ts();
         auto txn_id = op->txn_id();
         auto begin_ts = op->begin_ts();
@@ -573,13 +573,19 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto row_capacity = add_segment_entry_op->row_capacity();
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
+                auto deprecate_ts = add_segment_entry_op->deprecate_ts();
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
 
-                if (table_entry->segment_map_.find(segment_id) != table_entry->segment_map_.end()) {
+                // TODO: encapsulate to a function in TableEntry::Replay segment
+                if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
                     auto &old_segment_entry = table_entry->segment_map_.at(segment_id);
                     old_segment_entry->UpdateSegmentInfo(segment_status, row_count, min_row_ts, max_row_ts, commit_ts, begin_ts, txn_id);
+                    if (segment_status == SegmentStatus::kDeprecated) {
+                        old_segment_entry->Cleanup();
+                        table_entry->segment_map_.erase(iter);
+                    }
                 } else {
                     auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
                                                                                     segment_id,
@@ -591,6 +597,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                                     min_row_ts,
                                                                                     max_row_ts,
                                                                                     commit_ts,
+                                                                                    deprecate_ts,
                                                                                     begin_ts,
                                                                                     txn_id);
                     table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
@@ -633,12 +640,13 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto segment_id = add_column_entry_op->segment_id();
                 auto block_id = add_column_entry_op->block_id();
                 auto column_id = add_column_entry_op->column_id();
+                i32 next_outline_idx = add_column_entry_op->next_outline_idx();
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto block_entry = segment_entry->GetBlockEntryByID(block_id);
-                auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr);
+                auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx);
                 block_entry->columns().push_back(std::move(column_entry));
                 break;
             }
@@ -823,7 +831,6 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
         LOG_INFO("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    Vector<TransactionID> flushed_txn_ids;
     HashSet<TransactionID> flushed_unique_txn_ids;
     for (auto &op : flush_delta_entry->operations()) {
         flushed_unique_txn_ids.insert(op->txn_id());
@@ -844,7 +851,6 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
             default:
                 break;
         }
-        flushed_txn_ids.push_back(op->txn_id());
     }
 
     // Save the global catalog delta entry to disk.

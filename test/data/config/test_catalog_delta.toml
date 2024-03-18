@@ -1,0 +1,11 @@
+[general]
+version = "0.1.0"
+timezone = "utc-8"
+
+[resource]
+# close auto compaction
+enable_compaction = false
+
+[wal]
+#short checkpoint interval for test
+delta_checkpoint_interval_sec = 1

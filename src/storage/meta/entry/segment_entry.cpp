@@ -55,27 +55,15 @@ SegmentEntry::SegmentEntry(TableEntry *table_entry,
     : BaseEntry(EntryType::kSegment), table_entry_(table_entry), segment_dir_(segment_dir), segment_id_(segment_id), row_capacity_(row_capacity),
       column_count_(column_count), status_(status) {}
 
-SharedPtr<SegmentEntry> SegmentEntry::InnerNewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status) {
+SharedPtr<SegmentEntry> SegmentEntry::NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id),
                                                                      segment_id,
                                                                      DEFAULT_SEGMENT_CAPACITY,
                                                                      table_entry->ColumnCount(),
-                                                                     status);
+                                                                     SegmentStatus::kUnsealed);
     segment_entry->begin_ts_ = txn->BeginTS();
     return segment_entry;
-}
-
-SharedPtr<SegmentEntry> SegmentEntry::NewAppendSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
-    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kUnsealed);
-}
-
-SharedPtr<SegmentEntry> SegmentEntry::NewImportSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
-    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
-}
-
-SharedPtr<SegmentEntry> SegmentEntry::NewCompactSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn) {
-    return InnerNewSegmentEntry(table_entry, segment_id, txn, SegmentStatus::kSealed);
 }
 
 // used by import and compact, add a new segment, status:kSealed
@@ -97,6 +85,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *t
                                                                    TxnTimeStamp min_row_ts,
                                                                    TxnTimeStamp max_row_ts,
                                                                    TxnTimeStamp commit_ts,
+                                                                   TxnTimeStamp deprecate_ts,
                                                                    TxnTimeStamp begin_ts,
                                                                    TransactionID txn_id) {
     auto segment_dir = SegmentEntry::DetermineSegmentDir(*table_entry->TableEntryDir(), segment_id);
@@ -104,6 +93,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *t
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->max_row_ts_ = max_row_ts;
     segment_entry->commit_ts_ = commit_ts;
+    segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->begin_ts_ = begin_ts;
     segment_entry->row_count_ = row_count;
     segment_entry->actual_row_count_ = actual_row_count;
@@ -113,7 +103,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplayCatalogSegmentEntry(TableEntry *t
 
 void SegmentEntry::SetSealed() {
     std::unique_lock lock(rw_locker_);
-    if (status_ != SegmentStatus::kUnsealed) {
+    if (status_ != SegmentStatus::kUnsealed && status_ != SegmentStatus::kSealed) {
         UnrecoverableError("SetSealed failed");
     }
     status_ = SegmentStatus::kSealed;
@@ -474,7 +464,7 @@ void SegmentEntry::FlushNewData(TxnTimeStamp flush_ts) {
         this->min_row_ts_ = flush_ts;
     }
     for (const auto &block_entry : this->block_entries_) {
-        block_entry->FlushData(block_entry->row_count());
+        block_entry->FlushForImport(flush_ts);
     }
 }
 

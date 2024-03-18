@@ -81,7 +81,9 @@ public:
 
     void Cleanup();
 
-    void Flush(TxnTimeStamp checkpoint_ts);
+    void Flush(TxnTimeStamp checkpoint_ts, bool check_commit = true);
+
+    void FlushForImport(TxnTimeStamp checkpoint_ts);
 
 protected:
     u16

@@ -47,23 +47,23 @@ export enum class CatalogDeltaOpType : i8 {
     // -----------------------------
     // Entry
     // -----------------------------
-    ADD_DATABASE_ENTRY = 11,
-    ADD_TABLE_ENTRY = 12,
-    ADD_SEGMENT_ENTRY = 13,
-    ADD_BLOCK_ENTRY = 14,
-    ADD_COLUMN_ENTRY = 15,
+    ADD_DATABASE_ENTRY = 1,
+    ADD_TABLE_ENTRY = 2,
+    ADD_SEGMENT_ENTRY = 3,
+    ADD_BLOCK_ENTRY = 4,
+    ADD_COLUMN_ENTRY = 5,
 
     // -----------------------------
     // INDEX
     // -----------------------------
-    ADD_TABLE_INDEX_ENTRY = 21,
-    ADD_FULLTEXT_INDEX_ENTRY = 22,
-    ADD_SEGMENT_INDEX_ENTRY = 23,
+    ADD_TABLE_INDEX_ENTRY = 11,
+    ADD_FULLTEXT_INDEX_ENTRY = 12,
+    ADD_SEGMENT_INDEX_ENTRY = 13,
 
     // -----------------------------
     // SEGMENT STATUS
     // -----------------------------
-    SET_SEGMENT_STATUS_SEALED = 31,
+    SET_SEGMENT_STATUS_SEALED = 21,
 };
 
 /// class CatalogDeltaOperation
@@ -102,6 +102,7 @@ public:
     virtual void SaveState() = 0;
     virtual const String ToString() const = 0;
     virtual const String EncodeIndex() const = 0;
+    virtual bool operator==(const CatalogDeltaOperation &rhs) const;
 
     TxnTimeStamp begin_ts() { return begin_ts_; }
     TransactionID txn_id() { return txn_id_; }
@@ -147,6 +148,7 @@ public:
     void SaveState() final;
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_)); }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -207,6 +209,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -241,17 +244,20 @@ public:
                                SizeT row_capacity,
                                SizeT actual_row_count,
                                TxnTimeStamp min_row_ts,
-                               TxnTimeStamp max_row_ts)
+                               TxnTimeStamp max_row_ts,
+                               TxnTimeStamp deprecate_ts)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), segment_id_(segment_id), status_(status), column_count_(column_count), row_count_(row_count),
-          actual_row_count_(actual_row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts) {}
+          actual_row_count_(actual_row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts),
+          deprecate_ts_(deprecate_ts) {}
 
     explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
           table_name_(segment_entry->GetTableEntry()->GetTableName()), segment_id_(segment_entry->segment_id()), status_(segment_entry->status()),
           column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
           actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
-          row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()) {}
+          row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
+          deprecate_ts_(segment_entry->deprecate_ts()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
@@ -266,7 +272,7 @@ public:
         total_size += sizeof(SizeT);
         total_size += sizeof(actual_row_count_);
         total_size += sizeof(SizeT);
-        total_size += sizeof(TxnTimeStamp) * 2;
+        total_size += sizeof(TxnTimeStamp) * 3;
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -275,6 +281,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *this->db_name_, *this->table_name_, this->segment_id_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -287,6 +294,7 @@ public:
     SizeT row_capacity() const { return row_capacity_; }
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
+    TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
 
 private:
     SharedPtr<String> db_name_{};
@@ -301,6 +309,7 @@ private:
     SizeT row_capacity_{0};
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp deprecate_ts_{0};
 };
 
 /// class AddBlockEntryOp
@@ -350,6 +359,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
@@ -422,6 +432,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_, column_id_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -482,6 +493,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_, *index_name_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -532,6 +544,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -584,6 +597,7 @@ public:
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_, segment_id_));
     }
     void Flush(TxnTimeStamp max_commit_ts);
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }
@@ -633,16 +647,16 @@ public:
     String GetTypeStr() const final { return "SET_SEGMENT_STATUS_SEALED"; }
     [[nodiscard]] SizeT GetSizeInBytes() const final {
         SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += ::infinity::GetSizeInBytes(this->db_name_);
-        total_size += ::infinity::GetSizeInBytes(this->table_name_);
-        total_size += ::infinity::GetSizeInBytes(this->segment_id_);
-        total_size += ::infinity::GetSizeInBytes(this->segment_filter_binary_data_);
+        total_size += sizeof(i32) + this->db_name_->size();
+        total_size += sizeof(i32) + this->table_name_->size();
+        total_size += sizeof(this->segment_id_);
+        total_size += sizeof(i32) + this->segment_filter_binary_data_.size();
         i32 block_filter_count = block_filter_binary_data_.size();
         total_size += sizeof(block_filter_count);
         for (i32 i = 0; i < block_filter_count; ++i) {
             auto const &block_filter = block_filter_binary_data_[i];
-            total_size += ::infinity::GetSizeInBytes(block_filter.first);
-            total_size += ::infinity::GetSizeInBytes(block_filter.second);
+            total_size += sizeof(block_filter.first);
+            total_size += sizeof(i32) + block_filter.second.size();
         }
         return total_size;
     }
@@ -652,6 +666,7 @@ public:
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_));
     }
+    bool operator==(const CatalogDeltaOperation &rhs) const override;
 
 public:
     const SharedPtr<String> &db_name() const { return db_name_; }

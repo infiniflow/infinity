@@ -107,6 +107,14 @@ SharedPtr<CompactSegmentsTask> CompactSegmentsTask::MakeTaskWithPickedSegments(T
     if (segments.empty()) {
         UnrecoverableError("No segment to compact");
     }
+    {
+        HashSet<SegmentID> segment_ids;
+        for (auto *segment : segments) {
+            if (!segment_ids.insert(segment->segment_id()).second) {
+                UnrecoverableError("Duplicate segment to compact");
+            }
+        }
+    }
     LOG_INFO(fmt::format("Add compact task, picked, table dir: {}, begin ts: {}", *table_entry->TableEntryDir(), txn->BeginTS()));
     auto ret = MakeShared<CompactSegmentsTask>(table_entry, std::move(segments), txn, CompactSegmentsTaskType::kCompactPickedSegments);
     return ret;
@@ -246,21 +254,13 @@ void CompactSegmentsTask::SaveSegmentsData(CompactSegmentsTaskState &state) {
     for (auto &[new_segment, old_segments] : segment_data) {
         if (new_segment->row_count() > 0) {
             new_segment->FlushNewData(flush_ts);
-            // build minmax filter and optional bloom filter
-            BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(new_segment.get(), txn_->buffer_manager(), flush_ts);
-            // now have bloom filter and minmax filter
-            // serialize filter
-            String segment_filter_binary_data = new_segment->GetFastRoughFilter()->SerializeToString();
-            Vector<Pair<BlockID, String>> block_filter_binary_data = new_segment->GetBlockFilterBinaryDataVector();
+
             const auto [block_cnt, last_block_row_count] = new_segment->GetWalInfo();
             segment_infos.emplace_back(WalSegmentInfo{*new_segment->segment_dir(),
                                                       new_segment->segment_id(),
                                                       static_cast<u16>(block_cnt),
                                                       DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment entry
-                                                      last_block_row_count,
-                                                      u8(1), // have_rough_filter_: true
-                                                      segment_filter_binary_data,
-                                                      block_filter_binary_data});
+                                                      last_block_row_count});
         }
 
         for (auto *old_segment : old_segments) {
@@ -299,7 +299,7 @@ void CompactSegmentsTask::AddToDelete(SegmentID segment_id, Vector<SegmentOffset
 SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(CompactSegmentsTaskState &state, const Vector<SegmentEntry *> &segments) {
     auto *table_entry = state.table_entry_;
     auto &remapper = state.remapper_;
-    auto new_segment = SegmentEntry::NewCompactSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn_);
+    auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn_);
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry->ColumnCount();

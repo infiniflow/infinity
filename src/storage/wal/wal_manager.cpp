@@ -39,6 +39,7 @@ import infinity_exception;
 import block_entry;
 import segment_entry;
 import compact_segments_task;
+import build_fast_rough_filter_task;
 
 module wal_manager;
 
@@ -712,10 +713,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
-    if (!segment_info.have_rough_filter_) {
-        UnrecoverableError("ReplaySegment for import and compact: sealed segment need filter data");
-    }
-    segment_entry->LoadFilterBinaryData(segment_info.segment_filter_binary_data_, segment_info.block_filter_binary_data_);
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry.get(), storage_->buffer_manager(), commit_ts);
 
     table_entry->WalReplaySegment(segment_entry);
 }

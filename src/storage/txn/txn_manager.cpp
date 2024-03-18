@@ -38,9 +38,10 @@ TxnManager::TxnManager(Catalog *catalog,
                        BGTaskProcessor *bg_task_processor,
                        PutWalEntryFn put_wal_entry_fn,
                        TransactionID start_txn_id,
-                       TxnTimeStamp start_ts)
+                       TxnTimeStamp start_ts,
+                       bool enable_compaction)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
-      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {
+      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false), enable_compaction_(enable_compaction) {
     catalog_->SetTxnMgr(this);
 }
 
@@ -184,12 +185,17 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     std::shared_lock r_locker(rw_locker_);
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
-        if (txn_map_.find(txn_id) != txn_map_.end() || wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
+        if (txn_map_.find(txn_id) != txn_map_.end()) {
+            LOG_INFO(fmt::format("Txn: {} not found in txn map", txn_id));
+            return ts;
+        }
+        if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
+            LOG_INFO(fmt::format("Txn: {} wait flush", txn_id));
             return ts;
         }
         iter = ts_map_.erase(iter);
     }
-    // no txn is active, return the next ts
+    LOG_INFO(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 
