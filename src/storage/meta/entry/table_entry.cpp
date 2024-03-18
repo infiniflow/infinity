@@ -201,6 +201,21 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
+void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment,
+                                  std::function<void(SegmentEntry *)> &&update_segment,
+                                  SegmentID segment_id) {
+    if (auto iter = segment_map_.find(segment_id); iter != segment_map_.end()) {
+        auto *segment = iter->second.get();
+        update_segment(segment);
+        if (segment->status() == SegmentStatus::kDeprecated) {
+            segment->Cleanup();
+            segment_map_.erase(iter);
+        }
+        return;
+    }
+    segment_map_.emplace(segment_id, init_segment());
+}
+
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
                                       TxnTimeStamp begin_ts,
                                       SharedPtr<FulltextIndexEntry> &fulltext_index_entry,

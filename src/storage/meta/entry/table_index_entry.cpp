@@ -118,6 +118,9 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
         if (txn_index_store->fulltext_index_entry_ != nullptr) {
             txn_index_store->fulltext_index_entry_->Commit(commit_ts);
         }
+        if (!Committed()) {
+            commit_ts_.store(commit_ts);
+        }
     }
 }
 
@@ -217,7 +220,7 @@ Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
-        auto *buffer_mgr = txn->buffer_manager();
+        auto *buffer_mgr = txn->buffer_mgr();
         for (const auto *segment_entry : block_index->segments_) {
             fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
         }

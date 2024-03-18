@@ -95,6 +95,7 @@ private:
     // replay
     void CreateTableReplay(const SharedPtr<String> &table_name,
                            std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           std::function<void(TableEntry *)> &&update_entry,
                            TransactionID txn_id,
                            TxnTimeStamp begin_ts);
 

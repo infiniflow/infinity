@@ -198,7 +198,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     UniquePtr<ZxvParserCtx> parser_context = nullptr;
     Txn *txn = query_context->GetTxn();
     {
-        auto *buffer_mgr = txn->buffer_manager();
+        auto *buffer_mgr = txn->buffer_mgr();
         u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
         SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
         UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
@@ -278,7 +278,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     Vector<ColumnVector> column_vectors;
     for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_manager()));
+        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
     while (true) {
         SizeT end_pos = jsonl_str.find('\n', start_pos);
@@ -312,7 +312,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
             column_vectors.clear();
             for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
                 auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_manager()));
+                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
             }
         }
     }
@@ -361,7 +361,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     SizeT column_count = parser_context->parser_.CellCount();
 
     auto *txn = parser_context->txn_;
-    auto *buffer_mgr = txn->buffer_manager();
+    auto *buffer_mgr = txn->buffer_mgr();
 
     auto segment_entry = parser_context->segment_entry_;
     UniquePtr<BlockEntry> block_entry = std::move(parser_context->block_entry_);

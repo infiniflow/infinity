@@ -173,7 +173,6 @@ void WalManager::Flush() {
             continue;
         }
         auto [max_commit_ts, wal_size] = GetWalState();
-        u64 ckp_commit_ts;
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry->cmds_.empty()) {
@@ -191,9 +190,6 @@ void WalManager::Flush() {
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
             max_commit_ts = entry->commit_ts_;
             wal_size += act_size;
-            if (entry->IsCheckPoint()) {
-                ckp_commit_ts = entry->commit_ts_;
-            }
         }
 
         switch(flush_option_) {
@@ -236,7 +232,6 @@ void WalManager::Flush() {
             throw e;
         }
         this->SetWalState(max_commit_ts, wal_size);
-        last_ckp_commit_ts_.store(ckp_commit_ts);
     }
     LOG_TRACE("WalManager::Flush mainloop end");
 }
@@ -293,7 +288,8 @@ void WalManager::Checkpoint() {
                              current_max_commit_ts));
 
         txn->Checkpoint(current_max_commit_ts, is_full_checkpoint);
-        txn_mgr->CommitTxn(txn);
+        TxnTimeStamp ckp_commit_ts = txn_mgr->CommitTxn(txn);
+        last_ckp_commit_ts_.store(ckp_commit_ts);
 
         if (is_full_checkpoint) {
             last_full_ckp_time_ = current_time;

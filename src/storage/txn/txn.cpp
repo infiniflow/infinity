@@ -282,7 +282,7 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
     auto [fulltext_index_entry, segment_index_entries, status] =
         table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
     if (!status.ok()) {
-        return status;
+        return Status::OK();
     }
 
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
@@ -290,12 +290,6 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
         txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
     } else {
         txn_table_store->AddFulltextIndexStore(table_index_entry, fulltext_index_entry);
-    }
-
-    if (!prepare) {
-        String index_dir = *table_index_entry->index_dir();
-        auto index_base = table_index_entry->table_index_def();
-        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
     }
     return Status::OK();
 }
@@ -313,6 +307,13 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     }
 
     return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
+}
+
+Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
+    String index_dir = *table_index_entry->index_dir();
+    auto index_base = table_index_entry->table_index_def();
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
+    return Status::OK();
 }
 
 Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
@@ -389,7 +390,7 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
 
 void Txn::Begin() {
     TxnTimeStamp ts = txn_mgr_->GetBeginTimestamp(txn_id_);
-    LOG_TRACE(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
+    LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", txn_id_, ts));
     txn_context_.BeginCommit(ts);
 }
 
@@ -432,7 +433,7 @@ void Txn::CommitBottom() noexcept {
 
     txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
 
-    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get());
+    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {

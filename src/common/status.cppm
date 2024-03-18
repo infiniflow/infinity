@@ -137,8 +137,9 @@ export enum class ErrorCode : long {
 
     // 8. meta error
     kInvalidEntry = 8001,
-    kNotFoundEntry = 8002,
-    kEmptyEntryList = 8003,
+    kDuplicateEntry = 8002,
+    kNotFoundEntry = 8003,
+    kEmptyEntryList = 8004,
 };
 
 export class Status {
@@ -259,6 +260,7 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
+    static Status DuplicateEntry();
     static Status EmptyEntryList();
 
 public:

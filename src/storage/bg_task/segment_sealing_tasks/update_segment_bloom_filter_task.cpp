@@ -60,12 +60,12 @@ void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManage
     // begin txn
     // need a txn to keep segment from being deleted
     update_bloom_filter_txn->Begin();
-    auto buffer_manager = update_bloom_filter_txn->buffer_manager();
+    auto *buffer_mgr = update_bloom_filter_txn->buffer_mgr();
     auto begin_ts = update_bloom_filter_txn->BeginTS();
     LOG_TRACE(fmt::format("SetSegmentStatusSealedTask: BeginTS: {} begin task for segment: {}", begin_ts, segment->segment_id()));
     // build filter
     // TODO: check segment visibility?
-    BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_manager, begin_ts);
+    BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_mgr, begin_ts);
     // serialize filter
     String segment_filter_binary_data = segment->GetFastRoughFilter()->SerializeToString();
     Vector<Pair<BlockID, String>> block_filter_binary_data = segment->GetBlockFilterBinaryDataVector();

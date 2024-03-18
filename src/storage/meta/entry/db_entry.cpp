@@ -122,11 +122,12 @@ void DBEntry::RemoveTableEntry(const String &table_name, TransactionID txn_id) {
 
 void DBEntry::CreateTableReplay(const SharedPtr<String> &table_name,
                                 std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                std::function<void(TableEntry *)> &&update_entry,
                                 TransactionID txn_id,
                                 TxnTimeStamp begin_ts) {
     auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, table_name, this); };
     auto *table_meta = table_meta_map_.GetMetaNoLock(*table_name, std::move(init_table_meta));
-    table_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+    table_meta->CreateEntryReplay(std::move(init_entry), std::move(update_entry), txn_id, begin_ts);
 }
 
 void DBEntry::DropTableReplay(const String &table_name,

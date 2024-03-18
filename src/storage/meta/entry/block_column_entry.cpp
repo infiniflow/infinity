@@ -59,8 +59,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     }
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
-    auto buffer_manager = txn->buffer_manager();
-    block_column_entry->buffer_ = buffer_manager->Allocate(std::move(file_worker));
+    auto *buffer_mgr = txn->buffer_mgr();
+    block_column_entry->buffer_ = buffer_mgr->Allocate(std::move(file_worker));
 
     return block_column_entry;
 }
@@ -86,6 +86,15 @@ BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry, Colum
     }
 
     return column_entry;
+}
+
+void BlockColumnEntry::UpdateColumnInfo(i32 next_outline_idx, BufferManager *buffer_mgr) {
+    i32 old_outline_idx = outline_buffers_.size();
+    for (i32 i = old_outline_idx; i < next_outline_idx; ++i) {
+        auto file_worker = MakeUnique<DataFileWorker>(base_dir_, OutlineFilename(i), DEFAULT_FIXLEN_CHUNK_SIZE);
+        auto *buffer_obj = buffer_mgr->Get(std::move(file_worker));
+        outline_buffers_.emplace_back(buffer_obj);
+    }
 }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {

@@ -77,6 +77,14 @@ public:
 
     static UniquePtr<BlockEntry> Deserialize(const nlohmann::json &table_entry_json, SegmentEntry *table_entry, BufferManager *buffer_mgr);
 
+    // replay
+    void UpdateBlockInfo(SizeT row_count, TxnTimeStamp max_row_ts, TxnTimeStamp check_point_ts, SizeT check_point_row_count);
+
+    void AddColumnReplay(std::function<UniquePtr<BlockColumnEntry>()> init_column,
+                         std::function<void(BlockColumnEntry *)> update_column,
+                         ColumnID column_id);
+    //
+
     void AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr);
 
     void Cleanup();
@@ -164,9 +172,9 @@ protected:
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;
 
-    TxnTimeStamp min_row_ts_{UNCOMMIT_TS};    // Indicate the commit_ts which create this BlockEntry
-    TxnTimeStamp max_row_ts_{0};    // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
-    TxnTimeStamp checkpoint_ts_{0}; // replay not set
+    TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
+    TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
+    TxnTimeStamp checkpoint_ts_{0};        // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
 

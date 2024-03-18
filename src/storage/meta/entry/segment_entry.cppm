@@ -83,7 +83,8 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    // Used in catalog delta operation replay, we may need to update the info of segment
+    // replay
+    //  Used in catalog delta operation replay, we may need to update the info of segment
     void UpdateSegmentInfo(SegmentStatus status,
                            SizeT row_count,
                            TxnTimeStamp min_row_ts,
@@ -91,6 +92,9 @@ public:
                            TxnTimeStamp commit_ts,
                            TxnTimeStamp begin_ts,
                            TransactionID txn_id);
+
+    void AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, std::function<void(BlockEntry *)> &&update_block, BlockID block_id);
+    //
 
     void SetSealed();
 
@@ -125,9 +129,6 @@ public:
 
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
-
-    // used in Catalog::LoadFromEntry when restart
-    void SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry);
 
     FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
 

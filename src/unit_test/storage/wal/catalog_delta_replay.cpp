@@ -255,7 +255,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
                         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->GetBufferMgr()));
+                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
                     }
 
                     {
@@ -263,7 +263,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                         column_vectors[0].AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
                     }
                     {
-                        std::string v2 = "v2";
+                        std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
                         column_vectors[1].AppendByStringView(v2, ',');
                     }
                 }
@@ -276,55 +276,44 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
 
             last_commit_ts = txn_mgr->CommitTxn(txn);
         }
-        {
-        }
+        {}
         WaitFlushDeltaOp(txn_mgr, last_commit_ts);
 
         infinity::InfinityContext::instance().UnInit();
     }
     {
-        // InfinityContext::instance().Init(config_path);
-        // Storage *storage = InfinityContext::instance().storage();
+        InfinityContext::instance().Init(config_path);
+        Storage *storage = InfinityContext::instance().storage();
 
-        // infinity::InfinityContext::instance().UnInit();
+        TxnManager *txn_mgr = storage->txn_manager();
+
+        {
+            auto *txn = txn_mgr->CreateTxn();
+            txn->Begin();
+            {
+                auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(table_entry->row_count(), 1ul);
+                ASSERT_EQ(table_entry->segment_map().size(), 1ul);
+                {
+                    auto &segment_entry = table_entry->segment_map().begin()->second;
+                    EXPECT_EQ(segment_entry->row_count(), 1ul);
+                    ASSERT_EQ(segment_entry->block_entries().size(), 1ul);
+                    {
+                        BlockEntry *block_entry = segment_entry->block_entries()[0].get();
+                        EXPECT_EQ(block_entry->row_count(), 1ul);
+                        ASSERT_EQ(block_entry->columns().size(), 2ul);
+                        {
+                            auto &col2 = block_entry->columns()[1];
+                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                        }
+                    }
+                }
+            }
+            txn_mgr->CommitTxn(txn);
+        }
+
+        infinity::InfinityContext::instance().UnInit();
     }
-}
-
-TEST_F(CatalogDeltaReplayTest, replay_insert) {
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
-    auto db_name = std::make_shared<std::string>("default");
-
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
-    auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
-}
-
-TEST_F(CatalogDeltaReplayTest, replay_delete) {
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
-    auto db_name = std::make_shared<std::string>("default");
-
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
-    auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
-}
-
-TEST_F(CatalogDeltaReplayTest, replay_compact) {
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
-    auto db_name = std::make_shared<std::string>("default");
-
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::unordered_set<ConstraintType>{});
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::unordered_set<ConstraintType>{});
-    auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 }

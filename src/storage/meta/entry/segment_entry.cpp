@@ -126,6 +126,21 @@ void SegmentEntry::UpdateSegmentInfo(SegmentStatus status,
     txn_id_ = txn_id;
 }
 
+void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block,
+                                  std::function<void(BlockEntry *)> &&update_block,
+                                  BlockID block_id) {
+    BlockID cur_blocks_size = block_entries_.size();
+    if (block_id == cur_blocks_size) {
+        block_entries_.emplace_back(init_block());
+    } else {
+        if (cur_blocks_size < block_id) {
+            UnrecoverableError(fmt::format("BlockColumnEntry::AddBlockReplay: block_id {} is out of range", block_id));
+        }
+        auto *block = block_entries_[(SizeT)block_id].get();
+        update_block(block);
+    }
+}
+
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
@@ -217,15 +232,6 @@ void SegmentEntry::AppendBlockEntry(UniquePtr<BlockEntry> block_entry) {
     std::unique_lock lock(this->rw_locker_);
     IncreaseRowCount(block_entry->row_count());
     block_entries_.emplace_back(std::move(block_entry));
-}
-
-void SegmentEntry::SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry) {
-    std::unique_lock lock(this->rw_locker_);
-    if (index == block_entries_.size()) {
-        block_entries_.emplace_back(std::move(block_entry));
-    } else {
-        block_entries_[index] = std::move(block_entry);
-    }
 }
 
 // One writer

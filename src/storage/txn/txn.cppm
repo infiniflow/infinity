@@ -120,8 +120,9 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
-    // write wal
     Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
+
+    Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
@@ -146,7 +147,7 @@ public:
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
 
     // Getter
-    BufferManager *buffer_manager() const { return buffer_mgr_; }
+    BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
     Catalog *GetCatalog() { return catalog_; }
 

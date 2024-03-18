@@ -68,6 +68,7 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(DBMeta *, Shared
                                TxnTimeStamp begin_ts) {
     auto [entry, status] =
         db_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, db_name_, txn_id, begin_ts); },
+                                      [&](DBEntry *) { UnrecoverableError("DBEntry is not updatable now"); },
                                       txn_id,
                                       begin_ts);
     if (!status.ok()) {

@@ -233,12 +233,10 @@ void CompactSegmentsTask::CreateNewIndex(CompactSegmentsTaskState &state) {
                     UnrecoverableError("Get index entry failed");
                 }
             }
-            table_index_entry->CreateIndexPrepare(table_entry,
-                                                  new_table_ref->block_index_.get(),
-                                                  txn_,
-                                                  false,  // prepare
-                                                  false,  // isreplay
-                                                  false); // check_ts
+            status = txn_->CreateIndexPrepare(table_index_entry, new_table_ref, false /*prepare*/, false /*check_ts*/);
+            if (!status.ok()) {
+                UnrecoverableError("Create index prepare failed");
+            }
         }
     }
 }
@@ -303,7 +301,7 @@ SharedPtr<SegmentEntry> CompactSegmentsTask::CompactSegmentsToOne(CompactSegment
 
     TxnTimeStamp begin_ts = txn_->BeginTS();
     SizeT column_count = table_entry->ColumnCount();
-    BufferManager *buffer_mgr = txn_->buffer_manager();
+    BufferManager *buffer_mgr = txn_->buffer_mgr();
 
     auto new_block = BlockEntry::NewBlockEntry(new_segment.get(), 0, 0, column_count, txn_);
     for (auto *old_segment : segments) {

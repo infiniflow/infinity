@@ -86,7 +86,7 @@ public:
 
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
-    const SharedPtr<IndexBase> &table_index_def() { return index_base_; }
+    const SharedPtr<IndexBase> &table_index_def() const { return index_base_; }
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }

@@ -69,8 +69,10 @@ public:
     Tuple<Entry *, Status> GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Replay op
-    Tuple<Entry *, Status>
-    AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<Entry *, Status> AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
+                                          std::function<void(Entry *)> &&update_entry,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts);
 
     Tuple<SharedPtr<Entry>, Status>
     DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -166,7 +168,7 @@ FindResult EntryList<Entry>::FindEntryReplay(TransactionID txn_id, TxnTimeStamp 
     FindResult find_res = FindResult::kNotFound;
     if (!entry_list_.empty()) {
         auto *entry = entry_list_.front().get();
-        if (begin_ts >= entry->commit_ts_) {
+        if (begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_) {
             if (!entry->deleted_) {
                 find_res = FindResult::kFound;
             }
@@ -361,18 +363,23 @@ Tuple<Entry *, Status> EntryList<Entry>::GetEntryNolock(TransactionID txn_id, Tx
 
 template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
+                                                        std::function<void(Entry *)> &&update_entry,
                                                         TransactionID txn_id,
                                                         TxnTimeStamp begin_ts) {
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
-    if (find_res != FindResult::kNotFound) {
-        UniquePtr<String> err_msg = MakeUnique<String>("Duplicated entry");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status::InvalidEntry()};
+    switch (find_res) {
+        case FindResult::kNotFound: {
+            SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
+            auto *entry_ptr = entry.get();
+            entry_list_.push_front(std::move(entry));
+            return {entry_ptr, Status::OK()};
+        }
+        default: { // FIXME: handle FindRes::kConflict
+            auto *entry_ptr = entry_list_.front().get();
+            update_entry(entry_ptr);
+            return {nullptr, Status::OK()};
+        }
     }
-    SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
-    auto *entry_ptr = entry.get();
-    entry_list_.push_front(std::move(entry));
-    return {entry_ptr, Status::OK()};
 }
 
 template <EntryConcept Entry>
@@ -380,21 +387,26 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntryReplay(std::function<
                                                                   TransactionID txn_id,
                                                                   TxnTimeStamp begin_ts) {
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
-    if (find_res != FindResult::kFound) {
-        UniquePtr<String> err_msg = MakeUnique<String>("No entry found.");
-        LOG_ERROR(*err_msg);
-        return {nullptr, Status::NotFoundEntry()};
+    switch (find_res) {
+        case FindResult::kNotFound: {
+            return {nullptr, Status::NotFoundEntry()};
+        }
+        case FindResult::kFound: {
+            SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
+            entry_list_.front().swap(drop_entry);
+            return {drop_entry, Status::OK()};
+        }
+        default: {
+            return {nullptr, Status::InvalidEntry()};
+        }
     }
-    SharedPtr<Entry> drop_entry = init_func(txn_id, begin_ts);
-    entry_list_.front().swap(drop_entry);
-    return {drop_entry, Status::OK()};
 }
 
 template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     if (!entry_list_.empty()) {
         auto *entry = entry_list_.front().get();
-        if (begin_ts >= entry->commit_ts_ && !entry->deleted_) {
+        if ((begin_ts >= entry->commit_ts_ || txn_id == entry->txn_id_) && !entry->deleted_) {
             return {entry, Status::OK()};
         }
     }

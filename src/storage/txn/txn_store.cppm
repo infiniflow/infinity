@@ -114,7 +114,7 @@ public:
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
 
-    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr);
+    void TryTriggerCompaction(BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
 
     void AddSegmentStore(SegmentEntry *segment_entry);
 
@@ -122,7 +122,7 @@ public:
 
     void AddSealedSegment(SegmentEntry *segment_entry);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, bool enable_compaction, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
 
 public: // Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -166,7 +166,7 @@ public:
 
     TxnTableStore *GetTxnTableStore(const String &table_name);
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, BGTaskProcessor *bg_task_processor, TxnManager *txn_mgr) const;
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
