@@ -13,23 +13,6 @@
 // limitations under the License.
 module;
 
-// #include "oatpp/core/Types.hpp"
-// #include "oatpp/core/macro/codegen.hpp"
-// #include "oatpp/parser/json/mapping/ObjectMapper.hpp"
-
-// #include OATPP_CODEGEN_BEGIN(DTO) ///< Begin DTO codegen section
-
-// class DatabaseDto : public oatpp::DTO {
-
-//   DTO_INIT(DatabaseDto, DTO)
-
-//   DTO_FIELD(String, database_name);
-//   DTO_FIELD(infinity::CreateDatabaseOptions, options);
-
-// };
-
-// #include OATPP_CODEGEN_END(DTO) ///< End DTO codegen section
-
 module http_server;
 
 import infinity;
