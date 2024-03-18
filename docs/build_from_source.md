@@ -1,3 +1,8 @@
+---
+sidebar_position: 1
+slug: /
+---
+
 # Build from Source
 
 Infinity can only be compiled natively on Linux. If your operating system is not Linux, build it using Docker.
