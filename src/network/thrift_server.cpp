@@ -406,7 +406,11 @@ public:
                         knn_expr = nullptr;
                     }
 
-                    delete search_expr;
+                    if (search_expr != nullptr) {
+                        delete search_expr;
+                        search_expr = nullptr;
+                    }
+
                     ProcessStatus(response, knn_expr_status);
                     return;
                 }
