@@ -89,6 +89,7 @@ void ColumnLengthReader::LoadColumnLength(u32 column_counter,
             UnrecoverableError("segment list mismatch between different fulltext indexes");
         }
     }
+    column_length_vector_.resize(column_counter_);
 }
 
 template void ColumnLengthReader::LoadColumnLength(u32 column_counter,
