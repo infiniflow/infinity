@@ -21,15 +21,19 @@ import index_defines;
 import internal_types;
 import table_entry;
 import buffer_handle;
+import third_party;
 
 namespace infinity {
 
 export class ColumnLengthWriter {};
 
 export class ColumnLengthReader {
+    struct Hash {
+        inline SegmentID operator()(const SegmentID &val) const { return val; }
+    };
     u32 column_counter_{};
     // all available data in the table
-    Map<SegmentID, Vector<BufferHandle>> column_length_data_buffer_handles_;
+    FlatHashMap<SegmentID, Vector<BufferHandle>, Hash> column_length_data_buffer_handles_;
 
 public:
     ColumnLengthReader() = default;
