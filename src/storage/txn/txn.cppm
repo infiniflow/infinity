@@ -146,8 +146,6 @@ public:
     Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactSegmentsTaskType type);
 
     // Getter
-    BufferManager *GetBufferMgr() const;
-
     BufferManager *buffer_manager() const { return buffer_mgr_; }
 
     Catalog *GetCatalog() { return catalog_; }
