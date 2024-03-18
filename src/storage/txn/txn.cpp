@@ -153,14 +153,6 @@ TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
     return iter->second.get();
 }
 
-void Txn::SetTableStore(const String &table_name, SharedPtr<TxnTableStore> txn_table_store) {
-    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
-        iter->second = txn_table_store;
-    } else {
-        txn_tables_store_.emplace(table_name, txn_table_store);
-    }
-}
-
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {

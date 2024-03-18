@@ -191,8 +191,6 @@ private:
 public:
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
-    void SetTableStore(const String &table_name, SharedPtr<TxnTableStore> txn_table_store);
-
 private:
     void CheckTxnStatus();
 
