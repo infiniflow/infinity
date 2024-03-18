@@ -78,7 +78,7 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 *column_invert_length_ptr, bool offline) {
     u64 seq_inserted(0);
     u32 doc_count(0);
     {
@@ -91,17 +91,19 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
     if (offline) {
-        auto func = [this, task, provider](int id) {
+        auto func = [this, task, provider, column_invert_length_ptr](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            inverter->GetTermListLength(column_invert_length_ptr);
             inverter->SortForOfflineDump();
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(func);
     } else {
-        auto func = [this, task, provider](int id) {
+        auto func = [this, task, provider, column_invert_length_ptr](int id) {
             auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
             inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            inverter->GetTermListLength(column_invert_length_ptr);
             this->ring_inverted_.Put(task->task_seq_, inverter);
         };
         thread_pool_.push(func);

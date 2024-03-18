@@ -53,6 +53,8 @@ public:
 
     void GeneratePosting();
 
+    void GetTermListLength(u32 *term_list_length_ptr) const;
+
     struct PosInfo {
         u32 term_num_{0};
         u32 doc_id_{0};
