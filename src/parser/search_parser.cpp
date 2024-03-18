@@ -42,7 +42,7 @@
 
 
 // Unqualified %code blocks.
-#line 30 "search_parser.y"
+#line 32 "search_parser.y"
 
     #include "search_driver.h"
     #include "search_scanner.h"
@@ -157,7 +157,7 @@ namespace infinity {
 #line 158 "search_parser.cpp"
 
   /// Build a parser object.
-  SearchParser::SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg)
+  SearchParser::SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, const std::string &default_field_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg)
 #if YYDEBUG
     : yydebug_ (false),
       yycdebug_ (&std::cerr),
@@ -166,6 +166,7 @@ namespace infinity {
 #endif
       scanner (scanner_yyarg),
       driver (driver_yyarg),
+      default_field (default_field_yyarg),
       parse_result (parse_result_yyarg)
   {}
 
@@ -762,110 +763,110 @@ namespace infinity {
           switch (yyn)
             {
   case 2: // topLevelQuery: query "end of file"
-#line 72 "search_parser.y"
+#line 74 "search_parser.y"
             {
     parse_result = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
 }
-#line 770 "search_parser.cpp"
+#line 771 "search_parser.cpp"
     break;
 
   case 3: // query: clause
-#line 77 "search_parser.y"
+#line 79 "search_parser.y"
          { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 776 "search_parser.cpp"
+#line 777 "search_parser.cpp"
     break;
 
   case 4: // query: query clause
-#line 78 "search_parser.y"
+#line 80 "search_parser.y"
                {
     auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
 }
-#line 787 "search_parser.cpp"
+#line 788 "search_parser.cpp"
     break;
 
   case 5: // query: query OR clause
-#line 84 "search_parser.y"
+#line 86 "search_parser.y"
                   {
     auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
 }
-#line 798 "search_parser.cpp"
+#line 799 "search_parser.cpp"
     break;
 
   case 6: // clause: term
-#line 92 "search_parser.y"
+#line 94 "search_parser.y"
        { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 804 "search_parser.cpp"
+#line 805 "search_parser.cpp"
     break;
 
   case 7: // clause: clause AND term
-#line 93 "search_parser.y"
+#line 95 "search_parser.y"
                   {
     auto query = std::make_unique<AndQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
 }
-#line 815 "search_parser.cpp"
+#line 816 "search_parser.cpp"
     break;
 
   case 8: // term: basic_filter_boost
-#line 101 "search_parser.y"
+#line 103 "search_parser.y"
                      { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 821 "search_parser.cpp"
+#line 822 "search_parser.cpp"
     break;
 
   case 9: // term: NOT term
-#line 102 "search_parser.y"
+#line 104 "search_parser.y"
            {
     auto query = std::make_unique<NotQueryNode>();
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(query);
 }
-#line 831 "search_parser.cpp"
+#line 832 "search_parser.cpp"
     break;
 
   case 10: // term: LPAREN query RPAREN
-#line 107 "search_parser.y"
+#line 109 "search_parser.y"
                       { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()); }
-#line 837 "search_parser.cpp"
+#line 838 "search_parser.cpp"
     break;
 
   case 11: // term: LPAREN query RPAREN CARAT
-#line 108 "search_parser.y"
+#line 110 "search_parser.y"
                             {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ());
     yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
 }
-#line 846 "search_parser.cpp"
+#line 847 "search_parser.cpp"
     break;
 
   case 12: // basic_filter_boost: basic_filter
-#line 114 "search_parser.y"
+#line 116 "search_parser.y"
                {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ());
 }
-#line 854 "search_parser.cpp"
+#line 855 "search_parser.cpp"
     break;
 
   case 13: // basic_filter_boost: basic_filter CARAT
-#line 117 "search_parser.y"
+#line 119 "search_parser.y"
                      {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
     yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
 }
-#line 863 "search_parser.cpp"
+#line 864 "search_parser.cpp"
     break;
 
   case 14: // basic_filter: STRING
-#line 123 "search_parser.y"
+#line 125 "search_parser.y"
          {
-    const std::string &field = driver.default_field_;
+    const std::string &field = default_field;
     if(field.empty()){
         error(yystack_[0].location, "driver.default_field is empty");
         YYERROR;
@@ -874,22 +875,22 @@ namespace infinity {
     driver.Analyze(field, yystack_[0].value.as < std::string > (), terms);
     yylhs.value.as < std::unique_ptr<QueryNode> > () = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
 }
-#line 878 "search_parser.cpp"
+#line 879 "search_parser.cpp"
     break;
 
   case 15: // basic_filter: STRING OP_COLON STRING
-#line 133 "search_parser.y"
+#line 135 "search_parser.y"
                          {
     std::vector<std::string> terms;
     driver.Analyze(yystack_[2].value.as < std::string > (), yystack_[0].value.as < std::string > (), terms);
     const std::string &field = yystack_[2].value.as < std::string > ();
     yylhs.value.as < std::unique_ptr<QueryNode> > () = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
 }
-#line 889 "search_parser.cpp"
+#line 890 "search_parser.cpp"
     break;
 
 
-#line 893 "search_parser.cpp"
+#line 894 "search_parser.cpp"
 
             default:
               break;
@@ -1330,8 +1331,8 @@ namespace infinity {
   const unsigned char
   SearchParser::yyrline_[] =
   {
-       0,    72,    72,    77,    78,    84,    92,    93,   101,   102,
-     107,   108,   114,   117,   123,   133
+       0,    74,    74,    79,    80,    86,    94,    95,   103,   104,
+     109,   110,   116,   119,   125,   135
   };
 
   void
@@ -1369,9 +1370,9 @@ namespace infinity {
 
 #line 9 "search_parser.y"
 } // infinity
-#line 1373 "search_parser.cpp"
+#line 1374 "search_parser.cpp"
 
-#line 140 "search_parser.y"
+#line 142 "search_parser.y"
 
 
 namespace infinity{

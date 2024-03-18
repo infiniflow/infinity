@@ -31,11 +31,13 @@ public:
     SearchDriver(std::map<std::string, std::string> &field2analyzer, std::string &default_field)
         : field2analyzer_{field2analyzer}, default_field_{default_field} {}
 
+    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingleWithFields(const std::string &fields_str, const std::string &query) const;
+
     /**
      * parse a single query
      * @param query - a single query string
      */
-    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query) const;
+    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query, const std::string *default_field_ptr = nullptr) const;
 
     static std::unique_ptr<QueryNode> BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms);
 
@@ -52,7 +54,7 @@ public:
     const std::string &default_field_;
 
 private:
-    std::unique_ptr<QueryNode> ParseHelper(std::istream &stream) const;
+    std::unique_ptr<QueryNode> ParseHelper(std::istream &stream, const std::string &default_field) const;
 };
 
 } // namespace infinity

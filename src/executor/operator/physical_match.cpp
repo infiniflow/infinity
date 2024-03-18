@@ -51,6 +51,8 @@ import search_options;
 import query_driver;
 import status;
 import index_defines;
+import search_driver;
+import query_node;
 
 namespace infinity {
 
@@ -77,7 +79,30 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
     }
 }
 
-bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
+bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) { return ExecuteInner(query_context, operator_state); }
+
+bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
+    // 1.1 populate column2analyzer
+    TransactionID txn_id = query_context->GetTxn()->TxnID();
+    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    SharedPtr<FulltextIndexEntry> fulltext_index_entry;
+    Map<String, String> column2analyzer;
+    base_table_ref_->table_entry_ptr_->GetFulltextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
+    // 1.2 parse options into map, populate default_field
+    SearchOptions search_ops(match_expr_->options_text_);
+    String default_field = search_ops.options_["default_field"];
+    // 1.3 build filter
+    SearchDriver driver(column2analyzer, default_field);
+    driver.analyze_func_ = AnalyzeFunc;
+    auto result = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
+    if (!result) {
+        RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
+    }
+    // TODO
+    return true;
+}
+
+bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *operator_state) {
     // 1 build irs::filter
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
@@ -99,7 +124,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 
     // 2 full text search
     ScoredIds result;
-    if(fulltext_index_entry == nullptr) {
+    if (fulltext_index_entry == nullptr) {
         RecoverableError(Status::FTSIndexNotExist(*base_table_ref_->table_entry_ptr_->GetTableName()));
     }
     UniquePtr<IRSDataStore> &dataStore = fulltext_index_entry->irs_index_;

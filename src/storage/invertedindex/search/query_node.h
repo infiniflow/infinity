@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef QUERY_NODE_H
+#define QUERY_NODE_H
 
 #include <memory>
 #include <ostream>
@@ -144,3 +145,5 @@ struct SuffixTermQueryNode;
 struct SubstringTermQueryNode;
 
 } // namespace infinity
+
+#endif // QUERY_NODE_H

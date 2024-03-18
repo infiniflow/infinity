@@ -16,7 +16,9 @@
 /* code snippet copied to generated search_parser.tab.hh */
 %code requires{
     // unique_ptr<QueryNode> requires sizeof(QueryNode)
+    #ifndef QUERY_NODE_H
     #include "query_node.h"
+    #endif
 
     namespace infinity {
         class SearchDriver;
@@ -24,7 +26,7 @@
     }
 }
 
-%parse-param {SearchScanner &scanner} {const SearchDriver &driver} {std::unique_ptr<QueryNode> &parse_result}
+%parse-param {SearchScanner &scanner} {const SearchDriver &driver} {const std::string &default_field} {std::unique_ptr<QueryNode> &parse_result}
 
 /* code snippet copied to generated search_parser.tab.cc */
 %code{
@@ -121,7 +123,7 @@ basic_filter_boost
 
 basic_filter
 : STRING {
-    const std::string &field = driver.default_field_;
+    const std::string &field = default_field;
     if(field.empty()){
         error(@1, "driver.default_field is empty");
         YYERROR;
