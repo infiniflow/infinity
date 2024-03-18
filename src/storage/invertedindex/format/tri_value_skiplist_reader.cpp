@@ -42,6 +42,8 @@ void TriValueSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, con
 void TriValueSkipListReader::Load_(u32, u32, const u32 &item_count) { InitMember(); }
 
 bool TriValueSkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32 &offset, u32 &delta) {
+    assert(query_doc_id > prev_doc_id_);
+    assert(prev_doc_id_ == prev_doc_id);
     u32 current_doc_id = current_doc_id_;
     u32 current_offset = current_offset_;
     u32 current_ttf = current_ttf_;
