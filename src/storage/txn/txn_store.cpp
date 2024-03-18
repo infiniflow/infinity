@@ -206,7 +206,7 @@ void TxnTableStore::PrepareCommit() {
 
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
-    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), txn_->GetBufferMgr());
+    Catalog::Append(table_entry_, txn_->TxnID(), this, txn_->CommitTS(), txn_->buffer_manager());
 
     // Attention: "compact" needs to be ahead of "delete"
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
