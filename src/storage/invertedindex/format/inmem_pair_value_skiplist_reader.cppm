@@ -12,13 +12,13 @@ namespace infinity {
 
 export class InMemPairValueSkipListReader : public PairValueSkipListReader {
 public:
-    InMemPairValueSkipListReader(MemoryPool *sessionPool);
+    InMemPairValueSkipListReader(MemoryPool *session_pool);
 
     ~InMemPairValueSkipListReader();
 
     InMemPairValueSkipListReader(const InMemPairValueSkipListReader &other) = delete;
 
-    void Load(BufferedByteSlice *postingBuffer);
+    void Load(BufferedByteSlice *posting_buffer);
 
 private:
     Pair<int, bool> LoadBuffer() override;

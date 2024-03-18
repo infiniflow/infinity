@@ -28,6 +28,12 @@ namespace infinity {
 
 String ToString(ShowType type) {
     switch (type) {
+        case ShowType::kShowDatabase:
+            return "Show database";
+        case ShowType::kShowTable:
+            return "Show table";
+        case ShowType::kShowIndex:
+            return "Show index";
         case ShowType::kShowTables:
             return "Show tables";
         case ShowType::kShowViews:
@@ -44,6 +50,8 @@ String ToString(ShowType type) {
             return "Show profiles";
         case ShowType::kShowSegments:
             return "Show segments";
+        case ShowType::kShowBlocks:
+            return "Show blocks";
         case ShowType::kShowSessionStatus:
             return "Show session status";
         case ShowType::kShowGlobalStatus:

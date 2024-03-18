@@ -225,7 +225,7 @@ bool PositionListDecoder::LocateRecord(const InDocPositionState *state, u32 &tf)
     record_offset_ = record_offset;
     offset_in_record_ = offset_in_record;
 
-    ByteSliceList *positionList = pos_list_reader_.GetByteSliceList();
+    ByteSliceList *position_list = pos_list_reader_.GetByteSliceList();
     if (!need_reopen_ && last_decode_offset_ == record_offset_) {
         // no need to relocate
         return false;
@@ -235,7 +235,7 @@ bool PositionListDecoder::LocateRecord(const InDocPositionState *state, u32 &tf)
         if (pos_single_slice_) {
             pos_list_reader_.Open(pos_single_slice_);
         } else {
-            pos_list_reader_.Open(positionList);
+            pos_list_reader_.Open(position_list);
         }
         last_decode_offset_ = 0;
     }

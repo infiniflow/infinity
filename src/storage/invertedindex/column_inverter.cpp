@@ -45,9 +45,9 @@ ColumnInverter::ColumnInverter(const String &analyzer, MemoryPool *memory_pool, 
 
 bool ColumnInverter::CompareTermRef::operator()(const u32 lhs, const u32 rhs) const { return std::strcmp(GetTerm(lhs), GetTerm(rhs)) < 0; }
 
-void ColumnInverter::InvertColumn(const ColumnVector &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
+void ColumnInverter::InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id) {
     for (SizeT i = 0; i < row_count; ++i) {
-        String data = column_vector.ToString(row_offset + i);
+        String data = column_vector->ToString(row_offset + i);
         InvertColumn(start_doc_id + i, data);
     }
 }
@@ -74,19 +74,21 @@ u32 ColumnInverter::AddTerm(StringRef term) {
     return term_ref;
 }
 
-void ColumnInverter::Merge(ColumnInverter &rhs) {
-    if (positions_.empty()) {
-        for (auto &doc_terms : terms_per_doc_) {
-            u32 doc_id = doc_terms.first;
-            auto &terms_once = doc_terms.second;
-            for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
-                StringRef term(it->text_);
-                u32 term_ref = AddTerm(term);
-                positions_.emplace_back(term_ref, doc_id, it->word_offset_);
-            }
+void ColumnInverter::MergePrepare() {
+    for (auto &doc_terms : terms_per_doc_) {
+        u32 doc_id = doc_terms.first;
+        auto &terms_once = doc_terms.second;
+        for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
+            StringRef term(it->text_);
+            u32 term_ref = AddTerm(term);
+            positions_.emplace_back(term_ref, doc_id, it->word_offset_);
         }
-        terms_per_doc_.clear();
     }
+    terms_per_doc_.clear();
+}
+
+void ColumnInverter::Merge(ColumnInverter &rhs) {
+    MergePrepare();
     for (auto &doc_terms : rhs.terms_per_doc_) {
         u32 doc_id = doc_terms.first;
         auto &terms_once = doc_terms.second;
@@ -97,6 +99,16 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
         }
     }
     rhs.terms_per_doc_.clear();
+}
+
+void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
+    assert(!inverters.empty());
+    inverters[0]->MergePrepare();
+    SizeT end = inverters.size();
+    for (SizeT i = 1; i < end; i++) {
+        SharedPtr<ColumnInverter> &rhs = inverters[i];
+        inverters[0]->Merge(*rhs);
+    }
 }
 
 struct TermRefRadix {

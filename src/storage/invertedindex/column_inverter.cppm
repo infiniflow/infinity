@@ -39,11 +39,13 @@ public:
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
 
-    void InvertColumn(const ColumnVector &column_vector, u32 row_offset, u32 row_count, u32 start_doc_id);
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id);
 
     void InvertColumn(u32 doc_id, const String &val);
 
     void Merge(ColumnInverter &rhs);
+
+    static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
 
     void Sort();
 
@@ -99,6 +101,8 @@ private:
     u32 AddTerm(StringRef term);
 
     void SortTerms();
+
+    void MergePrepare();
 
     UniquePtr<Analyzer> analyzer_{nullptr};
     PoolAllocator<char> alloc_;

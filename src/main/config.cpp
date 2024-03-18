@@ -29,6 +29,7 @@ import logger;
 import local_file_system;
 import utility;
 import status;
+import options;
 
 namespace infinity {
 
@@ -138,7 +139,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     // Default network config
     String default_listen_address = "0.0.0.0";
     u32 default_pg_port = 5432;
-    u32 default_http_port = 23810;
+    u32 default_http_port = 23820;
     u32 default_sdk_port = 23817;
     i32 default_connection_limit = 128;
 
@@ -164,13 +165,14 @@ Status Config::Init(const SharedPtr<String> &config_path) {
     SharedPtr<String> default_temp_dir = MakeShared<String>("/tmp/infinity/temp");
 
     // Default wal config
-    u64 wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
+    u64 default_wal_size_threshold = DEFAULT_WAL_FILE_SIZE_THRESHOLD;
     // Attention: this phase full checkpoint interval is used for testing,
     //            it should be set to a larger value in production environment.
     u64 full_checkpoint_interval_sec = FULL_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_sec = DELTA_CHECKPOINT_INTERVAL_SEC;
     u64 delta_checkpoint_interval_wal_bytes = DELTA_CHECKPOINT_INTERVAL_WAL_BYTES;
     SharedPtr<String> default_wal_dir = MakeShared<String>("/tmp/infinity/wal");
+    FlushOption default_flush_at_commit = FlushOption::kOnlyWrite;
 
     // Default resource config
     String default_resource_dict_path = String("/tmp/infinity/resource");
@@ -245,10 +247,11 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         // Wal
         {
             system_option_.wal_dir = MakeShared<String>(*default_wal_dir);
-            system_option_.wal_size_threshold_ = wal_size_threshold;
+            system_option_.wal_size_threshold_ = default_wal_size_threshold;
             system_option_.full_checkpoint_interval_sec_ = full_checkpoint_interval_sec;
             system_option_.delta_checkpoint_interval_sec_ = delta_checkpoint_interval_sec;
             system_option_.delta_checkpoint_interval_wal_bytes_ = delta_checkpoint_interval_wal_bytes;
+            system_option_.flush_at_commit_ = default_flush_at_commit;
         }
 
         // Resource
@@ -445,6 +448,17 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             if (!status.ok()) {
                 return status;
             }
+            String flush_log_str = wal_config["flush_at_commit"].value_or("only_write");
+            system_option_.flush_at_commit_ = default_flush_at_commit;
+            if (IsEqual(flush_log_str, "flush_at_once")) {
+                system_option_.flush_at_commit_ = FlushOption::kFlushAtOnce;
+            }
+            if (IsEqual(flush_log_str, "only_write")) {
+                system_option_.flush_at_commit_ = default_flush_at_commit;
+            }
+            if (IsEqual(flush_log_str, "flush_per_second")) {
+                system_option_.flush_at_commit_ = FlushOption::kFlushPerSecond;
+            }
         }
 
         // Resource
@@ -508,6 +522,23 @@ void Config::PrintAll() const {
     fmt::print(" - wal_size_threshold: {}\n", Utility::FormatByteSize(system_option_.wal_size_threshold_));
     fmt::print(" - wal_dir: {}\n", system_option_.wal_dir->c_str());
 
+    String flush_str;
+    switch (system_option_.flush_at_commit_) {
+        case FlushOption::kFlushAtOnce: {
+            flush_str = "FlushAtOnce";
+            break;
+        }
+        case FlushOption::kOnlyWrite: {
+            flush_str = "OnlyWrite";
+            break;
+        }
+        case FlushOption::kFlushPerSecond: {
+            flush_str = "FlushPerSecond";
+            break;
+        }
+    }
+    fmt::print(" - flush_at_commit: {}\n", flush_str);
+
     // Resource
     fmt::print(" - dictionary_dir: {}\n", system_option_.resource_dict_path_.c_str());
 }
@@ -527,6 +558,7 @@ void SystemVariables::InitVariablesMap() {
     map_["http_api_port"] = SysVar::kHttpAPIPort;
     map_["data_url"] = SysVar::kDataURL;
     map_["time_zone"] = SysVar::kTimezone;
+    map_["flush_at_commit"] = SysVar::kLogFlushPolicy;
 }
 
 HashMap<String, SysVar> SystemVariables::map_;

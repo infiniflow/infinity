@@ -1,0 +1,21 @@
+# name: test/sql/dql/fulltext.slt
+# description: Test fulltext search
+# group: [dql]
+
+statement ok
+DROP TABLE IF EXISTS enwiki;
+
+statement ok
+CREATE TABLE enwiki(doctitle varchar, docdate varchar, body varchar);
+
+# copy data from csv file
+query I
+COPY enwiki FROM '/tmp/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+----
+
+statement ok
+CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(HOMEBREWED=1);
+
+# Clean up
+statement ok
+DROP TABLE enwiki;

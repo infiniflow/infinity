@@ -72,7 +72,9 @@ using namespace infinity;
 
 TEST_F(WalReplayTest, WalReplayDatabase) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -126,13 +128,17 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -155,9 +161,11 @@ TEST_F(WalReplayTest, WalReplayDatabase) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
@@ -189,7 +197,9 @@ TEST_F(WalReplayTest, WalReplayTables) {
         }
     }
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -238,12 +248,16 @@ TEST_F(WalReplayTest, WalReplayTables) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -267,15 +281,19 @@ TEST_F(WalReplayTest, WalReplayTables) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(WalReplayTest, WalReplayAppend) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -372,13 +390,17 @@ TEST_F(WalReplayTest, WalReplayAppend) {
             txn_mgr->CommitTxn(txn);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart the db instance
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -457,17 +479,20 @@ TEST_F(WalReplayTest, WalReplayAppend) {
         //                }
         //            }
         //        }
-
+#ifdef INFINITY_DEBUG
         infinity::InfinityContext::instance().UnInit();
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(WalReplayTest, WalReplayImport) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -605,14 +630,18 @@ TEST_F(WalReplayTest, WalReplayImport) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart the db instance
     system("tree  /tmp/infinity");
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -657,9 +686,11 @@ TEST_F(WalReplayTest, WalReplayImport) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
@@ -667,7 +698,9 @@ TEST_F(WalReplayTest, WalReplayImport) {
 TEST_F(WalReplayTest, WalReplayCompact) {
     u64 test_segment_n = 2;
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -748,12 +781,16 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             txn_mgr->CommitTxn(txn4);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     // Restart db instance
     system("tree  /tmp/infinity");
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -783,13 +820,17 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_EQ(block_entry->row_count(), test_segment_n);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -849,16 +890,20 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
     system("tree  /tmp/infinity");
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -881,15 +926,19 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -953,16 +1002,20 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
     ////////////////////////////////
     /// Restart the db instance...
     ////////////////////////////////
     system("tree  /tmp/infinity");
     {
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -985,8 +1038,10 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
         }
 
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }

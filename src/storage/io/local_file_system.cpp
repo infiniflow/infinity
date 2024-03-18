@@ -138,7 +138,7 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
 
 void LocalFileSystem::Seek(FileHandler &file_handler, i64 pos) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    if (0 != lseek(fd, pos, SEEK_SET)) {
+    if ((off_t)-1 == lseek(fd, pos, SEEK_SET)) {
         UnrecoverableError(fmt::format("Can't seek file: {}: {}", file_handler.path_.string(), strerror(errno)));
     }
 }
@@ -250,8 +250,8 @@ void LocalFileSystem::DeleteEmptyDirectory(const String &path) {
         };
         list_dir(p);
 
-        LOG_CRITICAL(fmt::format("ListDirectory: {} is not empty, files: {}", path, ss.str()));
-        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+        u64 removed_count = DeleteDirectory(path);
+        LOG_ERROR(fmt::format("DeleteEmptyDirectory: {} is not empty, files: {}, force deleted: {}", path, ss.str(), removed_count));
     }
 }
 

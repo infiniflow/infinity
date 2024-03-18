@@ -105,7 +105,6 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     // doclist -> ttf -> pos skiplist -> poslist
     ttf_t ttf = total_pos_count_;
 
-    // TODO: delete buffer in MemoryPool
     InMemPairValueSkipListReader *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_) {
         // not support tf bitmap in realtime segment

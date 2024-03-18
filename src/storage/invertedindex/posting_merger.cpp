@@ -168,7 +168,7 @@ public:
         doc_merger_.Merge(current_doc_id_, posting_writer.get());
     }
 
-    RowID GetCurrentDocID() const { return base_row_id_ + current_doc_id_; }
+    RowID GetCurrentRowID() const { return base_row_id_ + current_doc_id_; }
 
 private:
     PostingFormatOption format_option_;
@@ -178,7 +178,7 @@ private:
 };
 
 struct SortedPostingComparator {
-    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrentDocID() > rhs->GetCurrentDocID(); }
+    bool operator()(const SortedPosting *lhs, const SortedPosting *rhs) { return lhs->GetCurrentRowID() > rhs->GetCurrentRowID(); }
 };
 
 using PriorityQueue = Heap<SortedPosting *, SortedPostingComparator>;

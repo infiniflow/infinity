@@ -30,7 +30,7 @@ public:
     void Put(u64 off, T elem) {
         T zero{};
         std::unique_lock<std::mutex> lock(mutex_);
-        assert(off > off_filled_);
+        assert(off >= off_filled_);
         if (off >= off_ground_ + (1 << cap_mask_))
             cv_full_.wait(lock, [this, off] { return off < off_ground_ + (1 << cap_shift_); });
         ring_buf_[off & cap_mask_] = elem;
@@ -43,7 +43,8 @@ public:
                 off_filled_++;
             }
         }
-        cv_empty_.notify_one();
+        if (off == off_ground_)
+            cv_empty_.notify_one();
     }
 
     u64 Size() {
@@ -64,11 +65,11 @@ public:
     }
 
     u64 GetBatch(Vector<T> &batch) {
+        batch.clear();
         std::unique_lock<std::mutex> lock(mutex_);
         if (off_ground_ == off_filled_) {
-            cv_empty_.wait(lock, [this] { return off_ground_ < off_filled_; });
+            return 0;
         }
-        batch.clear();
         while (off_ground_ < off_filled_) {
             T elem = ring_buf_[off_ground_ & cap_mask_];
             batch.push_back(elem);

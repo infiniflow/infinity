@@ -49,11 +49,12 @@ WalManager::WalManager(Storage *storage,
                        u64 wal_size_threshold,
                        u64 full_checkpoint_interval_sec,
                        u64 delta_checkpoint_interval_sec,
-                       u64 delta_checkpoint_interval_wal_bytes)
+                       u64 delta_checkpoint_interval_wal_bytes,
+                       FlushOption flush_option)
     : cfg_wal_size_threshold_(wal_size_threshold), cfg_full_checkpoint_interval_sec_(full_checkpoint_interval_sec),
       cfg_delta_checkpoint_interval_sec_(delta_checkpoint_interval_sec),
       cfg_delta_checkpoint_interval_wal_bytes_(delta_checkpoint_interval_wal_bytes), wal_path_(std::move(wal_path)), storage_(storage),
-      running_(false) {}
+      running_(false), flush_option_(flush_option) {}
 
 WalManager::~WalManager() {
     Stop();
@@ -193,7 +194,22 @@ void WalManager::Flush() {
                 ckp_commit_ts = entry->commit_ts_;
             }
         }
-        ofs_.flush();
+
+        switch(flush_option_) {
+            case FlushOption::kFlushAtOnce: {
+                ofs_.flush();
+                break;
+            }
+            case FlushOption::kOnlyWrite: {
+                ofs_.flush(); // FIXME: not flush, only write
+                break;
+            }
+            case FlushOption::kFlushPerSecond: {
+                ofs_.flush(); // FIXME: not flush, flush per second
+                break;
+            }
+        }
+
 
         TxnManager *txn_mgr = storage_->txn_manager();
         // Commit sequentially so they get visible in the same order with wal.
@@ -246,9 +262,10 @@ void WalManager::Checkpoint() {
     auto [current_max_commit_ts, current_wal_size] = GetWalState();
     auto ckp_commit_ts = last_ckp_commit_ts_.load();
     if (ckp_commit_ts == current_max_commit_ts) {
-//        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {}, last_ckp_commit_ts: {}",
-//                              current_max_commit_ts,
-//                              ckp_commit_ts));
+        //        LOG_TRACE(fmt::format("WalManager::Skip!. Checkpoint no new commit since last checkpoint, current_max_commit_ts: {},
+        //        last_ckp_commit_ts: {}",
+        //                              current_max_commit_ts,
+        //                              ckp_commit_ts));
         return;
     }
 

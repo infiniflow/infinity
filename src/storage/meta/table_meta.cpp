@@ -33,6 +33,7 @@ import third_party;
 import status;
 import infinity_exception;
 import column_def;
+import block_index;
 
 namespace infinity {
 
@@ -85,6 +86,25 @@ Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropNewEntry(std::shared_lock<st
                                          begin_ts);
     };
     return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
+}
+
+Tuple<SharedPtr<TableInfo>, Status>
+TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, status] = table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
+    table_info->table_name_ = table_name_;
+    table_info->table_entry_dir_ = table_entry->TableEntryDir();
+    table_info->column_count_ = table_entry->ColumnCount();
+    table_info->row_count_ = table_entry->row_count();
+
+    SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(begin_ts);
+    table_info->segment_count_ = segment_index->SegmentCount();
+
+    return {table_info, status};
 }
 
 void TableMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = table_entry_list_.DeleteEntry(txn_id); }

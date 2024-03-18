@@ -145,6 +145,14 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
+Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_id, begin_ts);
+}
+
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     auto [index_meta, _, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     r_lock.unlock();

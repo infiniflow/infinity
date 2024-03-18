@@ -4,6 +4,7 @@ import stl;
 import int_encoder;
 import byte_slice_reader;
 import byte_slice_writer;
+import no_compress_encoder;
 
 export module posting_value;
 
@@ -42,6 +43,7 @@ struct ValueTypeTraits<u32> {
 
 export typedef IntEncoder<u32, NewPForDeltaCompressor> Int32Encoder;
 export typedef IntEncoder<u16, NewPForDeltaCompressor> Int16Encoder;
+export typedef NoCompressIntEncoder<u32> NoCompressEncoder;
 
 template <typename T>
 struct EncoderTypeTraits {
@@ -82,6 +84,22 @@ struct TypedPostingValue : public PostingValue {
     }
 
     const Encoder *encoder_;
+};
+
+export template <typename T>
+struct NoCompressPostingValue : public PostingValue {
+
+    SizeT GetSize() const override { return sizeof(T); }
+
+    u32 Encode(ByteSliceWriter &slice_writer, const u8 *src, u32 len) const override {
+        return encoder_->Encode(slice_writer, (const T *)src, len / sizeof(T));
+    }
+
+    u32 Decode(u8 *dest, u32 dest_len, ByteSliceReader &slice_reader) const override {
+        return encoder_->Decode((T *)dest, dest_len / sizeof(T), slice_reader);
+    }
+
+    const NoCompressEncoder *encoder_;
 };
 
 export struct PostingValues {

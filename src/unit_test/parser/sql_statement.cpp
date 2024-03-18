@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "base_statement.h"
+#include "statement/show_statement.h"
 #include "unit_test/base_test.h"
 
 import infinity_exception;
@@ -48,6 +50,24 @@ TEST_F(StatementParsingTest, good_test1) {
     using namespace infinity;
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
     SharedPtr<ParserResult> result = MakeShared<ParserResult>();
+
+    {
+        String input_sql = "SHOW DATABASE default";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kDatabase);
+        EXPECT_EQ(show_statement->table_name_, "");
+        EXPECT_EQ(show_statement->schema_name_, "default");
+        EXPECT_EQ(show_statement->index_name_.has_value(), false);
+
+        result->Reset();
+    }
 
     {
         String input_sql = "CREATE TABLE t1 AS SELECT a, b FROM t2;";
@@ -198,6 +218,100 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
+        String input_sql = "SHOW TABLE t1 INDEX idx1";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kIndex);
+        EXPECT_EQ(show_statement->table_name_, "t1");
+        EXPECT_EQ(show_statement->schema_name_, "");
+        EXPECT_EQ(show_statement->index_name_.value(), "idx1");
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLE t1 SEGMENTS";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kSegments);
+        EXPECT_EQ(show_statement->table_name_, "t1");
+        EXPECT_EQ(show_statement->schema_name_, "");
+        EXPECT_EQ(show_statement->index_name_.has_value(), false);
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLE t1 SEGMENT 1";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kSegments);
+        EXPECT_EQ(show_statement->table_name_, "t1");
+        EXPECT_EQ(show_statement->schema_name_, "");
+        EXPECT_EQ(show_statement->index_name_.has_value(), false);
+        EXPECT_EQ(show_statement->segment_id_.value(), 1);
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLE default.t1 SEGMENT 3 BLOCKS";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kBlocks);
+        EXPECT_EQ(show_statement->table_name_, "t1");
+        EXPECT_EQ(show_statement->schema_name_, "default");
+        EXPECT_EQ(show_statement->index_name_.has_value(), false);
+        EXPECT_EQ(show_statement->segment_id_.value(), 3);
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLE t1 SEGMENT 3 BLOCK 5";
+        parser->Parse(input_sql, result.get());
+
+        EXPECT_TRUE(result->error_message_.empty());
+        EXPECT_FALSE(result->statements_ptr_ == nullptr);
+
+        BaseStatement *statement = (*result->statements_ptr_)[0];
+        EXPECT_EQ(statement->type_, StatementType::kShow);
+        auto *show_statement = (ShowStatement *)(statement);
+        EXPECT_EQ(show_statement->show_type_, ShowStmtType::kBlocks);
+        EXPECT_EQ(show_statement->table_name_, "t1");
+        EXPECT_EQ(show_statement->schema_name_, "");
+        EXPECT_EQ(show_statement->index_name_.has_value(), false);
+        EXPECT_EQ(show_statement->segment_id_.value(), 3);
+        EXPECT_EQ(show_statement->block_id_.value(), 5);
+
+        result->Reset();
+    }
+
+    {
         String input_sql = "DROP INDEX index1 ON table1;";
         parser->Parse(input_sql, result.get());
 
@@ -259,18 +373,26 @@ TEST_F(StatementParsingTest, good_test1) {
         String input_sql = "DESCRIBE t1;";
         parser->Parse(input_sql, result.get());
 
+        EXPECT_FALSE(result->error_message_.empty());
+        EXPECT_TRUE(result->statements_ptr_ == nullptr);
+
+        result->Reset();
+    }
+
+    {
+        String input_sql = "SHOW TABLE t1;";
+        parser->Parse(input_sql, result.get());
+
         EXPECT_TRUE(result->error_message_.empty());
         EXPECT_FALSE(result->statements_ptr_ == nullptr);
 
         for (auto &statement : *result->statements_ptr_) {
             EXPECT_EQ(statement->type_, StatementType::kShow);
             auto *show_statement = (ShowStatement *)(statement);
-            EXPECT_EQ(show_statement->show_type_, ShowStmtType::kColumns);
+            EXPECT_EQ(show_statement->show_type_, ShowStmtType::kTable);
             EXPECT_EQ(show_statement->table_name_, "t1");
             EXPECT_EQ(show_statement->schema_name_, "");
         }
-
-        result->Reset();
     }
 
     {

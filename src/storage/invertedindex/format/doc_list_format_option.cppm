@@ -64,6 +64,7 @@ public:
         u8 row_count = 0;
         u32 offset = 0;
         {
+            // NoCompressPostingValue<u32> *doc_id_value = new NoCompressPostingValue<u32>;
             TypedPostingValue<u32> *doc_id_value = new TypedPostingValue<u32>;
             doc_id_value->location_ = row_count++;
             doc_id_value->offset_ = offset;

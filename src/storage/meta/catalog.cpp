@@ -36,7 +36,7 @@ import file_system_type;
 import file_system;
 import table_def;
 import table_entry_type;
-import table_detail;
+import meta_info;
 import index_base;
 import txn_store;
 import data_access_state;
@@ -97,6 +97,15 @@ Tuple<DBEntry *, Status> Catalog::GetDatabase(const String &db_name, Transaction
         return {nullptr, status};
     }
     return db_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_meta, status, r_lock] = db_meta_map_.GetExistMeta(db_name, ConflictType::kError);
+    if (db_meta == nullptr) {
+        return {nullptr, status};
+    }
+
+    return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {
@@ -176,6 +185,18 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
+Tuple<SharedPtr<TableInfo>, Status>
+Catalog::GetTableInfo(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_entry, status] = this->GetDatabase(db_name, txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", db_name));
+        return {nullptr, status};
+    }
+
+    return db_entry->GetTableInfo(table_name, txn_id, begin_ts);
+}
+
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
@@ -219,6 +240,15 @@ Catalog::GetIndexByName(const String &db_name, const String &table_name, const S
         return {nullptr, table_status};
     }
     return table_entry->GetIndex(index_name, txn_id, begin_ts);
+}
+
+Tuple<SharedPtr<TableIndexInfo>, Status>
+Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
 }
 
 Status Catalog::RemoveIndexEntry(const String &index_name, TableIndexEntry *table_index_entry, TransactionID txn_id) {

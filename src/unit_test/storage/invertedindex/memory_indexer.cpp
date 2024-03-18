@@ -15,30 +15,30 @@
 #include "type/complex/row_id.h"
 #include "type/logical_type.h"
 #include "unit_test/base_test.h"
-
+#include <iostream>
+#include <unistd.h>
 import stl;
 import analyzer;
 import analyzer_pool;
 import memory_pool;
 import pool_allocator;
 import index_defines;
-import posting_writer;
 import posting_list_format;
 import column_vector;
 import data_type;
 import value;
-import column_inverter;
-import segment_posting;
+import memory_indexer;
+import column_index_reader;
 import posting_iterator;
 
 using namespace infinity;
 
-class ColumnInverterTest : public BaseTest {
+class MemoryIndexerTest : public BaseTest {
 protected:
     MemoryPool byte_slice_pool_{};
     RecyclePool buffer_pool_{};
+    ThreadPool thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
-    Map<String, SharedPtr<PostingWriter>> postings_;
 
 public:
     struct ExpectedPosting {
@@ -48,22 +48,15 @@ public:
     };
 
 public:
-    void SetUp() override {}
+    void SetUp() override {
+        system("rm -rf /tmp/infinity/fulltext_tbl1_col1");
+        system("mkdir -p /tmp/infinity/fulltext_tbl1_col1");
+    }
 
     void TearDown() override {}
-
-    SharedPtr<PostingWriter> GetOrAddPosting(const String &term) {
-        auto it = postings_.find(term);
-        if (it != postings_.end()) {
-            return it->second;
-        }
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
-        postings_[term] = posting;
-        return posting;
-    }
 };
 
-TEST_F(ColumnInverterTest, Invert) {
+TEST_F(MemoryIndexerTest, Insert) {
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     const char *paragraphs[] = {
         R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -81,51 +74,39 @@ TEST_F(ColumnInverterTest, Invert) {
     }
     Vector<ExpectedPosting> expected_postings = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
 
-    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    ColumnInverter inverter1("standard", &byte_slice_pool_, provider);
-    ColumnInverter inverter2("standard", &byte_slice_pool_, provider);
-    inverter1.InvertColumn(column, 0, 3, 0);
-    inverter2.InvertColumn(column, 3, 2, 3);
+    MemoryIndexer
+        indexer1("/tmp/infinity/fulltext_tbl1_col1", "chunk1", RowID(0U, 0U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    indexer1.Insert(column, 0, 1);
+    indexer1.Insert(column, 1, 3);
+    indexer1.Dump();
 
-    inverter1.Merge(inverter2);
+    MemoryIndexer
+        indexer2("/tmp/infinity/fulltext_tbl1_col1", "chunk2", RowID(0U, 4U), flag_, "standard", byte_slice_pool_, buffer_pool_, thread_pool_);
+    indexer2.Insert(column, 4, 1);
+    while (indexer2.GetInflightTasks() > 0) {
+        sleep(1);
+        indexer2.CommitSync();
+    }
 
-    inverter1.Sort();
-
-    inverter1.GeneratePosting();
-
+    ColumnIndexReader reader;
+    reader.Open("/tmp/infinity/fulltext_tbl1_col1", Vector<String>{"chunk1"}, Vector<RowID>{RowID(0U, 0U)}, flag_, &indexer2);
     for (SizeT i = 0; i < expected_postings.size(); ++i) {
         const ExpectedPosting &expected = expected_postings[i];
         const String &term = expected.term;
-        auto it = postings_.find(term);
-        ASSERT_TRUE(it != postings_.end());
-        SharedPtr<PostingWriter> posting = it->second;
-        ASSERT_TRUE(posting != nullptr);
-        ASSERT_EQ(posting->GetDF(), expected.doc_ids.size());
 
-        SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>(1);
-        seg_postings->at(0).Init(u64(0), posting.get());
-
-        PostingIterator post_iter(flag_, &byte_slice_pool_);
-        post_iter.Init(seg_postings, 0);
+        UniquePtr<PostingIterator> post_iter(reader.Lookup(term, &byte_slice_pool_));
+        ASSERT_TRUE(post_iter != nullptr);
 
         RowID doc_id = INVALID_ROWID;
         for (SizeT j = 0; j < expected.doc_ids.size(); ++j) {
-            doc_id = post_iter.SeekDoc(expected.doc_ids[j]);
+            doc_id = post_iter->SeekDoc(expected.doc_ids[j]);
             ASSERT_EQ(doc_id, expected.doc_ids[j]);
-            u32 tf = post_iter.GetCurrentTF();
+            u32 tf = post_iter->GetCurrentTF();
             ASSERT_EQ(tf, expected.tfs[j]);
         }
         if (doc_id != INVALID_ROWID) {
-            doc_id = post_iter.SeekDoc(doc_id + 1);
+            doc_id = post_iter->SeekDoc(doc_id + 1);
             ASSERT_EQ(doc_id, INVALID_ROWID);
         }
-
-        pos_t pos = 0;
-        u32 ii = 0;
-        pos_t ret_occ = INVALID_POSITION;
-        do {
-            post_iter.SeekPosition(pos + ii, ret_occ);
-            ++ii;
-        } while (ret_occ != INVALID_POSITION);
     }
 }

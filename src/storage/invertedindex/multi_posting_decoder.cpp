@@ -42,7 +42,7 @@ MultiPostingDecoder::~MultiPostingDecoder() {
 void MultiPostingDecoder::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings) {
     seg_postings_ = seg_postings;
     segment_count_ = (u32)seg_postings_->size();
-    MoveToSegment(INVALID_ROWID);
+    MoveToSegment(0UL);
 }
 
 bool MultiPostingDecoder::DecodeDocBuffer(RowID start_row_id, docid_t *doc_buffer, RowID &first_doc_id, RowID &last_doc_id, ttf_t &current_ttf) {
@@ -78,8 +78,8 @@ bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_row_id,
                                                       RowID &first_row_id,
                                                       RowID &last_row_id,
                                                       ttf_t &current_ttf) {
-    RowID next_seg_base_doc_id = GetSegmentBaseRowId(segment_cursor_);
-    if (next_seg_base_doc_id != INVALID_ROWID && start_row_id >= next_seg_base_doc_id) {
+    RowID next_seg_base_row_id = GetSegmentBaseRowId(segment_cursor_);
+    if (next_seg_base_row_id != INVALID_ROWID && start_row_id >= next_seg_base_row_id) {
         // start docid not in current segment
         return false;
     }
@@ -118,7 +118,7 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
     segment_cursor_ = locate_seg_cursor;
     SegmentPosting &cur_segment_posting = (*seg_postings_)[segment_cursor_];
     cur_segment_format_option_ = cur_segment_posting.GetPostingFormatOption();
-    base_row_id_ = cur_segment_posting.GetBaseDocId();
+    base_row_id_ = cur_segment_posting.GetBaseRowId();
     const PostingWriter *posting_writer = cur_segment_posting.GetInMemPostingWriter();
     if (posting_writer) {
         InMemPostingDecoder *posting_decoder = posting_writer->CreateInMemPostingDecoder(session_pool_);
@@ -173,9 +173,9 @@ bool MultiPostingDecoder::MoveToSegment(RowID start_row_id) {
         index_decoder_ = nullptr;
     }
     index_decoder_ = CreateIndexDecoder(doc_list_begin_pos);
-    u32 doc_skipList_start = doc_list_reader.Tell();
-    u32 doc_skip_list_end = doc_skipList_start + doc_skiplist_size;
-    index_decoder_->InitSkipList(doc_skipList_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
+    u32 doc_skiplist_start = doc_list_reader.Tell();
+    u32 doc_skip_list_end = doc_skiplist_start + doc_skiplist_size;
+    index_decoder_->InitSkipList(doc_skiplist_start, doc_skip_list_end, posting_list, term_meta.GetDocFreq());
     if (cur_segment_format_option_.HasPositionList() || cur_segment_format_option_.HasTfBitmap()) {
         u32 pos_list_begin = doc_list_reader.Tell() + doc_skiplist_size + doc_list_size;
 

@@ -89,7 +89,9 @@ protected:
 TEST_F(CompactTaskTest, compact_to_single_segment) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -156,14 +158,18 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, compact_to_two_segment) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -235,14 +241,18 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, compact_with_delete) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -334,14 +344,18 @@ TEST_F(CompactTaskTest, compact_with_delete) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
 TEST_F(CompactTaskTest, delete_in_compact_process) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -461,7 +475,9 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
             txn_mgr->CommitTxn(txn5);
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
 
@@ -470,7 +486,9 @@ TEST_F(CompactTaskTest, delete_in_compact_process) {
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
     {
         String table_name = "tbl1";
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
+#endif
         std::shared_ptr<std::string> config_path = nullptr;
         infinity::InfinityContext::instance().Init(config_path);
 
@@ -628,6 +646,8 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
             }
         }
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 }
