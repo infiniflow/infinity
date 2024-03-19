@@ -13,6 +13,13 @@
 // limitations under the License.
 
 #include "type/logical_type.h"
+#include <memory>
+#include <string>
+#include <unordered_set>
+#include <set>
+#include <vector>
+#include <unordered_map>
+#include <map>
 
 namespace infinity {
 
@@ -68,6 +75,59 @@ static const char *type2name[] = {
     "Missing",
 
     "Invalid",
+};
+
+std::map<std::set<std::string>, LogicalType> name2type = {
+    // Bool
+    {{ "Boolean", "bool", "boolean" }, LogicalType::kBoolean }, 
+
+    {{ "TinyInt", "tinyint" }, LogicalType::kTinyInt },
+    {{ "SmallInt", "smallint" }, LogicalType::kSmallInt },
+    {{ "Integer", "int", "integer" }, LogicalType::kInteger },
+    {{ "BigInt", "bigint" }, LogicalType::kBigInt },
+    {{ "HugeInt", "hugeint" }, LogicalType::kHugeInt },
+    {{ "Decimal", "decimal" }, LogicalType::kDecimal },
+    {{ "Float", "float" }, LogicalType::kFloat },
+    {{ "Double", "double" }, LogicalType::kDouble },
+    
+    // std::string
+    {{ "Varchar", "varchar" }, LogicalType::kVarchar }, 
+
+    // Date and Time
+    {{ "Date", "date" }, LogicalType::kDate }, 
+    {{ "Time", "time" }, LogicalType::kTime },
+    {{ "DateTime", "datetime" }, LogicalType::kDateTime },
+    {{ "Timestamp", "timestamp" }, LogicalType::kTimestamp },
+    {{ "Interval", "interval" }, LogicalType::kInterval },
+    
+    // Nested types
+    {{ "Array", "array" }, LogicalType::kArray }, 
+    {{ "Tuple", "tuple" }, LogicalType::kTuple },
+    
+    // Geography
+    {{ "Point", "point" }, LogicalType::kPoint }, 
+    {{ "Line", "line" }, LogicalType::kLine },
+    {{ "LineSegment", "linesegment" }, LogicalType::kLineSeg },
+    {{ "Box", "box" }, LogicalType::kBox },
+    
+    //    "Path",
+    //    "Polygon",
+    {{ "Circle", "circle" }, LogicalType::kCircle },
+
+    // Other
+    //    "Bitmap",
+    {{ "UUID", "uuid" }, LogicalType::kUuid },
+
+    //    "Blob",
+    {{ "Embedding", "embedding" }, LogicalType::kEmbedding },
+    {{ "RowID", "rowid" }, LogicalType::kRowID },
+    
+    // Heterogeneous/Mix type
+    {{ "Heterogeneous", "heterogeneous" }, LogicalType::kMixed }, 
+    {{ "Null", "null" }, LogicalType::kNull },
+    {{ "Missing", "missing" }, LogicalType::kMissing },
+
+    {{ "Invalid", "invalid" }, LogicalType::kInvalid },
 };
 
 static int64_t type_size[] = {
@@ -128,6 +188,15 @@ static int64_t type_size[] = {
 };
 
 const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
+
+LogicalType Str2LogicalType(std::string str) {
+    for(auto &name_map : name2type){
+        if(name_map.first.find(str) != name_map.first.end()){
+            return name_map.second;   
+        }
+    }
+    return LogicalType::kInvalid; 
+}
 
 int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
 

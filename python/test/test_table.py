@@ -404,7 +404,7 @@ class TestTable:
         assert res.error_code == ErrorCode.OK
 
     # create/drop table with different invalid options
-    @pytest.mark.skip(reason="teardown error")
+    # @pytest.mark.skip(reason="teardown error")
     @pytest.mark.parametrize("invalid_option_array", [
         pytest.param([], marks=pytest.mark.xfail),
         pytest.param((), marks=pytest.mark.xfail),

@@ -57,6 +57,7 @@ public:
     bool operator!=(const DataType &other) const;
 
     [[nodiscard]] std::string ToString() const;
+    [[nodiscard]] LogicalType ToLogicalType() const;
 
     [[nodiscard]] size_t Size() const;
 
@@ -160,6 +161,8 @@ public:
 
     static std::shared_ptr<DataType> Deserialize(const nlohmann::json &data_type_json);
 
+    static std::shared_ptr<DataType> StringDeserialize(const std::string &data_type_string);
+
     // Estimated serialized size in bytes, ensured be no less than Write requires, allowed be larger.
     [[nodiscard]] int32_t GetSizeInBytes() const;
 
@@ -172,6 +175,7 @@ public:
 
 private:
     LogicalType type_{LogicalType::kInvalid};
+    std::string str_type_ {"invalid"};
     bool plain_type_{false};
     std::shared_ptr<TypeInfo> type_info_{nullptr};
     // Static method
