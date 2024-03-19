@@ -47,6 +47,11 @@ void ColumnLengthReader::LoadColumnLength(u32 column_counter,
             // Table index entry isn't found
             RecoverableError(status);
         }
+        // check index type
+        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kFullText) {
+            // non-fulltext index
+            continue;
+        }
         const String column_name = table_index_entry->index_base()->column_name();
         auto column_id = table_entry->GetColumnIdByName(column_name);
         auto iter_column_index = column_index_map.find(column_id);
@@ -55,12 +60,7 @@ void ColumnLengthReader::LoadColumnLength(u32 column_counter,
             continue;
         }
         u32 column_index = iter_column_index->second;
-        // check index type
-        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kFullText) {
-            // non-fulltext index
-            continue;
-        }
-        const HashMap<u32, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
+        const HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
         for (auto &[segment_id, segment_index_entry] : index_by_segment) {
             auto &buffer_handle_v = column_length_data_buffer_handles_[segment_id];
             if (buffer_handle_v.empty()) {

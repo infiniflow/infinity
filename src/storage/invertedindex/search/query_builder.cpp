@@ -39,7 +39,52 @@ import query_node;
 
 namespace infinity {
 
-QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) {
+QueryBuilder::QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry)
+    : txn_id_(txn_id), begin_ts_(begin_ts), table_entry_(table_entry) {
+    for (auto map_guard = table_entry_->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id_, begin_ts_);
+        if (!status.ok()) {
+            // Table index entry isn't found
+            RecoverableError(status);
+        }
+        // check index type
+        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kFullText) {
+            // non-fulltext index
+            continue;
+        }
+        const String column_name = table_index_entry->index_base()->column_name();
+        auto column_id = table_entry->GetColumnIdByName(column_name);
+        {
+            // update column2analyzer
+            column2analyzer_[column_name] = reinterpret_cast<const IndexFullText *>(table_index_entry->index_base())->analyzer_;
+        }
+        u64 ts = table_index_entry->GetFulltexSegmentUpdateTs();
+        if (index_reader_.NeedRefreshColumnIndexReader(column_id, ts)) {
+            UniquePtr<ColumnIndexReader> column_index_reader = MakeUnique<ColumnIndexReader>();
+            String index_dir = *(table_index_entry->index_dir());
+            const HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment = table_index_entry->index_by_segment();
+            const SharedPtr<IndexBase> &index_def = table_index_entry->table_index_def();
+            Vector<String> base_names;
+            Vector<RowID> base_rowids;
+            MemoryIndexer *memory_indexer = nullptr;
+            for (auto &[segment_id, segment_index_entry] : index_by_segment) {
+                Vector<String> &base_names = segment_index_entry->GetFulltextBaseNames();
+                Vector<u64> &base_row_ids = segment_index_entry->GetFulltextBaseRowIDs();
+                memory_indexer = segment_index_entry->GetMemoryIndexer();
+                for (auto &name : base_names)
+                    base_names.push_back(name);
+                for (auto base_row_id : base_row_ids) {
+                    RowID row_id(base_row_id);
+                    base_rowids.push_back(row_id);
+                }
+            }
+            optionflag_t flag = reinterpret_cast<IndexFullText *>(index_def.get())->flag_;
+            column_index_reader->Open(index_dir, base_names, base_rowids, flag, memory_indexer);
+            index_reader_.SetColumnIndexReader(column_id, ts, std::move(column_index_reader));
+        }
+    }
+    index_reader_.session_pool_ = MakeShared<MemoryPool>();
+    /*
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map = table_entry_->index_meta_map();
     for (auto &meta : index_meta_map) {
         List<SharedPtr<TableIndexEntry>> &index_entry_list = meta.second->index_entry_list();
@@ -74,6 +119,7 @@ QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) 
         }
     }
     index_reader_.session_pool_ = MakeShared<MemoryPool>();
+    */
 }
 
 QueryBuilder::~QueryBuilder() {}

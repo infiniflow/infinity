@@ -175,6 +175,12 @@ void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
                 if (index_base->index_type_ != IndexType::kFullText)
                     continue;
                 auto index_full_text = static_cast<const IndexFullText *>(index_base);
+                if (index_full_text->homebrewed_) {
+                    // set fulltext_index_entry to nullptr to indicate that the index is homebrewed
+                    fulltext_index_entry = nullptr;
+                    column2analyzer.clear();
+                    return;
+                }
                 for (auto &column_name : index_full_text->column_names_) {
                     column2analyzer[column_name] = index_full_text->analyzer_;
                 }

@@ -33,13 +33,15 @@ export struct FullTextQueryContext {
 
 export class QueryBuilder {
 public:
-    QueryBuilder(TableEntry *table_entry);
+    QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry);
 
     ~QueryBuilder();
 
+    Map<String, String> &GetColumn2Analyzer() { return column2analyzer_; }
+
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
-    void LoadScorerColumnLength(TransactionID txn_id, TxnTimeStamp begin_ts) { scorer_->LoadColumnLength(table_entry_, txn_id, begin_ts); }
+    void LoadScorerColumnLength() { scorer_->LoadColumnLength(table_entry_, txn_id_, begin_ts_); }
 
     float Score(RowID doc_id) {
         if (SegmentID segment_id = doc_id.segment_id_; segment_id != target_segment_id_) {
@@ -50,9 +52,12 @@ public:
     }
 
 private:
+    TransactionID txn_id_{};
+    TxnTimeStamp begin_ts_{};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     UniquePtr<Scorer> scorer_;
     SegmentID target_segment_id_ = INVALID_SEGMENT_ID;
+    Map<String, String> column2analyzer_;
 };
 } // namespace infinity

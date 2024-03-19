@@ -66,22 +66,20 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    SharedPtr<FulltextIndexEntry> fulltext_index_entry;
-    Map<String, String> column2analyzer;
-    base_table_ref_->table_entry_ptr_->GetFulltextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
+    QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_->table_entry_ptr_);
+    Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
     String &default_field = search_ops.options_["default_field"];
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
-    driver.analyze_func_ = reinterpret_cast<void (*)()>(AnalyzeFunc);
+    driver.analyze_func_ = reinterpret_cast<void (*)()>(&AnalyzeFunc);
     UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!query_tree) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
 
     // 2 build DocIterator
-    QueryBuilder query_builder(base_table_ref_->table_entry_ptr_);
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
     UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
@@ -107,7 +105,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
         ResultHandler result_handler(1, top_n, score_result.get(), row_id_result.get());
         result_handler.Begin();
         // prepare query_builder
-        query_builder.LoadScorerColumnLength(txn_id, begin_ts);
+        query_builder.LoadScorerColumnLength();
         do {
             // call scorer
             float score = query_builder.Score(iter_row_id);
