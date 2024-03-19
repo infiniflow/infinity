@@ -1,16 +1,16 @@
 module;
 #include <cassert>
 
+module buffered_skiplist_writer;
 import stl;
 import byte_slice;
 import memory_pool;
 import file_writer;
+import file_reader;
 import index_defines;
 import posting_value;
 import buffered_byte_slice;
 import short_list_optimize_util;
-
-module buffered_skiplist_writer;
 
 namespace infinity {
 
@@ -51,7 +51,24 @@ void BufferedSkipListWriter::AddItem(u32 value_delta) {
     }
 }
 
-void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file) { posting_writer_.Dump(file); }
+void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        file->WriteVInt(posting_writer_.GetSize());
+        if (posting_writer_.GetSize() == 0)
+            return;
+        file->WriteVInt(last_key_);
+        file->WriteVInt(last_value1_);
+    }
+    posting_writer_.Dump(file);
+}
 
-SizeT BufferedSkipListWriter::EstimateDumpSize() const { return posting_writer_.GetSize(); }
+void BufferedSkipListWriter::Load(const SharedPtr<FileReader> &file) {
+    u32 size = file->ReadVInt();
+    if (size == 0)
+        return;
+    last_key_ = file->ReadVInt();
+    last_value1_ = file->ReadVInt();
+    posting_writer_.Load(file, size);
+}
+
 } // namespace infinity

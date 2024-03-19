@@ -220,7 +220,6 @@ void MemoryIndexer::OfflineDump() {
     // 2. Generate posting
     // 3. Dump disk segment data
     FinalSpillFile();
-    std::cout << "num_runs_ " << num_runs_ << std::endl;
     SortMerger<TermTuple, u16> *merger = new SortMerger<TermTuple, u16>(spill_full_path_.c_str(), num_runs_, 100000000, 2);
     merger->Run();
     delete merger;

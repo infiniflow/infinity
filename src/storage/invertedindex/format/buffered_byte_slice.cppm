@@ -5,6 +5,7 @@ import memory_pool;
 import byte_slice;
 import byte_slice_writer;
 import file_writer;
+import file_reader;
 import flush_info;
 import posting_value;
 import index_defines;
@@ -52,9 +53,11 @@ public:
 
     SizeT Flush();
 
-    virtual void Dump(const SharedPtr<FileWriter> &file) { posting_writer_.Dump(file); }
+    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
 
-    virtual SizeT EstimateDumpSize() const { return posting_writer_.GetSize(); }
+    void Load(const SharedPtr<FileReader> &file);
+
+    SizeT EstimateDumpSize() const { return posting_writer_.GetSize(); }
 
 protected:
     SizeT DoFlush();
