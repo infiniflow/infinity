@@ -25,6 +25,7 @@ import kmeans_partition;
 import infinity_exception;
 import logger;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -61,9 +62,9 @@ struct AnnIVFFlatIndexData {
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                UnrecoverableError("Metric type not implemented");
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                UnrecoverableError("Metric type not supported");
+                RecoverableError(Status::NotSupport("Metric type not supported"));
             }
             return;
         }
@@ -100,9 +101,9 @@ struct AnnIVFFlatIndexData {
         }
         if (metric_ != MetricType::kMerticL2 && metric_ != MetricType::kMerticInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
-                UnrecoverableError("Metric type not implemented");
+                RecoverableError(Status::NotSupport("Metric type not implemented"));
             } else {
-                UnrecoverableError("Metric type not supported");
+                RecoverableError(Status::NotSupport("Metric type not supported"));
             }
             return;
         }

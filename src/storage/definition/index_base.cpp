@@ -26,6 +26,7 @@ import index_hnsw;
 import index_full_text;
 import index_secondary;
 import third_party;
+import status;
 
 import infinity_exception;
 import create_index_info;
@@ -135,7 +136,7 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             UnrecoverableError("Error index method while reading");
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     if (ptr_end < ptr) {
@@ -212,7 +213,7 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             UnrecoverableError("Error index method while deserializing");
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
     return res;

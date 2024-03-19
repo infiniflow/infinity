@@ -21,6 +21,7 @@ import base_table_ref;
 import infinity_exception;
 import merge_knn;
 import knn_result_handler;
+import status;
 
 module merge_knn_data;
 
@@ -41,7 +42,7 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }
