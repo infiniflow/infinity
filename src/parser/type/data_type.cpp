@@ -82,6 +82,10 @@ std::string DataType::ToString() const {
     return LogicalType2Str(type_);
 }
 
+LogicalType DataType::ToLogicalType() const {
+    return Str2LogicalType(str_type_);
+}
+
 bool DataType::operator==(const DataType &other) const {
     if (this == &other)
         return true;
@@ -304,6 +308,13 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 break;
         }
     }
+    std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
+    return data_type;
+}
+
+std::shared_ptr<DataType> DataType::StringDeserialize(const std::string &data_type_string) {
+    const LogicalType logical_type = Str2LogicalType(data_type_string);
+    std::shared_ptr<TypeInfo> type_info{nullptr};
     std::shared_ptr<DataType> data_type = std::make_shared<DataType>(logical_type, type_info);
     return data_type;
 }
