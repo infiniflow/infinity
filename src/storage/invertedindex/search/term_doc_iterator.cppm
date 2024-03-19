@@ -29,7 +29,7 @@ import internal_types;
 namespace infinity {
 export class TermDocIterator : public DocIterator {
 public:
-    TermDocIterator(PostingIterator *iter, u64 column_id);
+    TermDocIterator(PostingIterator *iter, u64 column_id, float weight);
 
     virtual ~TermDocIterator();
 
@@ -48,8 +48,11 @@ public:
         return false;
     }
 
+    float GetWeight() const { return weight_; }
+
 private:
     u64 column_id_;
     PostingIterator *iter_ = nullptr;
+    float weight_;
 };
 } // namespace infinity

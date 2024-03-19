@@ -256,10 +256,10 @@ class TestKnn:
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("topn", [
-        2,
-        10,
-        # FIXME 0, ERROR: AddressSanitizer: heap-buffer-overflow on address 0x502000009bf0 at pc 0x5bdb2772d2a4 bp 0x7d8ea9efc9d0 sp 0x7d8ea9efc9c8
-        # FIXME -1, exceeds maximum supported size of 0x10000000000
+        (2, True),
+        (10, True),
+        (0, False),
+        (-1, False),
         pytest.param("word", marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
         pytest.param({}, marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
         pytest.param((), marks=pytest.mark.skip(reason="struct.error: required argument is not an integer")),
@@ -284,5 +284,9 @@ class TestKnn:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "pl", topn).to_pl()
-        print(res)
+        if topn[1]:
+            res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "pl", topn[0]).to_pl()
+            print(res)
+        else:
+            with pytest.raises(Exception, match="ERROR:3014*"):
+                res = table_obj.output(["variant_id"]).knn("gender_vector", [1] * 4, "float", "pl", topn[0]).to_pl()

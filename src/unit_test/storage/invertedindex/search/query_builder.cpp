@@ -57,7 +57,7 @@ struct MockQueryNode : public QueryNode {
     MockQueryNode(Vector<RowID> doc_ids) : QueryNode(QueryNodeType::TERM), doc_ids_(std::move(doc_ids)) {}
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, std::unique_ptr<Scorer> &) const final {
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const final {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {

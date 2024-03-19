@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+slug: /miscellaneous_functions
+---
 # Functions
 
 ## Aggregate
