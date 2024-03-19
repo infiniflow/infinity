@@ -145,7 +145,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
@@ -170,16 +170,17 @@ public:
                              SharedPtr<String> table_name,
                              SharedPtr<String> table_entry_dir,
                              Vector<SharedPtr<ColumnDef>> column_defs,
-                             SizeT row_count)
+                             SizeT row_count,
+                             SegmentID unsealed_id)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
           table_name_(std::move(table_name)), table_entry_dir_(std::move(table_entry_dir)), column_defs_(std::move(column_defs)),
-          row_count_(row_count) {}
+          row_count_(row_count), unsealed_id_(unsealed_id) {}
 
     explicit AddTableEntryOp(TableEntry *table_entry)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_TABLE_ENTRY, table_entry), db_name_(table_entry->GetDBName()),
           table_name_(table_entry->GetTableName()), table_entry_dir_(table_entry->TableEntryDir()), column_defs_(table_entry->column_defs()),
-          row_count_(table_entry->row_count()) // TODO: fix it
-    {}
+          row_count_(table_entry->row_count()), // TODO: fix it
+          unsealed_id_(table_entry->unsealed_id()) {}
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_TABLE_ENTRY; }
     String GetTypeStr() const final { return "ADD_TABLE_ENTRY"; }
@@ -201,10 +202,11 @@ public:
         }
 
         total_size += sizeof(SizeT);
+        total_size += sizeof(SegmentID);
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_));
@@ -218,6 +220,7 @@ public:
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return column_defs_; }
     TableEntryType table_entry_type() const { return table_entry_type_; }
     SizeT row_count() const { return row_count_; }
+    SegmentID unsealed_id() const { return unsealed_id_; }
 
 private:
     SharedPtr<String> db_name_{};
@@ -226,6 +229,7 @@ private:
     Vector<SharedPtr<ColumnDef>> column_defs_{};
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     SizeT row_count_{0};
+    SegmentID unsealed_id_{};
 };
 
 /// class AddSegmentEntryOp
@@ -276,7 +280,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *this->db_name_, *this->table_name_, this->segment_id_));
@@ -354,7 +358,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_));
@@ -427,7 +431,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_, column_id_));
@@ -481,14 +485,14 @@ public:
         total_size += sizeof(i32) + this->db_name_->size();
         total_size += sizeof(i32) + this->table_name_->size();
         total_size += sizeof(i32) + this->index_name_->size();
-        total_size += sizeof(i32) + this->index_dir_->size();
         if (!is_delete()) {
+            total_size += sizeof(i32) + this->index_dir_->size();
             total_size += this->index_base_->GetSizeInBytes();
         }
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_, *index_name_));
@@ -539,7 +543,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_));
@@ -591,7 +595,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_, segment_id_));
@@ -661,7 +665,7 @@ public:
         return total_size;
     }
     void WriteAdv(char *&ptr) const final;
-    void SaveState() final;
+    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_));

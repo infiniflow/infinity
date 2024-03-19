@@ -71,6 +71,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             }
 
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
+            SegmentID unsealed_id = ReadBufAdv<SegmentID>(ptr);
             operation = MakeUnique<AddTableEntryOp>(begin_ts,
                                                     is_delete,
                                                     txn_id,
@@ -79,7 +80,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                     std::move(table_name),
                                                     std::move(table_entry_dir),
                                                     columns,
-                                                    row_count);
+                                                    row_count,
+                                                    unsealed_id);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
@@ -104,8 +106,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                       segment_status,
                                                       column_count,
                                                       row_count,
-                                                      actual_row_count,
                                                       row_capacity,
+                                                      actual_row_count,
                                                       min_row_ts,
                                                       max_row_ts,
                                                       deprecate_ts);
@@ -161,7 +163,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             auto index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
-            auto index_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
+            SharedPtr<String> index_dir = is_delete ? nullptr : MakeShared<String>(ReadBufAdv<String>(ptr));
             SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
                                                          is_delete,
@@ -273,6 +275,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
         }
     }
     WriteBufAdv(buf, this->row_count_);
+    WriteBufAdv(buf, this->unsealed_id_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -319,8 +322,8 @@ void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
-    WriteBufAdv(buf, *this->index_dir_);
     if (!is_delete()) {
+        WriteBufAdv(buf, *this->index_dir_);
         index_base_->WriteAdv(buf);
     }
 }
@@ -355,26 +358,6 @@ void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
         WriteBufAdv(buf, block_filter.second);
     }
 }
-
-void AddDBEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddTableEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddSegmentEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddBlockEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddColumnEntryOp::SaveState() { is_saved_sate_ = true; }
-
-/// Related to index
-
-void AddTableIndexEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddFulltextIndexEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void AddSegmentIndexEntryOp::SaveState() { is_saved_sate_ = true; }
-
-void SetSegmentStatusSealedOp::SaveState() { is_saved_sate_ = true; }
 
 const String AddDBEntryOp::ToString() const {
     return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", *db_name_, db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
@@ -477,7 +460,7 @@ bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddTableEntryOp *>(&rhs);
     bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
                IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*table_entry_dir_, *rhs_op->table_entry_dir_) &&
-               table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ &&
+               table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ && unsealed_id_ == rhs_op->unsealed_id_ &&
                column_defs_.size() == rhs_op->column_defs_.size();
     if (!res) {
         return false;

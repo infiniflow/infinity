@@ -477,7 +477,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
     auto &operations = catalog_delta_entry->operations();
     for (auto &op : operations) {
         auto type = op->GetType();
-        LOG_INFO(fmt::format("Catalog Delta Op is {}", op->ToString()));
+        LOG_TRACE(fmt::format("Catalog Delta Op is {}", op->ToString()));
         auto commit_ts = op->commit_ts();
         auto txn_id = op->txn_id();
         auto begin_ts = op->begin_ts();
@@ -522,6 +522,7 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto column_defs = add_table_entry_op->column_defs();
                 auto entry_type = add_table_entry_op->table_entry_type();
                 auto row_count = add_table_entry_op->row_count();
+                SegmentID unsealed_id = add_table_entry_op->unsealed_id();
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 if (!is_delete) {
@@ -537,9 +538,13 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                 begin_ts,
                                                                 commit_ts,
                                                                 false,
-                                                                row_count);
+                                                                row_count,
+                                                                unsealed_id);
                         },
-                        [&](TableEntry *table_entry) { table_entry->row_count_ = row_count; },
+                        [&](TableEntry *table_entry) {
+                            table_entry->row_count_ = row_count;
+                            table_entry->unsealed_id_ = unsealed_id;
+                        },
                         txn_id,
                         begin_ts);
                 } else {
@@ -555,7 +560,8 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                 begin_ts,
                                                                 commit_ts,
                                                                 true,
-                                                                row_count);
+                                                                row_count,
+                                                                unsealed_id);
                         },
                         txn_id,
                         begin_ts);

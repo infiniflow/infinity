@@ -101,12 +101,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 5u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -129,12 +128,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 13u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -169,12 +167,11 @@ TEST_F(DBTCompactionTest, AddSegments) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 33u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -230,12 +227,11 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         new_segment = static_cast<MockSegmentEntry *>(compacted_segments[0].get());
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3u);
-        {
-            Vector<SegmentEntry *> tmp;
-            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
-                return segment.get();
-            });
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -250,12 +246,11 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 1u);
-        {
-            Vector<SegmentEntry *> tmp;
-            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
-                return segment.get();
-            });
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -279,12 +274,11 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         new_segment = static_cast<MockSegmentEntry *>(compacted_segments[0].get());
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 3u);
-        {
-            Vector<SegmentEntry *> tmp;
-            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
-                return segment.get();
-            });
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -311,12 +305,11 @@ TEST_F(DBTCompactionTest, AddAndDeleteInSegments) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 4u);
-        {
-            Vector<SegmentEntry *> tmp;
-            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
-                return segment.get();
-            });
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -371,12 +364,11 @@ TEST_F(DBTCompactionTest, FillSegmentCapacity) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 800u);
-        {
-            Vector<SegmentEntry *> tmp;
-            std::transform(compacted_segments.begin(), compacted_segments.end(), std::back_inserter(tmp), [](auto &segment) {
-                return segment.get();
-            });
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -450,12 +442,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 7u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -489,12 +480,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         EXPECT_EQ(compacted_segments.size(), 1u);
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 20u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -541,12 +531,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         shrink_segment = compacted_segments[0].get();
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 51u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -577,12 +566,11 @@ TEST_F(DBTCompactionTest, RollbackTest) {
         segment_entries.insert(segment_entries.end(), compacted_segments.begin(), compacted_segments.end());
         EXPECT_EQ(compacted_segments.size(), 1u);
         EXPECT_EQ(compacted_segments[0]->actual_row_count(), 12u);
-        {
-            Vector<SegmentEntry *> tmp;
-            for (auto &segment : compacted_segments) {
-                tmp.emplace_back(segment.get());
-            }
-            DBTCompact.CommitCompact(tmp, txn_id);
+
+        DBTCompact.CommitCompact(txn_id);
+        for (auto &segment : compacted_segments) {
+            auto ret = DBTCompact.AddSegment(segment.get(), GetTxn);
+            ASSERT_EQ(ret.has_value(), false);
         }
         txn_mgr->CommitTxn(txn);
     }

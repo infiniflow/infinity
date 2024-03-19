@@ -57,9 +57,10 @@ TableEntry::TableEntry(bool is_delete,
                        TableEntryType table_entry_type,
                        TableMeta *table_meta,
                        TransactionID txn_id,
-                       TxnTimeStamp begin_ts)
+                       TxnTimeStamp begin_ts,
+                       SegmentID unsealed_id)
     : BaseEntry(EntryType::kTable, is_delete), table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)),
-      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type) {
+      table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -91,7 +92,8 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                   table_entry_type,
                                   table_meta,
                                   txn_id,
-                                  begin_ts);
+                                  begin_ts,
+                                  0);
 }
 
 SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
@@ -103,7 +105,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
                                                    TxnTimeStamp begin_ts,
                                                    TxnTimeStamp commit_ts,
                                                    bool is_delete,
-                                                   SizeT row_count) noexcept {
+                                                   SizeT row_count,
+                                                   SegmentID unsealed_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
                                               std::move(table_entry_dir),
                                               std::move(table_name),
@@ -111,7 +114,8 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(TableMeta *table_meta,
                                               table_entry_type,
                                               table_meta,
                                               txn_id,
-                                              begin_ts);
+                                              begin_ts,
+                                              unsealed_id);
     // TODO need to check if commit_ts influence replay catalog delta entry
     table_entry->commit_ts_.store(commit_ts);
     table_entry->row_count_.store(row_count);
@@ -213,7 +217,11 @@ void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&ini
         }
         return;
     }
-    segment_map_.emplace(segment_id, init_segment());
+    SharedPtr<SegmentEntry> new_segment = init_segment();
+    segment_map_.emplace(segment_id, new_segment);
+    if (new_segment->segment_id() == unsealed_id_) {
+        unsealed_segment_ = std::move(new_segment);
+    }
 }
 
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id,
@@ -281,7 +289,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
     while (!append_state_ptr->Finished()) {
         {
             std::unique_lock<std::shared_mutex> rw_locker(this->rw_locker()); // prevent another read conflict with this append operation
-            if (!this->unsealed_segment_ || unsealed_segment_->Room() <= 0) {
+            if (unsealed_segment_.get() == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_) {
                     unsealed_segment_->SetSealed();
@@ -291,6 +299,7 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
                 SegmentID new_segment_id = this->next_segment_id_++;
 
                 this->unsealed_segment_ = SegmentEntry::NewSegmentEntry(this, new_segment_id, txn);
+                unsealed_id_ = unsealed_segment_->segment_id();
                 this->segment_map_.emplace(new_segment_id, this->unsealed_segment_);
                 LOG_TRACE(fmt::format("Created a new segment {}", new_segment_id));
             }
@@ -378,7 +387,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
 
     switch (compact_store.task_type_) {
         case CompactSegmentsTaskType::kCompactPickedSegments: {
-            compaction_alg_->CommitCompact(new_segments, txn_id);
+            compaction_alg_->CommitCompact(txn_id);
             LOG_INFO(fmt::format("Compact commit picked, tablename: {}", *this->GetTableName()));
             break;
         }
@@ -576,6 +585,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts, bool is_full_ch
     for (const auto &segment_entry : segment_candidates) {
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts, is_full_checkpoint));
     }
+    json_res["unsealed_id"] = unsealed_id_;
 
     // Serialize indexes
     SizeT table_index_count = table_index_meta_candidates.size();
@@ -621,9 +631,10 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
+    SegmentID unsealed_id = table_entry_json["segment_id"];
 
     UniquePtr<TableEntry> table_entry =
-        MakeUnique<TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts);
+        MakeUnique<TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id);
     table_entry->row_count_ = row_count;
     table_entry->next_segment_id_ = table_entry_json["next_segment_id"];
 
@@ -632,6 +643,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
             SharedPtr<SegmentEntry> segment_entry = SegmentEntry::Deserialize(segment_json, table_entry.get(), buffer_mgr);
             table_entry->segment_map_.emplace(segment_entry->segment_id(), segment_entry);
         }
+        table_entry->unsealed_segment_ = table_entry->segment_map_.at(unsealed_id);
     }
 
     table_entry->commit_ts_ = table_entry_json["commit_ts"];

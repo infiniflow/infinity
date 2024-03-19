@@ -66,7 +66,8 @@ public:
                         TableEntryType table_entry_type,
                         TableMeta *table_meta,
                         TransactionID txn_id,
-                        TxnTimeStamp begin_ts);
+                        TxnTimeStamp begin_ts,
+                        SegmentID unsealed_id);
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
                                                const SharedPtr<String> &db_entry_dir,
@@ -86,7 +87,8 @@ public:
                                                   TxnTimeStamp begin_ts,
                                                   TxnTimeStamp commit_ts,
                                                   bool is_delete,
-                                                  SizeT row_count) noexcept;
+                                                  SizeT row_count,
+                                                  SegmentID unsealed_id) noexcept;
 
 public:
     Tuple<TableIndexEntry *, Status>
@@ -171,6 +173,8 @@ public:
 
     inline TableEntryType EntryType() const { return table_entry_type_; }
 
+    SegmentID unsealed_id() const { return unsealed_id_; }
+
     Pair<SizeT, Status> GetSegmentRowCountBySegmentID(u32 seg_id);
 
     SharedPtr<BlockIndex> GetBlockIndex(TxnTimeStamp begin_ts);
@@ -218,6 +222,7 @@ private:
     Atomic<SizeT> row_count_{}; // this is actual row count
     Map<SegmentID, SharedPtr<SegmentEntry>> segment_map_{};
     SharedPtr<SegmentEntry> unsealed_segment_{};
+    SegmentID unsealed_id_{};
     atomic_u32 next_segment_id_{};
 
 public:
@@ -234,10 +239,10 @@ private:
     // the compaction algorithm, mutable because all its interface are protected by lock
     mutable UniquePtr<CompactionAlg> compaction_alg_{};
 
-private: // TODO: remote it
+private: // TODO: remove it
     std::shared_mutex &rw_locker() const { return index_meta_map_.rw_locker_; }
 
-public: // TODO: remote it?
+public: // TODO: remove it?
     HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
 
 public:

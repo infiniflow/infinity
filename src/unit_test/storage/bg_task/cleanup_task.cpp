@@ -466,6 +466,7 @@ TEST_F(CleanupTaskTest, TestWithIndexCompactAndCleanup) {
         EXPECT_TRUE(status2.ok());
 
         auto status3 = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
+        txn->CreateIndexFinish(table_entry, table_index_entry);
         EXPECT_TRUE(status3.ok());
 
         txn_mgr->CommitTxn(txn);

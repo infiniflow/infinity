@@ -186,16 +186,16 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
         if (txn_map_.find(txn_id) != txn_map_.end()) {
-            LOG_INFO(fmt::format("Txn: {} not found in txn map", txn_id));
+            LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
             return ts;
         }
         if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
-            LOG_INFO(fmt::format("Txn: {} wait flush", txn_id));
+            LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
             return ts;
         }
         iter = ts_map_.erase(iter);
     }
-    LOG_INFO(fmt::format("No txn is active, return the next ts {}", start_ts_));
+    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 

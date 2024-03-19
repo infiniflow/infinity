@@ -69,7 +69,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         auto op0 = MakeUnique<AddDBEntryOp>(0, false, 0, 0, db_name, db_dir);
         catalog_delta_entry1->operations().push_back(std::move(op0));
 
-        auto op1 = MakeUnique<AddTableEntryOp>(1, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0);
+        auto op1 = MakeUnique<AddTableEntryOp>(1, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
         catalog_delta_entry1->operations().push_back(std::move(op1));
 
         auto op2 = MakeUnique<AddSegmentEntryOp>(2, false, 0, 0, db_name, table_name, segment_id, SegmentStatus::kSealed, 0, 0, 0, 0, 0, 0, 0);
@@ -150,9 +150,9 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op1_same_name));
 
     // table entry
-    auto op4 = MakeUnique<AddTableEntryOp>(5, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0);
-    auto op5 = MakeUnique<AddTableEntryOp>(6, true, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0);
-    auto op4_same_name = MakeUnique<AddTableEntryOp>(5, 0, 0, false, db_name, table_name, table_entry_dir, column_defs, 0);
+    auto op4 = MakeUnique<AddTableEntryOp>(5, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
+    auto op5 = MakeUnique<AddTableEntryOp>(6, true, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
+    auto op4_same_name = MakeUnique<AddTableEntryOp>(5, 0, 0, false, db_name, table_name, table_entry_dir, column_defs, 0, 0);
     local_catalog_delta_entry->operations().push_back(std::move(op4));
     local_catalog_delta_entry->operations().push_back(std::move(op5));
     local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));

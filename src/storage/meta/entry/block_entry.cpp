@@ -81,6 +81,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     }
     block_entry->block_version_ = MakeUnique<BlockVersion>(block_entry->row_capacity_);
     block_entry->block_version_->created_.emplace_back((TxnTimeStamp)block_entry->min_row_ts_, (i32)block_entry->row_count_);
+    block_entry->checkpoint_row_count_ = row_count;
     return block_entry;
 }
 
@@ -258,9 +259,10 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts, bool check_commit) {
             // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
             if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)
                 return;
+            checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
+        } else {
+            checkpoint_row_count = this->row_count_;
         }
-
-        checkpoint_row_count = this->block_version_->GetRowCount(checkpoint_ts);
         if (checkpoint_row_count == 0) {
             LOG_TRACE(fmt::format("Block entry {} is empty at checkpoint_ts {}", this->block_id_, checkpoint_ts));
             return;

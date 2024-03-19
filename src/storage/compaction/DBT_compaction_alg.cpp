@@ -138,7 +138,7 @@ Optional<Pair<Vector<SegmentEntry *>, Txn *>> DBTCompactionAlg::DeleteInSegment(
     return MakePair(std::move(compact_segments), std::move(txn)); // FIXME: MakePair is implemented incorrectly
 }
 
-void DBTCompactionAlg::CommitCompact(const Vector<SegmentEntry *> &new_segments, TransactionID commit_txn_id) {
+void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
     if (status_ != CompactionStatus::kRunning) {
         UnrecoverableError(fmt::format("Wrong status of compaction alg: {}", (u8)status_));
