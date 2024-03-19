@@ -25,7 +25,7 @@ import table_entry;
 namespace infinity {
 
 struct QueryNode;
-export struct QueryContext {
+export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
 };
 
@@ -35,7 +35,7 @@ public:
 
     ~QueryBuilder();
 
-    UniquePtr<DocIterator> CreateSearch(QueryContext &context);
+    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
 private:
     TableEntry *table_entry_{nullptr};

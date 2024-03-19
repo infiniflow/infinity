@@ -78,7 +78,7 @@ QueryBuilder::QueryBuilder(TableEntry *table_entry) : table_entry_(table_entry) 
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
+UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
     // Optimize the query tree.
     context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     // Create the iterator from the query tree.

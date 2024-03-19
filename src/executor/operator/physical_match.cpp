@@ -53,6 +53,8 @@ import status;
 import index_defines;
 import search_driver;
 import query_node;
+import query_builder;
+import doc_iterator;
 
 namespace infinity {
 
@@ -82,6 +84,7 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
 bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) { return ExecuteInner(query_context, operator_state); }
 
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
+    // 1. build QueryNode tree
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
@@ -90,15 +93,23 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     base_table_ref_->table_entry_ptr_->GetFulltextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
-    String default_field = search_ops.options_["default_field"];
+    String &default_field = search_ops.options_["default_field"];
     // 1.3 build filter
     SearchDriver driver(column2analyzer, default_field);
     driver.analyze_func_ = AnalyzeFunc;
-    auto result = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
+    UniquePtr<QueryNode> result = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
     if (!result) {
         RecoverableError(Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_));
     }
-    // TODO
+
+    // 2 build DocIterator
+    QueryBuilder query_builder(base_table_ref_->table_entry_ptr_);
+    FullTextQueryContext full_text_query_context;
+    full_text_query_context.query_tree_ = std::move(result);
+    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
+
+    // 3 full text search
+
     return true;
 }
 
