@@ -382,7 +382,7 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    RecoverableError(Status::NotSupport("Not implemented"));
                                 }
                             }
                             break;
@@ -406,19 +406,19 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    RecoverableError(Status::NotSupport("Not implemented"));
                                 }
                             }
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implemented");
+                            RecoverableError(Status::NotSupport("Not implemented"));
                         }
                     }
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not implemented"));
                 }
             }
             break;
@@ -430,7 +430,7 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
     return Status::OK();
 }
 
-void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
+void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { RecoverableError(Status::NotSupport("Not implemented")); }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {

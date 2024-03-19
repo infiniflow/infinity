@@ -19,6 +19,7 @@ from infinity.db import Database
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.table import RemoteTable
 from infinity.remote_thrift.utils import check_valid_name, select_res_to_polars
+from infinity.common import ConflictType
 
 
 def get_ordinary_info(column_big_info, column_defs, column_name, index):
@@ -111,7 +112,8 @@ class RemoteDatabase(Database, ABC):
         self._conn = conn
         self._db_name = name
 
-    def create_table(self, table_name: str, columns_definition: dict[str, str], options=None):
+    def create_table(self, table_name: str, columns_definition: dict[str, str],
+                     conflict_type: ConflictType = ConflictType.Error):
         # process column definitions
         # {"c1":'int, primary key',"c2":'vector,1024,float32'}
         # db_obj.create_table("my_table", {"c1": "int, primary key", "c2": "vector,1024,float32"}, None)
@@ -128,18 +130,38 @@ class RemoteDatabase(Database, ABC):
             else:  # numeric or varchar
                 get_ordinary_info(
                     column_big_info, column_defs, column_name, index)
+
+        create_table_conflict: ttypes.CreateConflict
+        if conflict_type == ConflictType.Error:
+            create_table_conflict = ttypes.CreateConflict.Error
+        elif conflict_type == ConflictType.Ignore:
+            create_table_conflict = ttypes.CreateConflict.Ignore
+        elif conflict_type == ConflictType.Replace:
+            create_table_conflict = ttypes.CreateConflict.Replace
+        else:
+            raise Exception(f"ERROR:3066, Invalid conflict type")
+
         # print(column_defs)
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
-                                      option=options)
+                                      conflict_type=create_table_conflict)
+
         if res.error_code == ErrorCode.OK:
             return RemoteTable(self._conn, self._db_name, table_name)
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def drop_table(self, table_name, if_exists=True):
+    def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
         check_valid_name(table_name, "Table")
-        return self._conn.drop_table(db_name=self._db_name, table_name=table_name, if_exists=if_exists)
+
+        if conflict_type == ConflictType.Error:
+            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
+                                         conflict_type=ttypes.DropConflict.Error)
+        elif conflict_type == ConflictType.Ignore:
+            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
+                                         conflict_type=ttypes.DropConflict.Ignore)
+        else:
+            raise Exception(f"Error:3036, invalid conflict type")
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
@@ -148,9 +170,18 @@ class RemoteDatabase(Database, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def describe_table(self, table_name):
+    def show_table(self, table_name):
         check_valid_name(table_name, "Table")
-        res = self._conn.describe_table(
+        res = self._conn.show_table(
+            db_name=self._db_name, table_name=table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_columns(self, table_name):
+        check_valid_name(table_name, "Table")
+        res = self._conn.show_columns(
             db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)

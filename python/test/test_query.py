@@ -20,15 +20,16 @@ from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
+from infinity.common import ConflictType
 
 
 class TestQuery:
     def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         db = RemoteDatabase(conn, "default")
-        db.drop_table("my_table")
+        db.drop_table("my_table", conflict_type=ConflictType.Ignore)
         db.create_table(
-            "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, None)
+            "my_table", {"num": "integer", "body": "varchar", "vec": "vector,5,float"}, ConflictType.Error)
 
         table = RemoteTable(conn, "default", "my_table")
         res = table.insert(
@@ -45,7 +46,7 @@ class TestQuery:
                                  [index.IndexInfo("body",
                                                   index.IndexType.FullText,
                                                   [index.InitParameter("ANALYZER", "segmentation")]),
-                                  ], None)
+                                  ], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # select_res = table.query_builder().output(["*"]).to_df()
@@ -63,7 +64,7 @@ class TestQuery:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_query_builder", if_exists=True)
-        table_obj = db_obj.create_table("test_query_builder", {"c1": "int"}, None)
+        db_obj.drop_table("test_query_builder", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_query_builder", {"c1": "int"}, ConflictType.Error)
         query_builder = table_obj.query_builder
         query_builder.output(["*"]).to_df()

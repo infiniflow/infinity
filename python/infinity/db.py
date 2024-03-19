@@ -30,7 +30,11 @@ class Database(ABC):
         pass  # implement list tables logic here
 
     @abstractmethod
-    def describe_table(self, table_name):
+    def show_table(self, table_name):
+        pass  # implement describe table logic here
+
+    @abstractmethod
+    def show_columns(self, table_name):
         pass  # implement describe table logic here
 
     @abstractmethod

@@ -265,10 +265,10 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 break;
             }
             case kNull: {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case kMissing: {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -405,13 +405,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
 #endif
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case kNull: {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case kMissing: {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             case kInvalid: {
                 UnrecoverableError("Invalid data type");
@@ -562,13 +562,13 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             break;
         }
         case kNull: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kMissing: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kInvalid: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }
@@ -600,7 +600,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((BigIntT *)data_ptr_)[row_index]);
         }
         case kHugeInt: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kFloat: {
             return std::to_string(((FloatT *)data_ptr_)[row_index]);
@@ -609,7 +609,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
         case kDecimal: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kVarchar: {
             VarcharT &varchar_ref = ((VarcharT *)data_ptr_)[row_index];
@@ -642,44 +642,44 @@ String ColumnVector::ToString(SizeT row_index) const {
             return ((TimestampT *)data_ptr_)[row_index].ToString();
         }
         case kInterval: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kArray: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kTuple: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kPoint: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kLine: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kLineSeg: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         case kBox: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
             //        case kPath: {
             //        }
             //        case kPolygon: {
             //        }
         case kCircle: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
             //        case kBitmap: {
             //        }
         case kUuid: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
             //        case kBlob: {
             //        }
         case kEmbedding: {
-            //            UnrecoverableError("Not implemented");
+            //            RecoverableError(Status::NotSupport("Not implemented"));
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
-                UnrecoverableError("Not implemented");
+                RecoverableError(Status::NotSupport("Not implemented"));
             }
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             EmbeddingT embedding_element(nullptr, false);
@@ -692,7 +692,7 @@ String ColumnVector::ToString(SizeT row_index) const {
             return (((RowID *)data_ptr_)[row_index]).ToString();
         }
         case kMixed: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
         default: {
             UnrecoverableError("Attempt to access an unaccepted type");
@@ -1248,7 +1248,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             SizeT dst_off = index * data_type_->Size();
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not implemented"));
                     break;
                 }
                 case kElemInt8: {
@@ -1296,7 +1296,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            RecoverableError(Status::NotSupport("Not implemented"));
         }
     }
 }

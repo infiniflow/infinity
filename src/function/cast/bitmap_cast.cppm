@@ -51,7 +51,7 @@ struct BitmapTryCastToVarlen {
 
 template <>
 inline bool BitmapTryCastToVarlen::Run(const BitmapT &source, VarcharT &target, const SharedPtr<ColumnVector> &vector_ptr) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return false;
 }
 

@@ -248,7 +248,7 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
-        UnrecoverableError("Not implemented");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
     const String &column_name = this->index_base_->column_name();
     const auto *column_def = table_entry->GetColumnDefByName(column_name);

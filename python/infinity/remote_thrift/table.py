@@ -26,6 +26,7 @@ from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuild
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, check_valid_name, select_res_to_polars
 from infinity.table import Table, ExplainType
+from infinity.common import ConflictType
 
 
 class RemoteTable(Table, ABC):
@@ -36,7 +37,8 @@ class RemoteTable(Table, ABC):
         self._table_name = table_name
         self.query_builder = InfinityThriftQueryBuilder(table=self)
 
-    def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
+    def create_index(self, index_name: str, index_infos: list[IndexInfo],
+                     conflict_type: ConflictType = ConflictType.Error):
         check_valid_name(index_name, "Index")
         index_name = index_name.strip()
 
@@ -50,21 +52,40 @@ class RemoteTable(Table, ABC):
 
             index_info_list_to_use.append(index_info_to_use)
 
+        create_index_conflict: ttypes.CreateConflict
+        if conflict_type == ConflictType.Error:
+            create_index_conflict = ttypes.CreateConflict.Error
+        elif conflict_type == ConflictType.Ignore:
+            create_index_conflict = ttypes.CreateConflict.Ignore
+        elif conflict_type == ConflictType.Replace:
+            create_index_conflict = ttypes.CreateConflict.Replace
+        else:
+            raise Exception(f"ERROR:3066, Invalid conflict type")
+
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
                                       index_name=index_name,
                                       index_info_list=index_info_list_to_use,
-                                      option=options)
+                                      conflict_type=create_index_conflict)
 
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def drop_index(self, index_name: str):
+    def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
+
+        drop_index_conflict: ttypes.DropConflict
+        if conflict_type == ConflictType.Error:
+            drop_index_conflict = ttypes.DropConflict.Error
+        elif conflict_type == ConflictType.Ignore:
+            drop_index_conflict = ttypes.DropConflict.Ignore
+        else:
+            raise Exception(f"Error:3036, invalid conflict type")
+
         check_valid_name(index_name, "Index")
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
-                                    index_name=index_name)
+                                    index_name=index_name, conflict_type=drop_index_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -188,7 +209,8 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def update(self, cond: Optional[str], data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
+    def update(self, cond: Optional[str],
+               data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
         # {"c1": 1, "c2": 1.1}
         match cond:
             case None:
@@ -238,9 +260,9 @@ class RemoteTable(Table, ABC):
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int):
+            topn: int, knn_params: {} = None):
         self.query_builder.knn(
-            vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
+            vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = ''):

@@ -10,7 +10,7 @@ import time
 def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("python test path is {}".format(python_test_dir))
     # run test
-    print("start pysdk test...")
+    print(f"start pysdk test with {pytest_mark}")
     process = subprocess.Popen(
         ["python", "-m", "pytest", '-m', pytest_mark, f'{python_test_dir}/test'],
         stdout=subprocess.PIPE,

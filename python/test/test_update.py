@@ -20,6 +20,7 @@ from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 from utils import trace_expected_exceptions
 
 
@@ -62,11 +63,11 @@ class TestUpdate:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table(table_name="table_4", if_exists=True)
+        db_obj.drop_table(table_name="table_4", conflict_type=ConflictType.Ignore)
 
         # infinity
         table_obj = db_obj.create_table(
-            "table_4", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, None)
+            "table_4", {"c1": "int, primary key, not null", "c2": "int", "c3": "int"}, ConflictType.Error)
         assert table_obj is not None
 
         res = table_obj.insert(
@@ -105,10 +106,10 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_empty_table")
+        db_obj.drop_table("test_update_empty_table", ConflictType.Ignore)
 
         try:
-            db_obj.create_table("test_update_empty_table", {}, None)
+            db_obj.create_table("test_update_empty_table", {}, ConflictType.Error)
         except Exception as e:
             print(e)
 
@@ -132,9 +133,9 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_non_existent_table")
+        db_obj.drop_table("test_update_non_existent_table", ConflictType.Ignore)
 
-        db_obj.create_table("test_update_non_existent_table", {"c1": "int", "c2": "int", "c3": "int"}, None)
+        db_obj.create_table("test_update_non_existent_table", {"c1": "int", "c2": "int", "c3": "int"}, ConflictType.Error)
 
         try:
             tb_obj = db_obj.get_table("test_update_empty_table")
@@ -160,12 +161,12 @@ class TestUpdate:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i))
+            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
             tb = db_obj.create_table("test_update_no_row_is_met_the_condition" + str(i),
                                      {"c1": common_values.types_array[i],
-                                      "c2": common_values.types_array[i]}, None)
+                                      "c2": common_values.types_array[i]}, ConflictType.Error)
             assert tb
 
             tb_obj = db_obj.get_table("test_update_no_row_is_met_the_condition" + str(i))
@@ -197,12 +198,12 @@ class TestUpdate:
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i))
+            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
             tb = db_obj.create_table("test_update_all_row_is_met_the_condition" + str(i),
                                      {"c1": common_values.types_array[i],
-                                      "c2": common_values.types_array[i]}, None)
+                                      "c2": common_values.types_array[i]}, ConflictType.Error)
             assert tb
 
             tb_obj = db_obj.get_table("test_update_all_row_is_met_the_condition" + str(i))
@@ -232,8 +233,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_table_with_one_block")
-        table_obj = db_obj.create_table("test_update_table_with_one_block", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_table_with_one_block", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_one_block", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
@@ -256,8 +257,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_table_with_one_segment")
-        table_obj = db_obj.create_table("test_update_table_with_one_segment", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_one_segment", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         for i in range(1024):
@@ -280,8 +281,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_before_delete")
-        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
@@ -308,8 +309,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_before_delete")
-        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_before_delete", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
@@ -332,8 +333,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_inserted_long_before")
-        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
@@ -357,8 +358,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_inserted_long_before")
-        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, None)
+        db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_inserted_long_before", {"c1": "int", "c2": "int"}, ConflictType.Error)
         db_obj.drop_table("test_update_inserted_long_before")
 
         # update
@@ -379,8 +380,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_invalid_value")
-        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
+        db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
 
         # update
         with pytest.raises(Exception, match="Invalid constant expression"):
@@ -400,8 +401,8 @@ class TestUpdate:
         # connect
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         db_obj = infinity_obj.get_database("default")
-        db_obj.drop_table("test_update_invalid_value")
-        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, None)
+        db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": "int", "c2": types}, ConflictType.Error)
 
         # update
         table_obj.update("c1 = 1", [{"c2": types_example}])
@@ -432,8 +433,8 @@ class TestUpdate:
     def test_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect
         db_obj = get_infinity_db
-        db_obj.drop_table("test_filter_expression")
-        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, None)
+        db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_expression", {"c1": "int", "c2": "float"}, ConflictType.Error)
 
         # insert
         for i in range(10):

@@ -38,13 +38,15 @@ class InfinityServiceIf {
   virtual void ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request) = 0;
   virtual void ListTable(ListTableResponse& _return, const ListTableRequest& request) = 0;
   virtual void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) = 0;
-  virtual void DescribeTable(SelectResponse& _return, const DescribeTableRequest& request) = 0;
-  virtual void DescribeDatabase(SelectResponse& _return, const DescribeDatabaseRequest& request) = 0;
+  virtual void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) = 0;
+  virtual void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) = 0;
+  virtual void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) = 0;
   virtual void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) = 0;
   virtual void GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request) = 0;
   virtual void GetTable(CommonResponse& _return, const GetTableRequest& request) = 0;
   virtual void CreateIndex(CommonResponse& _return, const CreateIndexRequest& request) = 0;
   virtual void DropIndex(CommonResponse& _return, const DropIndexRequest& request) = 0;
+  virtual void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -122,10 +124,13 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
   void ShowVariable(SelectResponse& /* _return */, const ShowVariableRequest& /* request */) override {
     return;
   }
-  void DescribeTable(SelectResponse& /* _return */, const DescribeTableRequest& /* request */) override {
+  void ShowTable(ShowTableResponse& /* _return */, const ShowTableRequest& /* request */) override {
     return;
   }
-  void DescribeDatabase(SelectResponse& /* _return */, const DescribeDatabaseRequest& /* request */) override {
+  void ShowColumns(SelectResponse& /* _return */, const ShowColumnsRequest& /* request */) override {
+    return;
+  }
+  void ShowDatabase(ShowDatabaseResponse& /* _return */, const ShowDatabaseRequest& /* request */) override {
     return;
   }
   void ShowTables(SelectResponse& /* _return */, const ShowTablesRequest& /* request */) override {
@@ -141,6 +146,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void DropIndex(CommonResponse& /* _return */, const DropIndexRequest& /* request */) override {
+    return;
+  }
+  void ShowIndex(ShowIndexResponse& /* _return */, const ShowIndexRequest& /* request */) override {
     return;
   }
 };
@@ -1797,37 +1805,37 @@ class InfinityService_ShowVariable_presult {
 
 };
 
-typedef struct _InfinityService_DescribeTable_args__isset {
-  _InfinityService_DescribeTable_args__isset() : request(false) {}
+typedef struct _InfinityService_ShowTable_args__isset {
+  _InfinityService_ShowTable_args__isset() : request(false) {}
   bool request :1;
-} _InfinityService_DescribeTable_args__isset;
+} _InfinityService_ShowTable_args__isset;
 
-class InfinityService_DescribeTable_args {
+class InfinityService_ShowTable_args {
  public:
 
-  InfinityService_DescribeTable_args(const InfinityService_DescribeTable_args&);
-  InfinityService_DescribeTable_args& operator=(const InfinityService_DescribeTable_args&);
-  InfinityService_DescribeTable_args() noexcept {
+  InfinityService_ShowTable_args(const InfinityService_ShowTable_args&);
+  InfinityService_ShowTable_args& operator=(const InfinityService_ShowTable_args&);
+  InfinityService_ShowTable_args() noexcept {
   }
 
-  virtual ~InfinityService_DescribeTable_args() noexcept;
-  DescribeTableRequest request;
+  virtual ~InfinityService_ShowTable_args() noexcept;
+  ShowTableRequest request;
 
-  _InfinityService_DescribeTable_args__isset __isset;
+  _InfinityService_ShowTable_args__isset __isset;
 
-  void __set_request(const DescribeTableRequest& val);
+  void __set_request(const ShowTableRequest& val);
 
-  bool operator == (const InfinityService_DescribeTable_args & rhs) const
+  bool operator == (const InfinityService_ShowTable_args & rhs) const
   {
     if (!(request == rhs.request))
       return false;
     return true;
   }
-  bool operator != (const InfinityService_DescribeTable_args &rhs) const {
+  bool operator != (const InfinityService_ShowTable_args &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const InfinityService_DescribeTable_args & ) const;
+  bool operator < (const InfinityService_ShowTable_args & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -1835,103 +1843,103 @@ class InfinityService_DescribeTable_args {
 };
 
 
-class InfinityService_DescribeTable_pargs {
+class InfinityService_ShowTable_pargs {
  public:
 
 
-  virtual ~InfinityService_DescribeTable_pargs() noexcept;
-  const DescribeTableRequest* request;
+  virtual ~InfinityService_ShowTable_pargs() noexcept;
+  const ShowTableRequest* request;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _InfinityService_DescribeTable_result__isset {
-  _InfinityService_DescribeTable_result__isset() : success(false) {}
+typedef struct _InfinityService_ShowTable_result__isset {
+  _InfinityService_ShowTable_result__isset() : success(false) {}
   bool success :1;
-} _InfinityService_DescribeTable_result__isset;
+} _InfinityService_ShowTable_result__isset;
 
-class InfinityService_DescribeTable_result {
+class InfinityService_ShowTable_result {
  public:
 
-  InfinityService_DescribeTable_result(const InfinityService_DescribeTable_result&);
-  InfinityService_DescribeTable_result& operator=(const InfinityService_DescribeTable_result&);
-  InfinityService_DescribeTable_result() noexcept {
+  InfinityService_ShowTable_result(const InfinityService_ShowTable_result&);
+  InfinityService_ShowTable_result& operator=(const InfinityService_ShowTable_result&);
+  InfinityService_ShowTable_result() noexcept {
   }
 
-  virtual ~InfinityService_DescribeTable_result() noexcept;
-  SelectResponse success;
+  virtual ~InfinityService_ShowTable_result() noexcept;
+  ShowTableResponse success;
 
-  _InfinityService_DescribeTable_result__isset __isset;
+  _InfinityService_ShowTable_result__isset __isset;
 
-  void __set_success(const SelectResponse& val);
+  void __set_success(const ShowTableResponse& val);
 
-  bool operator == (const InfinityService_DescribeTable_result & rhs) const
+  bool operator == (const InfinityService_ShowTable_result & rhs) const
   {
     if (!(success == rhs.success))
       return false;
     return true;
   }
-  bool operator != (const InfinityService_DescribeTable_result &rhs) const {
+  bool operator != (const InfinityService_ShowTable_result &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const InfinityService_DescribeTable_result & ) const;
+  bool operator < (const InfinityService_ShowTable_result & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _InfinityService_DescribeTable_presult__isset {
-  _InfinityService_DescribeTable_presult__isset() : success(false) {}
+typedef struct _InfinityService_ShowTable_presult__isset {
+  _InfinityService_ShowTable_presult__isset() : success(false) {}
   bool success :1;
-} _InfinityService_DescribeTable_presult__isset;
+} _InfinityService_ShowTable_presult__isset;
 
-class InfinityService_DescribeTable_presult {
+class InfinityService_ShowTable_presult {
  public:
 
 
-  virtual ~InfinityService_DescribeTable_presult() noexcept;
-  SelectResponse* success;
+  virtual ~InfinityService_ShowTable_presult() noexcept;
+  ShowTableResponse* success;
 
-  _InfinityService_DescribeTable_presult__isset __isset;
+  _InfinityService_ShowTable_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
 };
 
-typedef struct _InfinityService_DescribeDatabase_args__isset {
-  _InfinityService_DescribeDatabase_args__isset() : request(false) {}
+typedef struct _InfinityService_ShowColumns_args__isset {
+  _InfinityService_ShowColumns_args__isset() : request(false) {}
   bool request :1;
-} _InfinityService_DescribeDatabase_args__isset;
+} _InfinityService_ShowColumns_args__isset;
 
-class InfinityService_DescribeDatabase_args {
+class InfinityService_ShowColumns_args {
  public:
 
-  InfinityService_DescribeDatabase_args(const InfinityService_DescribeDatabase_args&);
-  InfinityService_DescribeDatabase_args& operator=(const InfinityService_DescribeDatabase_args&);
-  InfinityService_DescribeDatabase_args() noexcept {
+  InfinityService_ShowColumns_args(const InfinityService_ShowColumns_args&);
+  InfinityService_ShowColumns_args& operator=(const InfinityService_ShowColumns_args&);
+  InfinityService_ShowColumns_args() noexcept {
   }
 
-  virtual ~InfinityService_DescribeDatabase_args() noexcept;
-  DescribeDatabaseRequest request;
+  virtual ~InfinityService_ShowColumns_args() noexcept;
+  ShowColumnsRequest request;
 
-  _InfinityService_DescribeDatabase_args__isset __isset;
+  _InfinityService_ShowColumns_args__isset __isset;
 
-  void __set_request(const DescribeDatabaseRequest& val);
+  void __set_request(const ShowColumnsRequest& val);
 
-  bool operator == (const InfinityService_DescribeDatabase_args & rhs) const
+  bool operator == (const InfinityService_ShowColumns_args & rhs) const
   {
     if (!(request == rhs.request))
       return false;
     return true;
   }
-  bool operator != (const InfinityService_DescribeDatabase_args &rhs) const {
+  bool operator != (const InfinityService_ShowColumns_args &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const InfinityService_DescribeDatabase_args & ) const;
+  bool operator < (const InfinityService_ShowColumns_args & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
@@ -1939,67 +1947,171 @@ class InfinityService_DescribeDatabase_args {
 };
 
 
-class InfinityService_DescribeDatabase_pargs {
+class InfinityService_ShowColumns_pargs {
  public:
 
 
-  virtual ~InfinityService_DescribeDatabase_pargs() noexcept;
-  const DescribeDatabaseRequest* request;
+  virtual ~InfinityService_ShowColumns_pargs() noexcept;
+  const ShowColumnsRequest* request;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _InfinityService_DescribeDatabase_result__isset {
-  _InfinityService_DescribeDatabase_result__isset() : success(false) {}
+typedef struct _InfinityService_ShowColumns_result__isset {
+  _InfinityService_ShowColumns_result__isset() : success(false) {}
   bool success :1;
-} _InfinityService_DescribeDatabase_result__isset;
+} _InfinityService_ShowColumns_result__isset;
 
-class InfinityService_DescribeDatabase_result {
+class InfinityService_ShowColumns_result {
  public:
 
-  InfinityService_DescribeDatabase_result(const InfinityService_DescribeDatabase_result&);
-  InfinityService_DescribeDatabase_result& operator=(const InfinityService_DescribeDatabase_result&);
-  InfinityService_DescribeDatabase_result() noexcept {
+  InfinityService_ShowColumns_result(const InfinityService_ShowColumns_result&);
+  InfinityService_ShowColumns_result& operator=(const InfinityService_ShowColumns_result&);
+  InfinityService_ShowColumns_result() noexcept {
   }
 
-  virtual ~InfinityService_DescribeDatabase_result() noexcept;
+  virtual ~InfinityService_ShowColumns_result() noexcept;
   SelectResponse success;
 
-  _InfinityService_DescribeDatabase_result__isset __isset;
+  _InfinityService_ShowColumns_result__isset __isset;
 
   void __set_success(const SelectResponse& val);
 
-  bool operator == (const InfinityService_DescribeDatabase_result & rhs) const
+  bool operator == (const InfinityService_ShowColumns_result & rhs) const
   {
     if (!(success == rhs.success))
       return false;
     return true;
   }
-  bool operator != (const InfinityService_DescribeDatabase_result &rhs) const {
+  bool operator != (const InfinityService_ShowColumns_result &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const InfinityService_DescribeDatabase_result & ) const;
+  bool operator < (const InfinityService_ShowColumns_result & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
 };
 
-typedef struct _InfinityService_DescribeDatabase_presult__isset {
-  _InfinityService_DescribeDatabase_presult__isset() : success(false) {}
+typedef struct _InfinityService_ShowColumns_presult__isset {
+  _InfinityService_ShowColumns_presult__isset() : success(false) {}
   bool success :1;
-} _InfinityService_DescribeDatabase_presult__isset;
+} _InfinityService_ShowColumns_presult__isset;
 
-class InfinityService_DescribeDatabase_presult {
+class InfinityService_ShowColumns_presult {
  public:
 
 
-  virtual ~InfinityService_DescribeDatabase_presult() noexcept;
+  virtual ~InfinityService_ShowColumns_presult() noexcept;
   SelectResponse* success;
 
-  _InfinityService_DescribeDatabase_presult__isset __isset;
+  _InfinityService_ShowColumns_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_ShowDatabase_args__isset {
+  _InfinityService_ShowDatabase_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ShowDatabase_args__isset;
+
+class InfinityService_ShowDatabase_args {
+ public:
+
+  InfinityService_ShowDatabase_args(const InfinityService_ShowDatabase_args&);
+  InfinityService_ShowDatabase_args& operator=(const InfinityService_ShowDatabase_args&);
+  InfinityService_ShowDatabase_args() noexcept {
+  }
+
+  virtual ~InfinityService_ShowDatabase_args() noexcept;
+  ShowDatabaseRequest request;
+
+  _InfinityService_ShowDatabase_args__isset __isset;
+
+  void __set_request(const ShowDatabaseRequest& val);
+
+  bool operator == (const InfinityService_ShowDatabase_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowDatabase_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowDatabase_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ShowDatabase_pargs {
+ public:
+
+
+  virtual ~InfinityService_ShowDatabase_pargs() noexcept;
+  const ShowDatabaseRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowDatabase_result__isset {
+  _InfinityService_ShowDatabase_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowDatabase_result__isset;
+
+class InfinityService_ShowDatabase_result {
+ public:
+
+  InfinityService_ShowDatabase_result(const InfinityService_ShowDatabase_result&);
+  InfinityService_ShowDatabase_result& operator=(const InfinityService_ShowDatabase_result&);
+  InfinityService_ShowDatabase_result() noexcept {
+  }
+
+  virtual ~InfinityService_ShowDatabase_result() noexcept;
+  ShowDatabaseResponse success;
+
+  _InfinityService_ShowDatabase_result__isset __isset;
+
+  void __set_success(const ShowDatabaseResponse& val);
+
+  bool operator == (const InfinityService_ShowDatabase_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowDatabase_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowDatabase_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowDatabase_presult__isset {
+  _InfinityService_ShowDatabase_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowDatabase_presult__isset;
+
+class InfinityService_ShowDatabase_presult {
+ public:
+
+
+  virtual ~InfinityService_ShowDatabase_presult() noexcept;
+  ShowDatabaseResponse* success;
+
+  _InfinityService_ShowDatabase_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -2525,6 +2637,110 @@ class InfinityService_DropIndex_presult {
 
 };
 
+typedef struct _InfinityService_ShowIndex_args__isset {
+  _InfinityService_ShowIndex_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_ShowIndex_args__isset;
+
+class InfinityService_ShowIndex_args {
+ public:
+
+  InfinityService_ShowIndex_args(const InfinityService_ShowIndex_args&);
+  InfinityService_ShowIndex_args& operator=(const InfinityService_ShowIndex_args&);
+  InfinityService_ShowIndex_args() noexcept {
+  }
+
+  virtual ~InfinityService_ShowIndex_args() noexcept;
+  ShowIndexRequest request;
+
+  _InfinityService_ShowIndex_args__isset __isset;
+
+  void __set_request(const ShowIndexRequest& val);
+
+  bool operator == (const InfinityService_ShowIndex_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowIndex_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowIndex_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_ShowIndex_pargs {
+ public:
+
+
+  virtual ~InfinityService_ShowIndex_pargs() noexcept;
+  const ShowIndexRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowIndex_result__isset {
+  _InfinityService_ShowIndex_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowIndex_result__isset;
+
+class InfinityService_ShowIndex_result {
+ public:
+
+  InfinityService_ShowIndex_result(const InfinityService_ShowIndex_result&);
+  InfinityService_ShowIndex_result& operator=(const InfinityService_ShowIndex_result&);
+  InfinityService_ShowIndex_result() noexcept {
+  }
+
+  virtual ~InfinityService_ShowIndex_result() noexcept;
+  ShowIndexResponse success;
+
+  _InfinityService_ShowIndex_result__isset __isset;
+
+  void __set_success(const ShowIndexResponse& val);
+
+  bool operator == (const InfinityService_ShowIndex_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_ShowIndex_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_ShowIndex_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_ShowIndex_presult__isset {
+  _InfinityService_ShowIndex_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_ShowIndex_presult__isset;
+
+class InfinityService_ShowIndex_presult {
+ public:
+
+
+  virtual ~InfinityService_ShowIndex_presult() noexcept;
+  ShowIndexResponse* success;
+
+  _InfinityService_ShowIndex_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
  public:
   InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -2598,12 +2814,15 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
   void send_ShowVariable(const ShowVariableRequest& request);
   void recv_ShowVariable(SelectResponse& _return);
-  void DescribeTable(SelectResponse& _return, const DescribeTableRequest& request) override;
-  void send_DescribeTable(const DescribeTableRequest& request);
-  void recv_DescribeTable(SelectResponse& _return);
-  void DescribeDatabase(SelectResponse& _return, const DescribeDatabaseRequest& request) override;
-  void send_DescribeDatabase(const DescribeDatabaseRequest& request);
-  void recv_DescribeDatabase(SelectResponse& _return);
+  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
+  void send_ShowTable(const ShowTableRequest& request);
+  void recv_ShowTable(ShowTableResponse& _return);
+  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override;
+  void send_ShowColumns(const ShowColumnsRequest& request);
+  void recv_ShowColumns(SelectResponse& _return);
+  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
+  void send_ShowDatabase(const ShowDatabaseRequest& request);
+  void recv_ShowDatabase(ShowDatabaseResponse& _return);
   void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) override;
   void send_ShowTables(const ShowTablesRequest& request);
   void recv_ShowTables(SelectResponse& _return);
@@ -2619,6 +2838,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void DropIndex(CommonResponse& _return, const DropIndexRequest& request) override;
   void send_DropIndex(const DropIndexRequest& request);
   void recv_DropIndex(CommonResponse& _return);
+  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override;
+  void send_ShowIndex(const ShowIndexRequest& request);
+  void recv_ShowIndex(ShowIndexResponse& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -2650,13 +2872,15 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowVariable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DescribeTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_DescribeDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_ShowTables(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_GetTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_CreateIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DropIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_ShowIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
     iface_(iface) {
@@ -2676,13 +2900,15 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["ListDatabase"] = &InfinityServiceProcessor::process_ListDatabase;
     processMap_["ListTable"] = &InfinityServiceProcessor::process_ListTable;
     processMap_["ShowVariable"] = &InfinityServiceProcessor::process_ShowVariable;
-    processMap_["DescribeTable"] = &InfinityServiceProcessor::process_DescribeTable;
-    processMap_["DescribeDatabase"] = &InfinityServiceProcessor::process_DescribeDatabase;
+    processMap_["ShowTable"] = &InfinityServiceProcessor::process_ShowTable;
+    processMap_["ShowColumns"] = &InfinityServiceProcessor::process_ShowColumns;
+    processMap_["ShowDatabase"] = &InfinityServiceProcessor::process_ShowDatabase;
     processMap_["ShowTables"] = &InfinityServiceProcessor::process_ShowTables;
     processMap_["GetDatabase"] = &InfinityServiceProcessor::process_GetDatabase;
     processMap_["GetTable"] = &InfinityServiceProcessor::process_GetTable;
     processMap_["CreateIndex"] = &InfinityServiceProcessor::process_CreateIndex;
     processMap_["DropIndex"] = &InfinityServiceProcessor::process_DropIndex;
+    processMap_["ShowIndex"] = &InfinityServiceProcessor::process_ShowIndex;
   }
 
   virtual ~InfinityServiceProcessor() {}
@@ -2871,23 +3097,33 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
-  void DescribeTable(SelectResponse& _return, const DescribeTableRequest& request) override {
+  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DescribeTable(_return, request);
+      ifaces_[i]->ShowTable(_return, request);
     }
-    ifaces_[i]->DescribeTable(_return, request);
+    ifaces_[i]->ShowTable(_return, request);
     return;
   }
 
-  void DescribeDatabase(SelectResponse& _return, const DescribeDatabaseRequest& request) override {
+  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->DescribeDatabase(_return, request);
+      ifaces_[i]->ShowColumns(_return, request);
     }
-    ifaces_[i]->DescribeDatabase(_return, request);
+    ifaces_[i]->ShowColumns(_return, request);
+    return;
+  }
+
+  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ShowDatabase(_return, request);
+    }
+    ifaces_[i]->ShowDatabase(_return, request);
     return;
   }
 
@@ -2938,6 +3174,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->DropIndex(_return, request);
     }
     ifaces_[i]->DropIndex(_return, request);
+    return;
+  }
+
+  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->ShowIndex(_return, request);
+    }
+    ifaces_[i]->ShowIndex(_return, request);
     return;
   }
 
@@ -3021,12 +3267,15 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void ShowVariable(SelectResponse& _return, const ShowVariableRequest& request) override;
   int32_t send_ShowVariable(const ShowVariableRequest& request);
   void recv_ShowVariable(SelectResponse& _return, const int32_t seqid);
-  void DescribeTable(SelectResponse& _return, const DescribeTableRequest& request) override;
-  int32_t send_DescribeTable(const DescribeTableRequest& request);
-  void recv_DescribeTable(SelectResponse& _return, const int32_t seqid);
-  void DescribeDatabase(SelectResponse& _return, const DescribeDatabaseRequest& request) override;
-  int32_t send_DescribeDatabase(const DescribeDatabaseRequest& request);
-  void recv_DescribeDatabase(SelectResponse& _return, const int32_t seqid);
+  void ShowTable(ShowTableResponse& _return, const ShowTableRequest& request) override;
+  int32_t send_ShowTable(const ShowTableRequest& request);
+  void recv_ShowTable(ShowTableResponse& _return, const int32_t seqid);
+  void ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request) override;
+  int32_t send_ShowColumns(const ShowColumnsRequest& request);
+  void recv_ShowColumns(SelectResponse& _return, const int32_t seqid);
+  void ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request) override;
+  int32_t send_ShowDatabase(const ShowDatabaseRequest& request);
+  void recv_ShowDatabase(ShowDatabaseResponse& _return, const int32_t seqid);
   void ShowTables(SelectResponse& _return, const ShowTablesRequest& request) override;
   int32_t send_ShowTables(const ShowTablesRequest& request);
   void recv_ShowTables(SelectResponse& _return, const int32_t seqid);
@@ -3042,6 +3291,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void DropIndex(CommonResponse& _return, const DropIndexRequest& request) override;
   int32_t send_DropIndex(const DropIndexRequest& request);
   void recv_DropIndex(CommonResponse& _return, const int32_t seqid);
+  void ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request) override;
+  int32_t send_ShowIndex(const ShowIndexRequest& request);
+  void recv_ShowIndex(ShowIndexResponse& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

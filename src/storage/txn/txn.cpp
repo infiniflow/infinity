@@ -359,33 +359,27 @@ Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, con
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateCollection"};
 }
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetCollectionByName"};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateView"};
 }
 
 Status Txn::DropViewByName(const String &, const String &, ConflictType, BaseEntry *&) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: DropViewByName"};
 }
 
 Status Txn::GetViewByName(const String &, const String &, BaseEntry *&) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViewByName"};
 }
 
 Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
-    UnrecoverableError("Not Implemented");
-    return {ErrorCode::kNotSupported, "Not Implemented"};
+    return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
 void Txn::Begin() {

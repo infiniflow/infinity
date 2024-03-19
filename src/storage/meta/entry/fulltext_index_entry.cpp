@@ -25,6 +25,7 @@ import index_base;
 import index_full_text;
 import logger;
 import catalog_delta_entry;
+import status;
 
 namespace infinity {
 
@@ -91,7 +92,7 @@ void FulltextIndexEntry::Cleanup() {
 }
 
 SharedPtr<String> FulltextIndexEntry::DetermineIndexDir(const String &, const String &) {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 
