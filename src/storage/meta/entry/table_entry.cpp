@@ -630,7 +630,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     TransactionID txn_id = table_entry_json["txn_id"];
     TxnTimeStamp begin_ts = table_entry_json["begin_ts"];
-    SegmentID unsealed_id = table_entry_json["segment_id"];
+    SegmentID unsealed_id = table_entry_json["unsealed_id"];
 
     UniquePtr<TableEntry> table_entry =
         MakeUnique<TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id);
