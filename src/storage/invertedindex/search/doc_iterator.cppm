@@ -30,9 +30,7 @@ public:
 
     virtual ~DocIterator() = default;
 
-    virtual void AddIterator(DocIterator *iter) = 0;
-
-    virtual RowID Doc() { return doc_id_; }
+    RowID Doc() { return doc_id_; }
 
     // Check if the given doc id is a hit. If it is a hit, the
     // current doc id of this iterator is set to the given id,
@@ -45,6 +43,11 @@ public:
         return doc_id == doc_id_;
     }
 
+    RowID Next() {
+        DoSeek(doc_id_ + 1);
+        return doc_id_;
+    }
+
     virtual void DoSeek(RowID doc_id) = 0;
 
     virtual u32 GetDF() const = 0;
@@ -52,6 +55,6 @@ public:
     virtual bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) { return false; }
 
 protected:
-    RowID doc_id_;
+    RowID doc_id_{INVALID_ROWID};
 };
 } // namespace infinity

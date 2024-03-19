@@ -33,8 +33,6 @@ public:
 
     virtual ~TermDocIterator();
 
-    void AddIterator(DocIterator *iter) override {}
-
     void DoSeek(RowID doc_id) override;
 
     u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }

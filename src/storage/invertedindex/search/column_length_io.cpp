@@ -98,7 +98,7 @@ template void ColumnLengthReader::LoadColumnLength(u32 column_counter,
                                                    TransactionID txn_id,
                                                    TxnTimeStamp begin_ts);
 
-void ColumnLengthReader::UpdateAvgColumnLength(Vector<float> &avg_column_length) {
+void ColumnLengthReader::UpdateAvgColumnLength(Vector<float> &avg_column_length) const {
     avg_column_length.clear();
     avg_column_length.resize(column_counter_);
     u32 total_row_count = 0;

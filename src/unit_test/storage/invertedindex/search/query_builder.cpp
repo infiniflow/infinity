@@ -35,7 +35,6 @@ namespace infinity {
 
 class MockVectorDocIterator : public DocIterator {
 private:
-    void AddIterator(DocIterator *iter) override{};
     u32 GetDF() const override { return 0; }
 
 public:
