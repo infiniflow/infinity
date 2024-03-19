@@ -109,4 +109,29 @@ std::vector<std::string> Client::ListDatabases() const {
 /// Describe database
 DatabaseInfo Client::ShowDatabase(const std::string &db_name) const { return DatabaseInfo{}; }
 
+/// Create table
+ClientStatus Client::CreateTable(const std::string &table_name,
+                                 std::vector<ColumnDefinition> &columns,
+                                 const TableProperties &table_properties,
+                                 CreateOption create_option) {
+    return ClientStatus::OK();
+}
+
+/// Drop table
+ClientStatus Client::DropTable(const std::string &table_name, DropOption drop_option) { return ClientStatus::OK(); }
+
+/// List tables
+[[nodiscard]] std::vector<std::string> Client::ListTables(const std::string &database_name) const {
+    ListTableRequest request;
+    ListTableResponse response;
+
+
+    return std::vector<std::string>();
+}
+
+/// Show table
+TableInfo Client::ShowTable(const std::string &db_name, const std::string &table_name) const {
+    return {};
+}
+
 } // namespace infinity::client

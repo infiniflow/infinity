@@ -158,6 +158,20 @@ QueryResult Infinity::GetDatabase(const String &db_name) {
     return result;
 }
 
+QueryResult Infinity::ShowDatabase(const String &db_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->show_type_ = ShowStmtType::kDatabase;
+    show_statement->schema_name_ = db_name;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
 QueryResult Infinity::Query(const String &query_text) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -253,7 +267,22 @@ QueryResult Infinity::ListTables(const String &db_name) {
     return result;
 }
 
-QueryResult Infinity::DescribeTable(const String &db_name, const String &table_name) {
+QueryResult Infinity::ShowTable(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->show_type_ = ShowStmtType::kTable;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+}
+
+QueryResult Infinity::ShowColumns(const String &db_name, const String &table_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),

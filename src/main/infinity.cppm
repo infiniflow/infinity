@@ -64,6 +64,8 @@ public:
 
     QueryResult GetDatabase(const String &db_name);
 
+    QueryResult ShowDatabase(const String &db_name);
+
     QueryResult Flush();
 
     QueryResult ShowVariable(const String &variable_name);
@@ -82,7 +84,9 @@ public:
 
     QueryResult ListTables(const String &db_name);
 
-    QueryResult DescribeTable(const String &db_name, const String &table_name);
+    QueryResult ShowTable(const String &db_name, const String &table_name);
+
+    QueryResult ShowColumns(const String &db_name, const String &table_name);
 
     QueryResult ShowTables(const String &db_name);
 

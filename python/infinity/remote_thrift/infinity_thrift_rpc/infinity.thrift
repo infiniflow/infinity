@@ -275,31 +275,40 @@ struct ListTableResponse {
 3: list<string> table_names = [],
 }
 
-struct DescribeDatabaseRequest {
+struct ShowDatabaseRequest {
 1: string db_name,
 2: i64 session_id,
 }
 
-struct DescribeDatabaseResponse {
+struct ShowDatabaseResponse {
 1: i64 error_code,
 2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+3: string database_name,
+4: string store_dir,
+5: i64 table_count,
 }
 
-struct DescribeTableRequest {
+struct ShowTableRequest {
 1: string db_name,
 2: string table_name,
 3: i64 session_id,
 }
 
-struct DescribeTableResponse {
+struct ShowTableResponse {
 1: i64 error_code,
 2: string error_msg,
-3: i64 num_segments,
-4: i64 num_rows,
-5: i64 num_blocks,
+3: string database_name,
+4: string table_name,
+5: string store_dir,
+6: i64 column_count,
+7: i64 segment_count,
+8: i64 row_count,
+}
+
+struct ShowColumnsRequest {
+1: string db_name,
+2: string table_name,
+3: i64 session_id,
 }
 
 struct GetTableRequest {
@@ -336,6 +345,20 @@ struct DropIndexRequest {
 3: string index_name,
 4: i64 session_id,
 5: DropOption drop_option,
+}
+
+struct ShowIndexRequest {
+1: string db_name,
+2: string table_name,
+3: string index_name,
+4: i64 session_id,
+}
+
+struct ShowIndexResponse {
+1: string db_name,
+2: string table_name,
+3: string index_name,
+4: string store_dir,
 }
 
 struct GetDatabaseRequest {
@@ -497,8 +520,9 @@ ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
 ListTableResponse ListTable(1:ListTableRequest request),
 
 SelectResponse ShowVariable(1:ShowVariableRequest request),
-SelectResponse DescribeTable(1:DescribeTableRequest request),
-SelectResponse DescribeDatabase(1:DescribeDatabaseRequest request),
+ShowTableResponse ShowTable(1:ShowTableRequest request),
+SelectResponse ShowColumns(1:ShowColumnsRequest request),
+ShowDatabaseResponse ShowDatabase(1:ShowDatabaseRequest request),
 SelectResponse ShowTables(1:ShowTablesRequest request),
 
 CommonResponse GetDatabase(1:GetDatabaseRequest request),
@@ -506,4 +530,6 @@ CommonResponse GetTable(1:GetTableRequest request),
 
 CommonResponse CreateIndex(1:CreateIndexRequest request),
 CommonResponse DropIndex(1:DropIndexRequest request),
+ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
+
 }

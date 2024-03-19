@@ -3037,7 +3037,7 @@ class ListTableResponse(object):
         return not (self == other)
 
 
-class DescribeDatabaseRequest(object):
+class ShowDatabaseRequest(object):
     """
     Attributes:
      - db_name
@@ -3078,7 +3078,7 @@ class DescribeDatabaseRequest(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeDatabaseRequest')
+        oprot.writeStructBegin('ShowDatabaseRequest')
         if self.db_name is not None:
             oprot.writeFieldBegin('db_name', TType.STRING, 1)
             oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
@@ -3105,24 +3105,24 @@ class DescribeDatabaseRequest(object):
         return not (self == other)
 
 
-class DescribeDatabaseResponse(object):
+class ShowDatabaseResponse(object):
     """
     Attributes:
      - error_code
      - error_msg
-     - num_segments
-     - num_rows
-     - num_blocks
+     - database_name
+     - store_dir
+     - table_count
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
+    def __init__(self, error_code=None, error_msg=None, database_name=None, store_dir=None, table_count=None,):
         self.error_code = error_code
         self.error_msg = error_msg
-        self.num_segments = num_segments
-        self.num_rows = num_rows
-        self.num_blocks = num_blocks
+        self.database_name = database_name
+        self.store_dir = store_dir
+        self.table_count = table_count
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -3144,18 +3144,18 @@ class DescribeDatabaseResponse(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
-                if ftype == TType.I64:
-                    self.num_segments = iprot.readI64()
+                if ftype == TType.STRING:
+                    self.database_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
-                if ftype == TType.I64:
-                    self.num_rows = iprot.readI64()
+                if ftype == TType.STRING:
+                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 5:
                 if ftype == TType.I64:
-                    self.num_blocks = iprot.readI64()
+                    self.table_count = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             else:
@@ -3167,7 +3167,7 @@ class DescribeDatabaseResponse(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeDatabaseResponse')
+        oprot.writeStructBegin('ShowDatabaseResponse')
         if self.error_code is not None:
             oprot.writeFieldBegin('error_code', TType.I64, 1)
             oprot.writeI64(self.error_code)
@@ -3176,17 +3176,17 @@ class DescribeDatabaseResponse(object):
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
             oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
             oprot.writeFieldEnd()
-        if self.num_segments is not None:
-            oprot.writeFieldBegin('num_segments', TType.I64, 3)
-            oprot.writeI64(self.num_segments)
+        if self.database_name is not None:
+            oprot.writeFieldBegin('database_name', TType.STRING, 3)
+            oprot.writeString(self.database_name.encode('utf-8') if sys.version_info[0] == 2 else self.database_name)
             oprot.writeFieldEnd()
-        if self.num_rows is not None:
-            oprot.writeFieldBegin('num_rows', TType.I64, 4)
-            oprot.writeI64(self.num_rows)
+        if self.store_dir is not None:
+            oprot.writeFieldBegin('store_dir', TType.STRING, 4)
+            oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
             oprot.writeFieldEnd()
-        if self.num_blocks is not None:
-            oprot.writeFieldBegin('num_blocks', TType.I64, 5)
-            oprot.writeI64(self.num_blocks)
+        if self.table_count is not None:
+            oprot.writeFieldBegin('table_count', TType.I64, 5)
+            oprot.writeI64(self.table_count)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -3206,7 +3206,7 @@ class DescribeDatabaseResponse(object):
         return not (self == other)
 
 
-class DescribeTableRequest(object):
+class ShowTableRequest(object):
     """
     Attributes:
      - db_name
@@ -3254,7 +3254,7 @@ class DescribeTableRequest(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeTableRequest')
+        oprot.writeStructBegin('ShowTableRequest')
         if self.db_name is not None:
             oprot.writeFieldBegin('db_name', TType.STRING, 1)
             oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
@@ -3285,24 +3285,30 @@ class DescribeTableRequest(object):
         return not (self == other)
 
 
-class DescribeTableResponse(object):
+class ShowTableResponse(object):
     """
     Attributes:
      - error_code
      - error_msg
-     - num_segments
-     - num_rows
-     - num_blocks
+     - database_name
+     - table_name
+     - store_dir
+     - column_count
+     - segment_count
+     - row_count
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, num_segments=None, num_rows=None, num_blocks=None,):
+    def __init__(self, error_code=None, error_msg=None, database_name=None, table_name=None, store_dir=None, column_count=None, segment_count=None, row_count=None,):
         self.error_code = error_code
         self.error_msg = error_msg
-        self.num_segments = num_segments
-        self.num_rows = num_rows
-        self.num_blocks = num_blocks
+        self.database_name = database_name
+        self.table_name = table_name
+        self.store_dir = store_dir
+        self.column_count = column_count
+        self.segment_count = segment_count
+        self.row_count = row_count
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -3324,18 +3330,33 @@ class DescribeTableResponse(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 3:
-                if ftype == TType.I64:
-                    self.num_segments = iprot.readI64()
+                if ftype == TType.STRING:
+                    self.database_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
-                if ftype == TType.I64:
-                    self.num_rows = iprot.readI64()
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
             elif fid == 5:
+                if ftype == TType.STRING:
+                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 6:
                 if ftype == TType.I64:
-                    self.num_blocks = iprot.readI64()
+                    self.column_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 7:
+                if ftype == TType.I64:
+                    self.segment_count = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 8:
+                if ftype == TType.I64:
+                    self.row_count = iprot.readI64()
                 else:
                     iprot.skip(ftype)
             else:
@@ -3347,7 +3368,7 @@ class DescribeTableResponse(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeTableResponse')
+        oprot.writeStructBegin('ShowTableResponse')
         if self.error_code is not None:
             oprot.writeFieldBegin('error_code', TType.I64, 1)
             oprot.writeI64(self.error_code)
@@ -3356,17 +3377,108 @@ class DescribeTableResponse(object):
             oprot.writeFieldBegin('error_msg', TType.STRING, 2)
             oprot.writeString(self.error_msg.encode('utf-8') if sys.version_info[0] == 2 else self.error_msg)
             oprot.writeFieldEnd()
-        if self.num_segments is not None:
-            oprot.writeFieldBegin('num_segments', TType.I64, 3)
-            oprot.writeI64(self.num_segments)
+        if self.database_name is not None:
+            oprot.writeFieldBegin('database_name', TType.STRING, 3)
+            oprot.writeString(self.database_name.encode('utf-8') if sys.version_info[0] == 2 else self.database_name)
             oprot.writeFieldEnd()
-        if self.num_rows is not None:
-            oprot.writeFieldBegin('num_rows', TType.I64, 4)
-            oprot.writeI64(self.num_rows)
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 4)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
             oprot.writeFieldEnd()
-        if self.num_blocks is not None:
-            oprot.writeFieldBegin('num_blocks', TType.I64, 5)
-            oprot.writeI64(self.num_blocks)
+        if self.store_dir is not None:
+            oprot.writeFieldBegin('store_dir', TType.STRING, 5)
+            oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
+            oprot.writeFieldEnd()
+        if self.column_count is not None:
+            oprot.writeFieldBegin('column_count', TType.I64, 6)
+            oprot.writeI64(self.column_count)
+            oprot.writeFieldEnd()
+        if self.segment_count is not None:
+            oprot.writeFieldBegin('segment_count', TType.I64, 7)
+            oprot.writeI64(self.segment_count)
+            oprot.writeFieldEnd()
+        if self.row_count is not None:
+            oprot.writeFieldBegin('row_count', TType.I64, 8)
+            oprot.writeI64(self.row_count)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowColumnsRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - session_id
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, session_id=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowColumnsRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 3)
+            oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -3766,6 +3878,186 @@ class DropIndexRequest(object):
         if self.drop_option is not None:
             oprot.writeFieldBegin('drop_option', TType.STRUCT, 5)
             self.drop_option.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowIndexRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - index_name
+     - session_id
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, index_name=None, session_id=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.index_name = index_name
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.index_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowIndexRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.index_name is not None:
+            oprot.writeFieldBegin('index_name', TType.STRING, 3)
+            oprot.writeString(self.index_name.encode('utf-8') if sys.version_info[0] == 2 else self.index_name)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 4)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ShowIndexResponse(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - index_name
+     - store_dir
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, index_name=None, store_dir=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.index_name = index_name
+        self.store_dir = store_dir
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.index_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.store_dir = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowIndexResponse')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.index_name is not None:
+            oprot.writeFieldBegin('index_name', TType.STRING, 3)
+            oprot.writeString(self.index_name.encode('utf-8') if sys.version_info[0] == 2 else self.index_name)
+            oprot.writeFieldEnd()
+        if self.store_dir is not None:
+            oprot.writeFieldBegin('store_dir', TType.STRING, 4)
+            oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -5826,36 +6118,46 @@ ListTableResponse.thrift_spec = (
     (3, TType.LIST, 'table_names', (TType.STRING, 'UTF8', False), [
     ], ),  # 3
 )
-all_structs.append(DescribeDatabaseRequest)
-DescribeDatabaseRequest.thrift_spec = (
+all_structs.append(ShowDatabaseRequest)
+ShowDatabaseRequest.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.I64, 'session_id', None, None, ),  # 2
 )
-all_structs.append(DescribeDatabaseResponse)
-DescribeDatabaseResponse.thrift_spec = (
+all_structs.append(ShowDatabaseResponse)
+ShowDatabaseResponse.thrift_spec = (
     None,  # 0
     (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
-    (3, TType.I64, 'num_segments', None, None, ),  # 3
-    (4, TType.I64, 'num_rows', None, None, ),  # 4
-    (5, TType.I64, 'num_blocks', None, None, ),  # 5
+    (3, TType.STRING, 'database_name', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'store_dir', 'UTF8', None, ),  # 4
+    (5, TType.I64, 'table_count', None, None, ),  # 5
 )
-all_structs.append(DescribeTableRequest)
-DescribeTableRequest.thrift_spec = (
+all_structs.append(ShowTableRequest)
+ShowTableRequest.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
     (3, TType.I64, 'session_id', None, None, ),  # 3
 )
-all_structs.append(DescribeTableResponse)
-DescribeTableResponse.thrift_spec = (
+all_structs.append(ShowTableResponse)
+ShowTableResponse.thrift_spec = (
     None,  # 0
     (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
-    (3, TType.I64, 'num_segments', None, None, ),  # 3
-    (4, TType.I64, 'num_rows', None, None, ),  # 4
-    (5, TType.I64, 'num_blocks', None, None, ),  # 5
+    (3, TType.STRING, 'database_name', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'table_name', 'UTF8', None, ),  # 4
+    (5, TType.STRING, 'store_dir', 'UTF8', None, ),  # 5
+    (6, TType.I64, 'column_count', None, None, ),  # 6
+    (7, TType.I64, 'segment_count', None, None, ),  # 7
+    (8, TType.I64, 'row_count', None, None, ),  # 8
+)
+all_structs.append(ShowColumnsRequest)
+ShowColumnsRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.I64, 'session_id', None, None, ),  # 3
 )
 all_structs.append(GetTableRequest)
 GetTableRequest.thrift_spec = (
@@ -5892,6 +6194,22 @@ DropIndexRequest.thrift_spec = (
     (3, TType.STRING, 'index_name', 'UTF8', None, ),  # 3
     (4, TType.I64, 'session_id', None, None, ),  # 4
     (5, TType.STRUCT, 'drop_option', [DropOption, None], None, ),  # 5
+)
+all_structs.append(ShowIndexRequest)
+ShowIndexRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'index_name', 'UTF8', None, ),  # 3
+    (4, TType.I64, 'session_id', None, None, ),  # 4
+)
+all_structs.append(ShowIndexResponse)
+ShowIndexResponse.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'index_name', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'store_dir', 'UTF8', None, ),  # 4
 )
 all_structs.append(GetDatabaseRequest)
 GetDatabaseRequest.thrift_spec = (

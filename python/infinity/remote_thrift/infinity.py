@@ -61,9 +61,9 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def describe_database(self, db_name: str):
+    def show_database(self, db_name: str):
         check_valid_name(db_name, "DB")
-        res = self._client.describe_database(db_name=db_name)
+        res = self._client.show_database(db_name=db_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:

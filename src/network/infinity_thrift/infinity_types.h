@@ -273,13 +273,15 @@ class ListTableRequest;
 
 class ListTableResponse;
 
-class DescribeDatabaseRequest;
+class ShowDatabaseRequest;
 
-class DescribeDatabaseResponse;
+class ShowDatabaseResponse;
 
-class DescribeTableRequest;
+class ShowTableRequest;
 
-class DescribeTableResponse;
+class ShowTableResponse;
+
+class ShowColumnsRequest;
 
 class GetTableRequest;
 
@@ -288,6 +290,10 @@ class IndexInfo;
 class CreateIndexRequest;
 
 class DropIndexRequest;
+
+class ShowIndexRequest;
+
+class ShowIndexResponse;
 
 class GetDatabaseRequest;
 
@@ -2188,33 +2194,33 @@ void swap(ListTableResponse &a, ListTableResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ListTableResponse& obj);
 
-typedef struct _DescribeDatabaseRequest__isset {
-  _DescribeDatabaseRequest__isset() : db_name(false), session_id(false) {}
+typedef struct _ShowDatabaseRequest__isset {
+  _ShowDatabaseRequest__isset() : db_name(false), session_id(false) {}
   bool db_name :1;
   bool session_id :1;
-} _DescribeDatabaseRequest__isset;
+} _ShowDatabaseRequest__isset;
 
-class DescribeDatabaseRequest : public virtual ::apache::thrift::TBase {
+class ShowDatabaseRequest : public virtual ::apache::thrift::TBase {
  public:
 
-  DescribeDatabaseRequest(const DescribeDatabaseRequest&);
-  DescribeDatabaseRequest& operator=(const DescribeDatabaseRequest&);
-  DescribeDatabaseRequest() noexcept
-                          : db_name(),
-                            session_id(0) {
+  ShowDatabaseRequest(const ShowDatabaseRequest&);
+  ShowDatabaseRequest& operator=(const ShowDatabaseRequest&);
+  ShowDatabaseRequest() noexcept
+                      : db_name(),
+                        session_id(0) {
   }
 
-  virtual ~DescribeDatabaseRequest() noexcept;
+  virtual ~ShowDatabaseRequest() noexcept;
   std::string db_name;
   int64_t session_id;
 
-  _DescribeDatabaseRequest__isset __isset;
+  _ShowDatabaseRequest__isset __isset;
 
   void __set_db_name(const std::string& val);
 
   void __set_session_id(const int64_t val);
 
-  bool operator == (const DescribeDatabaseRequest & rhs) const
+  bool operator == (const ShowDatabaseRequest & rhs) const
   {
     if (!(db_name == rhs.db_name))
       return false;
@@ -2222,11 +2228,11 @@ class DescribeDatabaseRequest : public virtual ::apache::thrift::TBase {
       return false;
     return true;
   }
-  bool operator != (const DescribeDatabaseRequest &rhs) const {
+  bool operator != (const ShowDatabaseRequest &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const DescribeDatabaseRequest & ) const;
+  bool operator < (const ShowDatabaseRequest & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
@@ -2234,70 +2240,70 @@ class DescribeDatabaseRequest : public virtual ::apache::thrift::TBase {
   virtual void printTo(std::ostream& out) const;
 };
 
-void swap(DescribeDatabaseRequest &a, DescribeDatabaseRequest &b);
+void swap(ShowDatabaseRequest &a, ShowDatabaseRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DescribeDatabaseRequest& obj);
+std::ostream& operator<<(std::ostream& out, const ShowDatabaseRequest& obj);
 
-typedef struct _DescribeDatabaseResponse__isset {
-  _DescribeDatabaseResponse__isset() : error_code(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
+typedef struct _ShowDatabaseResponse__isset {
+  _ShowDatabaseResponse__isset() : error_code(false), error_msg(false), database_name(false), store_dir(false), table_count(false) {}
   bool error_code :1;
   bool error_msg :1;
-  bool num_segments :1;
-  bool num_rows :1;
-  bool num_blocks :1;
-} _DescribeDatabaseResponse__isset;
+  bool database_name :1;
+  bool store_dir :1;
+  bool table_count :1;
+} _ShowDatabaseResponse__isset;
 
-class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
+class ShowDatabaseResponse : public virtual ::apache::thrift::TBase {
  public:
 
-  DescribeDatabaseResponse(const DescribeDatabaseResponse&);
-  DescribeDatabaseResponse& operator=(const DescribeDatabaseResponse&);
-  DescribeDatabaseResponse() noexcept
-                           : error_code(0),
-                             error_msg(),
-                             num_segments(0),
-                             num_rows(0),
-                             num_blocks(0) {
+  ShowDatabaseResponse(const ShowDatabaseResponse&);
+  ShowDatabaseResponse& operator=(const ShowDatabaseResponse&);
+  ShowDatabaseResponse() noexcept
+                       : error_code(0),
+                         error_msg(),
+                         database_name(),
+                         store_dir(),
+                         table_count(0) {
   }
 
-  virtual ~DescribeDatabaseResponse() noexcept;
+  virtual ~ShowDatabaseResponse() noexcept;
   int64_t error_code;
   std::string error_msg;
-  int64_t num_segments;
-  int64_t num_rows;
-  int64_t num_blocks;
+  std::string database_name;
+  std::string store_dir;
+  int64_t table_count;
 
-  _DescribeDatabaseResponse__isset __isset;
+  _ShowDatabaseResponse__isset __isset;
 
   void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
-  void __set_num_segments(const int64_t val);
+  void __set_database_name(const std::string& val);
 
-  void __set_num_rows(const int64_t val);
+  void __set_store_dir(const std::string& val);
 
-  void __set_num_blocks(const int64_t val);
+  void __set_table_count(const int64_t val);
 
-  bool operator == (const DescribeDatabaseResponse & rhs) const
+  bool operator == (const ShowDatabaseResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
-    if (!(num_segments == rhs.num_segments))
+    if (!(database_name == rhs.database_name))
       return false;
-    if (!(num_rows == rhs.num_rows))
+    if (!(store_dir == rhs.store_dir))
       return false;
-    if (!(num_blocks == rhs.num_blocks))
+    if (!(table_count == rhs.table_count))
       return false;
     return true;
   }
-  bool operator != (const DescribeDatabaseResponse &rhs) const {
+  bool operator != (const ShowDatabaseResponse &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const DescribeDatabaseResponse & ) const;
+  bool operator < (const ShowDatabaseResponse & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
@@ -2305,34 +2311,34 @@ class DescribeDatabaseResponse : public virtual ::apache::thrift::TBase {
   virtual void printTo(std::ostream& out) const;
 };
 
-void swap(DescribeDatabaseResponse &a, DescribeDatabaseResponse &b);
+void swap(ShowDatabaseResponse &a, ShowDatabaseResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const DescribeDatabaseResponse& obj);
+std::ostream& operator<<(std::ostream& out, const ShowDatabaseResponse& obj);
 
-typedef struct _DescribeTableRequest__isset {
-  _DescribeTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+typedef struct _ShowTableRequest__isset {
+  _ShowTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
   bool session_id :1;
-} _DescribeTableRequest__isset;
+} _ShowTableRequest__isset;
 
-class DescribeTableRequest : public virtual ::apache::thrift::TBase {
+class ShowTableRequest : public virtual ::apache::thrift::TBase {
  public:
 
-  DescribeTableRequest(const DescribeTableRequest&);
-  DescribeTableRequest& operator=(const DescribeTableRequest&);
-  DescribeTableRequest() noexcept
-                       : db_name(),
-                         table_name(),
-                         session_id(0) {
+  ShowTableRequest(const ShowTableRequest&);
+  ShowTableRequest& operator=(const ShowTableRequest&);
+  ShowTableRequest() noexcept
+                   : db_name(),
+                     table_name(),
+                     session_id(0) {
   }
 
-  virtual ~DescribeTableRequest() noexcept;
+  virtual ~ShowTableRequest() noexcept;
   std::string db_name;
   std::string table_name;
   int64_t session_id;
 
-  _DescribeTableRequest__isset __isset;
+  _ShowTableRequest__isset __isset;
 
   void __set_db_name(const std::string& val);
 
@@ -2340,7 +2346,7 @@ class DescribeTableRequest : public virtual ::apache::thrift::TBase {
 
   void __set_session_id(const int64_t val);
 
-  bool operator == (const DescribeTableRequest & rhs) const
+  bool operator == (const ShowTableRequest & rhs) const
   {
     if (!(db_name == rhs.db_name))
       return false;
@@ -2350,11 +2356,11 @@ class DescribeTableRequest : public virtual ::apache::thrift::TBase {
       return false;
     return true;
   }
-  bool operator != (const DescribeTableRequest &rhs) const {
+  bool operator != (const ShowTableRequest &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const DescribeTableRequest & ) const;
+  bool operator < (const ShowTableRequest & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
@@ -2362,70 +2368,91 @@ class DescribeTableRequest : public virtual ::apache::thrift::TBase {
   virtual void printTo(std::ostream& out) const;
 };
 
-void swap(DescribeTableRequest &a, DescribeTableRequest &b);
+void swap(ShowTableRequest &a, ShowTableRequest &b);
 
-std::ostream& operator<<(std::ostream& out, const DescribeTableRequest& obj);
+std::ostream& operator<<(std::ostream& out, const ShowTableRequest& obj);
 
-typedef struct _DescribeTableResponse__isset {
-  _DescribeTableResponse__isset() : error_code(false), error_msg(false), num_segments(false), num_rows(false), num_blocks(false) {}
+typedef struct _ShowTableResponse__isset {
+  _ShowTableResponse__isset() : error_code(false), error_msg(false), database_name(false), table_name(false), store_dir(false), column_count(false), segment_count(false), row_count(false) {}
   bool error_code :1;
   bool error_msg :1;
-  bool num_segments :1;
-  bool num_rows :1;
-  bool num_blocks :1;
-} _DescribeTableResponse__isset;
+  bool database_name :1;
+  bool table_name :1;
+  bool store_dir :1;
+  bool column_count :1;
+  bool segment_count :1;
+  bool row_count :1;
+} _ShowTableResponse__isset;
 
-class DescribeTableResponse : public virtual ::apache::thrift::TBase {
+class ShowTableResponse : public virtual ::apache::thrift::TBase {
  public:
 
-  DescribeTableResponse(const DescribeTableResponse&);
-  DescribeTableResponse& operator=(const DescribeTableResponse&);
-  DescribeTableResponse() noexcept
-                        : error_code(0),
-                          error_msg(),
-                          num_segments(0),
-                          num_rows(0),
-                          num_blocks(0) {
+  ShowTableResponse(const ShowTableResponse&);
+  ShowTableResponse& operator=(const ShowTableResponse&);
+  ShowTableResponse() noexcept
+                    : error_code(0),
+                      error_msg(),
+                      database_name(),
+                      table_name(),
+                      store_dir(),
+                      column_count(0),
+                      segment_count(0),
+                      row_count(0) {
   }
 
-  virtual ~DescribeTableResponse() noexcept;
+  virtual ~ShowTableResponse() noexcept;
   int64_t error_code;
   std::string error_msg;
-  int64_t num_segments;
-  int64_t num_rows;
-  int64_t num_blocks;
+  std::string database_name;
+  std::string table_name;
+  std::string store_dir;
+  int64_t column_count;
+  int64_t segment_count;
+  int64_t row_count;
 
-  _DescribeTableResponse__isset __isset;
+  _ShowTableResponse__isset __isset;
 
   void __set_error_code(const int64_t val);
 
   void __set_error_msg(const std::string& val);
 
-  void __set_num_segments(const int64_t val);
+  void __set_database_name(const std::string& val);
 
-  void __set_num_rows(const int64_t val);
+  void __set_table_name(const std::string& val);
 
-  void __set_num_blocks(const int64_t val);
+  void __set_store_dir(const std::string& val);
 
-  bool operator == (const DescribeTableResponse & rhs) const
+  void __set_column_count(const int64_t val);
+
+  void __set_segment_count(const int64_t val);
+
+  void __set_row_count(const int64_t val);
+
+  bool operator == (const ShowTableResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
       return false;
     if (!(error_msg == rhs.error_msg))
       return false;
-    if (!(num_segments == rhs.num_segments))
+    if (!(database_name == rhs.database_name))
       return false;
-    if (!(num_rows == rhs.num_rows))
+    if (!(table_name == rhs.table_name))
       return false;
-    if (!(num_blocks == rhs.num_blocks))
+    if (!(store_dir == rhs.store_dir))
+      return false;
+    if (!(column_count == rhs.column_count))
+      return false;
+    if (!(segment_count == rhs.segment_count))
+      return false;
+    if (!(row_count == rhs.row_count))
       return false;
     return true;
   }
-  bool operator != (const DescribeTableResponse &rhs) const {
+  bool operator != (const ShowTableResponse &rhs) const {
     return !(*this == rhs);
   }
 
-  bool operator < (const DescribeTableResponse & ) const;
+  bool operator < (const ShowTableResponse & ) const;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
@@ -2433,9 +2460,66 @@ class DescribeTableResponse : public virtual ::apache::thrift::TBase {
   virtual void printTo(std::ostream& out) const;
 };
 
-void swap(DescribeTableResponse &a, DescribeTableResponse &b);
+void swap(ShowTableResponse &a, ShowTableResponse &b);
 
-std::ostream& operator<<(std::ostream& out, const DescribeTableResponse& obj);
+std::ostream& operator<<(std::ostream& out, const ShowTableResponse& obj);
+
+typedef struct _ShowColumnsRequest__isset {
+  _ShowColumnsRequest__isset() : db_name(false), table_name(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool session_id :1;
+} _ShowColumnsRequest__isset;
+
+class ShowColumnsRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowColumnsRequest(const ShowColumnsRequest&);
+  ShowColumnsRequest& operator=(const ShowColumnsRequest&);
+  ShowColumnsRequest() noexcept
+                     : db_name(),
+                       table_name(),
+                       session_id(0) {
+  }
+
+  virtual ~ShowColumnsRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  int64_t session_id;
+
+  _ShowColumnsRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ShowColumnsRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowColumnsRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowColumnsRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowColumnsRequest &a, ShowColumnsRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowColumnsRequest& obj);
 
 typedef struct _GetTableRequest__isset {
   _GetTableRequest__isset() : db_name(false), table_name(false), session_id(false) {}
@@ -2701,6 +2785,134 @@ class DropIndexRequest : public virtual ::apache::thrift::TBase {
 void swap(DropIndexRequest &a, DropIndexRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const DropIndexRequest& obj);
+
+typedef struct _ShowIndexRequest__isset {
+  _ShowIndexRequest__isset() : db_name(false), table_name(false), index_name(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool index_name :1;
+  bool session_id :1;
+} _ShowIndexRequest__isset;
+
+class ShowIndexRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowIndexRequest(const ShowIndexRequest&);
+  ShowIndexRequest& operator=(const ShowIndexRequest&);
+  ShowIndexRequest() noexcept
+                   : db_name(),
+                     table_name(),
+                     index_name(),
+                     session_id(0) {
+  }
+
+  virtual ~ShowIndexRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string index_name;
+  int64_t session_id;
+
+  _ShowIndexRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_index_name(const std::string& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ShowIndexRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(index_name == rhs.index_name))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowIndexRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowIndexRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowIndexRequest &a, ShowIndexRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowIndexRequest& obj);
+
+typedef struct _ShowIndexResponse__isset {
+  _ShowIndexResponse__isset() : db_name(false), table_name(false), index_name(false), store_dir(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool index_name :1;
+  bool store_dir :1;
+} _ShowIndexResponse__isset;
+
+class ShowIndexResponse : public virtual ::apache::thrift::TBase {
+ public:
+
+  ShowIndexResponse(const ShowIndexResponse&);
+  ShowIndexResponse& operator=(const ShowIndexResponse&);
+  ShowIndexResponse() noexcept
+                    : db_name(),
+                      table_name(),
+                      index_name(),
+                      store_dir() {
+  }
+
+  virtual ~ShowIndexResponse() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string index_name;
+  std::string store_dir;
+
+  _ShowIndexResponse__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_index_name(const std::string& val);
+
+  void __set_store_dir(const std::string& val);
+
+  bool operator == (const ShowIndexResponse & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(index_name == rhs.index_name))
+      return false;
+    if (!(store_dir == rhs.store_dir))
+      return false;
+    return true;
+  }
+  bool operator != (const ShowIndexResponse &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ShowIndexResponse & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ShowIndexResponse &a, ShowIndexResponse &b);
+
+std::ostream& operator<<(std::ostream& out, const ShowIndexResponse& obj);
 
 typedef struct _GetDatabaseRequest__isset {
   _GetDatabaseRequest__isset() : db_name(false), session_id(false) {}

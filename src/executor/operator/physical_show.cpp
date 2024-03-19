@@ -955,7 +955,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 }
 
 /**
- * @brief Execute Show table details statement (i.e. describe t1)
+ * @brief Execute Show table details statement (i.e. show t1)
  * @param query_context
  * @param input_state
  * @param output_state
@@ -1171,7 +1171,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
-// Execute describe system table
+// Execute show system table
 void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 

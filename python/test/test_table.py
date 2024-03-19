@@ -82,7 +82,7 @@ class TestTable:
             tb = db_obj.create_table(
                 "", {"c1": "int, primary key", "c2": "float"}, ConflictType.Error)
 
-        # FIXME: res = db_obj.describe_table("my_table")
+        # FIXME: res = db_obj.show_table("my_table")
 
         res = db_obj.list_tables()
         assert res.error_code == ErrorCode.OK
@@ -227,12 +227,12 @@ class TestTable:
 
     def test_table_with_different_column_name(self):
         """
-        target: test create/drop/describe/get valid table name with different column names
+        target: test create/drop/show/get valid table name with different column names
         methods:
         1. create table
         2. get table
         3. list table
-        4. describe table
+        4. show table
         expect: all operations successfully
 
         """
@@ -264,7 +264,7 @@ class TestTable:
                 res = db_obj.drop_table("my_table")
             except Exception as e:
                 print(e)
-        # FIXME: res = db_obj.describe_table("my_table")
+        # FIXME: res = db_obj.show_table("my_table")
 
         # disconnect
         # res = infinity_obj.disconnect()
@@ -275,10 +275,10 @@ class TestTable:
         except Exception as e:
             print(e)
 
-    # create/drop/describe/get valid table name with different column types
+    # create/drop/show/get valid table name with different column types
     def test_table_with_different_column_types(self):
         """
-        target: test create/drop/describe/get valid table name with different column types
+        target: test create/drop/show/get valid table name with different column types
         methods:
         1. create table
             - 'my_table'            √
@@ -311,7 +311,7 @@ class TestTable:
                 - c1 ("int")
         2. get table
         3. list table
-        4. describe table
+        4. show table
         expect: all operations successfully
 
         """
@@ -333,7 +333,7 @@ class TestTable:
             except Exception as e:
                 print(e)
 
-        # FIXME: res = db_obj.describe_table("my_table")
+        # FIXME: res = db_obj.show_table("my_table")
 
         # list table
         res = db_obj.list_tables()
@@ -353,10 +353,10 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # create/drop/describe/get table with 10000 columns with various column types.
+    # create/drop/show/get table with 10000 columns with various column types.
     def test_table_with_various_column_types(self):
         """
-        target: create/drop/describe/get table with 10000 columns with various column types.
+        target: create/drop/show/get table with 10000 columns with various column types.
         methods: create table with various column types
         expect: all operations successfully
         """
@@ -383,7 +383,7 @@ class TestTable:
         except Exception as e:
             print(e)
 
-        # FIXME: res = db_obj.describe_table("my_table")
+        # FIXME: res = db_obj.show_table("my_table")
 
         # list table
         res = db_obj.list_tables()
@@ -431,7 +431,7 @@ class TestTable:
         db_obj.drop_table("test_table_with_different_invalid_options", ConflictType.Ignore)
         db_obj.create_table("test_table_with_different_invalid_options", {"c1": "int"}, invalid_option_array)
 
-    # create/drop/describe/get 1000 tables with 10000 columns with various column types.
+    # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
     @pytest.mark.skip(reason="Cost too much times,and may cause the serve to terminate")
     def test_various_tables_with_various_columns(self):
@@ -467,13 +467,13 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # after disconnection, create / drop / describe / list / get table
+    # after disconnection, create / drop / show / list / get table
     def test_after_disconnect_use_table(self):
         """
-        target: after disconnection, create / drop / describe / list / get table
+        target: after disconnection, create / drop / show / list / get table
         methods:
         1. disconnect database
-        2. create / drop / describe / list / get table
+        2. create / drop / show / list / get table
         expect: all operations successfully
         """
         # connect
@@ -497,7 +497,7 @@ class TestTable:
         except Exception as e:
             print(e)
 
-        # FIXME: res = db_obj.describe_table("my_table")
+        # FIXME: res = db_obj.show_table("my_table")
 
         # list table
         try:
@@ -572,12 +572,12 @@ class TestTable:
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # describe created table, describe not-created table, describe dropped table
+    # show created table, show not-created table, show dropped table
     @pytest.mark.skip(reason="Feature request")
     def test_describe_various_table(self):
         """
-        target: describe created table, describe not-created table, describe dropped table
-        methods: describe table
+        target: show created table, show not-created table, show dropped table
+        methods: show table
         expect: all operations successfully
         """
         pass
@@ -586,7 +586,7 @@ class TestTable:
     def test_create_1K_table(self):
         """
         target: create/drop/list/get 1K table
-        methods: describe table
+        methods: show table
         expect: all operations successfully
         """
         # connect
@@ -631,7 +631,7 @@ class TestTable:
     def test_create_1M_table(self):
         """
         target: create/drop/list/get 1K table
-        methods: describe table
+        methods: show table
         expect: all operations successfully
         """
         # connect

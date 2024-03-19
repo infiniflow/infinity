@@ -170,6 +170,15 @@ struct DatabaseInfo {
     std::string storage_path_;
 };
 
+struct TableInfo {
+    std::string database_name_;
+    std::string name_;
+    std::string storage_path_;
+    int64_t column_count_;
+    int64_t segment_count_;
+    int64_t row_count_;
+};
+
 class Client {
 public:
     /// TODO: comment
@@ -192,15 +201,26 @@ public:
     ClientStatus DropDatabase(const std::string &db_name, DropOption drop_option = DropOption::kErrorIfNotExists);
 
     /// TODO: comment
-    std::vector<std::string> ListDatabases() const;
+    [[nodiscard]] std::vector<std::string> ListDatabases() const;
 
     /// Describe database
-    DatabaseInfo ShowDatabase(const std::string &db_name) const;
+    [[nodiscard]] DatabaseInfo ShowDatabase(const std::string &db_name) const;
 
     /// Create table
+    ClientStatus CreateTable(const std::string &table_name,
+                             std::vector<ColumnDefinition> &columns,
+                             const TableProperties &table_properties,
+                             CreateOption create_option = CreateOption::kErrorIfExists);
+
     /// Drop table
+    ClientStatus DropTable(const std::string &table_name, DropOption drop_option = DropOption::kErrorIfNotExists);
+
     /// List tables
+    [[nodiscard]] std::vector<std::string> ListTables(const std::string &database_name) const;
+
     /// Show table
+    TableInfo ShowTable(const std::string &db_name, const std::string &table_name) const;
+
     /// Create Index
     /// Drop Index
     /// Show index

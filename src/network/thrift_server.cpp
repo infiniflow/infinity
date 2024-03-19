@@ -200,8 +200,8 @@ public:
 
         SizeT properties_count = request.create_option.properties.size();
         create_table_opts.properties_.reserve(properties_count);
-        for(SizeT idx = 0; idx < properties_count; ++ idx) {
-            InitParameter* property = new InitParameter();
+        for (SizeT idx = 0; idx < properties_count; ++idx) {
+            InitParameter *property = new InitParameter();
             property->param_name_ = request.create_option.properties[idx].key;
             property->param_value_ = request.create_option.properties[idx].value;
             create_table_opts.properties_.emplace_back(property);
@@ -855,19 +855,100 @@ public:
         }
     }
 
-    void DescribeDatabase(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeDatabaseRequest &request) final {
-        // Your implementation goes here
-        printf("DescribeDatabase\n");
+    void ShowDatabase(infinity_thrift_rpc::ShowDatabaseResponse &response, const infinity_thrift_rpc::ShowDatabaseRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+        const QueryResult result = infinity->ShowDatabase(request.db_name);
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            if (row_count != 3) {
+                UnrecoverableError("ShowDatabase: query result is invalid.");
+            }
+
+            {
+                Value value = data_block->GetValue(1, 0);
+                response.database_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 2);
+                response.store_dir = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 3);
+                response.table_count = value.value_.big_int;
+            }
+
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
     }
 
-    void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) final {
+    void ShowTable(infinity_thrift_rpc::ShowTableResponse &response, const infinity_thrift_rpc::ShowTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
             return;
         }
 
-        const QueryResult result = infinity->DescribeTable(request.db_name, request.table_name);
+        const QueryResult result = infinity->ShowTable(request.db_name, request.table_name);
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            if (row_count != 6) {
+                UnrecoverableError("ShowTable: query result is invalid.");
+            }
+
+            {
+                Value value = data_block->GetValue(1, 0);
+                response.database_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 1);
+                response.table_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 2);
+                response.store_dir = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 3);
+                response.column_count = value.value_.big_int;
+            }
+
+            {
+                Value value = data_block->GetValue(1, 4);
+                response.segment_count = value.value_.big_int;
+            }
+
+            {
+                Value value = data_block->GetValue(1, 5);
+                response.row_count = value.value_.big_int;
+            }
+
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
+    }
+
+    void ShowColumns(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowColumnsRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        const QueryResult result = infinity->ShowColumns(request.db_name, request.table_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
@@ -979,11 +1060,8 @@ public:
             index_info_list_to_use->emplace_back(index_info_to_use);
         }
 
-        QueryResult result = infinity->CreateIndex(request.db_name,
-                                                   request.table_name,
-                                                   request.index_name,
-                                                   index_info_list_to_use,
-                                                   create_index_opts);
+        QueryResult result =
+            infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_list_to_use, create_index_opts);
         ProcessQueryResult(response, result);
     }
 
@@ -1013,6 +1091,8 @@ public:
         QueryResult result = infinity->DropIndex(request.db_name, request.table_name, request.index_name, drop_index_opts);
         ProcessQueryResult(response, result);
     }
+
+    void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &_return, const infinity_thrift_rpc::ShowIndexRequest &request) final {}
 
 private:
     std::mutex infinity_session_map_mutex_{};
@@ -1660,6 +1740,23 @@ private:
         }
     }
 
+    static void
+    ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
     static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(status.code()));
         if (!status.ok()) {
@@ -1714,6 +1811,24 @@ private:
 
     static void
     ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(result.ErrorCode()));
         if (!result.IsOk()) {
             response.__set_error_msg(result.ErrorStr());

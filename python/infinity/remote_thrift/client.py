@@ -50,9 +50,9 @@ class ThriftInfinityClient:
     def list_databases(self):
         return self.client.ListDatabase(ListDatabaseRequest(session_id=self.session_id))
 
-    def describe_database(self, db_name: str):
-        return self.client.DescribeDatabase(DescribeDatabaseRequest(session_id=self.session_id,
-                                                                    db_name=db_name))
+    def show_database(self, db_name: str):
+        return self.client.ShowDatabase(ShowDatabaseRequest(session_id=self.session_id,
+                                                            db_name=db_name))
 
     def get_database(self, db_name: str):
         return self.client.GetDatabase(GetDatabaseRequest(session_id=self.session_id,
@@ -77,10 +77,15 @@ class ThriftInfinityClient:
         return self.client.ListTable(ListTableRequest(session_id=self.session_id,
                                                       db_name=db_name))
 
-    def describe_table(self, db_name: str, table_name: str):
-        return self.client.DescribeTable(DescribeTableRequest(session_id=self.session_id,
-                                                              db_name=db_name,
-                                                              table_name=table_name))
+    def show_table(self, db_name: str, table_name: str):
+        return self.client.ShowTable(ShowTableRequest(session_id=self.session_id,
+                                                      db_name=db_name,
+                                                      table_name=table_name))
+
+    def show_columns(self, db_name: str, table_name: str):
+        return self.client.ShowColumns(ShowColumnsRequest(session_id=self.session_id,
+                                                          db_name=db_name,
+                                                          table_name=table_name))
 
     def get_table(self, db_name: str, table_name: str):
         return self.client.GetTable(GetTableRequest(session_id=self.session_id,

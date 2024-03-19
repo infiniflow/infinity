@@ -170,9 +170,18 @@ class RemoteDatabase(Database, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def describe_table(self, table_name):
+    def show_table(self, table_name):
         check_valid_name(table_name, "Table")
-        res = self._conn.describe_table(
+        res = self._conn.show_table(
+            db_name=self._db_name, table_name=table_name)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+
+    def show_columns(self, table_name):
+        check_valid_name(table_name, "Table")
+        res = self._conn.show_columns(
             db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
