@@ -97,6 +97,7 @@ enum LogicalType : int8_t {
 };
 
 extern const char *LogicalType2Str(LogicalType logical_type);
+extern LogicalType Str2LogicalType(std::string string);
 
 extern int64_t LogicalTypeWidth(LogicalType logical_type);
 
