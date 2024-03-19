@@ -30,6 +30,7 @@ import ring;
 import skiplist;
 
 namespace infinity {
+
 export class MemoryIndexer {
 public:
     struct KeyComp {
@@ -51,7 +52,9 @@ public:
     ~MemoryIndexer();
 
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 *column_invert_length_ptr, bool offline = false);
+    // MemoryIndex will load itself it's spilled.
+    void
+    Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, ColumnLengthPopulater populater = nullptr, bool offline = false);
 
     // Commit is non-blocking. There shall be a background thread which call this method regularly (for example, every 2 seconds).
     // Other threads can also call this method.
@@ -62,12 +65,17 @@ public:
 
     // Dump is blocking and shall be called only once after inserting all documents.
     // WARN: Don't reuse MemoryIndexer after calling Dump!
-    void Dump(bool offline = false);
+    void Dump(bool offline = false, bool spill = false);
+
+    // A MemoryIndexer is allow to load iff it's empty or spilled.
+    void Load();
 
     SizeT GetInflightTasks() {
         std::unique_lock<std::mutex> lock(mutex_);
         return inflight_tasks_;
     }
+
+    String GetBaseName() const { return base_name_; }
 
     RowID GetBaseRowId() const { return base_row_id_; }
 
@@ -117,5 +125,7 @@ private:
     FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort
     String spill_full_path_;           // Path of spill file
     u64 tuple_count_{0};               // Number of tuples for external merge sort
+
+    bool is_spilled_{false};
 };
 } // namespace infinity

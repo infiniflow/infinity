@@ -31,6 +31,8 @@ import posting_writer;
 
 namespace infinity {
 
+export using ColumnLengthPopulater = std::function<void(u32 begin_docid, Vector<u32> &lens)>;
+
 export class ColumnInverter {
 public:
     ColumnInverter(const String &analyzer, MemoryPool *memory_pool, PostingWriterProvider posting_writer_provider);
@@ -39,7 +41,7 @@ public:
     ColumnInverter &operator=(const ColumnInverter &) = delete;
     ColumnInverter &operator=(const ColumnInverter &&) = delete;
 
-    void InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 start_doc_id);
+    void InvertColumn(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, u32 begin_doc_id);
 
     void InvertColumn(u32 doc_id, const String &val);
 
@@ -53,7 +55,7 @@ public:
 
     void GeneratePosting();
 
-    void GetTermListLength(u32 *term_list_length_ptr) const;
+    void GetTermListLength(ColumnLengthPopulater populater) const;
 
     struct PosInfo {
         u32 term_num_{0};
@@ -110,6 +112,7 @@ private:
 
     UniquePtr<Analyzer> analyzer_{nullptr};
     PoolAllocator<char> alloc_;
+    u32 begin_doc_id_{0};
     TermBuffer terms_;
     PosInfoVec positions_;
     U32Vec term_refs_;

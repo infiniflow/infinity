@@ -47,6 +47,7 @@ import DBT_compaction_alg;
 import compact_segments_task;
 import local_file_system;
 import build_fast_rough_filter_task;
+import block_entry;
 
 namespace infinity {
 
@@ -489,6 +490,36 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
         }
     }
     return Status::OK();
+}
+
+void TableEntry::MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->MemIndexInsert(txn, block_entry, row_offset, row_count);
+        }
+    }
+}
+
+void TableEntry::MemIndexDump(Txn *txn, bool spill) {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+        if (status.ok()) {
+            table_index_entry->MemIndexDump(spill);
+        }
+    }
+}
+
+void TableEntry::MemIndexCommit() {
+    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, 0UL);
+        if (status.ok()) {
+            table_index_entry->MemIndexCommit();
+        }
+    }
 }
 
 SharedPtr<SegmentEntry> TableEntry::GetSegmentByID(SegmentID segment_id, TxnTimeStamp ts) const {

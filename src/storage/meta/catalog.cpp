@@ -15,6 +15,7 @@
 module;
 
 #include <fstream>
+#include <thread>
 #include <vector>
 
 module catalog;
@@ -55,7 +56,19 @@ import segment_index_entry;
 namespace infinity {
 
 // TODO Consider letting it commit as a transaction.
-Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)) {}
+Catalog::Catalog(SharedPtr<String> dir) : current_dir_(std::move(dir)), running_(true) {
+    mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
+}
+
+Catalog::~Catalog() {
+    bool expected = true;
+    bool changed = running_.compare_exchange_strong(expected, false);
+    if (!changed) {
+        LOG_INFO("Catalog MemIndexCommitLoop was stopped...");
+        return;
+    }
+    mem_index_commit_thread_.join();
+}
 
 void Catalog::SetTxnMgr(TxnManager *txn_mgr) { txn_mgr_ = txn_mgr; }
 
@@ -882,4 +895,22 @@ void Catalog::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entri
 }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }
+
+void Catalog::MemIndexCommit() {
+    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
+    for (auto &[_, db_meta] : *db_meta_map_guard) {
+        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, 0UL);
+        if (status.ok()) {
+            db_entry->MemIndexCommit();
+        }
+    }
+}
+
+void Catalog::MemIndexCommitLoop() {
+    while (running_.load()) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        MemIndexCommit();
+    }
+}
+
 } // namespace infinity

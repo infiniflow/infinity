@@ -14,6 +14,8 @@
 
 module;
 
+#include "type/complex/row_id.h"
+
 export module segment_index_entry;
 
 import stl;
@@ -28,6 +30,8 @@ import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
 import memory_indexer;
+import column_vector;
+import block_entry;
 
 namespace infinity {
 
@@ -83,19 +87,26 @@ public:
     inline TxnTimeStamp min_ts() const { return min_ts_; }
     inline TxnTimeStamp max_ts() const { return max_ts_; }
 
-    Status CreateIndexPrepare(const IndexBase *index_base,
-                              const ColumnDef *column_def,
-                              const SegmentEntry *segment_entry,
-                              Txn *txn,
-                              bool prepare,
-                              bool check_ts);
+    // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
+    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
 
-    Status CreateIndexDo(const IndexBase *index_base, const ColumnDef *column_def, atomic_u64 &create_index_idx);
+    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
+    void MemIndexCommit();
+
+    // Dump or spill the memory indexer
+    void MemIndexDump(bool spill = false);
+
+    // Init the mem index from previously spilled one.
+    void MemIndexLoad(const String &base_name, RowID base_row_id);
+
+    Status CreateIndexPrepare(const SegmentEntry *segment_entry, Txn *txn, bool prepare, bool check_ts);
+
+    Status CreateIndexDo(atomic_u64 &create_index_idx);
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(const IndexBase *index_base, SizeT seg_row_count, const ColumnDef *column_def);
 
     Vector<String> &GetFulltextBaseNames() { return ft_base_names_; }
-    Vector<u64> &GetFulltextBaseRowIDs() { return ft_base_rowids_; }
+    Vector<RowID> &GetFulltextBaseRowIDs() { return ft_base_rowids_; }
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
 
 private:
@@ -118,7 +129,7 @@ private:
     TxnTimeStamp checkpoint_ts_{0};
 
     Vector<String> ft_base_names_{};
-    Vector<u64> ft_base_rowids_{};
+    Vector<RowID> ft_base_rowids_{};
     UniquePtr<MemoryIndexer> memory_indexer_{};
 };
 

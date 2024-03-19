@@ -19,7 +19,7 @@ CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT WITH(HOMEBREWED=1);
 query II
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH('body^5', 'harmful chemical', 'topn=3');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 21.669640
+Anarchism 30-APR-2012 03:25:17.000 0 24.278290
 
 # Clean up
 statement ok

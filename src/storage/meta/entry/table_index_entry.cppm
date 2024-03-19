@@ -34,6 +34,7 @@ import meta_entry_interface;
 import index_file_worker;
 import column_def;
 import memory_pool;
+import block_entry;
 
 namespace infinity {
 
@@ -87,11 +88,21 @@ public:
     inline const TableIndexMeta *table_index_meta() const { return table_index_meta_; }
     inline const IndexBase *index_base() const { return index_base_.get(); }
     const SharedPtr<IndexBase> &table_index_def() const { return index_base_; }
+    inline const SharedPtr<ColumnDef> &column_def() const { return column_def_; }
 
     SharedPtr<FulltextIndexEntry> &fulltext_index_entry() { return fulltext_index_entry_; }
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> &index_by_segment() { return index_by_segment_; }
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     bool IsFulltextIndexHomebrewed() const;
+
+    // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
+    void MemIndexInsert(Txn *txn, SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count);
+
+    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
+    void MemIndexCommit();
+
+    // Dump or spill the memory indexer
+    void MemIndexDump(bool spill = false);
 
     Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts = true);
@@ -125,8 +136,10 @@ private:
     TableIndexMeta *const table_index_meta_{};
     const SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};
+    SharedPtr<ColumnDef> column_def_{};
 
     HashMap<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
+    SharedPtr<SegmentIndexEntry> last_segment_{};
     SharedPtr<FulltextIndexEntry> fulltext_index_entry_{};
 
     // For fulltext index
