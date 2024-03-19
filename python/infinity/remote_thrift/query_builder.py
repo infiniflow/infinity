@@ -115,8 +115,9 @@ class InfinityThriftQueryBuilder(ABC):
             dist_type = KnnDistanceType.Hamming
 
         knn_opt_params = []
-        for k, v in knn_params.items():
-            knn_opt_params.append(InitParameter(k, v))
+        if knn_params != None:
+            for k, v in knn_params.items():
+                knn_opt_params.append(InitParameter(k, v))
 
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn, opt_params = knn_opt_params)
