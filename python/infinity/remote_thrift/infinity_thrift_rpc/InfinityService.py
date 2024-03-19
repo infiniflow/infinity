@@ -142,7 +142,7 @@ class Iface(object):
         """
         pass
 
-    def DescribeTable(self, request):
+    def ShowTable(self, request):
         """
         Parameters:
          - request
@@ -150,7 +150,15 @@ class Iface(object):
         """
         pass
 
-    def DescribeDatabase(self, request):
+    def ShowColumns(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        pass
+
+    def ShowDatabase(self, request):
         """
         Parameters:
          - request
@@ -191,6 +199,14 @@ class Iface(object):
         pass
 
     def DropIndex(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        pass
+
+    def ShowIndex(self, request):
         """
         Parameters:
          - request
@@ -712,24 +728,24 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowVariable failed: unknown result")
 
-    def DescribeTable(self, request):
+    def ShowTable(self, request):
         """
         Parameters:
          - request
 
         """
-        self.send_DescribeTable(request)
-        return self.recv_DescribeTable()
+        self.send_ShowTable(request)
+        return self.recv_ShowTable()
 
-    def send_DescribeTable(self, request):
-        self._oprot.writeMessageBegin('DescribeTable', TMessageType.CALL, self._seqid)
-        args = DescribeTable_args()
+    def send_ShowTable(self, request):
+        self._oprot.writeMessageBegin('ShowTable', TMessageType.CALL, self._seqid)
+        args = ShowTable_args()
         args.request = request
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_DescribeTable(self):
+    def recv_ShowTable(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -737,31 +753,31 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = DescribeTable_result()
+        result = ShowTable_result()
         result.read(iprot)
         iprot.readMessageEnd()
         if result.success is not None:
             return result.success
-        raise TApplicationException(TApplicationException.MISSING_RESULT, "DescribeTable failed: unknown result")
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowTable failed: unknown result")
 
-    def DescribeDatabase(self, request):
+    def ShowColumns(self, request):
         """
         Parameters:
          - request
 
         """
-        self.send_DescribeDatabase(request)
-        return self.recv_DescribeDatabase()
+        self.send_ShowColumns(request)
+        return self.recv_ShowColumns()
 
-    def send_DescribeDatabase(self, request):
-        self._oprot.writeMessageBegin('DescribeDatabase', TMessageType.CALL, self._seqid)
-        args = DescribeDatabase_args()
+    def send_ShowColumns(self, request):
+        self._oprot.writeMessageBegin('ShowColumns', TMessageType.CALL, self._seqid)
+        args = ShowColumns_args()
         args.request = request
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
 
-    def recv_DescribeDatabase(self):
+    def recv_ShowColumns(self):
         iprot = self._iprot
         (fname, mtype, rseqid) = iprot.readMessageBegin()
         if mtype == TMessageType.EXCEPTION:
@@ -769,12 +785,44 @@ class Client(Iface):
             x.read(iprot)
             iprot.readMessageEnd()
             raise x
-        result = DescribeDatabase_result()
+        result = ShowColumns_result()
         result.read(iprot)
         iprot.readMessageEnd()
         if result.success is not None:
             return result.success
-        raise TApplicationException(TApplicationException.MISSING_RESULT, "DescribeDatabase failed: unknown result")
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowColumns failed: unknown result")
+
+    def ShowDatabase(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_ShowDatabase(request)
+        return self.recv_ShowDatabase()
+
+    def send_ShowDatabase(self, request):
+        self._oprot.writeMessageBegin('ShowDatabase', TMessageType.CALL, self._seqid)
+        args = ShowDatabase_args()
+        args.request = request
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_ShowDatabase(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = ShowDatabase_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowDatabase failed: unknown result")
 
     def ShowTables(self, request):
         """
@@ -936,6 +984,38 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "DropIndex failed: unknown result")
 
+    def ShowIndex(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_ShowIndex(request)
+        return self.recv_ShowIndex()
+
+    def send_ShowIndex(self, request):
+        self._oprot.writeMessageBegin('ShowIndex', TMessageType.CALL, self._seqid)
+        args = ShowIndex_args()
+        args.request = request
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_ShowIndex(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = ShowIndex_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowIndex failed: unknown result")
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
@@ -957,13 +1037,15 @@ class Processor(Iface, TProcessor):
         self._processMap["ListDatabase"] = Processor.process_ListDatabase
         self._processMap["ListTable"] = Processor.process_ListTable
         self._processMap["ShowVariable"] = Processor.process_ShowVariable
-        self._processMap["DescribeTable"] = Processor.process_DescribeTable
-        self._processMap["DescribeDatabase"] = Processor.process_DescribeDatabase
+        self._processMap["ShowTable"] = Processor.process_ShowTable
+        self._processMap["ShowColumns"] = Processor.process_ShowColumns
+        self._processMap["ShowDatabase"] = Processor.process_ShowDatabase
         self._processMap["ShowTables"] = Processor.process_ShowTables
         self._processMap["GetDatabase"] = Processor.process_GetDatabase
         self._processMap["GetTable"] = Processor.process_GetTable
         self._processMap["CreateIndex"] = Processor.process_CreateIndex
         self._processMap["DropIndex"] = Processor.process_DropIndex
+        self._processMap["ShowIndex"] = Processor.process_ShowIndex
         self._on_message_begin = None
 
     def on_message_begin(self, func):
@@ -1354,13 +1436,13 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_DescribeTable(self, seqid, iprot, oprot):
-        args = DescribeTable_args()
+    def process_ShowTable(self, seqid, iprot, oprot):
+        args = ShowTable_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = DescribeTable_result()
+        result = ShowTable_result()
         try:
-            result.success = self._handler.DescribeTable(args.request)
+            result.success = self._handler.ShowTable(args.request)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1372,18 +1454,18 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("DescribeTable", msg_type, seqid)
+        oprot.writeMessageBegin("ShowTable", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
-    def process_DescribeDatabase(self, seqid, iprot, oprot):
-        args = DescribeDatabase_args()
+    def process_ShowColumns(self, seqid, iprot, oprot):
+        args = ShowColumns_args()
         args.read(iprot)
         iprot.readMessageEnd()
-        result = DescribeDatabase_result()
+        result = ShowColumns_result()
         try:
-            result.success = self._handler.DescribeDatabase(args.request)
+            result.success = self._handler.ShowColumns(args.request)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1395,7 +1477,30 @@ class Processor(Iface, TProcessor):
             logging.exception('Unexpected exception in handler')
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
-        oprot.writeMessageBegin("DescribeDatabase", msg_type, seqid)
+        oprot.writeMessageBegin("ShowColumns", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_ShowDatabase(self, seqid, iprot, oprot):
+        args = ShowDatabase_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = ShowDatabase_result()
+        try:
+            result.success = self._handler.ShowDatabase(args.request)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("ShowDatabase", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -1511,6 +1616,29 @@ class Processor(Iface, TProcessor):
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
         oprot.writeMessageBegin("DropIndex", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_ShowIndex(self, seqid, iprot, oprot):
+        args = ShowIndex_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = ShowIndex_result()
+        try:
+            result.success = self._handler.ShowIndex(args.request)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("ShowIndex", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -3498,7 +3626,7 @@ ShowVariable_result.thrift_spec = (
 )
 
 
-class DescribeTable_args(object):
+class ShowTable_args(object):
     """
     Attributes:
      - request
@@ -3520,7 +3648,7 @@ class DescribeTable_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRUCT:
-                    self.request = DescribeTableRequest()
+                    self.request = ShowTableRequest()
                     self.request.read(iprot)
                 else:
                     iprot.skip(ftype)
@@ -3533,7 +3661,7 @@ class DescribeTable_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeTable_args')
+        oprot.writeStructBegin('ShowTable_args')
         if self.request is not None:
             oprot.writeFieldBegin('request', TType.STRUCT, 1)
             self.request.write(oprot)
@@ -3554,14 +3682,139 @@ class DescribeTable_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(DescribeTable_args)
-DescribeTable_args.thrift_spec = (
+all_structs.append(ShowTable_args)
+ShowTable_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRUCT, 'request', [DescribeTableRequest, None], None, ),  # 1
+    (1, TType.STRUCT, 'request', [ShowTableRequest, None], None, ),  # 1
 )
 
 
-class DescribeTable_result(object):
+class ShowTable_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = ShowTableResponse()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowTable_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(ShowTable_result)
+ShowTable_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [ShowTableResponse, None], None, ),  # 0
+)
+
+
+class ShowColumns_args(object):
+    """
+    Attributes:
+     - request
+
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = ShowColumnsRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowColumns_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(ShowColumns_args)
+ShowColumns_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [ShowColumnsRequest, None], None, ),  # 1
+)
+
+
+class ShowColumns_result(object):
     """
     Attributes:
      - success
@@ -3596,7 +3849,7 @@ class DescribeTable_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeTable_result')
+        oprot.writeStructBegin('ShowColumns_result')
         if self.success is not None:
             oprot.writeFieldBegin('success', TType.STRUCT, 0)
             self.success.write(oprot)
@@ -3617,13 +3870,13 @@ class DescribeTable_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(DescribeTable_result)
-DescribeTable_result.thrift_spec = (
+all_structs.append(ShowColumns_result)
+ShowColumns_result.thrift_spec = (
     (0, TType.STRUCT, 'success', [SelectResponse, None], None, ),  # 0
 )
 
 
-class DescribeDatabase_args(object):
+class ShowDatabase_args(object):
     """
     Attributes:
      - request
@@ -3645,7 +3898,7 @@ class DescribeDatabase_args(object):
                 break
             if fid == 1:
                 if ftype == TType.STRUCT:
-                    self.request = DescribeDatabaseRequest()
+                    self.request = ShowDatabaseRequest()
                     self.request.read(iprot)
                 else:
                     iprot.skip(ftype)
@@ -3658,7 +3911,7 @@ class DescribeDatabase_args(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeDatabase_args')
+        oprot.writeStructBegin('ShowDatabase_args')
         if self.request is not None:
             oprot.writeFieldBegin('request', TType.STRUCT, 1)
             self.request.write(oprot)
@@ -3679,14 +3932,14 @@ class DescribeDatabase_args(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(DescribeDatabase_args)
-DescribeDatabase_args.thrift_spec = (
+all_structs.append(ShowDatabase_args)
+ShowDatabase_args.thrift_spec = (
     None,  # 0
-    (1, TType.STRUCT, 'request', [DescribeDatabaseRequest, None], None, ),  # 1
+    (1, TType.STRUCT, 'request', [ShowDatabaseRequest, None], None, ),  # 1
 )
 
 
-class DescribeDatabase_result(object):
+class ShowDatabase_result(object):
     """
     Attributes:
      - success
@@ -3708,7 +3961,7 @@ class DescribeDatabase_result(object):
                 break
             if fid == 0:
                 if ftype == TType.STRUCT:
-                    self.success = SelectResponse()
+                    self.success = ShowDatabaseResponse()
                     self.success.read(iprot)
                 else:
                     iprot.skip(ftype)
@@ -3721,7 +3974,7 @@ class DescribeDatabase_result(object):
         if oprot._fast_encode is not None and self.thrift_spec is not None:
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
-        oprot.writeStructBegin('DescribeDatabase_result')
+        oprot.writeStructBegin('ShowDatabase_result')
         if self.success is not None:
             oprot.writeFieldBegin('success', TType.STRUCT, 0)
             self.success.write(oprot)
@@ -3742,9 +3995,9 @@ class DescribeDatabase_result(object):
 
     def __ne__(self, other):
         return not (self == other)
-all_structs.append(DescribeDatabase_result)
-DescribeDatabase_result.thrift_spec = (
-    (0, TType.STRUCT, 'success', [SelectResponse, None], None, ),  # 0
+all_structs.append(ShowDatabase_result)
+ShowDatabase_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [ShowDatabaseResponse, None], None, ),  # 0
 )
 
 
@@ -4370,6 +4623,131 @@ class DropIndex_result(object):
 all_structs.append(DropIndex_result)
 DropIndex_result.thrift_spec = (
     (0, TType.STRUCT, 'success', [CommonResponse, None], None, ),  # 0
+)
+
+
+class ShowIndex_args(object):
+    """
+    Attributes:
+     - request
+
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = ShowIndexRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowIndex_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(ShowIndex_args)
+ShowIndex_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [ShowIndexRequest, None], None, ),  # 1
+)
+
+
+class ShowIndex_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = ShowIndexResponse()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ShowIndex_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(ShowIndex_result)
+ShowIndex_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [ShowIndexResponse, None], None, ),  # 0
 )
 fix_spec(all_structs)
 del all_structs

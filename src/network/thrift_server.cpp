@@ -30,6 +30,8 @@ module;
 #include "infinity_thrift/InfinityService.h"
 #include "infinity_thrift/infinity_types.h"
 #include "statement/explain_statement.h"
+#include "statement/extra/extra_ddl_info.h"
+#include "statement/statement_common.h"
 
 module thrift_server;
 
@@ -108,9 +110,29 @@ public:
     }
 
     void CreateDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateDatabaseRequest &request) final {
+        CreateDatabaseOptions create_database_opts;
+        switch (request.create_option.conflict_type) {
+            case infinity_thrift_rpc::CreateConflict::Ignore: {
+                create_database_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Error: {
+                create_database_opts.conflict_type_ = ConflictType::kError;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Replace: {
+                create_database_opts.conflict_type_ = ConflictType::kReplace;
+                break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
+        }
+
         auto [infinity, status] = GetInfinityBySessionID(request.session_id);
         if (status.ok()) {
-            auto result = infinity->CreateDatabase(request.db_name, (const CreateDatabaseOptions &)request.option);
+            auto result = infinity->CreateDatabase(request.db_name, create_database_opts);
             ProcessQueryResult(response, result);
         } else {
             ProcessStatus(response, status);
@@ -118,9 +140,26 @@ public:
     }
 
     void DropDatabase(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropDatabaseRequest &request) final {
+
+        DropDatabaseOptions drop_database_opts;
+        switch (request.drop_option.conflict_type) {
+            case infinity_thrift_rpc::DropConflict::Ignore: {
+                drop_database_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            }
+            case infinity_thrift_rpc::DropConflict::Error: {
+                drop_database_opts.conflict_type_ = ConflictType::kError;
+                break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
+        }
+
         auto [infinity, status] = GetInfinityBySessionID(request.session_id);
         if (status.ok()) {
-            auto result = infinity->DropDatabase(request.db_name, (const DropDatabaseOptions &)request.option);
+            auto result = infinity->DropDatabase(request.db_name, drop_database_opts);
             ProcessQueryResult(response, result);
         } else {
             ProcessStatus(response, status);
@@ -139,13 +178,41 @@ public:
             column_defs.emplace_back(column_def);
         }
 
+        CreateTableOptions create_table_opts;
+        switch (request.create_option.conflict_type) {
+            case infinity_thrift_rpc::CreateConflict::Ignore: {
+                create_table_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Error: {
+                create_table_opts.conflict_type_ = ConflictType::kError;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Replace: {
+                create_table_opts.conflict_type_ = ConflictType::kReplace;
+                break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
+        }
+
+        SizeT properties_count = request.create_option.properties.size();
+        create_table_opts.properties_.reserve(properties_count);
+        for (SizeT idx = 0; idx < properties_count; ++idx) {
+            InitParameter *property = new InitParameter();
+            property->param_name_ = request.create_option.properties[idx].key;
+            property->param_value_ = request.create_option.properties[idx].value;
+            create_table_opts.properties_.emplace_back(property);
+        }
+
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
             return;
         }
 
-        CreateTableOptions create_table_opts;
         auto result = infinity->CreateTable(request.db_name, request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
         ProcessQueryResult(response, result);
     }
@@ -158,17 +225,19 @@ public:
         }
 
         DropTableOptions drop_table_opts;
-        switch (request.options.conflict_type) {
-            case infinity_thrift_rpc::ConflictType::Ignore:
+        switch (request.drop_option.conflict_type) {
+            case infinity_thrift_rpc::DropConflict::Ignore: {
                 drop_table_opts.conflict_type_ = ConflictType::kIgnore;
                 break;
-            case infinity_thrift_rpc::ConflictType::Replace:
-                drop_table_opts.conflict_type_ = ConflictType::kReplace;
-                break;
-            case infinity_thrift_rpc::ConflictType::Error:
-            default:
+            }
+            case infinity_thrift_rpc::DropConflict::Error: {
                 drop_table_opts.conflict_type_ = ConflictType::kError;
                 break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
         }
 
         auto result = infinity->DropTable(request.db_name, request.table_name, drop_table_opts);
@@ -791,19 +860,100 @@ public:
         }
     }
 
-    void DescribeDatabase(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeDatabaseRequest &request) final {
-        // Your implementation goes here
-        printf("DescribeDatabase\n");
+    void ShowDatabase(infinity_thrift_rpc::ShowDatabaseResponse &response, const infinity_thrift_rpc::ShowDatabaseRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+        const QueryResult result = infinity->ShowDatabase(request.db_name);
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            if (row_count != 3) {
+                UnrecoverableError("ShowDatabase: query result is invalid.");
+            }
+
+            {
+                Value value = data_block->GetValue(1, 0);
+                response.database_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 2);
+                response.store_dir = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 3);
+                response.table_count = value.value_.big_int;
+            }
+
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
     }
 
-    void DescribeTable(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::DescribeTableRequest &request) final {
+    void ShowTable(infinity_thrift_rpc::ShowTableResponse &response, const infinity_thrift_rpc::ShowTableRequest &request) final {
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
             return;
         }
 
-        const QueryResult result = infinity->DescribeTable(request.db_name, request.table_name);
+        const QueryResult result = infinity->ShowTable(request.db_name, request.table_name);
+        if (result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            if (row_count != 6) {
+                UnrecoverableError("ShowTable: query result is invalid.");
+            }
+
+            {
+                Value value = data_block->GetValue(1, 0);
+                response.database_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 1);
+                response.table_name = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 2);
+                response.store_dir = value.GetVarchar();
+            }
+
+            {
+                Value value = data_block->GetValue(1, 3);
+                response.column_count = value.value_.big_int;
+            }
+
+            {
+                Value value = data_block->GetValue(1, 4);
+                response.segment_count = value.value_.big_int;
+            }
+
+            {
+                Value value = data_block->GetValue(1, 5);
+                response.row_count = value.value_.big_int;
+            }
+
+            response.__set_error_code((i64)(result.ErrorCode()));
+        } else {
+            ProcessQueryResult(response, result);
+        }
+    }
+
+    void ShowColumns(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ShowColumnsRequest &request) final {
+        auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+        if (!infinity_status.ok()) {
+            ProcessStatus(response, infinity_status);
+            return;
+        }
+
+        const QueryResult result = infinity->ShowColumns(request.db_name, request.table_name);
         if (result.IsOk()) {
             auto &columns = response.column_fields;
             columns.resize(result.result_table_->ColumnCount());
@@ -853,6 +1003,26 @@ public:
     }
 
     void CreateIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CreateIndexRequest &request) final {
+        CreateIndexOptions create_index_opts;
+        switch (request.create_option.conflict_type) {
+            case infinity_thrift_rpc::CreateConflict::Ignore: {
+                create_index_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Error: {
+                create_index_opts.conflict_type_ = ConflictType::kError;
+                break;
+            }
+            case infinity_thrift_rpc::CreateConflict::Replace: {
+                create_index_opts.conflict_type_ = ConflictType::kReplace;
+                break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
+        }
+
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
@@ -895,24 +1065,39 @@ public:
             index_info_list_to_use->emplace_back(index_info_to_use);
         }
 
-        QueryResult result = infinity->CreateIndex(request.db_name,
-                                                   request.table_name,
-                                                   request.index_name,
-                                                   index_info_list_to_use,
-                                                   (CreateIndexOptions &)request.option);
+        QueryResult result =
+            infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_list_to_use, create_index_opts);
         ProcessQueryResult(response, result);
     }
 
     void DropIndex(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DropIndexRequest &request) final {
+        DropIndexOptions drop_index_opts;
+        switch (request.drop_option.conflict_type) {
+            case infinity_thrift_rpc::DropConflict::type::Ignore: {
+                drop_index_opts.conflict_type_ = ConflictType::kIgnore;
+                break;
+            }
+            case infinity_thrift_rpc::DropConflict::type::Error: {
+                drop_index_opts.conflict_type_ = ConflictType::kError;
+                break;
+            }
+            default: {
+                ProcessStatus(response, Status::InvalidConflictType());
+                return;
+            }
+        }
+
         auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
         if (!infinity_status.ok()) {
             ProcessStatus(response, infinity_status);
             return;
         }
 
-        QueryResult result = infinity->DropIndex(request.db_name, request.table_name, request.index_name);
+        QueryResult result = infinity->DropIndex(request.db_name, request.table_name, request.index_name, drop_index_opts);
         ProcessQueryResult(response, result);
     }
+
+    void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &_return, const infinity_thrift_rpc::ShowIndexRequest &request) final {}
 
 private:
     std::mutex infinity_session_map_mutex_{};
@@ -1567,6 +1752,23 @@ private:
         }
     }
 
+    static void
+    ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
+    static void ProcessStatus(infinity_thrift_rpc::ShowTableResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(status.code()));
+        if (!status.ok()) {
+            response.__set_error_msg(status.message());
+            LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+        }
+    }
+
     static void ProcessStatus(infinity_thrift_rpc::SelectResponse &response, const Status &status, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(status.code()));
         if (!status.ok()) {
@@ -1621,6 +1823,24 @@ private:
 
     static void
     ProcessQueryResult(infinity_thrift_rpc::ListTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowDatabaseResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
+        response.__set_error_code((i64)(result.ErrorCode()));
+        if (!result.IsOk()) {
+            response.__set_error_msg(result.ErrorStr());
+            LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+        }
+    }
+
+    static void
+    ProcessQueryResult(infinity_thrift_rpc::ShowTableResponse &response, const QueryResult &result, const String error_header = kErrorMsgHeader) {
         response.__set_error_code((i64)(result.ErrorCode()));
         if (!result.IsOk()) {
             response.__set_error_msg(result.ErrorStr());

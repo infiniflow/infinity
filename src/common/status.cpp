@@ -338,6 +338,8 @@ Status Status::MultipleFunctionMatched(const String &function, const String &fun
 
 Status Status::InsertWithoutValues() { return Status(ErrorCode::kInsertWithoutValues, MakeUnique<String>("Insert into table without any values")); }
 
+Status Status::InvalidConflictType() { return Status(ErrorCode::kInvalidConflictType, MakeUnique<String>("Invalid conflict type")); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

@@ -173,7 +173,7 @@ int main() {
             auto tims_costing_second =
                 Measurement("Describe Tables", thread_num, total_times, [&](SizeT i, SharedPtr<Infinity> infinity, std::thread::id thread_id) {
                     //                auto [ database, status ] = infinity->GetDatabase("default");
-                    __attribute__((unused)) auto ignored = infinity->DescribeTable("default", "benchmark_test");
+                    __attribute__((unused)) auto ignored = infinity->ShowTable("default", "benchmark_test");
                 });
             results.push_back(fmt::format("-> Describe Tables QPS: {}", total_times / tims_costing_second));
         }

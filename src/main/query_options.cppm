@@ -14,7 +14,7 @@
 
 export module query_options;
 
-
+import stl;
 import extra_ddl_info;
 import statement_common;
 
@@ -25,11 +25,15 @@ public:
     ConflictType conflict_type_{ConflictType::kError};
 };
 
-export class DropDatabaseOptions {};
+export class DropDatabaseOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class CreateTableOptions {
 public:
     ConflictType conflict_type_{ConflictType::kError};
+    Vector<InitParameter *> properties_;
 };
 
 export class DropTableOptions {
@@ -37,9 +41,15 @@ public:
     ConflictType conflict_type_{ConflictType::kError};
 };
 
-export class CreateIndexOptions {};
+export class CreateIndexOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
-export class DropIndexOptions {};
+export class DropIndexOptions {
+public:
+    ConflictType conflict_type_{ConflictType::kError};
+};
 
 export class ImportOptions {
 public:
