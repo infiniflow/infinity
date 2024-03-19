@@ -64,4 +64,31 @@ std::string ColumnDef::ToString() const {
     return ss.str();
 }
 
+ConstraintType ColumnDef::StringToConstraintType(std::string type) {
+    std::map<std::string, int> string_to_constraint_type = {
+        {"primarykey", 1},
+        {"unique", 2},
+        {"null", 3},
+        {"not null", 4},
+        {"invalid", 5},
+    };
+    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
+        int num = string_to_constraint_type.find(type)->second;
+        switch (num) {
+            case 1:
+                return ConstraintType::kPrimaryKey;
+            case 2:
+                return ConstraintType::kUnique;
+            case 3:
+                return ConstraintType::kNull;
+            case 4:
+                return ConstraintType::kNotNull;
+            case 5:
+                return ConstraintType::kInvalid;
+        }  
+    }
+    ParserError("Unexpected error.");
+    return ConstraintType::kInvalid;
+}
+
 } // namespace infinity
