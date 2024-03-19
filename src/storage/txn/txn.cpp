@@ -171,8 +171,6 @@ void Txn::CheckTxn(const String &db_name) {
     }
 }
 
-BufferManager *Txn::GetBufferMgr() const { return this->txn_mgr_->GetBufferMgr(); }
-
 // Database OPs
 Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     this->CheckTxnStatus();

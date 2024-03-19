@@ -78,7 +78,7 @@ MemoryIndexer::~MemoryIndexer() {
     Reset();
 }
 
-void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
+void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline) {
     u64 seq_inserted(0);
     u32 doc_count(0);
     {
@@ -90,16 +90,38 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     }
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
-    auto func = [this, task, provider](int id) {
-        auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
-        inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
-        this->ring_inverted_.Put(task->task_seq_, inverter);
-    };
-    thread_pool_.push(func);
+    if (offline) {
+        auto func = [this, task, provider](int id) {
+            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+            inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            inverter->SortForOfflineDump();
+            this->ring_sorted_.Put(task->task_seq_, inverter);
+        };
+        thread_pool_.push(func);
+    } else {
+        auto func = [this, task, provider](int id) {
+            auto inverter = MakeShared<ColumnInverter>(this->analyzer_, &this->byte_slice_pool_, provider);
+            inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+            this->ring_inverted_.Put(task->task_seq_, inverter);
+        };
+        thread_pool_.push(func);
+    }
 }
 
-void MemoryIndexer::Commit() {
-    thread_pool_.push([this](int id) { this->CommitSync(); });
+void MemoryIndexer::Commit(bool offline) {
+    if (offline) {
+        if (nullptr == spill_file_handle_) {
+            PrepareSpillFile();
+        }
+        while (inflight_tasks_ != 0) {
+            this->ring_sorted_.Iterate([this](SharedPtr<ColumnInverter> &inverter) {
+                inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_);
+                inflight_tasks_--;
+                num_runs_++;
+            });
+        }
+    } else
+        thread_pool_.push([this](int id) { this->CommitSync(); });
 }
 
 SizeT MemoryIndexer::CommitSync() {
@@ -122,12 +144,17 @@ SizeT MemoryIndexer::CommitSync() {
     return num;
 }
 
-void MemoryIndexer::Dump() {
+void MemoryIndexer::Dump(bool offline) {
+    if (offline) {
+        Commit(true);
+        OfflineDump();
+        return;
+    }
+
     while (GetInflightTasks() > 0) {
         sleep(1);
         CommitSync();
     }
-
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -191,34 +218,35 @@ void MemoryIndexer::OfflineDump() {
     // 2. Generate posting
     // 3. Dump disk segment data
     FinalSpillFile();
+    std::cout << "num_runs_ " << num_runs_ << std::endl;
     SortMerger<TermTuple, u16> *merger = new SortMerger<TermTuple, u16>(spill_full_path_.c_str(), num_runs_, 100000000, 2);
     merger->Run();
     delete merger;
     FILE *f = fopen(spill_full_path_.c_str(), "r");
     u64 count;
     fread((char *)&count, sizeof(u64), 1, f);
-
-    String index_prefix; /// TODO, to be integrated
+    Path path = Path(index_dir_) / base_name_;
+    String index_prefix = path.string();
     LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX;
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX;
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
-
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
     std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder builder(wtr);
 
+    u16 record_length;
+    char buf[MAX_TUPLE_LENGTH];
     std::string_view last_term;
     u32 last_term_pos = 0;
     u32 last_doc_id = INVALID_DOCID;
-    u16 record_length;
     Deque<String> term_buffer;
-    char buf[MAX_TUPLE_LENGTH];
     UniquePtr<PostingWriter> posting;
     SizeT term_meta_offset = 0;
+
     for (u64 i = 0; i < count; ++i) {
         fread(&record_length, sizeof(u16), 1, f);
         fread(buf, record_length, 1, f);
@@ -226,17 +254,17 @@ void MemoryIndexer::OfflineDump() {
         if (tuple.term_ != last_term) {
             if (last_doc_id != INVALID_DOCID) {
                 posting->EndDocument(last_doc_id, 0);
+                if (posting.get()) {
+                    TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+                    posting->Dump(posting_file_writer, term_meta);
+                    term_meta_dumpler.Dump(dict_file_writer, term_meta);
+                    builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
+                    term_meta_offset = dict_file_writer->TotalWrittenBytes();
+                }
             }
             term_buffer.push_back(String(tuple.term_));
             std::string_view view(term_buffer.back());
             last_term.swap(view);
-            if (posting.get()) {
-                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-                posting->Dump(posting_file_writer, term_meta);
-                term_meta_dumpler.Dump(dict_file_writer, term_meta);
-                builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-                term_meta_offset = dict_file_writer->TotalWrittenBytes();
-            }
             posting = MakeUnique<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_));
         } else if (last_doc_id != tuple.doc_id_) {
             posting->EndDocument(last_doc_id, 0);
@@ -247,15 +275,11 @@ void MemoryIndexer::OfflineDump() {
             posting->AddPosition(last_term_pos);
         }
     }
+
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
     }
-    if (posting->GetDF() > 0) {
-        TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-        posting->Dump(posting_file_writer, term_meta);
-        term_meta_dumpler.Dump(dict_file_writer, term_meta);
-        builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-    }
+    posting_file_writer->Sync();
     dict_file_writer->Sync();
     builder.Finish();
     fs.AppendFile(dict_file, fst_file);

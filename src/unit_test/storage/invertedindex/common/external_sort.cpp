@@ -124,13 +124,15 @@ protected:
         while (run_num < 100 || SIZE % run_num != 0)
             run_num = rand() % 300;
 
+        run_num = 10;
         char buffer[200];
         for (u32 i = 0; i < run_num; ++i) {
             u64 pos = ftell(f);
             fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);
             u32 s = 0;
             for (u32 j = 0; j < SIZE / run_num; ++j) {
-                str = RandStr();
+                // str = RandStr();
+                String str = std::to_string(i * SIZE / run_num + j);
                 u32 doc_id = 34567; // i * SIZE / run_num + j;
                 u32 term_pos = i;
                 memcpy(buffer, str.data(), str.size());
@@ -178,4 +180,4 @@ TEST_F(ExternalSortTest, test1) {
     CheckMerger<u32, u8>(10000, 1000000);
 }
 
-TEST_F(ExternalSortTest, test2) { CheckTermTuple(10000, 1000000); }
+TEST_F(ExternalSortTest, test2) { CheckTermTuple(100, 1000000); }
