@@ -53,6 +53,7 @@ export struct TermTuple {
     u32 term_pos_;
     int Compare(const TermTuple &rhs) const {
         int ret = term_.compare(rhs.term_);
+
         if (ret == 0) {
             if (doc_id_ != rhs.doc_id_) {
                 if (doc_id_ < rhs.doc_id_)
@@ -74,9 +75,9 @@ export struct TermTuple {
 
     bool operator==(const TermTuple &other) const { return Compare(other) == 0; }
 
-    bool operator>(const TermTuple &other) const { return Compare(other) < 0; }
+    bool operator>(const TermTuple &other) const { return Compare(other) > 0; }
 
-    bool operator<(const TermTuple &other) const { return Compare(other) > 0; }
+    bool operator<(const TermTuple &other) const { return Compare(other) < 0; }
 
     TermTuple(char *p, u16 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
         doc_id_ = *((u32 *)(p + term_.size() + 1));

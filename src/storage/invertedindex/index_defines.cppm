@@ -49,8 +49,8 @@ export {
     constexpr u32 MAX_UNCOMPRESSED_SKIP_LIST_SIZE = 10;
     constexpr u8 SKIP_LIST_BUFFER_SIZE = 32;
 
-    constexpr const char *DICT_SUFFIX = "dic";
-    constexpr const char *POSTING_SUFFIX = "pos";
+    constexpr const char *DICT_SUFFIX = ".dic";
+    constexpr const char *POSTING_SUFFIX = ".pos";
 
     using ScoredId = Pair<float, u32>;
     using ScoredIds = Vector<ScoredId>;

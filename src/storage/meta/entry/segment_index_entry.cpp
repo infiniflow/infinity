@@ -51,6 +51,7 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
+import fulltext_file_worker;
 import fulltext_index_entry;
 import index_full_text;
 import index_defines;
@@ -270,17 +271,28 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                                         table_index_entry_->GetFulltextBufferPool(),
                                                         table_index_entry_->GetFulltextThreadPool());
             u64 column_id = column_def->id();
+            Vector<u32> column_length(segment_entry->row_count());
+            u32 *column_length_ptr = column_length.data();
             auto block_entry_iter = BlockEntryIter(segment_entry);
             for (const auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_column_entry->GetColumnVector(buffer_mgr));
-                memory_indexer_->Insert(column_vector, 0, block_entry->row_count());
+                memory_indexer_->Insert(column_vector, 0, block_entry->row_count(), column_length_ptr);
+                column_length_ptr += block_entry->row_count();
             }
             memory_indexer_->Commit();
             memory_indexer_->Dump();
+            {
+                // after dump, all build threads should be finished.
+                BufferHandle column_length_handle = GetIndex();
+                auto &fulltext_column_length = *static_cast<FullTextColumnLengthData *>(column_length_handle.GetDataMut());
+                fulltext_column_length.row_count_ = column_length.size();
+                fulltext_column_length.total_length_ = std::reduce(column_length.begin(), column_length.end(), f32{0});
+                fulltext_column_length.avg_length_ = fulltext_column_length.total_length_ / fulltext_column_length.row_count_;
+                fulltext_column_length.column_length_ = std::move(column_length);
+            }
             ft_base_names_.push_back(base_name);
             ft_base_rowids_.push_back(base_row_id.ToUint64());
-
             auto duration = Clock::now().time_since_epoch();
             u64 ts = ChronoCast<NanoSeconds>(duration).count();
             table_index_entry_->UpdateFulltextSegmentTs(ts);
@@ -461,7 +473,7 @@ UniquePtr<CreateIndexParam> SegmentIndexEntry::GetCreateIndexParam(const IndexBa
             return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
         }
         case IndexType::kFullText: {
-            return MakeUnique<CreateFullTextParam>(index_base, column_def);
+            return MakeUnique<CreateIndexParam>(index_base, column_def);
         }
         case IndexType::kSecondary: {
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;

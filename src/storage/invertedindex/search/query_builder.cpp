@@ -82,7 +82,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(QueryContext &context) {
     // Optimize the query tree.
     context.query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     // Create the iterator from the query tree.
-    return context.query_tree_->CreateSearch(table_entry_, index_reader_, scorer_);
+    return context.query_tree_->CreateSearch(table_entry_, index_reader_, scorer_.get());
 }
 
 } // namespace infinity

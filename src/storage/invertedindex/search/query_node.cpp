@@ -313,8 +313,7 @@ std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
 
 // create search iterator
 
-std::unique_ptr<DocIterator>
-TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader)
@@ -322,13 +321,15 @@ TermQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_re
     PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
     if (posting_iterator == nullptr)
         return nullptr;
-    auto search = MakeUnique<TermDocIterator>(posting_iterator, column_id);
-    scorer->AddDocIterator(search.get(), column_id);
+    auto search = MakeUnique<TermDocIterator>(posting_iterator, column_id, GetWeight());
+    if (scorer) {
+        // nodes under "not" will not be added to scorer
+        scorer->AddDocIterator(search.get(), column_id);
+    }
     return std::move(search);
 }
 
-std::unique_ptr<DocIterator>
-AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
@@ -346,8 +347,7 @@ AndQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_rea
     }
 }
 
-std::unique_ptr<DocIterator>
-AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
@@ -358,7 +358,8 @@ AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
     }
     sub_doc_iters.emplace_back(std::move(first_iter));
     for (u32 i = 1; i < children_.size(); ++i) {
-        auto iter = children_[i]->CreateSearch(table_entry, index_reader, scorer);
+        // set scorer to nullptr, because nodes under "not" should not be added to scorer
+        auto iter = children_[i]->CreateSearch(table_entry, index_reader, nullptr);
         if (iter) {
             sub_doc_iters.emplace_back(std::move(iter));
         }
@@ -370,8 +371,7 @@ AndNotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_
     }
 }
 
-std::unique_ptr<DocIterator>
-OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
@@ -389,8 +389,7 @@ OrQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_read
     }
 }
 
-std::unique_ptr<DocIterator>
-NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, std::unique_ptr<Scorer> &scorer) const {
+std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
     return nullptr;
 }
