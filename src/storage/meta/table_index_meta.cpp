@@ -127,7 +127,7 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
 }
 
 SharedPtr<String> TableIndexMeta::ToString() {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 

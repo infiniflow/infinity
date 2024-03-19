@@ -28,6 +28,7 @@ import bitmask;
 import bitmask_buffer;
 import third_party;
 import internal_types;
+import status;
 
 namespace infinity {
 
@@ -887,7 +888,7 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        UnrecoverableError("Not implemented.");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1045,7 +1046,7 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        UnrecoverableError("Not implemented.");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1055,7 +1056,7 @@ private:
                                                 SizeT,
                                                 void *,
                                                 bool) {
-        UnrecoverableError("Not implemented.");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1065,7 +1066,7 @@ private:
                                                     SizeT,
                                                     void *,
                                                     bool) {
-        UnrecoverableError("Not implemented.");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 
     template <typename LeftType, typename RightType, typename ResultType, typename Operator>
@@ -1075,7 +1076,7 @@ private:
                                                          SizeT,
                                                          void *,
                                                          bool) {
-        UnrecoverableError("Not implemented.");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
 };
 
