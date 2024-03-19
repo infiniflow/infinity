@@ -39,29 +39,16 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     auto operation_type = ReadBufAdv<CatalogDeltaOpType>(ptr);
     auto [begin_ts, is_delete, txn_id, commit_ts] = ReadAdvBase(ptr);
     switch (operation_type) {
-        case CatalogDeltaOpType::ADD_DATABASE_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String data_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBMetaOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, data_dir);
-            break;
-        }
-        case CatalogDeltaOpType::ADD_TABLE_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddTableMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), table_name, db_entry_dir);
-            break;
-        }
         case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String db_entry_dir = ReadBufAdv<String>(ptr);
-            operation = MakeUnique<AddDBEntryOp>(begin_ts, is_delete, txn_id, commit_ts, db_name, db_entry_dir);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto db_entry_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
+            operation = MakeUnique<AddDBEntryOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(db_entry_dir));
             break;
         }
         case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String table_entry_dir = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_entry_dir = MakeShared<String>(ReadBufAdv<String>(ptr));
 
             i32 columns_size = ReadBufAdv<i32>(ptr);
             Vector<SharedPtr<ColumnDef>> columns;
@@ -84,22 +71,23 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             }
 
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
+            SegmentID unsealed_id = ReadBufAdv<SegmentID>(ptr);
             operation = MakeUnique<AddTableEntryOp>(begin_ts,
                                                     is_delete,
                                                     txn_id,
                                                     commit_ts,
                                                     std::move(db_name),
-                                                    table_name,
-                                                    table_entry_dir,
+                                                    std::move(table_name),
+                                                    std::move(table_entry_dir),
                                                     columns,
-                                                    row_count);
+                                                    row_count,
+                                                    unsealed_id);
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
-            String segment_dir = ReadBufAdv<String>(ptr);
             SegmentStatus segment_status = ReadBufAdv<SegmentStatus>(ptr);
             u64 column_count = ReadBufAdv<u64>(ptr);
             SizeT row_count = ReadBufAdv<SizeT>(ptr);
@@ -107,6 +95,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             SizeT row_capacity = ReadBufAdv<SizeT>(ptr);
             TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
+            TxnTimeStamp deprecate_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             operation = MakeUnique<AddSegmentEntryOp>(begin_ts,
                                                       is_delete,
                                                       txn_id,
@@ -114,22 +103,21 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                       std::move(db_name),
                                                       std::move(table_name),
                                                       segment_id,
-                                                      segment_dir,
                                                       segment_status,
                                                       column_count,
                                                       row_count,
-                                                      actual_row_count,
                                                       row_capacity,
+                                                      actual_row_count,
                                                       min_row_ts,
-                                                      max_row_ts);
+                                                      max_row_ts,
+                                                      deprecate_ts);
             break;
         }
         case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             BlockID block_id = ReadBufAdv<BlockID>(ptr);
-            String block_dir = ReadBufAdv<String>(ptr);
             u16 row_count = ReadBufAdv<u16>(ptr);
             u16 row_capacity = ReadBufAdv<u16>(ptr);
             TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
@@ -144,7 +132,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                     std::move(table_name),
                                                     segment_id,
                                                     block_id,
-                                                    block_dir,
                                                     row_count,
                                                     row_capacity,
                                                     min_row_ts,
@@ -154,8 +141,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             BlockID block_id = ReadBufAdv<BlockID>(ptr);
             ColumnID column_id = ReadBufAdv<ColumnID>(ptr);
@@ -172,19 +159,11 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                      next_outline_idx);
             break;
         }
-        case CatalogDeltaOpType::ADD_INDEX_META: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            operation =
-                MakeUnique<AddIndexMetaOp>(begin_ts, is_delete, txn_id, commit_ts, std::move(db_name), std::move(table_name), std::move(index_name));
-            break;
-        }
         case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            String index_dir = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            SharedPtr<String> index_dir = is_delete ? nullptr : MakeShared<String>(ReadBufAdv<String>(ptr));
             SharedPtr<IndexBase> index_base = is_delete ? nullptr : IndexBase::ReadAdv(ptr, ptr_end - ptr);
             operation = MakeUnique<AddTableIndexEntryOp>(begin_ts,
                                                          is_delete,
@@ -193,29 +172,27 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                          std::move(db_name),
                                                          std::move(table_name),
                                                          std::move(index_name),
-                                                         index_dir,
+                                                         std::move(index_dir),
                                                          index_base);
             break;
         }
         case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
-            String index_dir = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             operation = MakeUnique<AddFulltextIndexEntryOp>(begin_ts,
                                                             is_delete,
                                                             txn_id,
                                                             commit_ts,
                                                             std::move(db_name),
                                                             std::move(table_name),
-                                                            std::move(index_name),
-                                                            index_dir);
+                                                            std::move(index_name));
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            String index_name = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto index_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             TxnTimeStamp min_ts = ReadBufAdv<TxnTimeStamp>(ptr);
             TxnTimeStamp max_ts = ReadBufAdv<TxnTimeStamp>(ptr);
@@ -232,8 +209,8 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
+            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
+            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
             SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
             String segment_filter_binary_data = ReadBufAdv<String>(ptr);
             Vector<Pair<BlockID, String>> block_filter_binary_data;
@@ -254,29 +231,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                              std::move(block_filter_binary_data));
             break;
         }
-        case CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA: {
-            String db_name = ReadBufAdv<String>(ptr);
-            String table_name = ReadBufAdv<String>(ptr);
-            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
-            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
-            Vector<Pair<BlockID, String>> block_filter_binary_data;
-            i32 block_filter_binary_vector_size = ReadBufAdv<i32>(ptr);
-            for (i32 i = 0; i < block_filter_binary_vector_size; i++) {
-                BlockID block_id = ReadBufAdv<BlockID>(ptr);
-                String block_filter_binary = ReadBufAdv<String>(ptr);
-                block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
-            }
-            operation = MakeUnique<UpdateSegmentBloomFilterDataOp>(begin_ts,
-                                                                   is_delete,
-                                                                   txn_id,
-                                                                   commit_ts,
-                                                                   db_name,
-                                                                   table_name,
-                                                                   segment_id,
-                                                                   std::move(segment_filter_binary_data),
-                                                                   std::move(block_filter_binary_data));
-           break;
-        }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
     }
@@ -291,30 +245,22 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
     return operation;
 }
 
-void AddDBMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->data_dir_);
-}
-
-void AddTableMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->db_entry_dir_);
+bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
+    return this->begin_ts_ == rhs.begin_ts_ && this->txn_id_ == rhs.txn_id_ && this->commit_ts_ == rhs.commit_ts_ &&
+           this->is_delete_ == rhs.is_delete_ && this->type_ == rhs.type_;
 }
 
 void AddDBEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->db_entry_dir_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->db_entry_dir_);
 }
 
 void AddTableEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->table_entry_dir_);
+    WriteBufAdv(buf, *this->table_name_);
+    WriteBufAdv(buf, *this->table_entry_dir_);
 
     WriteBufAdv(buf, (i32)(column_defs_.size()));
     SizeT column_count = column_defs_.size();
@@ -329,6 +275,7 @@ void AddTableEntryOp::WriteAdv(char *&buf) const {
         }
     }
     WriteBufAdv(buf, this->row_count_);
+    WriteBufAdv(buf, this->unsealed_id_);
 }
 
 void AddSegmentEntryOp::WriteAdv(char *&buf) const {
@@ -336,7 +283,6 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
-    WriteBufAdv(buf, this->segment_dir_);
     WriteBufAdv(buf, this->status_);
     WriteBufAdv(buf, this->column_count_);
     WriteBufAdv(buf, this->row_count_);
@@ -344,6 +290,7 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->row_capacity_);
     WriteBufAdv(buf, this->min_row_ts_);
     WriteBufAdv(buf, this->max_row_ts_);
+    WriteBufAdv(buf, this->deprecate_ts_);
 }
 
 void AddBlockEntryOp::WriteAdv(char *&buf) const {
@@ -352,7 +299,6 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->block_id_);
-    WriteBufAdv(buf, this->block_dir_);
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->row_capacity_);
     WriteBufAdv(buf, this->min_row_ts_);
@@ -371,20 +317,13 @@ void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->next_outline_idx_);
 }
 
-void AddIndexMetaOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, *this->index_name_);
-}
-
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
-    WriteBufAdv(buf, this->index_dir_);
     if (!is_delete()) {
+        WriteBufAdv(buf, *this->index_dir_);
         index_base_->WriteAdv(buf);
     }
 }
@@ -394,7 +333,6 @@ void AddFulltextIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, *this->db_name_);
     WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, *this->index_name_);
-    WriteBufAdv(buf, this->index_dir_);
 }
 
 void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
@@ -409,8 +347,8 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
 
 void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
     WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, *this->db_name_);
+    WriteBufAdv(buf, *this->table_name_);
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->segment_filter_binary_data_);
     i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
@@ -421,143 +359,16 @@ void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
     }
 }
 
-void UpdateSegmentBloomFilterDataOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, this->db_name_);
-    WriteBufAdv(buf, this->table_name_);
-    WriteBufAdv(buf, this->segment_id_);
-    WriteBufAdv(buf, this->segment_filter_binary_data_);
-    i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
-    WriteBufAdv(buf, block_filter_binary_vector_size);
-    for (const auto &block_filter : block_filter_binary_data_) {
-        WriteBufAdv(buf, block_filter.first);
-        WriteBufAdv(buf, block_filter.second);
-    }
+const String AddDBEntryOp::ToString() const {
+    return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", *db_name_, db_entry_dir_.get() != nullptr ? *db_entry_dir_ : "nullptr");
 }
-
-void AddDBMetaOp::SaveState() {
-    this->db_name_ = *this->db_meta_->db_name();
-    this->data_dir_ = *this->db_meta_->data_dir();
-    is_saved_sate_ = true;
-}
-
-void AddTableMetaOp::SaveState() {
-    this->table_name_ = this->table_meta_->table_name();
-    this->db_entry_dir_ = this->table_meta_->db_entry_dir();
-    is_saved_sate_ = true;
-}
-
-void AddDBEntryOp::SaveState() {
-    this->is_delete_ = this->db_entry_->deleted_;
-    this->begin_ts_ = this->db_entry_->begin_ts_;
-    this->db_name_ = this->db_entry_->db_name();
-    if (!this->is_delete_) {
-        this->db_entry_dir_ = *this->db_entry_->db_entry_dir();
-    }
-    is_saved_sate_ = true;
-}
-
-void AddTableEntryOp::SaveState() {
-    this->is_delete_ = this->table_entry_->deleted_;
-    this->begin_ts_ = this->table_entry_->begin_ts_;
-    this->table_name_ = *this->table_entry_->GetTableName();
-    if (!this->is_delete_) {
-        this->table_entry_dir_ = *this->table_entry_->TableEntryDir();
-        this->column_defs_ = this->table_entry_->column_defs();
-        this->row_count_ = this->table_entry_->row_count();
-    }
-    is_saved_sate_ = true;
-}
-
-void AddSegmentEntryOp::SaveState() {
-    this->is_delete_ = segment_entry_->deleted_;
-    this->begin_ts_ = segment_entry_->begin_ts_;
-    this->segment_id_ = this->segment_entry_->segment_id();
-    this->segment_dir_ = *this->segment_entry_->segment_dir();
-    this->min_row_ts_ = this->segment_entry_->min_row_ts();
-    this->max_row_ts_ = this->segment_entry_->max_row_ts();
-    this->row_capacity_ = this->segment_entry_->row_capacity();
-    this->row_count_ = this->segment_entry_->row_count();
-    this->actual_row_count_ = this->segment_entry_->actual_row_count();
-    this->column_count_ = this->segment_entry_->column_count();
-    is_saved_sate_ = true;
-}
-
-void AddBlockEntryOp::SaveState() {
-    this->is_delete_ = block_entry_->deleted_;
-    this->begin_ts_ = block_entry_->begin_ts_;
-    this->block_id_ = this->block_entry_->block_id();
-    this->block_dir_ = this->block_entry_->DirPath();
-    this->row_count_ = this->block_entry_->row_count();
-    this->row_capacity_ = this->block_entry_->row_capacity();
-    this->min_row_ts_ = this->block_entry_->min_row_ts();
-    this->max_row_ts_ = this->block_entry_->max_row_ts();
-    this->checkpoint_ts_ = this->block_entry_->checkpoint_ts();
-    this->checkpoint_row_count_ = this->block_entry_->checkpoint_row_count();
-    is_saved_sate_ = true;
-}
-
-void AddColumnEntryOp::SaveState() {
-    this->is_delete_ = column_entry_->deleted_;
-    this->begin_ts_ = column_entry_->begin_ts_;
-    this->column_id_ = this->column_entry_->column_id();
-    this->next_outline_idx_ = this->column_entry_->OutlineBufferCount();
-    is_saved_sate_ = true;
-}
-
-/// Related to index
-void AddIndexMetaOp::SaveState() { is_saved_sate_ = true; }
-
-void AddTableIndexEntryOp::SaveState() {
-    this->is_delete_ = table_index_entry_->deleted_;
-    this->begin_ts_ = table_index_entry_->begin_ts_;
-    if (!this->is_delete_) {
-        this->index_dir_ = *this->table_index_entry_->index_dir();
-        this->index_base_ = this->table_index_entry_->table_index_def();
-    }
-    is_saved_sate_ = true;
-}
-
-void AddFulltextIndexEntryOp::SaveState() {
-    this->is_delete_ = fulltext_index_entry_->deleted_;
-    this->begin_ts_ = fulltext_index_entry_->begin_ts_;
-    this->index_dir_ = this->fulltext_index_entry_->index_dir();
-    is_saved_sate_ = true;
-}
-
-void AddSegmentIndexEntryOp::SaveState() {
-    this->is_delete_ = segment_index_entry_->deleted_;
-    this->begin_ts_ = segment_index_entry_->begin_ts_;
-    this->segment_id_ = this->segment_index_entry_->segment_id();
-    this->min_ts_ = this->segment_index_entry_->min_ts();
-    this->max_ts_ = this->segment_index_entry_->max_ts();
-    is_saved_sate_ = true;
-}
-
-void SetSegmentStatusSealedOp::SaveState() {
-    is_saved_sate_ = true;
-    this->begin_ts_ = segment_entry_->begin_ts_;
-    this->segment_id_ = this->segment_entry_->segment_id();
-}
-
-void UpdateSegmentBloomFilterDataOp::SaveState() {
-
-    is_saved_sate_ = true;
-    this->begin_ts_ = segment_entry_->begin_ts_;
-    this->segment_id_ = this->segment_entry_->segment_id();
-}
-
-const String AddDBMetaOp::ToString() const { return fmt::format("AddDBMetaOp db_name: {} data_dir: {}", db_name_, data_dir_); }
-
-const String AddTableMetaOp::ToString() const {
-    return fmt::format("AddTableMetaOp db_name: {} table_name: {} db_entry_dir: {}", *db_name_, table_name_, db_entry_dir_);
-}
-
-const String AddDBEntryOp::ToString() const { return fmt::format("AddDBEntryOp db_name: {} db_entry_dir: {}", db_name_, db_entry_dir_); }
 
 const String AddTableEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}", *db_name_, table_name_, table_entry_dir_);
+    sstream << fmt::format("AddTableEntryOp db_name: {} table_name: {} table_entry_dir: {}",
+                           *db_name_,
+                           *table_name_,
+                           table_entry_dir_.get() != nullptr ? *table_entry_dir_ : "nullptr");
     for (const auto &column_def : column_defs_) {
         sstream << fmt::format(" column_def: {}", column_def->ToString());
     }
@@ -567,13 +378,12 @@ const String AddTableEntryOp::ToString() const {
 
 const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format("AddSegmentEntryOp begin_ts: {}, commit_ts: {}, db_name: {} table_name: {} segment_id: {} segment_dir: {}\n",
+    sstream << fmt::format("AddSegmentEntryOp begin_ts: {}, commit_ts: {}, db_name: {} table_name: {} segment_id: {}\n",
                            begin_ts_,
                            commit_ts_,
                            *db_name_,
                            *table_name_,
-                           segment_id_,
-                           segment_dir_);
+                           segment_id_);
 
     sstream << fmt::format(" min_row_ts: {} max_row_ts: {} row_capacity: {} row_count: {} actual_row_count: {} column_count: {}",
                            min_row_ts_,
@@ -587,18 +397,16 @@ const String AddSegmentEntryOp::ToString() const {
 
 const String AddBlockEntryOp::ToString() const {
     std::stringstream sstream;
-    sstream << fmt::format(
-        "AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} block_dir: {} row_count: {} row_capacity: {} min_row_ts: {} "
-        "max_row_ts: {}",
-        *db_name_,
-        *table_name_,
-        segment_id_,
-        block_id_,
-        block_dir_,
-        row_count_,
-        row_capacity_,
-        min_row_ts_,
-        max_row_ts_);
+    sstream << fmt::format("AddBlockEntryOp db_name: {} table_name: {} segment_id: {} block_id: {} row_count: {} row_capacity: {} min_row_ts: {} "
+                           "max_row_ts: {}",
+                           *db_name_,
+                           *table_name_,
+                           segment_id_,
+                           block_id_,
+                           row_count_,
+                           row_capacity_,
+                           min_row_ts_,
+                           max_row_ts_);
 
     sstream << fmt::format(" checkpoint_ts: {} checkpoint_row_count: {}", checkpoint_ts_, checkpoint_row_count_);
 
@@ -615,25 +423,17 @@ const String AddColumnEntryOp::ToString() const {
                        next_outline_idx_);
 }
 
-const String AddIndexMetaOp::ToString() const {
-    return fmt::format("AddIndexMetaOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
-}
-
 const String AddTableIndexEntryOp::ToString() const {
     return fmt::format("AddTableIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {} index_base: {}",
                        *db_name_,
                        *table_name_,
                        *index_name_,
-                       index_dir_,
-                       index_base_ ? index_base_->ToString() : "nullptr");
+                       index_dir_.get() != nullptr ? *index_dir_ : "nullptr",
+                       index_base_.get() != nullptr ? index_base_->ToString() : "nullptr");
 }
 
 const String AddFulltextIndexEntryOp::ToString() const {
-    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {} index_dir: {}",
-                       *db_name_,
-                       *table_name_,
-                       *index_name_,
-                       index_dir_);
+    return fmt::format("AddFulltextIndexEntryOp db_name: {} table_name: {} index_name: {}", *db_name_, *table_name_, *index_name_);
 }
 
 const String AddSegmentIndexEntryOp::ToString() const {
@@ -647,20 +447,100 @@ const String AddSegmentIndexEntryOp::ToString() const {
 }
 
 const String SetSegmentStatusSealedOp::ToString() const {
-    return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
+    return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", *db_name_, *table_name_, segment_id_);
 }
 
-const String UpdateSegmentBloomFilterDataOp::ToString() const {
-    return fmt::format("UpdateSegmentBloomFilterDataOp db_name: {} table_name: {} segment_id: {}", db_name_, table_name_, segment_id_);
+bool AddDBEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddDBEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*db_entry_dir_, *rhs_op->db_entry_dir_);
 }
 
-void AddSegmentEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
-    this->segment_entry_->FlushDataToDisk(max_commit_ts);
-    LOG_TRACE("Segment has flushed to disk, now try set to deprecated if it was compacted before");
-    this->segment_entry_->TrySetDeprecated();
+bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddTableEntryOp *>(&rhs);
+    bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+               IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*table_entry_dir_, *rhs_op->table_entry_dir_) &&
+               table_entry_type_ == rhs_op->table_entry_type_ && row_count_ == rhs_op->row_count_ && unsealed_id_ == rhs_op->unsealed_id_ &&
+               column_defs_.size() == rhs_op->column_defs_.size();
+    if (!res) {
+        return false;
+    }
+    for (size_t i = 0; i < column_defs_.size(); ++i) {
+        if (!(*column_defs_[i] == *rhs_op->column_defs_[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
-void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { this->segment_index_entry_->Flush(max_commit_ts); }
+bool AddSegmentEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddSegmentEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && status_ == rhs_op->status_ &&
+           column_count_ == rhs_op->column_count_ && row_count_ == rhs_op->row_count_ && actual_row_count_ == rhs_op->actual_row_count_ &&
+           row_capacity_ == rhs_op->row_capacity_ && min_row_ts_ == rhs_op->min_row_ts_ && max_row_ts_ == rhs_op->max_row_ts_ &&
+           deprecate_ts_ == rhs_op->deprecate_ts_;
+}
+
+bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddBlockEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && block_id_ == rhs_op->block_id_ &&
+           row_count_ == rhs_op->row_count_ && row_capacity_ == rhs_op->row_capacity_ && min_row_ts_ == rhs_op->min_row_ts_ &&
+           max_row_ts_ == rhs_op->max_row_ts_ && checkpoint_ts_ == rhs_op->checkpoint_ts_ && checkpoint_row_count_ == rhs_op->checkpoint_row_count_;
+}
+
+bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && block_id_ == rhs_op->block_id_ &&
+           column_id_ == rhs_op->column_id_ && next_outline_idx_ == rhs_op->next_outline_idx_;
+}
+
+bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddTableIndexEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && IsEqual(*index_dir_, *rhs_op->index_dir_) &&
+           *index_base_ == *rhs_op->index_base_;
+}
+
+bool AddFulltextIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddFulltextIndexEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_);
+}
+
+bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const AddSegmentIndexEntryOp *>(&rhs);
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+           IsEqual(*table_name_, *rhs_op->table_name_) && IsEqual(*index_name_, *rhs_op->index_name_) && segment_id_ == rhs_op->segment_id_ &&
+           min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_;
+}
+
+bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) const {
+    auto *rhs_op = dynamic_cast<const SetSegmentStatusSealedOp *>(&rhs);
+    bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+               IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ &&
+               segment_filter_binary_data_ == rhs_op->segment_filter_binary_data_ &&
+               block_filter_binary_data_.size() == rhs_op->block_filter_binary_data_.size();
+    if (!res) {
+        return false;
+    }
+    for (size_t i = 0; i < block_filter_binary_data_.size(); ++i) {
+        if (block_filter_binary_data_[i].first != rhs_op->block_filter_binary_data_[i].first ||
+            block_filter_binary_data_[i].second != rhs_op->block_filter_binary_data_[i].second) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
+    LOG_TRACE(fmt::format("BlockEntry {} flush to disk", block_entry_->block_id()));
+    block_entry_->Flush(max_commit_ts);
+}
+
+void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }
 
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
@@ -735,11 +615,11 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     SizeT operation_count = operations_.size();
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
+        i32 exp_size = operation->GetSizeInBytes();
         LOG_TRACE(fmt::format("!Write {}", operation->ToString()));
         char *const save_ptr = ptr;
         operation->WriteAdv(ptr);
         i32 act_size = ptr - save_ptr;
-        i32 exp_size = operation->GetSizeInBytes();
         if (exp_size != act_size) {
             UnrecoverableError(fmt::format("catalog delta operation write failed, exp_size: {}, act_size: {}", exp_size, act_size));
         }
@@ -761,7 +641,6 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
-        operation->SaveState();
         operation->txn_id_ = txn_id;
         operation->commit_ts_ = commit_ts;
     }

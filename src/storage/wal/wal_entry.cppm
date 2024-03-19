@@ -68,9 +68,6 @@ export struct WalSegmentInfo {
     u16 block_entries_size_{};
     u32 block_capacity_{};
     u16 last_block_row_count_{};
-    u8 have_rough_filter_{};
-    String segment_filter_binary_data_{};
-    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 
     bool operator==(const WalSegmentInfo &other) const;
 

@@ -43,62 +43,57 @@ import embedding_info;
 namespace infinity {
 
 TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
+                                 bool is_delete,
                                  TableIndexMeta *table_index_meta,
-                                 SharedPtr<String> index_dir,
+                                 const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
-                                 TxnTimeStamp begin_ts,
-                                 bool is_replay)
-    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), index_base_(index_base), index_dir_(std::move(index_dir)),
-      byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
-    begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
-    txn_id_ = txn_id;
-}
-
-TableIndexEntry::TableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex), table_index_meta_(table_index_meta), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
+                                 TxnTimeStamp begin_ts)
+    : BaseEntry(EntryType::kTableIndex, is_delete), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
+      index_dir_(index_entry_dir), byte_slice_pool_(), buffer_pool_(), thread_pool_(4) {
     begin_ts_ = begin_ts; // TODO:: begin_ts and txn_id should be const and set in BaseEntry
     txn_id_ = txn_id;
 }
 
 SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<IndexBase> &index_base,
+                                                               bool is_delete,
+                                                               const SharedPtr<String> &table_entry_dir,
                                                                TableIndexMeta *table_index_meta,
                                                                Txn *txn,
                                                                TransactionID txn_id,
-                                                               TxnTimeStamp begin_ts,
-                                                               bool is_replay,
-                                                               String replay_table_index_dir) {
-
-    if (is_replay) {
-        auto table_index_entry =
-            MakeShared<TableIndexEntry>(index_base, table_index_meta, MakeShared<String>(replay_table_index_dir), txn_id, begin_ts);
-        return table_index_entry;
-    } else {
-        SharedPtr<String> index_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
-        auto table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
-
-        TableIndexEntry *table_index_entry_ptr = table_index_entry.get();
-
-        {
-            auto operation = MakeUnique<AddTableIndexEntryOp>(table_index_entry);
-            txn->AddCatalogDeltaOperation(std::move(operation));
-        }
-
-        // Get column info
-        if (index_base->column_names_.size() != 1) {
-            RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
-        }
-        if (index_base->index_type_ == IndexType::kFullText) {
-            SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
-            if (index_fulltext->homebrewed_) {
-                // TODO yzc: remove table_index_entry->fulltext_index_entry_
-            } else {
-                table_index_entry->fulltext_index_entry_ =
-                    FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry_ptr, txn, txn_id, table_index_entry->index_dir_, begin_ts);
-            }
-        }
-
-        return table_index_entry;
+                                                               TxnTimeStamp begin_ts) {
+    if (is_delete) {
+        return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
+    SharedPtr<String> index_dir =
+        is_delete ? MakeShared<String>("deleted") : DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
+    auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
+
+    // Get column info
+    if (index_base->column_names_.size() != 1) {
+        RecoverableError(Status::SyntaxError("Currently, composite index doesn't supported."));
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        SharedPtr<IndexFullText> index_fulltext = std::static_pointer_cast<IndexFullText>(index_base);
+        if (index_fulltext->homebrewed_) {
+            // TODO yzc: remove table_index_entry->fulltext_index_entry_
+        } else {
+            table_index_entry->fulltext_index_entry_ = FulltextIndexEntry::NewFulltextIndexEntry(table_index_entry.get(), txn, txn_id, begin_ts);
+        }
+    }
+
+    return table_index_entry;
+}
+
+SharedPtr<TableIndexEntry> TableIndexEntry::ReplayTableIndexEntry(TableIndexMeta *table_index_meta,
+                                                                  const SharedPtr<IndexBase> &index_base,
+                                                                  const SharedPtr<String> &index_entry_dir,
+                                                                  TransactionID txn_id,
+                                                                  TxnTimeStamp begin_ts,
+                                                                  TxnTimeStamp commit_ts,
+                                                                  bool is_delete) noexcept {
+    auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_entry_dir, txn_id, begin_ts);
+    table_index_entry->commit_ts_.store(commit_ts);
+    return table_index_entry;
 }
 
 bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
@@ -108,29 +103,6 @@ bool TableIndexEntry::IsFulltextIndexHomebrewed() const {
         homebrewed = index_fulltext->homebrewed_;
     }
     return homebrewed;
-}
-
-SharedPtr<TableIndexEntry> TableIndexEntry::NewReplayTableIndexEntry(TableIndexMeta *table_index_meta,
-                                                                     const SharedPtr<IndexBase> &index_base,
-                                                                     const SharedPtr<String> &index_dir,
-                                                                     TransactionID txn_id,
-                                                                     TxnTimeStamp begin_ts,
-                                                                     TxnTimeStamp commit_ts,
-                                                                     bool is_delete) noexcept {
-    auto table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts);
-    table_index_entry->commit_ts_.store(commit_ts);
-    table_index_entry->deleted_ = is_delete;
-    return table_index_entry;
-}
-
-SharedPtr<TableIndexEntry> TableIndexEntry::NewDropTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto dropped_index_entry = MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
-    return dropped_index_entry;
-}
-
-SharedPtr<TableIndexEntry>
-TableIndexEntry::NewDropReplayTableIndexEntry(TableIndexMeta *table_index_meta, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return MakeShared<TableIndexEntry>(nullptr, table_index_meta, nullptr, txn_id, begin_ts);
 }
 
 // For segment_index_entry
@@ -146,6 +118,9 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
         }
         if (txn_index_store->fulltext_index_entry_ != nullptr) {
             txn_index_store->fulltext_index_entry_->Commit(commit_ts);
+        }
+        if (!Committed()) {
+            commit_ts_.store(commit_ts);
         }
     }
 }
@@ -213,7 +188,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     bool deleted = index_def_entry_json["deleted"];
 
     if (deleted) {
-        auto table_index_entry = NewDropReplayTableIndexEntry(table_index_meta, txn_id, begin_ts);
+        auto table_index_entry = ReplayTableIndexEntry(table_index_meta, nullptr, nullptr, txn_id, begin_ts, commit_ts, true);
         table_index_entry->deleted_ = true;
         table_index_entry->commit_ts_.store(commit_ts);
         table_index_entry->begin_ts_ = begin_ts;
@@ -223,7 +198,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::Deserialize(const nlohmann::json &in
     auto index_dir = MakeShared<String>(index_def_entry_json["index_dir"]);
     auto index_base = IndexBase::Deserialize(index_def_entry_json["index_base"]);
 
-    SharedPtr<TableIndexEntry> table_index_entry = MakeShared<TableIndexEntry>(index_base, table_index_meta, index_dir, txn_id, begin_ts, true);
+    SharedPtr<TableIndexEntry> table_index_entry = ReplayTableIndexEntry(table_index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, false);
     table_index_entry->commit_ts_.store(commit_ts);
     table_index_entry->begin_ts_ = begin_ts;
 
@@ -246,7 +221,7 @@ Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
-        auto *buffer_mgr = txn->buffer_manager();
+        auto *buffer_mgr = txn->buffer_mgr();
         for (const auto *segment_entry : block_index->segments_) {
             fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
         }
@@ -273,7 +248,7 @@ TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_i
 Status TableIndexEntry::CreateIndexDo(const TableEntry *table_entry, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
-        UnrecoverableError("Not implemented");
+        RecoverableError(Status::NotSupport("Not implemented"));
     }
     const String &column_name = this->index_base_->column_name();
     const auto *column_def = table_entry->GetColumnDefByName(column_name);

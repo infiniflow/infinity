@@ -36,16 +36,12 @@ namespace infinity {
 
 class DBEntry;
 class TxnManager;
-class AddTableMetaOp;
 
 export struct TableMeta : public MetaInterface {
     using EntryT = TableEntry;
 
     friend class DBEntry;
     friend struct Catalog;
-
-public:
-    using MetaOp = AddTableMetaOp;
 
 public:
     inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)
@@ -66,21 +62,21 @@ public:
     [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
 
 private:
-    Tuple<TableEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                               TableEntryType table_entry_type,
-                                               const SharedPtr<String> &table_collection_name,
-                                               const Vector<SharedPtr<ColumnDef>> &columns,
-                                               TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnManager *txn_mgr,
-                                               ConflictType conflict_type);
+    Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                            TableEntryType table_entry_type,
+                                            const SharedPtr<String> &table_collection_name,
+                                            const Vector<SharedPtr<ColumnDef>> &columns,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnManager *txn_mgr,
+                                            ConflictType conflict_type);
 
-    Tuple<SharedPtr<TableEntry>, Status> DropNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
-                                                      TransactionID txn_id,
-                                                      TxnTimeStamp begin_ts,
-                                                      TxnManager *txn_mgr,
-                                                      const String &table_name,
-                                                      ConflictType conflict_type);
+    Tuple<SharedPtr<TableEntry>, Status> DropEntry(std::shared_lock<std::shared_mutex> &&r_lock,
+                                                   TransactionID txn_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   TxnManager *txn_mgr,
+                                                   const String &table_name,
+                                                   ConflictType conflict_type);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -92,11 +88,21 @@ private:
         return table_entry_list_.GetEntryNolock(txn_id, begin_ts);
     }
 
-    Tuple<TableEntry *, Status> GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return table_entry_list_.GetEntryReplay(txn_id, begin_ts);
-    }
+    void DeleteEntry(TransactionID txn_id);
 
-    void DeleteNewEntry(TransactionID txn_id);
+    // replay
+    void CreateEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           std::function<void(TableEntry *)> &&update_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
+    void DropEntryReplay(std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    // GetEntryReplay(txn_id, begin_ts);
+    TableEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
 
 private:
     SharedPtr<String> db_entry_dir_{};

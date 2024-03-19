@@ -32,14 +32,13 @@ class IndexFullText;
 
 export struct FulltextIndexEntry : public BaseEntry {
 public:
-    FulltextIndexEntry(TableIndexEntry *table_index_entry, SharedPtr<String> index_dir, TransactionID txn_id, TxnTimeStamp begin_ts);
+    FulltextIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
     ~FulltextIndexEntry() override = default;
 
     static SharedPtr<FulltextIndexEntry>
-    NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, SharedPtr<String> index_dir, TxnTimeStamp begin_ts);
+    NewFulltextIndexEntry(TableIndexEntry *table_index_entry, Txn *txn, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static SharedPtr<FulltextIndexEntry> NewReplayFulltextIndexEntry(TableIndexEntry *table_index_entry,
-                                                                     SharedPtr<String> index_dir,
                                                                      TransactionID txn_id,
                                                                      TxnTimeStamp begin_ts,
                                                                      TxnTimeStamp commit_ts,
@@ -59,14 +58,13 @@ private:
 
 public:
     const TableIndexEntry *table_index_entry() { return table_index_entry_; }
-    const String index_dir() { return *index_dir_; }
+    const SharedPtr<String> &index_dir() const;
     HashMap<u64, SharedPtr<IndexFullText>> &index_info_map() { return index_info_map_; }
 
 public:
     std::shared_mutex rw_locker_{};
 
     const TableIndexEntry *table_index_entry_{};
-    SharedPtr<String> index_dir_{};
     HashMap<u64, SharedPtr<IndexFullText>> index_info_map_{};
     UniquePtr<IRSDataStore> irs_index_{};
 };

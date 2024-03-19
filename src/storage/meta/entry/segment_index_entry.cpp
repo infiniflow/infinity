@@ -63,7 +63,7 @@ SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, Segment
 
 SharedPtr<SegmentIndexEntry>
 SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
-    auto *buffer_mgr = txn->buffer_manager();
+    auto *buffer_mgr = txn->buffer_mgr();
 
     // FIXME: estimate index size.
     auto vector_file_worker = table_index_entry->CreateFileWorker(param, segment_id);
@@ -77,10 +77,6 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
 
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
     return segment_index_entry;
 }
 
@@ -139,7 +135,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                              bool check_ts) {
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto *buffer_mgr = txn->buffer_manager();
+    auto *buffer_mgr = txn->buffer_mgr();
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
@@ -386,7 +382,7 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    RecoverableError(Status::NotSupport("Not implemented"));
                                 }
                             }
                             break;
@@ -410,19 +406,19 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
                                     break;
                                 }
                                 default: {
-                                    UnrecoverableError("Not implemented");
+                                    RecoverableError(Status::NotSupport("Not implemented"));
                                 }
                             }
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implemented");
+                            RecoverableError(Status::NotSupport("Not implemented"));
                         }
                     }
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implemented");
+                    RecoverableError(Status::NotSupport("Not implemented"));
                 }
             }
             break;
@@ -434,7 +430,7 @@ Status SegmentIndexEntry::CreateIndexDo(const IndexBase *index_base, const Colum
     return Status::OK();
 }
 
-void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { UnrecoverableError("Not implemented"); }
+void SegmentIndexEntry::UpdateIndex(TxnTimeStamp, FaissIndexPtr *, BufferManager *) { RecoverableError(Status::NotSupport("Not implemented")); }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
     if (table_index_entry_->index_base()->index_type_ == IndexType::kFullText) {

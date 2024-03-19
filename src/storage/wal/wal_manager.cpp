@@ -39,6 +39,7 @@ import infinity_exception;
 import block_entry;
 import segment_entry;
 import compact_segments_task;
+import build_fast_rough_filter_task;
 
 module wal_manager;
 
@@ -172,7 +173,6 @@ void WalManager::Flush() {
             continue;
         }
         auto [max_commit_ts, wal_size] = GetWalState();
-        u64 ckp_commit_ts;
         for (const auto &entry : que2_) {
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
             if (entry->cmds_.empty()) {
@@ -190,9 +190,6 @@ void WalManager::Flush() {
             LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
             max_commit_ts = entry->commit_ts_;
             wal_size += act_size;
-            if (entry->IsCheckPoint()) {
-                ckp_commit_ts = entry->commit_ts_;
-            }
         }
 
         switch(flush_option_) {
@@ -235,7 +232,6 @@ void WalManager::Flush() {
             throw e;
         }
         this->SetWalState(max_commit_ts, wal_size);
-        last_ckp_commit_ts_.store(ckp_commit_ts);
     }
     LOG_TRACE("WalManager::Flush mainloop end");
 }
@@ -292,7 +288,8 @@ void WalManager::Checkpoint() {
                              current_max_commit_ts));
 
         txn->Checkpoint(current_max_commit_ts, is_full_checkpoint);
-        txn_mgr->CommitTxn(txn);
+        TxnTimeStamp ckp_commit_ts = txn_mgr->CommitTxn(txn);
+        last_ckp_commit_ts_.store(ckp_commit_ts);
 
         if (is_full_checkpoint) {
             last_full_ckp_time_ = current_time;
@@ -590,7 +587,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdDropTableReplay(*dynamic_cast<const WalCmdDropTable *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             case WalCommandType::ALTER_INFO:
-                UnrecoverableError("WalCmdAlterInfo Replay Not implemented");
+                RecoverableError(Status::NotSupport("WalCmdAlterInfo Replay Not implemented"));
                 break;
             case WalCommandType::CREATE_INDEX:
                 WalCmdCreateIndexReplay(*dynamic_cast<const WalCmdCreateIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
@@ -667,14 +664,9 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         UnrecoverableError(fmt::format("Wal Replay: Get table failed {}", table_status.message()));
     }
 
-    auto [table_index_entry, index_def_entry_status] = storage_->catalog()->CreateIndex(table_entry,
-                                                                                        cmd.index_base_,
-                                                                                        ConflictType::kError,
-                                                                                        txn_id,
-                                                                                        commit_ts,
-                                                                                        nullptr,
-                                                                                        true, /*is_replay*/
-                                                                                        cmd.table_index_dir_);
+    TxnTimeStamp begin_ts = 0; // TODO: FIX IT
+    auto *table_index_entry =
+        storage_->catalog()->CreateIndexReplay(table_entry, cmd.index_base_, MakeShared<String>(cmd.table_index_dir_), txn_id, begin_ts, commit_ts);
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
 
@@ -717,10 +709,7 @@ void WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &se
 
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
-    if (!segment_info.have_rough_filter_) {
-        UnrecoverableError("ReplaySegment for import and compact: sealed segment need filter data");
-    }
-    segment_entry->LoadFilterBinaryData(segment_info.segment_filter_binary_data_, segment_info.block_filter_binary_data_);
+    BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(segment_entry.get(), storage_->buffer_manager(), commit_ts);
 
     table_entry->WalReplaySegment(segment_entry);
 }
@@ -765,8 +754,7 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
             UnrecoverableError("Assert: Replay segment should be compactable.");
         }
         segment_entry->SetNoDelete();
-        segment_entry->SetForbidCleanup(commit_ts);
-        segment_entry->TrySetDeprecated();
+        segment_entry->SetDeprecated(commit_ts);
     }
 }
 

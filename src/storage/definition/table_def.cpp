@@ -64,27 +64,7 @@ bool TableDef::operator==(const TableDef &other) const {
         // Compare each column
         const ColumnDef &cd1 = *(this->columns_[i]);
         const ColumnDef &cd2 = *(other.columns_[i]);
-        if (cd1.type_ != cd2.type_ || cd1.id_ != cd2.id_ || cd1.column_type_.get() == nullptr || cd2.column_type_.get() == nullptr ||
-            *(cd1.column_type_) != *(cd2.column_type_) || !IsEqual(cd1.name_, cd2.name_) || cd1.constraints_.size() != cd2.constraints_.size())
-            return false;
-        // Convert HashSet to Set
-        Set<ConstraintType> constraints1, constraints2;
-        for (auto &cons : cd1.constraints_) {
-            constraints1.insert(cons);
-        }
-        for (auto &cons : cd2.constraints_) {
-            constraints2.insert(cons);
-        }
-        Set<ConstraintType>::iterator it1 = constraints1.begin();
-        Set<ConstraintType>::iterator it2 = constraints2.begin();
-        for (u32 j = 0; j < constraints1.size(); j++) {
-            if (*it1 != *it2) {
-                return false;
-            }
-            it1++;
-            it2++;
-        }
-        if (cd1.build_bloom_filter_ != cd2.build_bloom_filter_) {
+        if (cd1 != cd2) {
             return false;
         }
     }

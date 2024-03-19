@@ -43,7 +43,6 @@ export enum class SegmentStatus : u8 {
     kSealed,
     kCompacting,
     kNoDelete,
-    kForbidCleanup,
     kDeprecated,
 };
 
@@ -60,25 +59,13 @@ public:
                           SizeT column_count,
                           SegmentStatus status);
 
-private:
-    static SharedPtr<SegmentEntry> InnerNewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn, SegmentStatus status);
-
-public:
-    // create unsealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewAppendSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
-
-    // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewImportSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
-
-    // create sealed entry, write delta catalog
-    static SharedPtr<SegmentEntry> NewCompactSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
+    static SharedPtr<SegmentEntry> NewSegmentEntry(TableEntry *table_entry, SegmentID segment_id, Txn *txn);
 
     static SharedPtr<SegmentEntry>
     NewReplaySegmentEntry(TableEntry *table_entry, SegmentID segment_id, const SharedPtr<String> &segment_dir, TxnTimeStamp commit_ts);
 
     static SharedPtr<SegmentEntry> NewReplayCatalogSegmentEntry(TableEntry *table_entry,
                                                                 SegmentID segment_id,
-                                                                const SharedPtr<String> &segment_dir,
                                                                 SegmentStatus status,
                                                                 u64 column_count,
                                                                 SizeT row_count,
@@ -87,6 +74,7 @@ public:
                                                                 TxnTimeStamp min_row_ts,
                                                                 TxnTimeStamp max_row_ts,
                                                                 TxnTimeStamp commit_ts,
+                                                                TxnTimeStamp deprecate_ts,
                                                                 TxnTimeStamp begin_ts,
                                                                 TransactionID txn_id);
 
@@ -95,7 +83,8 @@ public:
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
 public:
-    // Used in catalog delta operation replay, we may need to update the info of segment
+    // replay
+    //  Used in catalog delta operation replay, we may need to update the info of segment
     void UpdateSegmentInfo(SegmentStatus status,
                            SizeT row_count,
                            TxnTimeStamp min_row_ts,
@@ -104,16 +93,16 @@ public:
                            TxnTimeStamp begin_ts,
                            TransactionID txn_id);
 
+    void AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, std::function<void(BlockEntry *)> &&update_block, BlockID block_id);
+    //
+
     void SetSealed();
 
     bool TrySetCompacting(CompactSegmentsTask *compact_task);
 
     void SetNoDelete();
 
-    // TODO: Remove after refactor catalog delta operations log
-    void SetForbidCleanup(TxnTimeStamp deprecate_ts);
-
-    void TrySetDeprecated();
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
 
     void RollbackCompact();
 
@@ -140,9 +129,6 @@ public:
 
     // `this` called in wal thread, and `block_entry_` is also accessed in flush, so lock is needed
     void AppendBlockEntry(UniquePtr<BlockEntry> block_entry);
-
-    // used in Catalog::LoadFromEntry when restart
-    void SetBlockEntryAt(SizeT index, UniquePtr<BlockEntry> block_entry);
 
     FastRoughFilter *GetFastRoughFilter() { return &fast_rough_filter_; }
 
@@ -183,6 +169,11 @@ public:
     TxnTimeStamp max_row_ts() const {
         std::shared_lock lock(rw_locker_);
         return max_row_ts_;
+    }
+
+    TxnTimeStamp deprecate_ts() const {
+        std::shared_lock lock(rw_locker_);
+        return deprecate_ts_;
     }
 
     BlockEntry *GetBlockEntryByID(BlockID block_id) const;

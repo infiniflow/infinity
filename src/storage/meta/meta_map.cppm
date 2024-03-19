@@ -49,10 +49,18 @@ public:
     };
 
 public:
-    Tuple<Meta *, std::shared_lock<std::shared_mutex>>
-    GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    Tuple<Meta *, std::shared_lock<std::shared_mutex>> GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func);
+
+    Meta *GetMetaNoLock(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
+        return std::get<0>(this->GetMeta(name, std::move(init_func)));
+    }
 
     Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> GetExistMeta(const String &name, ConflictType conflict_type);
+
+    Tuple<Meta *, Status> GetExistMetaNoLock(const String &name, ConflictType conflict_type) {
+        auto [meta, status, r_lock] = this->GetExistMeta(name, conflict_type);
+        return {meta, status};
+    }
 
     MapGuard GetMetaMap() { return {meta_map_, std::shared_lock(rw_locker_)}; }
 
@@ -67,11 +75,7 @@ public:                                     // TODO: make both private
 };
 
 template <MetaConcept Meta>
-Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name,
-                                                                          std::function<UniquePtr<Meta>()> &&init_func,
-                                                                          TransactionID txn_id,
-                                                                          TxnTimeStamp begin_ts,
-                                                                          TxnManager *txn_mgr) {
+Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
     std::shared_lock r_lock(rw_locker_);
     auto iter = meta_map_.find(name);
     if (iter == meta_map_.end()) {
@@ -84,12 +88,6 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
                 iter = iter1;
             } else {
                 LOG_TRACE("Add new entry in existed meta_map");
-                // When replay database creation,if the txn_manger is nullptr, represent the txn manager not running, it is reasonable.
-                // In replay phase, not need to recording the catalog delta operation.
-                if (txn_mgr != nullptr) {
-                    auto operation = MakeUnique<typename Meta::MetaOp>(new_meta.get(), begin_ts);
-                    txn_mgr->GetTxn(txn_id)->AddCatalogDeltaOperation(std::move(operation));
-                }
                 iter = meta_map_.emplace(name, std::move(new_meta)).first;
             }
         }
@@ -108,7 +106,7 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
     }
     if (conflict_type == ConflictType::kIgnore) {
         LOG_TRACE(fmt::format("Ignore drop a non-exist meta: {}", name));
-        return {nullptr, Status::OK(), std::move(r_lock)};
+        return {nullptr, Status::Ignore(), std::move(r_lock)};
     }
 
     if constexpr (std::is_same_v<Meta, TableMeta>) {

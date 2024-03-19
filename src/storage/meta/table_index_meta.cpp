@@ -48,18 +48,14 @@ UniquePtr<TableIndexMeta> TableIndexMeta::NewTableIndexMeta(TableEntry *table_en
 
 Tuple<TableIndexEntry *, Status> TableIndexMeta::CreateTableIndexEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                                                        const SharedPtr<IndexBase> &index_base,
+                                                                       const SharedPtr<String> &table_entry_dir,
                                                                        ConflictType conflict_type,
                                                                        TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts,
-                                                                       TxnManager *txn_mgr,
-                                                                       bool is_replay,
-                                                                       String replay_table_index_dir) {
-    auto init_index_entry = [&]() {
-        Txn *txn{nullptr};
-        if (txn_mgr != nullptr) {
-            txn = txn_mgr->GetTxn(txn_id);
-        }
-        return TableIndexEntry::NewTableIndexEntry(index_base, this, txn, txn_id, begin_ts, is_replay, replay_table_index_dir);
+                                                                       TxnManager *txn_mgr) {
+    auto init_index_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        return TableIndexEntry::NewTableIndexEntry(index_base, false, table_entry_dir, this, txn, txn_id, begin_ts);
     };
     return index_entry_list_.AddEntry(std::move(r_lock), std::move(init_index_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -69,15 +65,50 @@ Tuple<SharedPtr<TableIndexEntry>, Status> TableIndexMeta::DropTableIndexEntry(st
                                                                               TransactionID txn_id,
                                                                               TxnTimeStamp begin_ts,
                                                                               TxnManager *txn_mgr) {
-    auto init_drop_entry = [&]() {
-        auto drop_entry = TableIndexEntry::NewDropTableIndexEntry(this, txn_id, begin_ts);
-        drop_entry->deleted_ = true;
-        return drop_entry;
+    auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
+        auto *txn = txn_mgr->GetTxn(txn_id);
+        return TableIndexEntry::NewTableIndexEntry(nullptr, true, nullptr, this, txn, txn_id, begin_ts);
     };
     return index_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-void TableIndexMeta::DeleteNewEntry(TransactionID txn_id) { auto erase_list = index_entry_list_.DeleteEntry(txn_id); }
+void TableIndexMeta::DeleteEntry(TransactionID txn_id) { auto erase_list = index_entry_list_.DeleteEntry(txn_id); }
+
+TableIndexEntry *TableIndexMeta::CreateEntryReplay(
+    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+    auto [entry, status] =
+        index_entry_list_.AddEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
+                                         [](TableIndexEntry *) { UnrecoverableError("TableIndexEntry is not updatable now"); },
+                                         txn_id,
+                                         begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return entry;
+}
+
+void TableIndexMeta::DropEntryReplay(
+    std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+    TransactionID txn_id,
+    TxnTimeStamp begin_ts) {
+    auto [entry, status] = index_entry_list_.DropEntryReplay(
+        [&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(this, index_name_, txn_id, begin_ts); },
+        txn_id,
+        begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return entry;
+}
 
 Tuple<SharedPtr<TableIndexInfo>, Status>
 TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -96,7 +127,7 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
 }
 
 SharedPtr<String> TableIndexMeta::ToString() {
-    UnrecoverableError("Not implemented");
+    RecoverableError(Status::NotSupport("Not implemented"));
     return nullptr;
 }
 

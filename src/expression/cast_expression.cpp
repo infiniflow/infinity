@@ -37,7 +37,6 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
         RecoverableError(Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString()));
-//        UnrecoverableError(fmt::format("Can't cast from: {} to {}", source_expr_ptr->Type().ToString(), target_type.ToString()));
     }
     return nullptr;
 }
