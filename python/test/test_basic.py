@@ -21,6 +21,7 @@ from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
+from infinity.common import ConflictType
 from utils import copy_data
 
 test_csv_file = "embedding_int_dim3.csv"
@@ -97,9 +98,9 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             db_obj = infinity_obj.get_database("default")
-            db_obj.drop_table("my_table1", if_exists=True)
+            db_obj.drop_table("my_table1", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table1", {"c1": "int, primary key"}, None)
+                "my_table1", {"c1": "int, primary key"}, ConflictType.Error)
             assert table_obj is not None
 
             res = db_obj.list_tables()
@@ -109,9 +110,9 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # index
-            db_obj.drop_table("my_table2", if_exists=True)
+            db_obj.drop_table("my_table2", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table2", {"c1": "vector,1024,float"}, None)
+                "my_table2", {"c1": "vector,1024,float"}, ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table2")
@@ -121,7 +122,7 @@ class TestCase:
                                          [index.IndexInfo("c1",
                                                           index.IndexType.IVFFlat,
                                                           [index.InitParameter("centroids_count", "128"),
-                                                           index.InitParameter("metric", "l2")])], None)
+                                                           index.InitParameter("metric", "l2")])], ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
             res = table_obj.drop_index("my_index")
@@ -131,9 +132,9 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # insert
-            db_obj.drop_table("my_table3", if_exists=True)
+            db_obj.drop_table("my_table3", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table3", {"c1": "int, primary key", "c2": "float"}, None)
+                "my_table3", {"c1": "int, primary key", "c2": "float"}, ConflictType.Error)
             assert table_obj is not None
 
             table_obj = db_obj.get_table("my_table3")
@@ -158,9 +159,9 @@ class TestCase:
             assert res.error_code == ErrorCode.OK
 
             # import
-            db_obj.drop_table("my_table4", if_exists=True)
+            db_obj.drop_table("my_table4", ConflictType.Ignore)
             table_obj = db_obj.create_table(
-                "my_table4", {"c1": "int", "c2": "vector,3,int"}, None)
+                "my_table4", {"c1": "int", "c2": "vector,3,int"}, ConflictType.Error)
             assert table_obj is not None
             table_obj = db_obj.get_table("my_table4")
             assert table_obj

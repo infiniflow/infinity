@@ -92,6 +92,7 @@ pip3 install infinity-sdk
 import infinity
 import infinity.index as index
 from infinity.common import REMOTE_HOST
+from infinity.common import ConflictType
 ```
 
 
@@ -114,9 +115,9 @@ db = infinity_obj.get_database("default")
 
 ```python
 # Drop my_table if it already exists
-db.drop_table("my_table", if_exists=True)
+db.drop_table("my_table", ConflictType.Ignore)
 # Create a table named "my_table"
-table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"}, None)
+table = db.create_table("my_table", {"num": "integer", "body": "varchar", "vec": "vector, 4, float"})
 ```
 
 

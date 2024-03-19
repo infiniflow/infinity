@@ -143,7 +143,7 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
 # Compile benchmark
 add_subdirectory(benchmark)
-
+add_subdirectory(client)
 
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")

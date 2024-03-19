@@ -19,6 +19,7 @@ from common import common_values
 import infinity
 
 from utils import copy_data
+from infinity.common import ConflictType
 
 
 class TestKnn:
@@ -36,7 +37,7 @@ class TestKnn:
         #
         db_obj = infinity_obj.get_database("default")
 
-        db_obj.drop_table("fix_tmp_20240116", if_exists=True)
+        db_obj.drop_table("fix_tmp_20240116", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("fix_tmp_20240116", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -48,7 +49,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
 
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
         if not check_data:
@@ -82,7 +83,7 @@ class TestKnn:
 
         with pytest.raises(Exception, match=r".*value count mismatch*"):
             db_obj = infinity_obj.get_database("default")
-            db_obj.drop_table("test_insert_multi_column", if_exists=True)
+            db_obj.drop_table("test_insert_multi_column", conflict_type=ConflictType.Ignore)
             table = db_obj.create_table("test_insert_multi_column", {
                 "variant_id": "varchar",
                 "gender_vector": "vector,4,float",
@@ -94,7 +95,7 @@ class TestKnn:
                 "query_gender": "varchar",
                 "query_color": "varchar",
                 "query_price": "float"
-            }, None)
+            }, ConflictType.Error)
             table.insert([{"variant_id": "123",
                            "gender_vector": [1.0] * 4,
                            "color_vector": [2.0] * 4,
@@ -120,7 +121,7 @@ class TestKnn:
                                              ])
     def test_various_vector_column_name(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_vector_column_name", if_exists=True)
+        db_obj.drop_table("test_various_vector_column_name", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_vector_column_name", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -132,7 +133,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
@@ -155,7 +156,7 @@ class TestKnn:
     ])
     def test_various_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data", if_exists=True)
+        db_obj.drop_table("test_various_embedding_data", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_embedding_data", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -167,7 +168,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
@@ -190,7 +191,7 @@ class TestKnn:
     ])
     def test_various_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_embedding_data_type", if_exists=True)
+        db_obj.drop_table("test_various_embedding_data_type", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_embedding_data_type", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -202,7 +203,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
@@ -230,7 +231,7 @@ class TestKnn:
     def test_various_distance_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type,
                                    distance_type):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_distance_type", if_exists=True)
+        db_obj.drop_table("test_various_distance_type", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_distance_type", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -242,7 +243,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"
@@ -270,7 +271,7 @@ class TestKnn:
     ])
     def test_various_topn(self, get_infinity_db, check_data, topn):
         db_obj = get_infinity_db
-        db_obj.drop_table("test_various_topn", if_exists=True)
+        db_obj.drop_table("test_various_topn", conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_topn", {
             "variant_id": "varchar",
             "gender_vector": "vector,4,float",
@@ -282,7 +283,7 @@ class TestKnn:
             "query_gender": "varchar",
             "query_color": "varchar",
             "query_price": "float"
-        }, None)
+        }, ConflictType.Error)
         if not check_data:
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/tmp/infinity/test_data/tmp_20240116.csv"

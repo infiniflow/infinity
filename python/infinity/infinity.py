@@ -48,7 +48,7 @@ class InfinityConnection(ABC):
         pass
 
     @abstractmethod
-    def describe_database(self, db_name):
+    def show_database(self, db_name):
         pass
 
     @abstractmethod
