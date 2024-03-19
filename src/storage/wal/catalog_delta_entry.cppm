@@ -99,7 +99,6 @@ public:
         return {begin_ts, is_delete, txn_id, commit_ts};
     }
 
-    virtual void SaveState() = 0;
     virtual const String ToString() const = 0;
     virtual const String EncodeIndex() const = 0;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
@@ -145,7 +144,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final { return String(fmt::format("{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_)); }
     bool operator==(const CatalogDeltaOperation &rhs) const override;
@@ -206,7 +204,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_));
@@ -280,7 +277,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *this->db_name_, *this->table_name_, this->segment_id_));
@@ -358,7 +354,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_));
@@ -431,7 +426,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_, block_id_, column_id_));
@@ -492,7 +486,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, is_delete_, *db_name_, *table_name_, *index_name_));
@@ -543,7 +536,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_));
@@ -595,7 +587,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, *index_name_, segment_id_));
@@ -665,7 +656,6 @@ public:
         return total_size;
     }
     void WriteAdv(char *&ptr) const final;
-    void SaveState() final { is_saved_sate_ = true; }
     const String ToString() const final;
     const String EncodeIndex() const final {
         return String(fmt::format("{}#{}#{}#{}#{}", i32(GetType()), txn_id_, *db_name_, *table_name_, segment_id_));

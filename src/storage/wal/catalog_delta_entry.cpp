@@ -641,7 +641,6 @@ void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) 
     this->txn_id_ = txn_id;
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
-        operation->SaveState();
         operation->txn_id_ = txn_id;
         operation->commit_ts_ = commit_ts;
     }
