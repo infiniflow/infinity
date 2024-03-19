@@ -75,7 +75,6 @@ private:
     SharedPtr<MatchExpression> match_expr_{};
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
-    bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);
 };
 
 } // namespace infinity

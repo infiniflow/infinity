@@ -160,7 +160,7 @@ TEST_F(QueryBuilderTest, test_and) {
     std::cerr << "\nQueryTree before optimization:" << std::endl;
     static_cast<QueryNode *>(and_root.get())->PrintTree(std::cerr);
     // apply query builder
-    QueryContext context;
+    FullTextQueryContext context;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
@@ -223,7 +223,7 @@ TEST_F(QueryBuilderTest, test_or) {
     std::cerr << "\nQueryTree before optimization:" << std::endl;
     static_cast<QueryNode *>(or_root.get())->PrintTree(std::cerr);
     // apply query builder
-    QueryContext context;
+    FullTextQueryContext context;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
@@ -290,7 +290,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
     std::cerr << "\nQueryTree before optimization:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
     // apply query builder
-    QueryContext context;
+    FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
@@ -363,7 +363,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     std::cerr << "\nQueryTree before optimization:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(std::cerr);
     // apply query builder
-    QueryContext context;
+    FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;

@@ -871,26 +871,21 @@ namespace infinity {
         error(yystack_[0].location, "default_field is empty");
         YYERROR;
     }
-    std::vector<std::string> terms;
-    driver.Analyze(field, yystack_[0].value.as < std::string > (), terms);
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, std::move(yystack_[0].value.as < std::string > ()));
 }
-#line 879 "search_parser.cpp"
+#line 877 "search_parser.cpp"
     break;
 
   case 15: // basic_filter: STRING OP_COLON STRING
-#line 135 "search_parser.y"
+#line 133 "search_parser.y"
                          {
-    std::vector<std::string> terms;
-    driver.Analyze(yystack_[2].value.as < std::string > (), yystack_[0].value.as < std::string > (), terms);
-    const std::string &field = yystack_[2].value.as < std::string > ();
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(yystack_[2].value.as < std::string > (), std::move(yystack_[0].value.as < std::string > ()));
 }
-#line 890 "search_parser.cpp"
+#line 885 "search_parser.cpp"
     break;
 
 
-#line 894 "search_parser.cpp"
+#line 889 "search_parser.cpp"
 
             default:
               break;
@@ -1332,7 +1327,7 @@ namespace infinity {
   SearchParser::yyrline_[] =
   {
        0,    74,    74,    79,    80,    86,    94,    95,   103,   104,
-     109,   110,   116,   119,   125,   135
+     109,   110,   116,   119,   125,   133
   };
 
   void
@@ -1370,9 +1365,9 @@ namespace infinity {
 
 #line 9 "search_parser.y"
 } // infinity
-#line 1374 "search_parser.cpp"
+#line 1369 "search_parser.cpp"
 
-#line 142 "search_parser.y"
+#line 137 "search_parser.y"
 
 
 namespace infinity{

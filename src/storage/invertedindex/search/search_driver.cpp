@@ -22,6 +22,10 @@
 #include "search_parser.h"
 #include "search_scanner.h"
 
+import term;
+import infinity_exception;
+import status;
+
 namespace infinity {
 
 std::pair<std::string, float> ParseField(const std::string_view &field) {
@@ -46,11 +50,11 @@ void ParseFields(const std::string &fields_str, std::vector<std::pair<std::strin
         size_t comma_idx = fields_str.find_first_of(',', begin_idx);
         if (comma_idx == std::string::npos) {
             auto field = ParseField(fields_str.substr(begin_idx));
-            fields.push_back(field);
+            fields.emplace_back(std::move(field));
             break;
         } else {
             auto field = ParseField(fields_str.substr(begin_idx, comma_idx - begin_idx));
-            fields.push_back(field);
+            fields.emplace_back(std::move(field));
             begin_idx = comma_idx + 1;
         }
     }
@@ -96,62 +100,64 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     if (!default_field_ptr) {
         default_field_ptr = &default_field_;
     }
-    return ParseHelper(iss, *default_field_ptr);
+    std::unique_ptr<SearchScanner> scanner;
+    std::unique_ptr<SearchParser> parser;
+    std::unique_ptr<QueryNode> result;
+    try {
+        scanner = std::make_unique<SearchScanner>(&iss);
+        parser = std::make_unique<SearchParser>(*scanner, *this, *default_field_ptr, result);
+    } catch (std::bad_alloc &ba) {
+        std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
+        return nullptr;
+    }
+    constexpr int accept = 0;
+    if (parser->parse() != accept) {
+        return nullptr;
+    }
+    return result;
 }
 
-std::unique_ptr<QueryNode> SearchDriver::BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms) {
-    if (terms.size() == 1) {
+std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
+    if (text.empty()) {
+        RecoverableError(Status::SyntaxError("Empty query text"));
+        return nullptr;
+    }
+    TermList terms;
+    // 1. analyze
+    bool analyzed = false;
+    if (!field.empty()) {
+        if (auto it = field2analyzer_.find(field); it != field2analyzer_.end()) {
+            if (const std::string &analyzer_name = it->second; !analyzer_name.empty()) {
+                auto analyzer_func = reinterpret_cast<void (*)(const std::string &, std::string &&, TermList &)>(analyze_func_);
+                analyzer_func(analyzer_name, std::move(text), terms);
+                analyzed = true;
+            }
+        }
+    }
+    // 2. build query node
+    if (!analyzed) {
         auto result = std::make_unique<TermQueryNode>();
-        result->term_ = std::move(terms[0]);
+        result->term_ = std::move(text);
+        result->column_ = field;
+        return result;
+    } else if (terms.empty()) {
+        RecoverableError(Status::SyntaxError("Empty terms after analyzing"));
+        return nullptr;
+    } else if (terms.size() == 1) {
+        auto result = std::make_unique<TermQueryNode>();
+        result->term_ = std::move(terms.front().text_);
         result->column_ = field;
         return result;
     } else {
         auto result = std::make_unique<OrQueryNode>();
-        for (std::string &term : terms) {
+        for (auto &term : terms) {
             auto subquery = std::make_unique<TermQueryNode>();
-            subquery->term_ = std::move(term);
+            subquery->term_ = std::move(term.text_);
             subquery->column_ = field;
             result->Add(std::move(subquery));
         }
         return result;
     }
-}
-
-void SearchDriver::Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) const {
-    if (field.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    auto it = field2analyzer_.find(field);
-    if (it == field2analyzer_.end()) {
-        terms.push_back(text);
-        return;
-    }
-    const std::string &analyzer_name = it->second;
-    if (analyzer_name.empty()) {
-        terms.push_back(text);
-        return;
-    }
-    analyze_func_(analyzer_name, text, terms);
-}
-
-std::unique_ptr<QueryNode> SearchDriver::ParseHelper(std::istream &stream, const std::string &default_field) const {
-    std::unique_ptr<SearchScanner> scanner;
-    std::unique_ptr<SearchParser> parser;
-    std::unique_ptr<QueryNode> result;
-    try {
-        scanner = std::make_unique<SearchScanner>(&stream);
-        parser = std::make_unique<SearchParser>(*scanner, *this, default_field, result);
-    } catch (std::bad_alloc &ba) {
-        std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
-        return nullptr;
-    }
-
-    const int accept(0);
-    if (parser->parse() != accept) {
-        return nullptr;
-    }
-    return result;
 }
 
 } // namespace infinity

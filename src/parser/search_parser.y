@@ -128,15 +128,10 @@ basic_filter
         error(@1, "default_field is empty");
         YYERROR;
     }
-    std::vector<std::string> terms;
-    driver.Analyze(field, $1, terms);
-    $$ = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move($1));
 }
 | STRING OP_COLON STRING {
-    std::vector<std::string> terms;
-    driver.Analyze($1, $3, terms);
-    const std::string &field = $1;
-    $$ = SearchDriver::BuildQueryNodeByFieldAndTerms(field, terms);
+    $$ = driver.AnalyzeAndBuildQueryNode($1, std::move($3));
 };
 
 %%
