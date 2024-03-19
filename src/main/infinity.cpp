@@ -293,6 +293,22 @@ QueryResult Infinity::GetTable(const String &db_name, const String &table_name) 
     return result;
 }
 
+QueryResult Infinity::ListTableIndexes(const String &db_name, const String &table_name){
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    show_statement->table_name_ = table_name;
+    show_statement->show_type_ = ShowStmtType::kIndexes;
+    QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
+    return result;
+
+}
+
 QueryResult Infinity::CreateIndex(const String &db_name,
                                   const String &table_name,
                                   const String &index_name,
