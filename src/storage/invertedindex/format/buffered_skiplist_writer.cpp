@@ -18,6 +18,8 @@ BufferedSkipListWriter::BufferedSkipListWriter(MemoryPool *byte_slice_pool, Memo
     : BufferedByteSlice(byte_slice_pool, buffer_pool), last_key_(0), last_value1_(0) {}
 
 void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
+    assert(key > last_key_);
+    assert(value1 > last_value1_);
     PushBack(0, key - last_key_);
     PushBack(1, value1 - last_value1_);
     last_key_ = key;
@@ -30,6 +32,7 @@ void BufferedSkipListWriter::AddItem(u32 key, u32 value1, u32 value2) {
 }
 
 void BufferedSkipListWriter::AddItem(u32 key, u32 value1) {
+    assert(key > last_key_);
     PushBack(0, key - last_key_);
     PushBack(1, value1);
     EndPushBack();
