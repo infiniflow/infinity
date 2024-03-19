@@ -1,5 +1,6 @@
 module;
 
+module doc_list_encoder;
 import stl;
 import memory_pool;
 import file_writer;
@@ -14,7 +15,6 @@ import inmem_tri_value_skiplist_reader;
 import index_defines;
 import skiplist_reader;
 import vbyte_compressor;
-module doc_list_encoder;
 
 namespace infinity {
 
@@ -34,6 +34,7 @@ DocListEncoder::DocListEncoder(const DocListFormatOption &format_option,
     if (format_option_.HasTfBitmap()) {
         tf_bitmap_writer_ = new PositionBitmapWriter(byte_slice_pool_);
     }
+    CreateDocSkipListWriter();
 }
 
 DocListEncoder::~DocListEncoder() {
@@ -130,7 +131,7 @@ void DocListEncoder::Load(const SharedPtr<FileReader> &file) {
     current_tf_ = file->ReadVInt();
     total_tf_ = file->ReadVInt();
     df_ = file->ReadVInt();
-    CreateDocSkipListWriter();
+
     doc_skiplist_writer_->Load(file);
     doc_list_buffer_.Load(file);
 }

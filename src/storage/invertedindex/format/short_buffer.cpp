@@ -1,13 +1,12 @@
 module;
 
+module short_buffer;
 import stl;
 import memory_pool;
 import index_defines;
 import posting_value;
 import file_writer;
 import file_reader;
-
-module short_buffer;
 
 namespace infinity {
 
@@ -77,23 +76,25 @@ void ShortBuffer::BufferMemoryCopy(u8 *dst, u8 dst_col_count, u8 *src, u8 src_co
 
 void ShortBuffer::Dump(const SharedPtr<FileWriter> &file) {
     file->WriteVInt(size_);
+    file->WriteVInt(capacity_);
     if (size_ > 0) {
         for (u8 i = 0; i < posting_values_->GetSize(); ++i) {
             const PostingValue *value = posting_values_->GetValue(i);
             u8 *buffer = GetRow(i);
-            file->Write((char *)buffer, size_ * value->GetSize());
+            file->Write((char *)buffer, (u32)size_ * value->GetSize());
         }
     }
 }
 
 void ShortBuffer::Load(const SharedPtr<FileReader> &file) {
     size_ = file->ReadVInt();
+    capacity_ = file->ReadVInt();
     if (size_ > 0) {
-        Reserve(size_);
+        Reserve(capacity_);
         for (u8 i = 0; i < posting_values_->GetSize(); ++i) {
             const PostingValue *value = posting_values_->GetValue(i);
             u8 *buffer = GetRow(i);
-            file->Read((char *)buffer, size_ * value->GetSize());
+            file->Read((char *)buffer, (u32)size_ * value->GetSize());
         }
     }
 }

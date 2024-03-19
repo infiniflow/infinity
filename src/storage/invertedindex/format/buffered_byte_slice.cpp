@@ -1,12 +1,12 @@
 module;
 
+module buffered_byte_slice;
 import stl;
 import memory_pool;
 import posting_value;
 import flush_info;
 import file_writer;
 import file_reader;
-module buffered_byte_slice;
 
 namespace infinity {
 
@@ -43,15 +43,21 @@ SizeT BufferedByteSlice::Flush() {
 void BufferedByteSlice::Dump(const SharedPtr<FileWriter> &file, bool spill) {
     if (spill) {
         buffer_.Dump(file);
+        file->WriteVLong(flush_info_.flush_info_);
         u32 byte_slice_size = posting_writer_.GetSize();
         file->WriteVInt(byte_slice_size);
+        if (byte_slice_size == 0)
+            return;
     }
     posting_writer_.Dump(file);
 }
 
 void BufferedByteSlice::Load(const SharedPtr<FileReader> &file) {
     buffer_.Load(file);
+    flush_info_.flush_info_ = file->ReadVLong();
     u32 byte_slice_size = file->ReadVInt();
+    if (byte_slice_size == 0)
+        return;
     posting_writer_.Load(file, byte_slice_size);
 }
 

@@ -20,27 +20,9 @@ public:
     PositionListEncoder(const PositionListFormatOption &pos_list_format_option,
                         MemoryPool *byte_slice_pool,
                         MemoryPool *buffer_pool,
-                        const PositionListFormat *pos_list_format = nullptr)
-        : pos_list_buffer_(byte_slice_pool, buffer_pool), last_pos_in_cur_doc_(0), total_pos_count_(0),
-          pos_list_format_option_(pos_list_format_option), is_own_format_(false), pos_skiplist_writer_(nullptr), pos_list_format_(pos_list_format),
-          byte_slice_pool_(byte_slice_pool) {
-        if (!pos_list_format) {
-            pos_list_format_ = new PositionListFormat(pos_list_format_option);
-            is_own_format_ = true;
-        }
-        pos_list_buffer_.Init(pos_list_format_);
-    }
+                        const PositionListFormat *pos_list_format = nullptr);
 
-    ~PositionListEncoder() {
-        if (pos_skiplist_writer_) {
-            pos_skiplist_writer_->~BufferedSkipListWriter();
-            pos_skiplist_writer_ = nullptr;
-        }
-        if (is_own_format_) {
-            delete pos_list_format_;
-            pos_list_format_ = nullptr;
-        }
-    }
+    ~PositionListEncoder();
 
     void AddPosition(pos_t pos);
     void EndDocument();
