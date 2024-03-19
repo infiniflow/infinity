@@ -40,7 +40,7 @@ CREATE INDEX [[IF NOT EXISTS] name] ON table_name (column_name[, ...]) USING met
 * expression  
     An expression based on one or more columns of the table. The expression usually must be written with surrounding parentheses, as shown in the syntax. However, the parentheses can be omitted if the expression has the form of a function call.
 * index_parameter  
-    A parameter to be associated with the index method. The allowed parameters vary depending on the index method being used. See the documentation for the individual index methods for details. See [Index Parameters](#index-parameters) below for details.
+    A parameter to be associated with the index method. The allowed parameters vary depending on the index method being used. See the documentation for the individual index methods for details. 
 
 
 ### DROP INDEX
