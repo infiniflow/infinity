@@ -119,6 +119,7 @@ private:
     TxnTimeStamp max_commit_ts_{};
     i64 wal_size_{};
     atomic_u64 last_ckp_commit_ts_{};
+    atomic_u64 last_deltaop_commit_ts_{};
 
     // Only Checkpoint thread access following members
     i64 last_full_ckp_wal_size_{};

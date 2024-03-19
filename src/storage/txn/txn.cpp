@@ -52,11 +52,11 @@ import default_values;
 namespace infinity {
 
 Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, Catalog *catalog, BGTaskProcessor *bg_task_processor, TransactionID txn_id)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_id_(txn_id),
-      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+    : txn_store_(this, catalog), txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog),
+      txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
+    : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), wal_entry_(MakeShared<WalEntry>()),
       local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
@@ -68,8 +68,6 @@ UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr,
 Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
     this->CheckTxn(db_name);
 
-    String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
-    Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
     const auto [block_cnt, last_block_row_count] = segment_entry->GetWalInfo();
     // build WalCmd
     wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name,
@@ -78,15 +76,7 @@ Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<Se
                                                                         segment_entry->segment_id(),
                                                                         static_cast<u16>(block_cnt),
                                                                         DEFAULT_BLOCK_CAPACITY, // TODO: store block capacity in segment_entry
-                                                                        last_block_row_count,
-                                                                        u8(1), // have_rough_filter_: true
-                                                                        segment_filter_binary_data,
-                                                                        block_filter_binary_data}));
-
-    // build delta catalog operation
-    auto catalog_delta_op =
-        MakeUnique<UpdateSegmentBloomFilterDataOp>(segment_entry.get(), std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
-    this->AddCatalogDeltaOperation(std::move(catalog_delta_op));
+                                                                        last_block_row_count}));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_name);
     table_store->Import(std::move(segment_entry));
@@ -132,25 +122,18 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
     return compact_status;
 }
 
-TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
-    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
-        return iter->second.get();
-    }
-    auto [table_entry, status] = this->GetTableByName(db_name_, table_name);
-    if (table_entry == nullptr) {
-        UnrecoverableError(status.message());
-    }
-    auto [iter, insert_ok] = txn_tables_store_.emplace(table_name, MakeUnique<TxnTableStore>(table_entry, this));
-    return iter->second.get();
-}
+TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
 
-TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) {
-    const String &table_name = *table_entry->GetTableName();
-    if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
-        return iter->second.get();
+TxnTableStore *Txn::GetTxnTableStore(const String &table_name) {
+    auto *store = txn_store_.GetTxnTableStore(table_name);
+    if (store == nullptr) {
+        auto [table_entry, status] = this->GetTableByName(db_name_, table_name);
+        if (table_entry == nullptr) {
+            UnrecoverableError(status.message());
+        }
+        store = txn_store_.GetTxnTableStore(table_entry);
     }
-    auto [iter, insert_ok] = txn_tables_store_.emplace(table_name, MakeUnique<TxnTableStore>(table_entry, this));
-    return iter->second.get();
+    return store;
 }
 
 void Txn::CheckTxnStatus() {
@@ -180,7 +163,7 @@ Status Txn::CreateDatabase(const String &db_name, ConflictType conflict_type) {
     if (db_entry == nullptr) { // nullptr means some exception happened
         return status;
     }
-    this->AddDBStore(db_entry);
+    txn_store_.AddDBStore(db_entry);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(db_name));
     return Status::OK();
@@ -194,7 +177,7 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     if (dropped_db_entry.get() == nullptr) {
         return status;
     }
-    this->DropDBStore(dropped_db_entry.get());
+    txn_store_.DropDBStore(dropped_db_entry.get());
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
     return Status::OK();
@@ -247,7 +230,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
         return table_status;
     }
 
-    this->AddTableStore(table_entry);
+    txn_store_.AddTableStore(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(db_name, table_def));
 
     return Status::OK();
@@ -264,7 +247,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
         return table_status;
     }
 
-    this->DropTableStore(table_entry.get());
+    txn_store_.DropTableStore(table_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
     return Status::OK();
 }
@@ -277,7 +260,7 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
-    auto *txn_table_store = this->GetTxnTableStore(table_entry);
+    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     txn_table_store->AddIndexStore(table_index_entry);
     return {table_index_entry, index_status};
 }
@@ -299,20 +282,14 @@ Status Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef 
     auto [fulltext_index_entry, segment_index_entries, status] =
         table_index_entry->CreateIndexPrepare(table_entry, table_ref->block_index_.get(), this, prepare, false, check_ts);
     if (!status.ok()) {
-        return status;
+        return Status::OK();
     }
 
-    auto *txn_table_store = this->GetTxnTableStore(table_entry);
+    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     if (fulltext_index_entry == nullptr) {
         txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
     } else {
         txn_table_store->AddFulltextIndexStore(table_index_entry, fulltext_index_entry);
-    }
-
-    if (!prepare) {
-        String index_dir = *table_index_entry->index_dir();
-        auto index_base = table_index_entry->table_index_def();
-        wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
     }
     return Status::OK();
 }
@@ -330,6 +307,13 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     }
 
     return table_index_entry->CreateIndexDo(table_entry, create_index_idxes);
+}
+
+Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
+    String index_dir = *table_index_entry->index_dir();
+    auto index_base = table_index_entry->table_index_def();
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), index_dir, index_base));
+    return Status::OK();
 }
 
 Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
@@ -439,32 +423,17 @@ TxnTimeStamp Txn::Commit() {
 }
 
 void Txn::CommitBottom() noexcept {
-
     // prepare to commit txn local data into table
-    for (const auto &[table_name, table_store] : txn_tables_store_) {
-        table_store->PrepareCommit();
-    }
+    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
+
+    // Append data, trigger compaction
+    txn_store_.PrepareCommit(txn_id_, commit_ts, buffer_mgr_);
 
     txn_context_.SetTxnCommitted();
 
-    // Commit the prepared data
-    for (const auto &name_table_pair : txn_tables_store_) {
-        TxnTableStore *table_local_store = name_table_pair.second.get();
-        table_local_store->Commit();
-        table_local_store->TryTriggerCompaction(bg_task_processor_, txn_mgr_);
-    }
+    txn_store_.CommitBottom(txn_id_, commit_ts, bg_task_processor_, txn_mgr_);
 
-    TxnTimeStamp commit_ts = txn_context_.GetCommitTS();
-
-    // Commit databases to memory catalog
-    for (auto *db_entry : txn_dbs_) {
-        db_entry->Commit(commit_ts);
-    }
-
-    // Commit tables to memory catalog
-    for (auto *table_entry : txn_tables_) {
-        table_entry->Commit(commit_ts);
-    }
+    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
@@ -501,21 +470,7 @@ void Txn::Rollback() {
     TxnTimeStamp abort_ts = txn_mgr_->GetTimestamp();
     txn_context_.SetTxnRollbacking(abort_ts);
 
-    for (auto *table_entry : txn_tables_) {
-        table_entry->Cleanup();
-        Catalog::RemoveTableEntry(table_entry, txn_id_);
-    }
-
-    for (auto *db_entry : txn_dbs_) {
-        db_entry->Cleanup();
-        catalog_->RemoveDBEntry(db_entry, txn_id_);
-    }
-
-    // Rollback the prepared data
-    for (const auto &name_table_pair : txn_tables_store_) {
-        TxnTableStore *table_local_store = name_table_pair.second.get();
-        table_local_store->Rollback();
-    }
+    txn_store_.Rollback(txn_id_, abort_ts);
 
     txn_context_.SetTxnRollbacked();
 
@@ -523,10 +478,6 @@ void Txn::Rollback() {
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
-
-// called by worker thread when create new entry
-// Add lock because multiple threads may add catalog
-void Txn::AddCatalogDeltaOperation(UniquePtr<CatalogDeltaOperation> operation) { local_catalog_delta_ops_entry_->AddOperation(std::move(operation)); }
 
 void Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
@@ -561,31 +512,6 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     // catalog_->SaveDeltaCatalog(delta_path, max_commit_ts, true);
     UniquePtr<String> catalog_path_ptr = catalog_->SaveFullCatalog(dir_name, max_commit_ts);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, *catalog_path_ptr));
-}
-
-void Txn::AddDBStore(DBEntry *db_entry) { txn_dbs_.insert(db_entry); }
-
-void Txn::DropDBStore(DBEntry *dropped_db_entry) {
-    if (txn_dbs_.contains(dropped_db_entry)) {
-        txn_dbs_.erase(dropped_db_entry);
-        dropped_db_entry->Cleanup();
-    } else {
-        txn_dbs_.insert(dropped_db_entry);
-    }
-}
-
-void Txn::AddTableStore(TableEntry *table_entry) { txn_tables_.insert(table_entry); }
-
-void Txn::DropTableStore(TableEntry *dropped_table_entry) {
-    if (txn_tables_.contains(dropped_table_entry)) {
-        txn_tables_.erase(dropped_table_entry);
-        if (catalog_->CheckAllowCleanup(dropped_table_entry)) {
-            dropped_table_entry->Cleanup();
-        }
-        txn_tables_store_.erase(*dropped_table_entry->GetTableName());
-    } else {
-        txn_tables_.insert(dropped_table_entry);
-    }
 }
 
 } // namespace infinity

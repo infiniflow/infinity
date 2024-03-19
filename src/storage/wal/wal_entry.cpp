@@ -35,23 +35,11 @@ namespace infinity {
 
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
     return segment_dir_ == other.segment_dir_ && segment_id_ == other.segment_id_ && block_entries_size_ == other.block_entries_size_ &&
-           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_ &&
-           have_rough_filter_ == other.have_rough_filter_ && segment_filter_binary_data_ == other.segment_filter_binary_data_ &&
-           block_filter_binary_data_ == other.block_filter_binary_data_;
+           block_capacity_ == other.block_capacity_ && last_block_row_count_ == other.last_block_row_count_;
 }
 
 i32 WalSegmentInfo::GetSizeInBytes() const {
     i32 sz = sizeof(i32) + segment_dir_.size() + sizeof(SegmentID) + sizeof(u16) + sizeof(u32) + sizeof(u16);
-    sz += sizeof(have_rough_filter_);
-    if (have_rough_filter_) {
-        sz += ::infinity::GetSizeInBytes(segment_filter_binary_data_);
-        i32 block_filter_string_data_size = block_filter_binary_data_.size();
-        sz += sizeof(block_filter_string_data_size);
-        for (i32 i = 0; i < block_filter_string_data_size; ++i) {
-            const Pair<BlockID, String> &data = block_filter_binary_data_[i];
-            sz += ::infinity::GetSizeInBytes(data.first) + ::infinity::GetSizeInBytes(data.second);
-        }
-    }
     return sz;
 }
 
@@ -61,17 +49,6 @@ void WalSegmentInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, block_entries_size_);
     WriteBufAdv(buf, block_capacity_);
     WriteBufAdv(buf, last_block_row_count_);
-    WriteBufAdv(buf, have_rough_filter_);
-    if (have_rough_filter_) {
-        WriteBufAdv(buf, segment_filter_binary_data_);
-        i32 block_filter_string_data_size = block_filter_binary_data_.size();
-        WriteBufAdv(buf, block_filter_string_data_size);
-        for (i32 i = 0; i < block_filter_string_data_size; ++i) {
-            const Pair<BlockID, String> &data = block_filter_binary_data_[i];
-            WriteBufAdv(buf, data.first);
-            WriteBufAdv(buf, data.second);
-        }
-    }
 }
 
 WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
@@ -80,26 +57,7 @@ WalSegmentInfo WalSegmentInfo::ReadBufferAdv(char *&ptr) {
     u16 block_entries_size = ReadBufAdv<u16>(ptr);
     u32 block_capacity = ReadBufAdv<u32>(ptr);
     u16 last_block_row_count = ReadBufAdv<u16>(ptr);
-    u8 have_rough_filter = ReadBufAdv<u8>(ptr);
-    String segment_filter_binary_data;
-    Vector<Pair<BlockID, String>> block_filter_binary_data;
-    if (have_rough_filter) {
-        segment_filter_binary_data = ReadBufAdv<String>(ptr);
-        i32 count = ReadBufAdv<i32>(ptr);
-        block_filter_binary_data.resize(count);
-        for (auto &data : block_filter_binary_data) {
-            data.first = ReadBufAdv<BlockID>(ptr);
-            data.second = ReadBufAdv<String>(ptr);
-        }
-    }
-    return {std::move(segment_dir),
-            segment_id,
-            block_entries_size,
-            block_capacity,
-            last_block_row_count,
-            have_rough_filter,
-            std::move(segment_filter_binary_data),
-            std::move(block_filter_binary_data)};
+    return {std::move(segment_dir), segment_id, block_entries_size, block_capacity, last_block_row_count};
 }
 
 SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {

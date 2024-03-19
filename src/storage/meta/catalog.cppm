@@ -125,6 +125,19 @@ public:
 
     void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
 
+    // replay
+    void CreateDatabaseReplay(const SharedPtr<String> &db_name,
+                              std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp begin_ts);
+
+    void DropDatabaseReplay(const String &db_name,
+                            std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                            TransactionID txn_id,
+                            TxnTimeStamp begin_ts);
+
+    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -157,9 +170,14 @@ public:
                                                  ConflictType conflict_type,
                                                  TransactionID txn_id,
                                                  TxnTimeStamp begin_ts,
-                                                 TxnManager *txn_mgr,
-                                                 bool is_replay = false,
-                                                 String replay_table_index_dir = "");
+                                                 TxnManager *txn_mgr);
+
+    TableIndexEntry *CreateIndexReplay(TableEntry *table_entry,
+                                       const SharedPtr<IndexBase> &index_base,
+                                       const SharedPtr<String> &index_entry_dir,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts,
+                                       TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<TableIndexEntry>, Status> DropIndex(const String &db_name,
                                                         const String &table_name,
@@ -190,8 +208,7 @@ public:
 
     static Status RollbackDelete(TableEntry *table_entry, TransactionID txn_id, DeleteState &append_state, BufferManager *buffer_mgr);
 
-    static Status
-    CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
+    static Status CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
 
     static Status RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store);
 
@@ -204,9 +221,6 @@ public:
 
     // This not add row count
     static void AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segment_entry);
-
-    // Check if allow drop table
-    bool CheckAllowCleanup(TableEntry *dropped_table_entry);
 
 public:
     // Function related methods

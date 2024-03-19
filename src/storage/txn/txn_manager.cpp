@@ -38,9 +38,10 @@ TxnManager::TxnManager(Catalog *catalog,
                        BGTaskProcessor *bg_task_processor,
                        PutWalEntryFn put_wal_entry_fn,
                        TransactionID start_txn_id,
-                       TxnTimeStamp start_ts)
+                       TxnTimeStamp start_ts,
+                       bool enable_compaction)
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
-      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false) {
+      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false), enable_compaction_(enable_compaction) {
     catalog_->SetTxnMgr(this);
 }
 
@@ -51,6 +52,7 @@ Txn *TxnManager::CreateTxn() {
     }
     rw_locker_.lock();
     TransactionID new_txn_id = GetNewTxnID();
+    // LOG_INFO(fmt::format("Create new txn: {}", new_txn_id));
     UniquePtr<Txn> new_txn = MakeUnique<Txn>(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id);
     Txn *res = new_txn.get();
     txn_map_[new_txn_id] = std::move(new_txn);
@@ -167,11 +169,25 @@ void TxnManager::RollBackTxn(Txn *txn) {
 }
 
 void TxnManager::AddWaitFlushTxn(TransactionID txn_id) {
+    // std::stringstream ss;
+    // for (auto txn_id : wait_flush_txns_) {
+    //     ss << txn_id << " ";
+    // }
+    // LOG_INFO(fmt::format("Current wait flush set: {}, add txn: {} to wait flush set", ss.str(), txn_id));
     std::unique_lock w_lock(rw_locker_);
     wait_flush_txns_.insert(txn_id);
 }
 
 void TxnManager::RemoveWaitFlushTxns(const Vector<TransactionID> &txn_ids) {
+    // std::stringstream ss1;
+    // for (auto txn_id : wait_flush_txns_) {
+    //     ss1 << txn_id << " ";
+    // }
+    // std::stringstream ss2;
+    // for (auto txn_id : txn_ids) {
+    //     ss2 << txn_id << " ";
+    // }
+    // LOG_INFO(fmt::format("Current wait flush set: {}, Remove txn: {} from wait flush set", ss1.str(), ss2.str()));
     std::unique_lock w_lock(rw_locker_);
     for (auto txn_id : txn_ids) {
         if (!wait_flush_txns_.erase(txn_id)) {
@@ -184,12 +200,17 @@ TxnTimeStamp TxnManager::GetMinUnflushedTS() {
     std::shared_lock r_locker(rw_locker_);
     for (auto iter = ts_map_.begin(); iter != ts_map_.end();) {
         auto &[ts, txn_id] = *iter;
-        if (txn_map_.find(txn_id) != txn_map_.end() || wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
+        if (txn_map_.find(txn_id) != txn_map_.end()) {
+            LOG_TRACE(fmt::format("Txn: {} not found in txn map", txn_id));
+            return ts;
+        }
+        if (wait_flush_txns_.find(txn_id) != wait_flush_txns_.end()) {
+            LOG_TRACE(fmt::format("Txn: {} wait flush", txn_id));
             return ts;
         }
         iter = ts_map_.erase(iter);
     }
-    // no txn is active, return the next ts
+    LOG_TRACE(fmt::format("No txn is active, return the next ts {}", start_ts_));
     return start_ts_;
 }
 

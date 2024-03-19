@@ -40,6 +40,21 @@ ColumnDef::ColumnDef(int64_t id, std::shared_ptr<DataType> column_type, std::str
 ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr)
     : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)) {}
 
+bool ColumnDef::operator==(const ColumnDef &other) const {
+    bool res = type_ == other.type_ && id_ == other.id_ && name_ == other.name_ && column_type_ != nullptr && other.column_type_ != nullptr &&
+               *column_type_ == *other.column_type_ && constraints_.size() == other.constraints_.size() &&
+               build_bloom_filter_ == other.build_bloom_filter_;
+    if (!res) {
+        return false;
+    }
+    for (auto &con : constraints_) {
+        if (!other.constraints_.contains(con)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::string ColumnDef::ToString() const {
     std::stringstream ss;
     ss << name_ << " " << column_type_->ToString();

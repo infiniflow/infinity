@@ -53,18 +53,19 @@ void UpdateSegmentBloomFilterTask::Execute() {
     ExecuteInner(segment_, txn_mgr_);
 }
 
+// deprecated temporary
 void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManager *txn_mgr) {
     // create txn
     auto update_bloom_filter_txn = txn_mgr->CreateTxn();
     // begin txn
     // need a txn to keep segment from being deleted
     update_bloom_filter_txn->Begin();
-    auto buffer_manager = update_bloom_filter_txn->buffer_manager();
+    auto *buffer_mgr = update_bloom_filter_txn->buffer_mgr();
     auto begin_ts = update_bloom_filter_txn->BeginTS();
     LOG_TRACE(fmt::format("SetSegmentStatusSealedTask: BeginTS: {} begin task for segment: {}", begin_ts, segment->segment_id()));
     // build filter
     // TODO: check segment visibility?
-    BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_manager, begin_ts);
+    BuildFastRoughFilterTask::ExecuteUpdateSegmentBloomFilter(segment, buffer_mgr, begin_ts);
     // serialize filter
     String segment_filter_binary_data = segment->GetFastRoughFilter()->SerializeToString();
     Vector<Pair<BlockID, String>> block_filter_binary_data = segment->GetBlockFilterBinaryDataVector();
@@ -82,11 +83,11 @@ void UpdateSegmentBloomFilterTask::ExecuteInner(SegmentEntry *segment, TxnManage
         update_bloom_filter_txn->AddWalCmd(std::move(wal_cmd));
     }
     // build CatalogDeltaOperation
-    {
-        auto catalog_delta_op =
-            MakeUnique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
-        update_bloom_filter_txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
-    }
+    // {
+    //     auto catalog_delta_op =
+    //         MakeUnique<UpdateSegmentBloomFilterDataOp>(segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data));
+    //     update_bloom_filter_txn->AddCatalogDeltaOperation(std::move(catalog_delta_op));
+    // }
     // segment status will be changed in SetSegmentStatusSealedOp::SaveSate(), in CommitBottom()
     auto commit_ts = txn_mgr->CommitTxn(update_bloom_filter_txn);
     LOG_TRACE(fmt::format("SetSegmentStatusSealedTask: CommitTS: {} end task for segment: {}", commit_ts, segment->segment_id()));

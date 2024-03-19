@@ -569,7 +569,7 @@ TEST_F(WalReplayTest, WalReplayImport) {
             EXPECT_NE(table_entry, nullptr);
             u64 segment_id = Catalog::GetNextSegmentID(table_entry);
             EXPECT_EQ(segment_id, 0u);
-            auto segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn4);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4);
             EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn4);
             // auto last_block_entry = segment_entry->GetLastEntry();
@@ -738,7 +738,7 @@ TEST_F(WalReplayTest, WalReplayCompact) {
             EXPECT_NE(table_entry, nullptr);
 
             SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewImportSegmentEntry(table_entry, segment_id, txn2);
+            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2);
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -885,6 +885,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
+                txn->CreateIndexFinish(table_entry, table_index_entry);
             }
             txn_mgr->CommitTxn(txn);
         }
@@ -914,14 +915,11 @@ TEST_F(WalReplayTest, WalReplayCreateIndexIvfFlat) {
             auto txn = txn_mgr->CreateTxn();
             txn->Begin();
             Vector<ColumnID> column_ids{0};
-            auto [table_entry, status] = txn->GetTableByName("default", "test_annivfflat");
-            EXPECT_NE(table_entry, nullptr);
-            auto table_index_meta = table_entry->index_meta_map()["idx1"].get();
-            EXPECT_NE(table_index_meta, nullptr);
-            EXPECT_EQ(*table_index_meta->index_name(), "idx1");
-            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
-            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "idx1");
+            auto [table_entry, status1] = txn->GetTableByName("default", "test_annivfflat");
+            EXPECT_TRUE(status1.ok());
+            auto [index_entry, status2] = table_entry->GetIndex("idx1", txn->TxnID(), txn->BeginTS());
+            ASSERT_TRUE(status2.ok());
+            EXPECT_EQ(*index_entry->index_base()->index_name_, "idx1");
             txn_mgr->CommitTxn(txn);
         }
 
@@ -997,6 +995,7 @@ TEST_F(WalReplayTest, WalReplayCreateIndexHnsw) {
                 auto status = std::get<1>(result);
                 EXPECT_EQ(status.ok(), true);
                 txn->CreateIndexPrepare(table_index_entry, table_ref.get(), prepare);
+                txn->CreateIndexFinish(table_entry, table_index_entry);
             }
             txn_mgr->CommitTxn(txn);
         }

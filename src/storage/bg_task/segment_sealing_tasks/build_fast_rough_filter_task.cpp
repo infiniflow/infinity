@@ -366,6 +366,7 @@ void BuildFastRoughFilterTask::SetSegmentFinishBuildMinMaxFilterTask(SegmentEntr
     ApplyToAllFastRoughFilterInSegment(segment, [](FastRoughFilter *filter) { filter->FinishBuildMinMaxFilterTask(); });
 }
 
+// deprecate except this
 void BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(SegmentEntry *segment_entry, BufferManager *buffer_manager, TxnTimeStamp begin_ts) {
     bool use_block_version = false;
     switch (auto status = segment_entry->status(); status) {

@@ -63,7 +63,7 @@ SegmentIndexEntry::SegmentIndexEntry(TableIndexEntry *table_index_entry, Segment
 
 SharedPtr<SegmentIndexEntry>
 SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id, Txn *txn, CreateIndexParam *param) {
-    auto *buffer_mgr = txn->buffer_manager();
+    auto *buffer_mgr = txn->buffer_mgr();
 
     // FIXME: estimate index size.
     auto vector_file_worker = table_index_entry->CreateFileWorker(param, segment_id);
@@ -77,10 +77,6 @@ SegmentIndexEntry::NewIndexEntry(TableIndexEntry *table_index_entry, SegmentID s
     segment_index_entry->max_ts_ = begin_ts;
     segment_index_entry->begin_ts_ = begin_ts;
 
-    if (txn != nullptr) {
-        auto operation = MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry);
-        txn->AddCatalogDeltaOperation(std::move(operation));
-    }
     return segment_index_entry;
 }
 
@@ -139,7 +135,7 @@ Status SegmentIndexEntry::CreateIndexPrepare(const IndexBase *index_base,
                                              bool check_ts) {
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    auto *buffer_mgr = txn->buffer_manager();
+    auto *buffer_mgr = txn->buffer_mgr();
     switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {

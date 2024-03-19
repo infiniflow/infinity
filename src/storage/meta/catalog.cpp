@@ -74,7 +74,7 @@ Catalog::CreateDatabase(const String &db_name, TransactionID txn_id, TxnTimeStam
         return DBMeta::NewDBMeta(db_dir, MakeShared<String>(db_name));
     };
     LOG_TRACE(fmt::format("Adding new database entry: {}", db_name));
-    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta), txn_id, begin_ts, txn_mgr);
+    auto [db_meta, r_lock] = this->db_meta_map_.GetMeta(db_name, std::move(init_db_meta));
     return db_meta->CreateNewEntry(std::move(r_lock), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
@@ -106,6 +106,42 @@ Tuple<SharedPtr<DatabaseInfo>, Status> Catalog::GetDatabaseInfo(const String &db
     }
 
     return db_meta->GetDatabaseInfo(std::move(r_lock), txn_id, begin_ts);
+}
+
+void Catalog::CreateDatabaseReplay(const SharedPtr<String> &db_name,
+                                   std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                   TransactionID txn_id,
+                                   TxnTimeStamp begin_ts) {
+    auto init_db_meta = [&]() {
+        // Not find the db and create new db meta
+        Path catalog_path(*this->current_dir_);
+        Path parent_path = catalog_path.parent_path();
+        auto db_dir = MakeShared<String>(parent_path.string());
+        // Physical wal log
+        return DBMeta::NewDBMeta(db_dir, db_name);
+    };
+    LOG_TRACE(fmt::format("Adding new database entry: {}", *db_name));
+    auto *db_meta = db_meta_map_.GetMetaNoLock(*db_name, std::move(init_db_meta));
+    db_meta->CreateEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+void Catalog::DropDatabaseReplay(const String &db_name,
+                                 std::function<SharedPtr<DBEntry>(DBMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                                 TransactionID txn_id,
+                                 TxnTimeStamp begin_ts) {
+    auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    db_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
+}
+
+DBEntry *Catalog::GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return db_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
 void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {
@@ -200,7 +236,7 @@ Catalog::GetTableInfo(const String &db_name, const String &table_name, Transacti
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
-    table_meta->DeleteNewEntry(txn_id);
+    table_meta->DeleteEntry(txn_id);
 
     return Status::OK();
 }
@@ -210,11 +246,26 @@ Tuple<TableIndexEntry *, Status> Catalog::CreateIndex(TableEntry *table_entry,
                                                       ConflictType conflict_type,
                                                       TransactionID txn_id,
                                                       TxnTimeStamp begin_ts,
-                                                      TxnManager *txn_mgr,
-                                                      bool is_replay,
-                                                      String replay_table_index_dir) {
+                                                      TxnManager *txn_mgr) {
 
-    return table_entry->CreateIndex(index_base, conflict_type, txn_id, begin_ts, txn_mgr, is_replay, replay_table_index_dir);
+    return table_entry->CreateIndex(index_base, conflict_type, txn_id, begin_ts, txn_mgr
+                                    // , is_replay, replay_table_index_dir
+    );
+}
+
+TableIndexEntry *Catalog::CreateIndexReplay(TableEntry *table_entry,
+                                            const SharedPtr<IndexBase> &index_base,
+                                            const SharedPtr<String> &index_entry_dir,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnTimeStamp commit_ts) {
+    return table_entry->CreateIndexReplay(
+        index_base->index_name_,
+        [&](TableIndexMeta *index_meta, SharedPtr<String> index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_entry_dir, txn_id, begin_ts, commit_ts, false);
+        },
+        txn_id,
+        begin_ts);
 }
 
 Tuple<SharedPtr<TableIndexEntry>, Status> Catalog::DropIndex(const String &db_name,
@@ -284,9 +335,8 @@ Status Catalog::RollbackDelete(TableEntry *table_entry, TransactionID txn_id, De
     return table_entry->RollbackDelete(txn_id, append_state, buffer_mgr);
 }
 
-Status
-Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, void *txn_store, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
-    return table_entry->CommitCompact(txn_id, txn_store, commit_ts, compact_store);
+Status Catalog::CommitCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+    return table_entry->CommitCompact(txn_id, commit_ts, compact_store);
 }
 
 Status Catalog::RollbackCompact(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
@@ -310,17 +360,6 @@ void Catalog::AddSegment(TableEntry *table_entry, SharedPtr<SegmentEntry> &segme
     table_entry->segment_map_.emplace(segment_entry->segment_id(), std::move(segment_entry));
     // ATTENTION: focusing on the segment id
     table_entry->next_segment_id_++;
-}
-
-bool Catalog::CheckAllowCleanup(TableEntry *dropped_table_entry) {
-    std::shared_lock<std::shared_mutex> lock(rw_locker());
-    for (auto &operation : global_catalog_delta_entry_->operations()) {
-        AddSegmentEntryOp *add_segment_entry_op = dynamic_cast<AddSegmentEntryOp *>(operation.get());
-        if (add_segment_entry_op != nullptr && add_segment_entry_op->segment_entry_->GetTableEntry() == dropped_table_entry) {
-            return false;
-        }
-    }
-    return true;
 }
 
 SharedPtr<FunctionSet> Catalog::GetFunctionSetByName(Catalog *catalog, String function_name) {
@@ -448,101 +487,92 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             continue;
         }
         switch (type) {
-            // -----------------------------
-            // Meta
-            // -----------------------------
-            case CatalogDeltaOpType::ADD_DATABASE_META: {
-                auto add_db_meta_op = static_cast<AddDBMetaOp *>(op.get());
-                auto db_dir = add_db_meta_op->data_dir();
-                auto db_name = add_db_meta_op->db_name();
-                UniquePtr<DBMeta> new_db_meta = DBMeta::NewDBMeta(MakeShared<String>(db_dir), MakeShared<String>(db_name));
-
-                catalog->db_meta_map().insert({db_name, std::move(new_db_meta)});
-                break;
-            }
-            case CatalogDeltaOpType::ADD_TABLE_META: {
-                auto add_table_meta_op = static_cast<AddTableMetaOp *>(op.get());
-                auto db_name = add_table_meta_op->db_name();
-                auto table_name = add_table_meta_op->table_name();
-
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = TableMeta::NewTableMeta(db_entry->db_entry_dir(), MakeShared<String>(table_name), db_entry);
-                db_entry->table_meta_map().insert({table_name, std::move(table_meta)});
-                break;
-            }
-            case CatalogDeltaOpType::ADD_INDEX_META: {
-                auto add_index_meta_op = static_cast<AddIndexMetaOp *>(op.get());
-                String db_name = add_index_meta_op->db_name();
-                auto table_name = add_index_meta_op->table_name();
-                auto index_name = add_index_meta_op->index_name();
-
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto index_meta = TableIndexMeta::NewTableIndexMeta(table_entry, MakeShared<String>(index_name));
-                table_entry->index_meta_map().insert({index_name, std::move(index_meta)});
-                break;
-            }
 
             // -----------------------------
             // Entry
             // -----------------------------
             case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
                 auto add_db_entry_op = static_cast<AddDBEntryOp *>(op.get());
-                auto db_name = add_db_entry_op->db_name();
+                const auto &db_name = add_db_entry_op->db_name();
                 const auto &db_entry_dir = add_db_entry_op->db_entry_dir();
-                auto db_meta = catalog->db_meta_map().at(db_name).get();
-                auto db_entry =
-                    DBEntry::NewReplayDBEntry(db_meta, MakeShared<String>(db_entry_dir), db_meta->db_name_, txn_id, begin_ts, commit_ts, is_delete);
-                db_meta->db_entry_list().emplace_front(std::move(db_entry));
+                if (!is_delete) {
+                    catalog->CreateDatabaseReplay(
+                        db_name,
+                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, false);
+                        },
+                        txn_id,
+                        begin_ts);
+                } else {
+                    catalog->DropDatabaseReplay(
+                        *db_name,
+                        [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return DBEntry::ReplayDBEntry(db_meta, db_entry_dir, db_name, txn_id, begin_ts, commit_ts, true);
+                        },
+                        txn_id,
+                        begin_ts);
+                }
                 break;
             }
             case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
                 auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                auto db_name = add_table_entry_op->db_name();
-                auto table_name = add_table_entry_op->table_name();
-                auto table_entry_dir = add_table_entry_op->table_entry_dir();
+                const auto &db_name = add_table_entry_op->db_name();
+                const auto &table_name = add_table_entry_op->table_name();
+                const auto &table_entry_dir = add_table_entry_op->table_entry_dir();
                 auto column_defs = add_table_entry_op->column_defs();
                 auto entry_type = add_table_entry_op->table_entry_type();
                 auto row_count = add_table_entry_op->row_count();
+                SegmentID unsealed_id = add_table_entry_op->unsealed_id();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                if (!is_delete) {
+                    db_entry->CreateTableReplay(
+                        table_name,
+                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableEntry::ReplayTableEntry(table_meta,
+                                                                table_entry_dir,
+                                                                table_name,
+                                                                column_defs,
+                                                                entry_type,
+                                                                txn_id,
+                                                                begin_ts,
+                                                                commit_ts,
+                                                                false,
+                                                                row_count,
+                                                                unsealed_id);
+                        },
+                        [&](TableEntry *table_entry) {
+                            table_entry->row_count_ = row_count;
+                            table_entry->unsealed_id_ = unsealed_id;
+                        },
+                        txn_id,
+                        begin_ts);
+                } else {
+                    db_entry->DropTableReplay(
+                        *table_name,
+                        [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableEntry::ReplayTableEntry(table_meta,
+                                                                table_entry_dir,
+                                                                table_name,
+                                                                column_defs,
+                                                                entry_type,
+                                                                txn_id,
+                                                                begin_ts,
+                                                                commit_ts,
+                                                                true,
+                                                                row_count,
+                                                                unsealed_id);
+                        },
+                        txn_id,
+                        begin_ts);
                 }
-                // LOG_INFO(fmt::format("Add Table entry: {} ", table_name));
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto table_entry = TableEntry::NewReplayTableEntry(table_meta,
-                                                                   MakeUnique<String>(table_entry_dir),
-                                                                   MakeUnique<String>(table_name),
-                                                                   column_defs,
-                                                                   entry_type,
-                                                                   txn_id,
-                                                                   begin_ts,
-                                                                   commit_ts,
-                                                                   is_delete,
-                                                                   row_count);
-                table_meta->table_entry_list().emplace_front(std::move(table_entry));
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
                 auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
-                auto db_name = add_segment_entry_op->db_name();
-                auto table_name = add_segment_entry_op->table_name();
+                const auto &db_name = add_segment_entry_op->db_name();
+                const auto &table_name = add_segment_entry_op->table_name();
                 auto segment_id = add_segment_entry_op->segment_id();
-                auto segment_dir = add_segment_entry_op->segment_dir();
                 auto segment_status = add_segment_entry_op->status();
                 auto column_count = add_segment_entry_op->column_count();
                 auto row_count = add_segment_entry_op->row_count();
@@ -550,50 +580,39 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto row_capacity = add_segment_entry_op->row_capacity();
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
+                auto deprecate_ts = add_segment_entry_op->deprecate_ts();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
 
-                if (segment_status == SegmentStatus::kForbidCleanup) {
-                    segment_status = SegmentStatus::kDeprecated;
-                }
-
-                if (table_entry->segment_map_.find(segment_id) != table_entry->segment_map_.end()) {
-                    auto &old_segment_entry = table_entry->segment_map_.at(segment_id);
-                    old_segment_entry->UpdateSegmentInfo(segment_status, row_count, min_row_ts, max_row_ts, commit_ts, begin_ts, txn_id);
-                } else {
-                    auto segment_entry = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
-                                                                                    segment_id,
-                                                                                    MakeUnique<String>(segment_dir),
-                                                                                    segment_status,
-                                                                                    column_count,
-                                                                                    row_count,
-                                                                                    actual_row_count,
-                                                                                    row_capacity,
-                                                                                    min_row_ts,
-                                                                                    max_row_ts,
-                                                                                    commit_ts,
-                                                                                    begin_ts,
-                                                                                    txn_id);
-                    table_entry->segment_map_.insert({segment_id, std::move(segment_entry)});
-                }
+                table_entry->AddSegmentReplay(
+                    [&]() {
+                        return SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
+                                                                          segment_id,
+                                                                          segment_status,
+                                                                          column_count,
+                                                                          row_count,
+                                                                          actual_row_count,
+                                                                          row_capacity,
+                                                                          min_row_ts,
+                                                                          max_row_ts,
+                                                                          commit_ts,
+                                                                          deprecate_ts,
+                                                                          begin_ts,
+                                                                          txn_id);
+                    },
+                    [&](SegmentEntry *segment) {
+                        segment->UpdateSegmentInfo(segment_status, row_count, min_row_ts, max_row_ts, commit_ts, begin_ts, txn_id);
+                    },
+                    segment_id);
                 break;
             }
             case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
                 auto add_block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
-                auto db_name = add_block_entry_op->db_name();
-                auto table_name = add_block_entry_op->table_name();
+                const auto &db_name = add_block_entry_op->db_name();
+                const auto &table_name = add_block_entry_op->table_name();
                 auto segment_id = add_block_entry_op->segment_id();
                 auto block_id = add_block_entry_op->block_id();
-                auto block_dir = add_block_entry_op->block_dir();
                 auto row_count = add_block_entry_op->row_count();
                 auto row_capacity = add_block_entry_op->row_capacity();
                 auto min_row_ts = add_block_entry_op->min_row_ts();
@@ -601,51 +620,43 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto check_point_ts = add_block_entry_op->checkpoint_ts();
                 auto check_point_row_count = add_block_entry_op->checkpoint_row_count();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto block_entry = BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
-                                                                          block_id,
-                                                                          row_count,
-                                                                          row_capacity,
-                                                                          min_row_ts,
-                                                                          max_row_ts,
-                                                                          check_point_ts,
-                                                                          check_point_row_count,
-                                                                          buffer_mgr);
-                segment_entry->SetBlockEntryAt(block_id, std::move(block_entry));
+                segment_entry->AddBlockReplay(
+                    [&]() {
+                        return BlockEntry::NewReplayCatalogBlockEntry(segment_entry,
+                                                                      block_id,
+                                                                      row_count,
+                                                                      row_capacity,
+                                                                      min_row_ts,
+                                                                      max_row_ts,
+                                                                      check_point_ts,
+                                                                      check_point_row_count,
+                                                                      buffer_mgr);
+                    },
+                    [&](BlockEntry *block) { block->UpdateBlockInfo(row_count, max_row_ts, check_point_ts, check_point_row_count); },
+                    block_id);
                 break;
             }
             case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
                 auto add_column_entry_op = static_cast<AddColumnEntryOp *>(op.get());
-                auto db_name = add_column_entry_op->db_name();
-                auto table_name = add_column_entry_op->table_name();
+                const auto &db_name = add_column_entry_op->db_name();
+                const auto &table_name = add_column_entry_op->table_name();
                 auto segment_id = add_column_entry_op->segment_id();
                 auto block_id = add_column_entry_op->block_id();
                 auto column_id = add_column_entry_op->column_id();
+                i32 next_outline_idx = add_column_entry_op->next_outline_idx();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                auto block_entry = segment_entry->GetBlockEntryByID(block_id);
-                auto column_entry = BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr);
-                block_entry->columns().push_back(std::move(column_entry));
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
+                auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
+                block_entry->AddColumnReplay(
+                    [&]() { return BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx); },
+                    [&](BlockColumnEntry *column) { column->UpdateColumnInfo(next_outline_idx, buffer_mgr); },
+                    column_id);
                 break;
             }
 
@@ -654,100 +665,84 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             // -----------------------------
             case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
                 auto add_table_index_entry_op = static_cast<AddTableIndexEntryOp *>(op.get());
-                auto db_name = add_table_index_entry_op->db_name();
-                auto table_name = add_table_index_entry_op->table_name();
-                auto index_name = add_table_index_entry_op->index_name();
-                auto index_dir = add_table_index_entry_op->index_dir();
+                const auto &db_name = add_table_index_entry_op->db_name();
+                const auto &table_name = add_table_index_entry_op->table_name();
+                const auto &index_name = add_table_index_entry_op->index_name();
+                const auto &index_dir = add_table_index_entry_op->index_dir();
                 auto index_base = add_table_index_entry_op->index_base();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                if (!is_delete) {
+                    table_entry->CreateIndexReplay(
+                        index_name,
+                        [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, false);
+                        },
+                        txn_id,
+                        begin_ts);
+                } else {
+                    table_entry->DropIndexReplay(
+                        *index_name,
+                        [&](TableIndexMeta *index_meta, const SharedPtr<String> &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+                            return TableIndexEntry::ReplayTableIndexEntry(index_meta, index_base, index_dir, txn_id, begin_ts, commit_ts, true);
+                        },
+                        txn_id,
+                        begin_ts);
                 }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto table_index_entry = TableIndexEntry::NewReplayTableIndexEntry(index_meta,
-                                                                                   index_base,
-                                                                                   MakeUnique<String>(index_dir),
-                                                                                   txn_id,
-                                                                                   begin_ts,
-                                                                                   commit_ts,
-                                                                                   is_delete);
-                index_meta->index_entry_list().emplace_front(std::move(table_index_entry));
                 break;
             }
             case CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY: {
                 auto add_fulltext_index_entry_op = static_cast<AddFulltextIndexEntryOp *>(op.get());
-                auto db_name = add_fulltext_index_entry_op->db_name();
-                auto table_name = add_fulltext_index_entry_op->table_name();
-                auto index_name = add_fulltext_index_entry_op->index_name();
-                auto index_dir = add_fulltext_index_entry_op->index_dir();
+                const auto &db_name = add_fulltext_index_entry_op->db_name();
+                const auto &table_name = add_fulltext_index_entry_op->table_name();
+                const auto &index_name = add_fulltext_index_entry_op->index_name();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+                auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+
+                auto fulltext_index_entry =
+                    FulltextIndexEntry::NewReplayFulltextIndexEntry(table_index_entry, txn_id, begin_ts, commit_ts, is_delete);
+                table_index_entry->fulltext_index_entry().swap(fulltext_index_entry);
+                if (fulltext_index_entry.get() != nullptr) {
+                    UnrecoverableError(fmt::format("Fulltext index {} is already in the catalog", *index_name));
                 }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!index_status.ok()) {
-                    UnrecoverableError(index_status.message());
-                }
-                auto fulltext_index_entry = FulltextIndexEntry::NewReplayFulltextIndexEntry(table_index_entry,
-                                                                                            MakeUnique<String>(index_dir),
-                                                                                            txn_id,
-                                                                                            begin_ts,
-                                                                                            commit_ts,
-                                                                                            is_delete);
-                table_index_entry->fulltext_index_entry() = std::move(fulltext_index_entry);
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
                 auto add_segment_index_entry_op = static_cast<AddSegmentIndexEntryOp *>(op.get());
-                auto db_name = add_segment_index_entry_op->db_name();
-                auto table_name = add_segment_index_entry_op->table_name();
-                auto index_name = add_segment_index_entry_op->index_name();
+                const auto &db_name = add_segment_index_entry_op->db_name();
+                const auto &table_name = add_segment_index_entry_op->table_name();
+                const auto &index_name = add_segment_index_entry_op->index_name();
                 auto segment_id = add_segment_index_entry_op->segment_id();
                 auto min_ts = add_segment_index_entry_op->min_ts();
                 auto max_ts = add_segment_index_entry_op->max_ts();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                LOG_TRACE(fmt::format("at db {}", db_name));
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+
+                if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
+                    auto *table_index_entry = table_entry->GetIndexReplay(*index_name, txn_id, begin_ts);
+                    auto *segment_entry = iter->second.get();
+                    if (segment_entry->status() == SegmentStatus::kDeprecated) {
+                        UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
+                    }
+                    auto segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                                             table_entry,
+                                                                                             segment_id,
+                                                                                             buffer_mgr,
+                                                                                             min_ts,
+                                                                                             max_ts,
+                                                                                             txn_id,
+                                                                                             begin_ts,
+                                                                                             commit_ts,
+                                                                                             is_delete);
+                    bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
+                    if (!insert_ok) {
+                        UnrecoverableError(fmt::format("Segment index {} is already in the catalog", segment_id));
+                    }
                 }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto *index_meta = table_entry->index_meta_map().at(index_name).get();
-                auto [table_index_entry, index_status] = index_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!index_status.ok()) {
-                    UnrecoverableError(index_status.message());
-                }
-                auto segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
-                                                                                         table_entry,
-                                                                                         segment_id,
-                                                                                         buffer_mgr,
-                                                                                         min_ts,
-                                                                                         max_ts,
-                                                                                         txn_id,
-                                                                                         begin_ts,
-                                                                                         commit_ts,
-                                                                                         is_delete);
-                table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)});
                 break;
             }
 
@@ -757,46 +752,17 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
             case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
                 // case: unsealed segment become full in append operation
                 auto set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
-                auto db_name = set_segment_status_sealed_op->db_name();
-                auto table_name = set_segment_status_sealed_op->table_name();
+                const auto &db_name = set_segment_status_sealed_op->db_name();
+                const auto &table_name = set_segment_status_sealed_op->table_name();
                 auto segment_id = set_segment_status_sealed_op->segment_id();
                 auto const &segment_filter_binary = set_segment_status_sealed_op->segment_filter_binary_data();
                 auto const &block_filter_binary = set_segment_status_sealed_op->block_filter_binary_data();
 
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
+                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
+                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
+
                 auto segment_entry = table_entry->segment_map_.at(segment_id).get();
                 segment_entry->SetSealed();
-                segment_entry->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
-                break;
-            }
-            case CatalogDeltaOpType::UPDATE_SEGMENT_BLOOM_FILTER_DATA: {
-                auto update_segment_filter_op = static_cast<UpdateSegmentBloomFilterDataOp *>(op.get());
-                auto db_name = update_segment_filter_op->db_name();
-                auto table_name = update_segment_filter_op->table_name();
-                auto segment_id = update_segment_filter_op->segment_id();
-                auto const &segment_filter_binary = update_segment_filter_op->segment_filter_binary_data();
-                auto const &block_filter_binary = update_segment_filter_op->block_filter_binary_data();
-
-                auto *db_meta = catalog->db_meta_map().at(db_name).get();
-                auto [db_entry, db_status] = db_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!db_status.ok()) {
-                    UnrecoverableError(db_status.message());
-                }
-                auto table_meta = db_entry->table_meta_map().at(table_name).get();
-                auto [table_entry, tb_status] = table_meta->GetEntryReplay(txn_id, begin_ts);
-                if (!tb_status.ok()) {
-                    UnrecoverableError(tb_status.message());
-                }
-                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
                 segment_entry->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
                 break;
             }
@@ -886,21 +852,15 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
         LOG_INFO("Save delta catalog ops is empty. Skip flush.");
         return true;
     }
-    Vector<TransactionID> flushed_txn_ids;
     HashSet<TransactionID> flushed_unique_txn_ids;
     for (auto &op : flush_delta_entry->operations()) {
         flushed_unique_txn_ids.insert(op->txn_id());
 
         switch (op->GetType()) {
-            case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
-                auto add_table_entry_op = static_cast<AddTableEntryOp *>(op.get());
-                add_table_entry_op->SaveState();
-                break;
-            }
-            case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
-                auto add_segment_entry_op = static_cast<AddSegmentEntryOp *>(op.get());
-                LOG_TRACE(fmt::format("Flush segment entry: {}", add_segment_entry_op->ToString()));
-                add_segment_entry_op->FlushDataToDisk(max_commit_ts);
+            case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+                auto *block_entry_op = static_cast<AddBlockEntryOp *>(op.get());
+                LOG_TRACE(fmt::format("Flush block entry: {}", block_entry_op->ToString()));
+                block_entry_op->FlushDataToDisk(max_commit_ts);
                 break;
             }
             case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
@@ -912,7 +872,6 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
             default:
                 break;
         }
-        flushed_txn_ids.push_back(op->txn_id());
     }
 
     // Save the global catalog delta entry to disk.
@@ -930,6 +889,14 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
+    // {
+    //     std::stringstream ss;
+    //     ss << "Save delta catalog ops: ";
+    //     for (auto &op : flush_delta_entry->operations()) {
+    //         ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
+    //     }
+    //     LOG_INFO(ss.str());
+    // }
     LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_unique_txn_ids.begin(), flushed_unique_txn_ids.end()));

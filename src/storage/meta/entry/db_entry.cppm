@@ -35,15 +35,12 @@ import cleanup_scanner;
 namespace infinity {
 
 class TxnManager;
-class AddDBEntryOp;
 class DBMeta;
 
 export class DBEntry final : public BaseEntry, public EntryInterface {
     friend struct Catalog;
 
 public:
-    using EntryOp = AddDBEntryOp;
-
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
                      const SharedPtr<String> &db_entry_dir,
@@ -58,13 +55,13 @@ public:
                                          TransactionID txn_id,
                                          TxnTimeStamp begin_ts);
 
-    static SharedPtr<DBEntry> NewReplayDBEntry(DBMeta *db_meta,
-                                               const SharedPtr<String> &db_entry_dir,
-                                               const SharedPtr<String> &db_name,
-                                               TransactionID txn_id,
-                                               TxnTimeStamp begin_ts,
-                                               TxnTimeStamp commit_ts,
-                                               bool is_delete) noexcept;
+    static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
+                                            const SharedPtr<String> &db_entry_dir,
+                                            const SharedPtr<String> &db_name,
+                                            TransactionID txn_id,
+                                            TxnTimeStamp begin_ts,
+                                            TxnTimeStamp commit_ts,
+                                            bool is_delete) noexcept;
 
 public:
     SharedPtr<String> ToString();
@@ -72,8 +69,6 @@ public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
 
     static UniquePtr<DBEntry> Deserialize(const nlohmann::json &db_entry_json, DBMeta *db_meta, BufferManager *buffer_mgr);
-
-    [[nodiscard]] const String &db_name() const { return *db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
@@ -97,6 +92,21 @@ private:
 
     void RemoveTableEntry(const String &table_collection_name, TransactionID txn_id);
 
+    // replay
+    void CreateTableReplay(const SharedPtr<String> &table_name,
+                           std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                           std::function<void(TableEntry *)> &&update_entry,
+                           TransactionID txn_id,
+                           TxnTimeStamp begin_ts);
+
+    void DropTableReplay(const String &table_name,
+                         std::function<SharedPtr<TableEntry>(TableMeta *, SharedPtr<String>, TransactionID, TxnTimeStamp)> &&init_entry,
+                         TransactionID txn_id,
+                         TxnTimeStamp begin_ts);
+
+    TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    //
+
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status GetTablesDetail(TransactionID txn_id, TxnTimeStamp begin_ts, Vector<TableDetail> &output_table_array);
@@ -113,7 +123,7 @@ public:
 
 private:
     const SharedPtr<String> db_entry_dir_{};
-    SharedPtr<String> db_name_{};
+    const SharedPtr<String> db_name_{};
 
     MetaMap<TableMeta> table_meta_map_{};
 
