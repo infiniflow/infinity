@@ -109,36 +109,12 @@ void SegmentEntry::SetSealed() {
     status_ = SegmentStatus::kSealed;
 }
 
-void SegmentEntry::UpdateSegmentInfo(SegmentStatus status,
-                                     SizeT row_count,
-                                     TxnTimeStamp min_row_ts,
-                                     TxnTimeStamp max_row_ts,
-                                     TxnTimeStamp commit_ts,
-                                     TxnTimeStamp begin_ts,
-                                     TransactionID txn_id) {
-    std::unique_lock lock(rw_locker_);
-    status_ = status;
-    row_count_ = row_count;
-    min_row_ts_ = min_row_ts;
-    max_row_ts_ = max_row_ts;
-    commit_ts_ = commit_ts;
-    begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
-}
-
-void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block,
-                                  std::function<void(BlockEntry *)> &&update_block,
-                                  BlockID block_id) {
+void SegmentEntry::AddBlockReplay(std::function<SharedPtr<BlockEntry>()> &&init_block, BlockID block_id) {
     BlockID cur_blocks_size = block_entries_.size();
-    if (block_id == cur_blocks_size) {
-        block_entries_.emplace_back(init_block());
-    } else {
-        if (cur_blocks_size < block_id) {
-            UnrecoverableError(fmt::format("BlockColumnEntry::AddBlockReplay: block_id {} is out of range", block_id));
-        }
-        auto *block = block_entries_[(SizeT)block_id].get();
-        update_block(block);
+    if (block_id >= cur_blocks_size) {
+        block_entries_.resize(block_id + 1);
     }
+    block_entries_[block_id] = init_block();
 }
 
 bool SegmentEntry::TrySetCompacting(CompactSegmentsTask *compact_task) {

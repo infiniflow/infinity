@@ -119,9 +119,7 @@ public:
 
     TableIndexEntry *GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment,
-                          std::function<void(SegmentEntry *)> &&update_segment,
-                          SegmentID segment_id);
+    void AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id);
     //
 public:
     TableMeta *GetTableMeta() const { return table_meta_; }

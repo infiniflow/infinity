@@ -20,6 +20,7 @@ import stl;
 import bg_task;
 import wal_entry;
 import options;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -52,6 +53,10 @@ public:
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
     void Flush();
+
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
+
+    void ApplyDeltaEntries();
 
     // Checkpoint is scheduled regularly.
     // Checkpoint for transactions which lsn no larger than lsn_pend_chk_.
@@ -105,6 +110,7 @@ private:
     Atomic<bool> running_{};
     Thread flush_thread_{};
     Thread checkpoint_thread_{};
+    Thread apply_delta_entries_thread_{};
 
     // TxnManager and Flush thread access following members
     std::mutex mutex_{};
@@ -120,6 +126,9 @@ private:
     i64 wal_size_{};
     atomic_u64 last_ckp_commit_ts_{};
     atomic_u64 last_deltaop_commit_ts_{};
+
+    std::mutex mutex3_{};
+    Deque<UniquePtr<CatalogDeltaEntry>> delta_entries_{};
 
     // Only Checkpoint thread access following members
     i64 last_full_ckp_wal_size_{};

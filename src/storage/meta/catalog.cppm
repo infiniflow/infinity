@@ -240,6 +240,8 @@ public:
 
     bool SaveDeltaCatalog(const String &catalog_dir, TxnTimeStamp max_commit_ts);
 
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_ops);
+
     static void Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr, UniquePtr<Catalog> &catalog);
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> dir, bool create_default_db);

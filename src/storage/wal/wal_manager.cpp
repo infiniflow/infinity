@@ -40,6 +40,7 @@ import block_entry;
 import segment_entry;
 import compact_segments_task;
 import build_fast_rough_filter_task;
+import catalog_delta_entry;
 
 module wal_manager;
 
@@ -86,6 +87,7 @@ void WalManager::Start() {
     wal_size_ = 0;
     flush_thread_ = Thread([this] { Flush(); });
     checkpoint_thread_ = Thread([this] { CheckpointTimer(); });
+    apply_delta_entries_thread_ = Thread([this] { ApplyDeltaEntries(); });
     LOG_INFO("WAL manager is started.");
 }
 
@@ -112,6 +114,10 @@ void WalManager::Stop() {
         }
     }
     que_.clear();
+
+    // Wait for add delta entries thread to stop.
+    LOG_TRACE("WalManager::Stop add delta entries thread join");
+    apply_delta_entries_thread_.join();
 
     // Wait for checkpoint thread to stop.
     LOG_TRACE("WalManager::Stop checkpoint thread join");
@@ -192,7 +198,7 @@ void WalManager::Flush() {
             wal_size += act_size;
         }
 
-        switch(flush_option_) {
+        switch (flush_option_) {
             case FlushOption::kFlushAtOnce: {
                 ofs_.flush();
                 break;
@@ -206,7 +212,6 @@ void WalManager::Flush() {
                 break;
             }
         }
-
 
         TxnManager *txn_mgr = storage_->txn_manager();
         // Commit sequentially so they get visible in the same order with wal.
@@ -236,6 +241,33 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush mainloop end");
 }
 
+void WalManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
+    std::unique_lock w_lock(mutex3_);
+    delta_entries_.push_back(std::move(delta_entry));
+}
+
+void WalManager::ApplyDeltaEntries() {
+    Catalog *catalog = storage_->catalog();
+    while (running_.load()) {
+        auto [max_commit_ts, wal_size] = GetWalState();
+        mutex3_.lock();
+        if (delta_entries_.empty() || delta_entries_.front()->commit_ts() > max_commit_ts) {
+            mutex3_.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
+        Vector<UniquePtr<CatalogDeltaEntry>> flushed_entries;
+        while (!delta_entries_.empty() && delta_entries_.front()->commit_ts() <= max_commit_ts) {
+            flushed_entries.push_back(std::move(delta_entries_.front()));
+            delta_entries_.pop_front();
+        }
+        mutex3_.unlock();
+
+        catalog->AddDeltaEntries(std::move(flushed_entries));
+    }
+}
+
 /*****************************************************************************
  * CHECKPOINT WAL FILE
  *****************************************************************************/
@@ -244,7 +276,7 @@ void WalManager::CheckpointTimer() {
     LOG_TRACE("WalManager::Checkpoint mainloop begin");
     while (running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        storage_->bg_processor()->Submit(MakeShared<TryCheckpointTask>(true));
+        Checkpoint();
     }
 }
 

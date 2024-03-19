@@ -49,8 +49,6 @@ public:
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
 
-    void UpdateColumnInfo(i32 next_outline_idx, BufferManager *buffer_mgr);
-
 public:
     // Getter
     inline const BlockEntry *GetBlockEntry() const { return block_entry_; }

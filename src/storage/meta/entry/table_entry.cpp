@@ -205,21 +205,14 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
     return index_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
-void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment,
-                                  std::function<void(SegmentEntry *)> &&update_segment,
-                                  SegmentID segment_id) {
-    if (auto iter = segment_map_.find(segment_id); iter != segment_map_.end()) {
-        auto *segment = iter->second.get();
-        update_segment(segment);
-        if (segment->status() == SegmentStatus::kDeprecated) {
-            segment->Cleanup();
-            segment_map_.erase(iter);
-        }
-        return;
-    }
+void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
     SharedPtr<SegmentEntry> new_segment = init_segment();
-    segment_map_.emplace(segment_id, new_segment);
-    if (new_segment->segment_id() == unsealed_id_) {
+    segment_map_[segment_id] = new_segment;
+    if (new_segment->status() == SegmentStatus::kDeprecated) {
+        new_segment->Cleanup();
+        segment_map_.erase(segment_id);
+    }
+    if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
 }

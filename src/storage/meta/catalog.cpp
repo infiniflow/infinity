@@ -468,6 +468,9 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
     fs.Close(*catalog_file_handler);
     char *ptr = buf.data();
     auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
+    if (catalog_delta_entry.get() == nullptr) {
+        UnrecoverableError(fmt::format("Load catalog delta entry failed: {}", catalog_path));
+    }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
     if (file_size != n_bytes) {
         RecoverableError(Status::CatalogCorrupted(catalog_path));
@@ -602,9 +605,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                           begin_ts,
                                                                           txn_id);
                     },
-                    [&](SegmentEntry *segment) {
-                        segment->UpdateSegmentInfo(segment_status, row_count, min_row_ts, max_row_ts, commit_ts, begin_ts, txn_id);
-                    },
                     segment_id);
                 break;
             }
@@ -637,7 +637,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                                                                       check_point_row_count,
                                                                       buffer_mgr);
                     },
-                    [&](BlockEntry *block) { block->UpdateBlockInfo(row_count, max_row_ts, check_point_ts, check_point_row_count); },
                     block_id);
                 break;
             }
@@ -656,7 +655,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id);
                 block_entry->AddColumnReplay(
                     [&]() { return BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx); },
-                    [&](BlockColumnEntry *column) { column->UpdateColumnInfo(next_outline_idx, buffer_mgr); },
                     column_id);
                 break;
             }
@@ -846,10 +844,10 @@ UniquePtr<String> Catalog::SaveFullCatalog(const String &catalog_dir, TxnTimeSta
 // called by bg_task
 bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp max_commit_ts) {
     LOG_INFO("SAVING DELTA CATALOG");
-    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", global_catalog_delta_entry_->commit_ts(), max_commit_ts));
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+    LOG_INFO(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     if (flush_delta_entry->operations().empty()) {
         LOG_INFO("Save delta catalog ops is empty. Skip flush.");
@@ -892,19 +890,23 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
-    // {
-    //     std::stringstream ss;
-    //     ss << "Save delta catalog ops: ";
-    //     for (auto &op : flush_delta_entry->operations()) {
-    //         ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
-    //     }
-    //     LOG_INFO(ss.str());
-    // }
-    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    {
+        std::stringstream ss;
+        ss << "Save delta catalog ops: ";
+        for (auto &op : flush_delta_entry->operations()) {
+            ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
+        }
+        LOG_INFO(ss.str());
+    }
+    // LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_unique_txn_ids.begin(), flushed_unique_txn_ids.end()));
 
     return false;
+}
+
+void Catalog::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+    global_catalog_delta_entry_->AddDeltaOps(std::move(delta_entries));
 }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }

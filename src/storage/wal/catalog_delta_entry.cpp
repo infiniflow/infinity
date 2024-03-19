@@ -535,12 +535,87 @@ bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) cons
     return true;
 }
 
+void AddDBEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_DATABASE_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddDBEntryOp *>(other.get()));
+}
+
+void AddTableEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_TABLE_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddTableEntryOp *>(other.get()));
+}
+
+void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddSegmentEntryOp *>(other.get()));
+}
+
+void AddBlockEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_BLOCK_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddBlockEntryOp *>(other.get()));
+}
+
+void AddColumnEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_COLUMN_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddColumnEntryOp *>(other.get()));
+}
+
+void AddTableIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddTableIndexEntryOp *>(other.get()));
+}
+
+void AddFulltextIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_FULLTEXT_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddFulltextIndexEntryOp *>(other.get()));
+}
+
+void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<AddSegmentIndexEntryOp *>(other.get()));
+}
+
+void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
+    if (other->type_ != CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED) {
+        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
+    }
+    *this = std::move(*static_cast<SetSegmentStatusSealedOp *>(other.get()));
+}
+
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     LOG_TRACE(fmt::format("BlockEntry {} flush to disk", block_entry_->block_id()));
     block_entry_->Flush(max_commit_ts);
 }
 
 void AddSegmentIndexEntryOp::Flush(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }
+
+void CatalogDeltaEntryHeader::WriteAdv(char *&buf) const {
+    std::memcpy(buf, this, sizeof(CatalogDeltaEntryHeader));
+    buf += sizeof(CatalogDeltaEntryHeader);
+}
+
+CatalogDeltaEntryHeader CatalogDeltaEntryHeader::ReadAdv(char *&ptr) {
+    CatalogDeltaEntryHeader header;
+    std::memcpy(&header, ptr, sizeof(CatalogDeltaEntryHeader));
+    ptr += sizeof(CatalogDeltaEntryHeader);
+    return header;
+}
 
 /// class CatalogDeltaEntry
 i32 CatalogDeltaEntry::GetSizeInBytes() const {
@@ -555,26 +630,23 @@ i32 CatalogDeltaEntry::GetSizeInBytes() const {
 }
 
 SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_bytes) {
+    char *const ptr_start = ptr;
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         UnrecoverableError("ptr goes out of range when reading WalEntry");
     }
     auto entry = MakeShared<CatalogDeltaEntry>();
-    auto *header = (CatalogDeltaEntryHeader *)ptr;
-    entry->size_ = header->size_;
-    entry->checksum_ = header->checksum_;
-    entry->txn_id_ = header->txn_id_;
-    entry->commit_ts_ = header->commit_ts_;
-    i32 size2 = *(i32 *)(ptr + entry->size_ - sizeof(i32));
-    if (entry->size_ != size2) {
+    entry->header_ = CatalogDeltaEntryHeader::ReadAdv(ptr);
+    auto *header = (CatalogDeltaEntryHeader *)ptr_start;
+    i32 size2 = *(i32 *)(ptr_start + header->size_ - sizeof(i32));
+    if (header->size_ != size2) {
         return nullptr;
     }
     header->checksum_ = 0;
-    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr), entry->size_);
-    if (entry->checksum_ != checksum2) {
+    u32 checksum2 = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(ptr_start), header->size_);
+    if (entry->header_.checksum_ != checksum2) {
         return nullptr;
     }
-    ptr += sizeof(CatalogDeltaEntryHeader);
     i32 cnt = ReadBufAdv<i32>(ptr);
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
@@ -606,13 +678,12 @@ SharedPtr<CatalogDeltaEntry> CatalogDeltaEntry::ReadAdv(char *&ptr, i32 max_byte
  * @return void
  */
 // called by bg_task
-void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
+void CatalogDeltaEntry::WriteAdv(char *&ptr) {
     char *const saved_ptr = ptr;
-    std::memcpy(ptr, this, sizeof(CatalogDeltaEntryHeader));
-    ptr += sizeof(CatalogDeltaEntryHeader);
+    header_.WriteAdv(ptr);
 
-    WriteBufAdv(ptr, static_cast<i32>(operations_.size()));
     SizeT operation_count = operations_.size();
+    WriteBufAdv(ptr, static_cast<i32>(operation_count));
     for (SizeT idx = 0; idx < operation_count; ++idx) {
         const auto &operation = operations_[idx];
         i32 exp_size = operation->GetSizeInBytes();
@@ -627,18 +698,19 @@ void CatalogDeltaEntry::WriteAdv(char *&ptr) const {
     i32 size = ptr - saved_ptr + sizeof(i32);
     WriteBufAdv(ptr, size);
     auto *header = (CatalogDeltaEntryHeader *)saved_ptr;
-    header->size_ = size;
+    header_.size_ = header->size_ = size;
     header->checksum_ = 0;
     // CRC32IEEE is equivalent to boost::crc_32_type on
     // little-endian machine.
-    header->checksum_ = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
+    u32 crc = CRC32IEEE::makeCRC(reinterpret_cast<const unsigned char *>(saved_ptr), size);
+    header_.checksum_ = header->checksum_ = crc;
 }
 
 // called by wal thread
 void CatalogDeltaEntry::SaveState(TransactionID txn_id, TxnTimeStamp commit_ts) {
     LOG_TRACE(fmt::format("SaveState txn_id {} commit_ts {}", txn_id, commit_ts));
-    this->commit_ts_ = commit_ts;
-    this->txn_id_ = txn_id;
+    this->header_.commit_ts_ = commit_ts;
+    this->header_.txn_id_ = txn_id;
     for (auto &operation : operations_) {
         LOG_TRACE(fmt::format("SaveState operation {}", operation->GetTypeStr()));
         operation->txn_id_ = txn_id;
@@ -654,39 +726,41 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
-UniquePtr<CatalogDeltaEntry> CatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
-    std::lock_guard<std::mutex> lock(mtx_);
-
-    auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
-    for (auto &op : operations_) {
-        TxnTimeStamp op_commit_ts = op->commit_ts();
-        if (op_commit_ts <= max_commit_ts) {
-            flush_delta_entry->operations_.emplace_back(std::move(op));
-        } else {
-            break; // commit_ts is in ascending order
+void GlobalCatalogDeltaEntry::AddDeltaOps(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+    std::unique_lock w_lock(mtx_);
+    for (auto &delta_entry : delta_entries) {
+        for (auto &op : delta_entry->operations()) {
+            String encode = op->EncodeIndex();
+            auto iter = delta_ops_.find(encode);
+            if (iter != delta_ops_.end()) {
+                iter->second->Merge(std::move(op));
+            } else {
+                delta_ops_[encode] = std::move(op);
+            }
         }
     }
-    auto flush_size = flush_delta_entry->operations_.size();
-    operations_.erase(operations_.begin(), operations_.begin() + flush_size);
+}
+
+UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+    auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
+
+    {
+        std::unique_lock w_lock(mtx_);
+
+        // all delta op in global delta entry has been flushed in wal
+        for (auto &[_, op] : delta_ops_) {
+            if (op->commit_ts() > max_commit_ts) {
+                UnrecoverableError(fmt::format("commit_ts {} > max_commit_ts {}", op->commit_ts(), max_commit_ts));
+            }
+            flush_delta_entry->AddOperation(std::move(op));
+        }
+        delta_ops_.clear();
+    }
+    // write delta op from top to bottom.
+    std::sort(flush_delta_entry->operations().begin(), flush_delta_entry->operations().end(), [](const auto &lhs, const auto &rhs) {
+        return lhs->type_ < rhs->type_;
+    });
     return flush_delta_entry;
 }
 
-// called by bg_task
-void GlobalCatalogDeltaEntry::Merge(UniquePtr<CatalogDeltaEntry> other) {
-    // FIXME: should make timestamp increase ?
-    std::lock_guard<std::mutex> lock(mtx_);
-
-    auto &global_operations = this->operations();
-    auto &local_operations = other->operations();
-
-    // TODO: optimize this merge process
-    // add the local operations to the global operations
-    for (auto &local_operation : local_operations) {
-        global_operations.push_back(std::move(local_operation));
-    }
-
-    local_operations.clear();
-    this->set_txn_id(other->txn_id());
-    this->set_commit_ts(other->commit_ts());
-}
 } // namespace infinity

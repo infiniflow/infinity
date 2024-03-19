@@ -430,11 +430,11 @@ void Txn::CommitBottom() noexcept {
     txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), bg_task_processor_, txn_mgr_);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
+
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         // Snapshot the physical operations in one txn
         local_catalog_delta_ops_entry_->SaveState(txn_id_, commit_ts);
-        auto catalog_delta_ops_merge_task = MakeShared<CatalogDeltaOpsMergeTask>(std::move(local_catalog_delta_ops_entry_), catalog_);
-        bg_task_processor_->Submit(catalog_delta_ops_merge_task);
+        txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
         txn_mgr_->AddWaitFlushTxn(txn_id_);
     }
 

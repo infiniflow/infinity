@@ -30,18 +30,19 @@ import buffer_manager;
 import background_process;
 import catalog_delta_entry;
 import default_values;
+import wal_manager;
 
 namespace infinity {
 
 TxnManager::TxnManager(Catalog *catalog,
                        BufferManager *buffer_mgr,
                        BGTaskProcessor *bg_task_processor,
-                       PutWalEntryFn put_wal_entry_fn,
+                       WalManager *wal_mgr,
                        TransactionID start_txn_id,
                        TxnTimeStamp start_ts,
                        bool enable_compaction)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), put_wal_entry_(put_wal_entry_fn),
-      start_txn_id_(start_txn_id), start_ts_(start_ts), is_running_(false), enable_compaction_(enable_compaction) {
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_txn_id_(start_txn_id),
+      start_ts_(start_ts), is_running_(false), enable_compaction_(enable_compaction) {
     catalog_->SetTxnMgr(this);
 }
 
@@ -77,7 +78,7 @@ u64 TxnManager::GetNewTxnID() {
 TxnTimeStamp TxnManager::GetTimestamp(bool prepare_wal) {
     std::lock_guard<std::mutex> guard(mutex_);
     TxnTimeStamp ts = ++start_ts_;
-    if (prepare_wal && put_wal_entry_ != nullptr) {
+    if (prepare_wal && wal_mgr_ != nullptr) {
         priority_que_[ts] = nullptr;
     }
     return ts;
@@ -100,7 +101,7 @@ void TxnManager::Invalidate(TxnTimeStamp commit_ts) {
     if (cnt > 0 && !priority_que_.empty()) {
         auto it = priority_que_.begin();
         while (it != priority_que_.end() && it->second.get() != nullptr) {
-            put_wal_entry_(it->second);
+            wal_mgr_->PutEntry(it->second);
             it = priority_que_.erase(it);
         }
     }
@@ -111,16 +112,26 @@ void TxnManager::PutWalEntry(SharedPtr<WalEntry> entry) {
     if (is_running_.load() == false) {
         UnrecoverableError("TxnManager is not running, cannot put wal entry");
     }
-    if (put_wal_entry_ == nullptr)
+    if (wal_mgr_ == nullptr)
         return;
     std::unique_lock<std::mutex> lk(mutex_);
     priority_que_[entry->commit_ts_] = entry;
     auto it = priority_que_.begin();
     while (it != priority_que_.end() && it->second.get() != nullptr) {
-        put_wal_entry_(it->second);
+        wal_mgr_->PutEntry(it->second);
         it = priority_que_.erase(it);
     }
     return;
+}
+
+void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
+    // Check if the is_running_ is true
+    if (is_running_.load() == false) {
+        UnrecoverableError("TxnManager is not running, cannot add delta entry");
+    }
+    if (wal_mgr_ == nullptr)
+        return;
+    wal_mgr_->AddDeltaEntry(std::move(delta_entry));
 }
 
 void TxnManager::Start() {
