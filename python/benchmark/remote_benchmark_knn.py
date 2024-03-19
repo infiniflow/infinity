@@ -190,7 +190,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
 
             query_builder = InfinityThriftQueryBuilder(table)
             query_builder.output(["_row_id"])
-            query_builder.knn('col1', query_vec, 'float', 'l2', 100)
+            query_builder.knn('col1', query_vec, 'float', 'l2', 100, {'ef': '200'})
             res, _ = query_builder.to_result()
             end = time.time()
 

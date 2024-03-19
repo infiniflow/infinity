@@ -260,9 +260,9 @@ class RemoteTable(Table, ABC):
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int):
+            topn: int, knn_params: {} = None):
         self.query_builder.knn(
-            vector_column_name, embedding_data, embedding_data_type, distance_type, topn)
+            vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = ''):
