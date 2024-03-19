@@ -507,7 +507,6 @@ void PhysicalImport::SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPt
 
     const String &db_name = *table_entry->GetDBName();
     const String &table_name = *table_entry->GetTableName();
-    segment_entry->SetSealed();
     txn->Import(db_name, table_name, std::move(segment_entry));
 }
 

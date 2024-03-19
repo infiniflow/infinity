@@ -212,8 +212,6 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
         compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), std::move(old_segments));
 
-        new_segment->SetSealed();
-
         this->AddSegmentStore(new_segment.get());
         this->AddSealedSegment(new_segment.get());
         table_entry_->AddCompactNew(std::move(new_segment));
@@ -339,6 +337,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
         Vector<Pair<BlockID, String>> block_filter_binary_data = sealed_segment->GetBlockFilterBinaryDataVector();
         local_delta_ops->AddOperation(
             MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data)));
+        sealed_segment->SetSealed();
     }
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {
         compact_state_.AddDeltaOp(local_delta_ops);

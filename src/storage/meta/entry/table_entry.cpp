@@ -292,7 +292,6 @@ void TableEntry::Append(TransactionID txn_id, void *txn_store, TxnTimeStamp comm
             if (unsealed_segment_.get() == nullptr || unsealed_segment_->Room() <= 0) {
                 // unsealed_segment_ is unpopulated or full
                 if (unsealed_segment_) {
-                    unsealed_segment_->SetSealed();
                     txn_store_ptr->AddSealedSegment(unsealed_segment_.get());
                 }
 
