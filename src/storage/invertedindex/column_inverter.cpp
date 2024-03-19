@@ -110,6 +110,12 @@ void ColumnInverter::Merge(Vector<SharedPtr<ColumnInverter>> &inverters) {
     }
 }
 
+void ColumnInverter::GetTermListLength(u32 *term_list_length_ptr) const {
+    for (const auto &[_, term_list] : terms_per_doc_) {
+        *(term_list_length_ptr++) = term_list->size();
+    }
+}
+
 struct TermRefRadix {
     u32 operator()(const u64 v) { return v >> 32; }
 };
