@@ -765,10 +765,12 @@ export class GlobalCatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
 
-    void AddDeltaOps(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
+    void AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries);
 
     // Pick and remove all operations that are committed before `max_commit_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+
+    SizeT OpSize() const { return delta_ops_.size(); }
 
 private:
     std::mutex mtx_{};

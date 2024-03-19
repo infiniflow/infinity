@@ -890,15 +890,15 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
-    {
-        std::stringstream ss;
-        ss << "Save delta catalog ops: ";
-        for (auto &op : flush_delta_entry->operations()) {
-            ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
-        }
-        LOG_INFO(ss.str());
-    }
-    // LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    // {
+    //     std::stringstream ss;
+    //     ss << "Save delta catalog ops: ";
+    //     for (auto &op : flush_delta_entry->operations()) {
+    //         ss << op->ToString() << ". txn id: " << op->txn_id() << "\n";
+    //     }
+    //     LOG_INFO(ss.str());
+    // }
+    LOG_INFO(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
 
     txn_mgr_->RemoveWaitFlushTxns(Vector<TransactionID>(flushed_unique_txn_ids.begin(), flushed_unique_txn_ids.end()));
 
@@ -906,7 +906,7 @@ bool Catalog::SaveDeltaCatalog(const String &delta_catalog_path, TxnTimeStamp ma
 }
 
 void Catalog::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
-    global_catalog_delta_entry_->AddDeltaOps(std::move(delta_entries));
+    global_catalog_delta_entry_->AddDeltaEntries(std::move(delta_entries));
 }
 
 void Catalog::PickCleanup(CleanupScanner *scanner) { db_meta_map_.PickCleanup(scanner); }

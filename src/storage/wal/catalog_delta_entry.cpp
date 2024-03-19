@@ -726,7 +726,7 @@ String CatalogDeltaEntry::ToString() const {
     return sstream.str();
 }
 
-void GlobalCatalogDeltaEntry::AddDeltaOps(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
+void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
     std::unique_lock w_lock(mtx_);
     for (auto &delta_entry : delta_entries) {
         for (auto &op : delta_entry->operations()) {
