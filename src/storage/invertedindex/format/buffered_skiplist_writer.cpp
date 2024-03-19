@@ -5,6 +5,7 @@ import stl;
 import byte_slice;
 import memory_pool;
 import file_writer;
+import file_reader;
 import index_defines;
 import posting_value;
 import buffered_byte_slice;
@@ -51,7 +52,20 @@ void BufferedSkipListWriter::AddItem(u32 value_delta) {
     }
 }
 
-void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file) { posting_writer_.Dump(file); }
+void BufferedSkipListWriter::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        file->WriteVInt(last_key_);
+        file->WriteVInt(last_value1_);
+        file->WriteVInt(posting_writer_.GetSize());
+    }
+    posting_writer_.Dump(file);
+}
 
-SizeT BufferedSkipListWriter::EstimateDumpSize() const { return posting_writer_.GetSize(); }
+void BufferedSkipListWriter::Load(const SharedPtr<FileReader> &file) {
+    last_key_ = file->ReadVInt();
+    last_value1_ = file->ReadVInt();
+    u32 size = file->ReadVInt();
+    posting_writer_.Load(file, size);
+}
+
 } // namespace infinity

@@ -5,6 +5,7 @@ import stl;
 import byte_slice_writer;
 import memory_pool;
 import file_writer;
+import file_reader;
 import vbyte_compressor;
 import index_defines;
 import buffered_byte_slice;
@@ -40,20 +41,33 @@ void PositionListEncoder::Flush() {
     }
 }
 
-void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file) {
-    Flush();
-    u32 pos_list_size = pos_list_buffer_.EstimateDumpSize();
-    u32 pos_skiplist_size = 0;
-    if (pos_skiplist_writer_) {
-        pos_skiplist_size = pos_skiplist_writer_->EstimateDumpSize();
-    }
+void PositionListEncoder::Dump(const SharedPtr<FileWriter> &file, bool spill) {
+    if (spill) {
+        file->WriteVInt(last_pos_in_cur_doc_);
+        file->WriteVInt(total_pos_count_);
+    } else {
+        Flush();
+        u32 pos_list_size = pos_list_buffer_.EstimateDumpSize();
+        u32 pos_skiplist_size = 0;
+        if (pos_skiplist_writer_) {
+            pos_skiplist_size = pos_skiplist_writer_->EstimateDumpSize();
+        }
 
-    file->WriteVInt(pos_skiplist_size);
-    file->WriteVInt(pos_list_size);
-    if (pos_skiplist_writer_) {
-        pos_skiplist_writer_->Dump(file);
+        file->WriteVInt(pos_skiplist_size);
+        file->WriteVInt(pos_list_size);
     }
-    pos_list_buffer_.Dump(file);
+    if (pos_skiplist_writer_) {
+        pos_skiplist_writer_->Dump(file, spill);
+    }
+    pos_list_buffer_.Dump(file, spill);
+}
+
+void PositionListEncoder::Load(const SharedPtr<FileReader> &file) {
+    last_pos_in_cur_doc_ = file->ReadVInt();
+    total_pos_count_ = file->ReadVInt();
+    CreatePosSkipListWriter();
+    pos_skiplist_writer_->Load(file);
+    pos_list_buffer_.Load(file);
 }
 
 u32 PositionListEncoder::GetDumpLength() const {
