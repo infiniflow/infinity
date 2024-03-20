@@ -629,7 +629,7 @@ curl --request PUT \
 ```
 {
     "error_code": 0,
-    "delete_row_count": 10
+    "update_row_count": 10
 }
 ```
 
@@ -739,7 +739,8 @@ curl --request GET \
 
 ```
 {
-    "error_code": 0
+    "error_code": 0,
+    "time_zone": "UTC-8"
 }
 ```
 

@@ -5,6 +5,7 @@ import byte_slice;
 import memory_chunk;
 import memory_pool;
 import file_writer;
+import file_reader;
 
 import infinity_exception;
 
@@ -50,6 +51,8 @@ public:
     const ByteSliceList *GetByteSliceList() const { return slice_list_; }
 
     void Dump(const SharedPtr<FileWriter> &file);
+
+    void Load(const SharedPtr<FileReader> &file, u32 size);
 
     void Reset();
 

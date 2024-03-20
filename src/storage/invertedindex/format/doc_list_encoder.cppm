@@ -3,6 +3,7 @@ module;
 import stl;
 import memory_pool;
 import file_writer;
+import file_reader;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
 import doc_list_format_option;
@@ -42,7 +43,9 @@ public:
 
     void EndDocument(docid_t doc_id, docpayload_t doc_payload);
 
-    void Dump(const SharedPtr<FileWriter> &file);
+    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
+
+    void Load(const SharedPtr<FileReader> &file);
 
     u32 GetDumpLength();
 

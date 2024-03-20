@@ -5,6 +5,8 @@ module;
 import stl;
 import memory_pool;
 import posting_value;
+import file_writer;
+import file_reader;
 export module short_buffer;
 
 namespace infinity {
@@ -63,6 +65,10 @@ public:
 
     static u8 AllocatePlan(u8 curCapacity);
 
+    void Dump(const SharedPtr<FileWriter> &file);
+
+    void Load(const SharedPtr<FileReader> &file);
+
 private:
     void *Allocate(SizeT size) { return pool_->Allocate(size); }
     void Deallocate(void *buf, SizeT size) { pool_->Deallocate(buf, size); }
@@ -82,7 +88,7 @@ private:
 private:
     u8 *volatile buffer_;
     u8 offset_[8];
-    u8 volatile capacity_; // numnber of rows
+    u8 volatile capacity_; // capacity of columns
     u8 volatile size_;     // number of columns (maximum of 128)
 
     bool volatile is_buffer_valid_;

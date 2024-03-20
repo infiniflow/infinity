@@ -4,7 +4,7 @@ import stl;
 import byte_slice;
 import memory_pool;
 import file_writer;
-
+import file_reader;
 import infinity_exception;
 
 module byte_slice_writer;
@@ -35,6 +35,13 @@ void ByteSliceWriter::Dump(const SharedPtr<FileWriter> &file) {
         file->Write((char *)(slice->data_), slice->size_);
         slice = slice->next_;
     }
+}
+
+void ByteSliceWriter::Load(const SharedPtr<FileReader> &file, u32 size) {
+    ByteSlice *slice = CreateSlice(size);
+    file->Read((char *)slice->data_, size);
+    slice_list_->Clear(pool_);
+    slice_list_->Add(slice);
 }
 
 void ByteSliceWriter::Reset() {

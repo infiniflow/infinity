@@ -2,6 +2,7 @@ module;
 
 import stl;
 import file_writer;
+import file_reader;
 import buffered_byte_slice;
 import short_list_optimize_util;
 import memory_pool;
@@ -20,9 +21,9 @@ public:
 
     void AddItem(u32 key, u32 value1, u32 value2);
 
-    void Dump(const SharedPtr<FileWriter> &file) override;
+    void Dump(const SharedPtr<FileWriter> &file, bool spill = false);
 
-    SizeT EstimateDumpSize() const override;
+    void Load(const SharedPtr<FileReader> &file);
 
 private:
     static const u32 INVALID_LAST_KEY = (u32)-1;
