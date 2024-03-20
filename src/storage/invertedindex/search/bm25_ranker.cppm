@@ -30,6 +30,6 @@ public:
 
 private:
     float score_{0};
-    i64 total_df_{0};
+    u64 total_df_{0};
 };
 } // namespace infinity

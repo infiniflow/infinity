@@ -30,7 +30,6 @@ Scorer::Scorer(u64 num_of_docs) : total_df_(num_of_docs) { column_length_reader_
 u32 Scorer::GetOrSetColumnIndex(u64 column_id) {
     if (auto iter = column_index_map_.find(column_id); iter == column_index_map_.end()) {
         column_index_map_[column_id] = column_counter_;
-        match_data_.term_columns_.resize(column_counter_ + 1);
         column_ids_.push_back(column_id);
         return column_counter_++;
     } else {
@@ -56,7 +55,7 @@ float Scorer::Score(RowID doc_id) {
         float avg_column_length = avg_column_length_[i];
         u32 column_len = column_length_reader_->GetColumnLength(i, doc_id.segment_offset_);
         Vector<TermDocIterator *> &column_iters = iterators_[i];
-        TermColumnMatchData &column_match_data = match_data_.term_columns_[i];
+        TermColumnMatchData column_match_data;
         for (u32 j = 0; j < column_iters.size(); j++) {
             if (column_iters[j]->GetTermMatchData(column_match_data, doc_id)) {
                 ranker.AddTermParam(column_match_data.tf_, column_iters[j]->GetDF(), avg_column_length, column_len, column_iters[j]->GetWeight());
