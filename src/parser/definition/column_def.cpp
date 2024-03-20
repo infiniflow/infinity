@@ -73,11 +73,12 @@ std::string ColumnDef::ToString() const {
 }
 
 ConstraintType ColumnDef::StringToConstraintType(std::string &type) {
-    if(string_to_constraint_type.find(type) != string_to_constraint_type.end()){
-        ConstraintType constraint_type = string_to_constraint_type.find(type)->second;
-        return constraint_type;
+    auto iter = string_to_constraint_type.find(type);
+    if(iter != string_to_constraint_type.end()) {
+        return iter->second;
+    } else {
+        return ConstraintType::kInvalid;
     }
-    return ConstraintType::kInvalid;
 }
 
 } // namespace infinity
