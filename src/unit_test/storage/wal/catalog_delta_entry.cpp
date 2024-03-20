@@ -72,7 +72,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         auto op1 = MakeUnique<AddTableEntryOp>(1, false, 0, 0, db_name, table_name, table_entry_dir, column_defs, 0, 0);
         catalog_delta_entry1->operations().push_back(std::move(op1));
 
-        auto op2 = MakeUnique<AddSegmentEntryOp>(2, false, 0, 0, db_name, table_name, segment_id, SegmentStatus::kSealed, 0, 0, 0, 0, 0, 0, 0);
+        auto op2 = MakeUnique<AddSegmentEntryOp>();
         catalog_delta_entry1->operations().push_back(std::move(op2));
 
         auto op3 = MakeUnique<AddBlockEntryOp>(3, false, 0, 0, db_name, table_name, segment_id, block_id, 0, 0, 0, 0, 0, 0);
@@ -89,17 +89,6 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
 
         auto op7 = MakeUnique<AddSegmentIndexEntryOp>(7, false, 0, 0, db_name, table_name, index_name, segment_id, 0, 14);
         catalog_delta_entry1->operations().push_back(std::move(op7));
-
-        auto op8 = MakeUnique<SetSegmentStatusSealedOp>(8,
-                                                        false,
-                                                        0,
-                                                        0,
-                                                        db_name,
-                                                        table_name,
-                                                        segment_id,
-                                                        std::move(segment_filter_binary_data),
-                                                        std::move(block_filter_binary_data));
-        catalog_delta_entry1->operations().push_back(std::move(op8));
 
         buffer_size = catalog_delta_entry1->GetSizeInBytes();
         buffer = MakeUnique<char[]>(buffer_size);
@@ -158,8 +147,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     local_catalog_delta_entry->operations().push_back(std::move(op4_same_name));
 
     // segment entry
-    auto op7 = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, SegmentStatus::kSealed, 0, 0, 0, 0, 0, 0, 0);
-    auto op7_same_name = MakeUnique<AddSegmentEntryOp>(7, false, 0, 0, db_name, table_name, segment_id, SegmentStatus::kSealed, 0, 0, 0, 0, 0, 0, 0);
+    auto op7 = MakeUnique<AddSegmentEntryOp>();
+    auto op7_same_name = MakeUnique<AddSegmentEntryOp>();
     local_catalog_delta_entry->operations().push_back(std::move(op7));
     local_catalog_delta_entry->operations().push_back(std::move(op7_same_name));
 

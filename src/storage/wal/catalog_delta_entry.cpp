@@ -85,32 +85,7 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
             break;
         }
         case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
-            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
-            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
-            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
-            SegmentStatus segment_status = ReadBufAdv<SegmentStatus>(ptr);
-            u64 column_count = ReadBufAdv<u64>(ptr);
-            SizeT row_count = ReadBufAdv<SizeT>(ptr);
-            SizeT actual_row_count = ReadBufAdv<SizeT>(ptr);
-            SizeT row_capacity = ReadBufAdv<SizeT>(ptr);
-            TxnTimeStamp min_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            TxnTimeStamp max_row_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            TxnTimeStamp deprecate_ts = ReadBufAdv<TxnTimeStamp>(ptr);
-            operation = MakeUnique<AddSegmentEntryOp>(begin_ts,
-                                                      is_delete,
-                                                      txn_id,
-                                                      commit_ts,
-                                                      std::move(db_name),
-                                                      std::move(table_name),
-                                                      segment_id,
-                                                      segment_status,
-                                                      column_count,
-                                                      row_count,
-                                                      row_capacity,
-                                                      actual_row_count,
-                                                      min_row_ts,
-                                                      max_row_ts,
-                                                      deprecate_ts);
+            operation = AddSegmentEntryOp::ReadAdv(ptr);
             break;
         }
         case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
@@ -208,29 +183,6 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
                                                            max_ts);
             break;
         }
-        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
-            auto db_name = MakeShared<String>(ReadBufAdv<String>(ptr));
-            auto table_name = MakeShared<String>(ReadBufAdv<String>(ptr));
-            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
-            String segment_filter_binary_data = ReadBufAdv<String>(ptr);
-            Vector<Pair<BlockID, String>> block_filter_binary_data;
-            i32 block_filter_binary_vector_size = ReadBufAdv<i32>(ptr);
-            for (i32 i = 0; i < block_filter_binary_vector_size; i++) {
-                BlockID block_id = ReadBufAdv<BlockID>(ptr);
-                String block_filter_binary = ReadBufAdv<String>(ptr);
-                block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
-            }
-            operation = MakeUnique<SetSegmentStatusSealedOp>(begin_ts,
-                                                             is_delete,
-                                                             txn_id,
-                                                             commit_ts,
-                                                             db_name,
-                                                             table_name,
-                                                             segment_id,
-                                                             std::move(segment_filter_binary_data),
-                                                             std::move(block_filter_binary_data));
-            break;
-        }
         default:
             UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for CatalogDeltaOperation type {}", int(operation_type)));
     }
@@ -243,6 +195,35 @@ UniquePtr<CatalogDeltaOperation> CatalogDeltaOperation::ReadAdv(char *&ptr, i32 
         UnrecoverableError("operation is nullptr");
     }
     return operation;
+}
+
+UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
+    auto add_segment_op = MakeUnique<AddSegmentEntryOp>();
+    add_segment_op->db_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_segment_op->table_name_ = MakeShared<String>(ReadBufAdv<String>(ptr));
+    add_segment_op->segment_id_ = ReadBufAdv<SegmentID>(ptr);
+    add_segment_op->status_ = ReadBufAdv<SegmentStatus>(ptr);
+    add_segment_op->column_count_ = ReadBufAdv<u64>(ptr);
+    add_segment_op->row_count_ = ReadBufAdv<SizeT>(ptr);
+    add_segment_op->actual_row_count_ = ReadBufAdv<SizeT>(ptr);
+    add_segment_op->row_capacity_ = ReadBufAdv<SizeT>(ptr);
+    add_segment_op->min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    add_segment_op->max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    add_segment_op->deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    add_segment_op->set_sealed_ = ReadBufAdv<bool>(ptr);
+    if (add_segment_op->set_sealed_) {
+        String segment_filter_binary_data = ReadBufAdv<String>(ptr);
+        Vector<Pair<BlockID, String>> block_filter_binary_data;
+        i32 block_filter_binary_vector_size = ReadBufAdv<i32>(ptr);
+        for (i32 i = 0; i < block_filter_binary_vector_size; i++) {
+            BlockID block_id = ReadBufAdv<BlockID>(ptr);
+            String block_filter_binary = ReadBufAdv<String>(ptr);
+            block_filter_binary_data.emplace_back(block_id, std::move(block_filter_binary));
+        }
+        add_segment_op->segment_filter_binary_data_ = std::move(segment_filter_binary_data);
+        add_segment_op->block_filter_binary_data_ = std::move(block_filter_binary_data);
+    }
+    return add_segment_op;
 }
 
 bool CatalogDeltaOperation::operator==(const CatalogDeltaOperation &rhs) const {
@@ -291,6 +272,16 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->min_row_ts_);
     WriteBufAdv(buf, this->max_row_ts_);
     WriteBufAdv(buf, this->deprecate_ts_);
+    WriteBufAdv(buf, this->set_sealed_);
+    if (this->set_sealed_) {
+        WriteBufAdv(buf, this->segment_filter_binary_data_);
+        i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
+        WriteBufAdv(buf, block_filter_binary_vector_size);
+        for (const auto &block_filter : block_filter_binary_data_) {
+            WriteBufAdv(buf, block_filter.first);
+            WriteBufAdv(buf, block_filter.second);
+        }
+    }
 }
 
 void AddBlockEntryOp::WriteAdv(char *&buf) const {
@@ -343,20 +334,6 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->segment_id_);
     WriteBufAdv(buf, this->min_ts_);
     WriteBufAdv(buf, this->max_ts_);
-}
-
-void SetSegmentStatusSealedOp::WriteAdv(char *&buf) const {
-    WriteAdvBase(buf);
-    WriteBufAdv(buf, *this->db_name_);
-    WriteBufAdv(buf, *this->table_name_);
-    WriteBufAdv(buf, this->segment_id_);
-    WriteBufAdv(buf, this->segment_filter_binary_data_);
-    i32 block_filter_binary_vector_size = block_filter_binary_data_.size();
-    WriteBufAdv(buf, block_filter_binary_vector_size);
-    for (const auto &block_filter : block_filter_binary_data_) {
-        WriteBufAdv(buf, block_filter.first);
-        WriteBufAdv(buf, block_filter.second);
-    }
 }
 
 const String AddDBEntryOp::ToString() const {
@@ -446,10 +423,6 @@ const String AddSegmentIndexEntryOp::ToString() const {
                        max_ts_);
 }
 
-const String SetSegmentStatusSealedOp::ToString() const {
-    return fmt::format("SetSegmentStatusSealedOp db_name: {} table_name: {} segment_id: {}", *db_name_, *table_name_, segment_id_);
-}
-
 bool AddDBEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddDBEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
@@ -475,11 +448,29 @@ bool AddTableEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
 
 bool AddSegmentEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddSegmentEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
-           IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && status_ == rhs_op->status_ &&
-           column_count_ == rhs_op->column_count_ && row_count_ == rhs_op->row_count_ && actual_row_count_ == rhs_op->actual_row_count_ &&
-           row_capacity_ == rhs_op->row_capacity_ && min_row_ts_ == rhs_op->min_row_ts_ && max_row_ts_ == rhs_op->max_row_ts_ &&
-           deprecate_ts_ == rhs_op->deprecate_ts_;
+    bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
+               IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ && status_ == rhs_op->status_ &&
+               column_count_ == rhs_op->column_count_ && row_count_ == rhs_op->row_count_ && actual_row_count_ == rhs_op->actual_row_count_ &&
+               row_capacity_ == rhs_op->row_capacity_ && min_row_ts_ == rhs_op->min_row_ts_ && max_row_ts_ == rhs_op->max_row_ts_ &&
+               deprecate_ts_ == rhs_op->deprecate_ts_ && set_sealed_ == rhs_op->set_sealed_;
+    if (!res) {
+        return false;
+    }
+    if (!set_sealed_) {
+        return true;
+    }
+    res = segment_filter_binary_data_ == rhs_op->segment_filter_binary_data_ &&
+          block_filter_binary_data_.size() == rhs_op->block_filter_binary_data_.size();
+    if (!res) {
+        return false;
+    }
+    for (size_t i = 0; i < block_filter_binary_data_.size(); ++i) {
+        if (block_filter_binary_data_[i].first != rhs_op->block_filter_binary_data_[i].first ||
+            block_filter_binary_data_[i].second != rhs_op->block_filter_binary_data_[i].second) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -517,24 +508,6 @@ bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const 
            min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_;
 }
 
-bool SetSegmentStatusSealedOp::operator==(const CatalogDeltaOperation &rhs) const {
-    auto *rhs_op = dynamic_cast<const SetSegmentStatusSealedOp *>(&rhs);
-    bool res = rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && IsEqual(*db_name_, *rhs_op->db_name_) &&
-               IsEqual(*table_name_, *rhs_op->table_name_) && segment_id_ == rhs_op->segment_id_ &&
-               segment_filter_binary_data_ == rhs_op->segment_filter_binary_data_ &&
-               block_filter_binary_data_.size() == rhs_op->block_filter_binary_data_.size();
-    if (!res) {
-        return false;
-    }
-    for (size_t i = 0; i < block_filter_binary_data_.size(); ++i) {
-        if (block_filter_binary_data_[i].first != rhs_op->block_filter_binary_data_[i].first ||
-            block_filter_binary_data_[i].second != rhs_op->block_filter_binary_data_[i].second) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void AddDBEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     if (other->type_ != CatalogDeltaOpType::ADD_DATABASE_ENTRY) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
@@ -553,7 +526,19 @@ void AddSegmentEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
     if (other->type_ != CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
-    *this = std::move(*static_cast<AddSegmentEntryOp *>(other.get()));
+    auto *add_segment_op = static_cast<AddSegmentEntryOp *>(other.get());
+    bool set_sealed = add_segment_op->set_sealed_;
+    String tmp_segment_filter = std::move(add_segment_op->segment_filter_binary_data_);
+    Vector<Pair<BlockID, String>> tmp_block_filter = std::move(add_segment_op->block_filter_binary_data_);
+
+    *this = std::move(*add_segment_op);
+
+    if (!set_sealed) {
+        segment_filter_binary_data_ = std::move(tmp_segment_filter);
+        block_filter_binary_data_ = std::move(tmp_block_filter);
+    } else {
+        set_sealed_ = true;
+    }
 }
 
 void AddBlockEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
@@ -589,13 +574,6 @@ void AddSegmentIndexEntryOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
         UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
     }
     *this = std::move(*static_cast<AddSegmentIndexEntryOp *>(other.get()));
-}
-
-void SetSegmentStatusSealedOp::Merge(UniquePtr<CatalogDeltaOperation> other) {
-    if (other->type_ != CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED) {
-        UnrecoverableError(fmt::format("Merge failed, other type: {}", other->GetTypeStr()));
-    }
-    *this = std::move(*static_cast<SetSegmentStatusSealedOp *>(other.get()));
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
@@ -726,13 +704,21 @@ String CatalogDeltaEntry::ToString() const {
 
 void GlobalCatalogDeltaEntry::AddDeltaEntries(Vector<UniquePtr<CatalogDeltaEntry>> &&delta_entries) {
     std::unique_lock w_lock(mtx_);
+    TxnTimeStamp last_commit_ts = 0;
     for (auto &delta_entry : delta_entries) {
+        if (delta_entry->commit_ts() < last_commit_ts) {
+            UnrecoverableError(fmt::format("delta_entry->commit_ts() {} < last_commit_ts {}", delta_entry->commit_ts(), last_commit_ts));
+        }
+        last_commit_ts = delta_entry->commit_ts();
+
         SizeT idx = delta_entry_infos_.size();
         for (auto &op : delta_entry->operations()) {
             String encode = op->EncodeIndex();
             auto iter = delta_ops_.find(encode);
             if (iter != delta_ops_.end()) {
                 auto &[delta_op, info_idxs] = iter->second;
+
+                PruneDeltaOp(delta_op.get());
                 delta_op->Merge(std::move(op));
                 info_idxs.push_back(idx);
             } else {
@@ -775,6 +761,10 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
         return lhs->type_ < rhs->type_;
     });
     return flush_delta_entry;
+}
+
+void GlobalCatalogDeltaEntry::PruneDeltaOp(CatalogDeltaOperation *delta_op) {
+    //
 }
 
 } // namespace infinity

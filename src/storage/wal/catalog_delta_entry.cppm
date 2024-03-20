@@ -235,33 +235,24 @@ private:
 /// class AddSegmentEntryOp
 export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
-    explicit AddSegmentEntryOp(TxnTimeStamp begin_ts,
-                               bool is_delete,
-                               TransactionID txn_id,
-                               TxnTimeStamp commit_ts,
-                               SharedPtr<String> db_name,
-                               SharedPtr<String> table_name,
-                               SegmentID segment_id,
-                               SegmentStatus status,
-                               u64 column_count,
-                               SizeT row_count,
-                               SizeT row_capacity,
-                               SizeT actual_row_count,
-                               TxnTimeStamp min_row_ts,
-                               TxnTimeStamp max_row_ts,
-                               TxnTimeStamp deprecate_ts)
-        : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), segment_id_(segment_id), status_(status), column_count_(column_count), row_count_(row_count),
-          actual_row_count_(actual_row_count), row_capacity_(row_capacity), min_row_ts_(min_row_ts), max_row_ts_(max_row_ts),
-          deprecate_ts_(deprecate_ts) {}
+    static UniquePtr<AddSegmentEntryOp> ReadAdv(char *&ptr);
 
-    explicit AddSegmentEntryOp(SegmentEntry *segment_entry)
+    AddSegmentEntryOp() = default;
+
+    explicit AddSegmentEntryOp(SegmentEntry *segment_entry, bool set_sealed = false)
         : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
           table_name_(segment_entry->GetTableEntry()->GetTableName()), segment_id_(segment_entry->segment_id()), status_(segment_entry->status()),
           column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
           actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
           row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
-          deprecate_ts_(segment_entry->deprecate_ts()) {}
+          deprecate_ts_(segment_entry->deprecate_ts()), set_sealed_(set_sealed) {
+        if (set_sealed) {
+            String segment_filter_binary_data = segment_entry->GetFastRoughFilter()->SerializeToString();
+            Vector<Pair<BlockID, String>> block_filter_binary_data = segment_entry->GetBlockFilterBinaryDataVector();
+            this->segment_filter_binary_data_ = std::move(segment_filter_binary_data);
+            this->block_filter_binary_data_ = std::move(block_filter_binary_data);
+        }
+    }
 
     CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::ADD_SEGMENT_ENTRY; }
     String GetTypeStr() const final { return "ADD_SEGMENT_ENTRY"; }
@@ -277,6 +268,17 @@ public:
         total_size += sizeof(actual_row_count_);
         total_size += sizeof(SizeT);
         total_size += sizeof(TxnTimeStamp) * 3;
+        total_size += sizeof(bool);
+        if (set_sealed_) {
+            total_size += sizeof(i32) + this->segment_filter_binary_data_.size();
+            i32 block_filter_count = block_filter_binary_data_.size();
+            total_size += sizeof(block_filter_count);
+            for (i32 i = 0; i < block_filter_count; ++i) {
+                auto const &block_filter = block_filter_binary_data_[i];
+                total_size += sizeof(block_filter.first);
+                total_size += sizeof(i32) + block_filter.second.size();
+            }
+        }
         return total_size;
     }
     void WriteAdv(char *&buf) const final;
@@ -303,6 +305,9 @@ public:
     TxnTimeStamp min_row_ts() const { return min_row_ts_; }
     TxnTimeStamp max_row_ts() const { return max_row_ts_; }
     TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
+    bool set_sealed() const { return set_sealed_; }
+    const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
+    const Vector<Pair<BlockID, String>> &block_filter_binary_data() const { return block_filter_binary_data_; }
 
 private:
     SharedPtr<String> db_name_{};
@@ -318,6 +323,12 @@ private:
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};
     TxnTimeStamp deprecate_ts_{0};
+
+    // merge if set_sealed is true
+    // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
+    bool set_sealed_{false};
+    String segment_filter_binary_data_{};
+    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
 /// class AddBlockEntryOp
@@ -644,73 +655,6 @@ private:
     TxnTimeStamp max_ts_{0};
 };
 
-// used when a segment is sealed (import, append, compact)
-// should always contain minmax filter data
-// maybe also contain bloom filter data for selected columns
-export class SetSegmentStatusSealedOp : public CatalogDeltaOperation {
-public:
-    explicit SetSegmentStatusSealedOp(TxnTimeStamp begin_ts,
-                                      bool is_delete,
-                                      TransactionID txn_id,
-                                      TxnTimeStamp commit_ts,
-                                      SharedPtr<String> db_name,
-                                      SharedPtr<String> table_name,
-                                      SegmentID segment_id,
-                                      String &&segment_filter_binary_data,
-                                      Vector<Pair<BlockID, String>> &&block_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, begin_ts, is_delete, txn_id, commit_ts), db_name_(std::move(db_name)),
-          table_name_(std::move(table_name)), segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
-          block_filter_binary_data_(std::move(block_filter_binary_data)) {}
-
-    explicit SetSegmentStatusSealedOp(SegmentEntry *segment_entry,
-                                      String &&segment_filter_binary_data,
-                                      Vector<Pair<BlockID, String>> &&block_filter_binary_data)
-        : CatalogDeltaOperation(CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED, segment_entry), db_name_(segment_entry->GetTableEntry()->GetDBName()),
-          table_name_(segment_entry->GetTableEntry()->GetTableName()), segment_id_(segment_entry->segment_id()),
-          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
-
-    CatalogDeltaOpType GetType() const final { return CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED; }
-    String GetTypeStr() const final { return "SET_SEGMENT_STATUS_SEALED"; }
-    [[nodiscard]] SizeT GetSizeInBytes() const final {
-        SizeT total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-        total_size += sizeof(i32) + this->db_name_->size();
-        total_size += sizeof(i32) + this->table_name_->size();
-        total_size += sizeof(this->segment_id_);
-        total_size += sizeof(i32) + this->segment_filter_binary_data_.size();
-        i32 block_filter_count = block_filter_binary_data_.size();
-        total_size += sizeof(block_filter_count);
-        for (i32 i = 0; i < block_filter_count; ++i) {
-            auto const &block_filter = block_filter_binary_data_[i];
-            total_size += sizeof(block_filter.first);
-            total_size += sizeof(i32) + block_filter.second.size();
-        }
-        return total_size;
-    }
-    void WriteAdv(char *&ptr) const final;
-    const String ToString() const final;
-    const String EncodeIndex() const final {
-        return String(
-            fmt::format("{}#{}#{}#{}", static_cast<std::underlying_type_t<CatalogDeltaOpType>>(type_), *db_name_, *table_name_, segment_id_));
-    }
-    bool operator==(const CatalogDeltaOperation &rhs) const override;
-    void Merge(UniquePtr<CatalogDeltaOperation> other) override;
-
-public:
-    const SharedPtr<String> &db_name() const { return db_name_; }
-    const SharedPtr<String> &table_name() const { return table_name_; }
-    SegmentID segment_id() const { return segment_id_; }
-    const String &segment_filter_binary_data() const { return segment_filter_binary_data_; }
-    const Vector<Pair<BlockID, String>> &block_filter_binary_data() const { return block_filter_binary_data_; }
-
-private:
-    SharedPtr<String> db_name_{};
-    SharedPtr<String> table_name_{};
-    SegmentID segment_id_{};
-    // following data include: 1. minmax filter for all valid columns 2. bloom filter for selected columns
-    String segment_filter_binary_data_{};
-    Vector<Pair<BlockID, String>> block_filter_binary_data_{};
-};
-
 // size of payload, including the header, round to multi
 // of 4. There's 4 bytes pad just after the payload storing
 // the same value to assist backward iterating.
@@ -769,6 +713,9 @@ public:
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
 
     SizeT OpSize() const { return delta_ops_.size(); }
+
+private:
+    void PruneDeltaOp(CatalogDeltaOperation *delta_op);
 
 private:
     std::mutex mtx_{};

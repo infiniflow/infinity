@@ -333,10 +333,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops,
         BuildFastRoughFilterTask::ExecuteOnNewSealedSegment(sealed_segment, txn_->buffer_mgr(), commit_ts);
         // now have minmax filter and optional bloom filter
         // serialize filter
-        String segment_filter_binary_data = sealed_segment->GetFastRoughFilter()->SerializeToString();
-        Vector<Pair<BlockID, String>> block_filter_binary_data = sealed_segment->GetBlockFilterBinaryDataVector();
-        local_delta_ops->AddOperation(
-            MakeUnique<SetSegmentStatusSealedOp>(sealed_segment, std::move(segment_filter_binary_data), std::move(block_filter_binary_data)));
+        local_delta_ops->AddOperation(MakeUnique<AddSegmentEntryOp>(sealed_segment, true));
         sealed_segment->SetSealed();
     }
     if (compact_state_.task_type_ != CompactSegmentsTaskType::kInvalid) {

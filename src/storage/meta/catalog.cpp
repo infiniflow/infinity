@@ -585,25 +585,32 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                 auto min_row_ts = add_segment_entry_op->min_row_ts();
                 auto max_row_ts = add_segment_entry_op->max_row_ts();
                 auto deprecate_ts = add_segment_entry_op->deprecate_ts();
+                bool set_sealed = add_segment_entry_op->set_sealed();
 
                 auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
 
                 table_entry->AddSegmentReplay(
                     [&]() {
-                        return SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
-                                                                          segment_id,
-                                                                          segment_status,
-                                                                          column_count,
-                                                                          row_count,
-                                                                          actual_row_count,
-                                                                          row_capacity,
-                                                                          min_row_ts,
-                                                                          max_row_ts,
-                                                                          commit_ts,
-                                                                          deprecate_ts,
-                                                                          begin_ts,
-                                                                          txn_id);
+                        auto segment = SegmentEntry::NewReplayCatalogSegmentEntry(table_entry,
+                                                                                  segment_id,
+                                                                                  segment_status,
+                                                                                  column_count,
+                                                                                  row_count,
+                                                                                  actual_row_count,
+                                                                                  row_capacity,
+                                                                                  min_row_ts,
+                                                                                  max_row_ts,
+                                                                                  commit_ts,
+                                                                                  deprecate_ts,
+                                                                                  begin_ts,
+                                                                                  txn_id);
+                        if (set_sealed) {
+                            auto const &segment_filter_binary = add_segment_entry_op->segment_filter_binary_data();
+                            auto const &block_filter_binary = add_segment_entry_op->block_filter_binary_data();
+                            segment->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
+                        }
+                        return segment;
                     },
                     segment_id);
                 break;
@@ -742,27 +749,6 @@ void Catalog::LoadFromEntry(Catalog *catalog, const String &catalog_path, Buffer
                         UnrecoverableError(fmt::format("Segment index {} is already in the catalog", segment_id));
                     }
                 }
-                break;
-            }
-
-            // -----------------------------
-            // Segment Status
-            // -----------------------------
-            case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
-                // case: unsealed segment become full in append operation
-                auto set_segment_status_sealed_op = static_cast<SetSegmentStatusSealedOp *>(op.get());
-                const auto &db_name = set_segment_status_sealed_op->db_name();
-                const auto &table_name = set_segment_status_sealed_op->table_name();
-                auto segment_id = set_segment_status_sealed_op->segment_id();
-                auto const &segment_filter_binary = set_segment_status_sealed_op->segment_filter_binary_data();
-                auto const &block_filter_binary = set_segment_status_sealed_op->block_filter_binary_data();
-
-                auto *db_entry = catalog->GetDatabaseReplay(*db_name, txn_id, begin_ts);
-                auto *table_entry = db_entry->GetTableReplay(*table_name, txn_id, begin_ts);
-
-                auto segment_entry = table_entry->segment_map_.at(segment_id).get();
-                segment_entry->SetSealed();
-                segment_entry->LoadFilterBinaryData(segment_filter_binary, block_filter_binary);
                 break;
             }
 

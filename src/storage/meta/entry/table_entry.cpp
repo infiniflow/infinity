@@ -208,10 +208,6 @@ TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, Transactio
 void TableEntry::AddSegmentReplay(std::function<SharedPtr<SegmentEntry>()> &&init_segment, SegmentID segment_id) {
     SharedPtr<SegmentEntry> new_segment = init_segment();
     segment_map_[segment_id] = new_segment;
-    if (new_segment->status() == SegmentStatus::kDeprecated) {
-        new_segment->Cleanup();
-        segment_map_.erase(segment_id);
-    }
     if (segment_id == unsealed_id_) {
         unsealed_segment_ = std::move(new_segment);
     }
