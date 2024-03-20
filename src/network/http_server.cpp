@@ -186,6 +186,36 @@ public:
     }
 };
 
+class ShowVariableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto variable_name = request->getPathVariable("variable_name");
+        auto result = infinity->ShowVariable(variable_name);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+         if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            json_response["variable_name"] = variable_name;
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            Value value = data_block->GetValue(0, 0);
+            const String& variable_value = value.ToString();
+            json_response["variable_value"] = variable_value;
+
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 }
 
 namespace infinity {
@@ -202,6 +232,8 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{db_name}", MakeShared<RetrieveDatabaseHandler>());
 
     router->route("GET", "/indexes/{db_name}/{table_name}", MakeShared<ListTableIndexesHandler>());
+
+    router->route("GET", "/variables/{variable_name}", MakeShared<ShowVariableHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler =  HttpConnectionHandler::createShared(router);
