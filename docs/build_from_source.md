@@ -22,7 +22,7 @@ git clone https://github.com/infiniflow/infinity.git
 cd infinity && mkdir build
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
 docker run -d --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
-docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && ninja -j 12"
+docker exec infinity_build bash -c "cd /infinity/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && ninja"
 ```
 
 ### Step3 Start up the Infinity server
@@ -62,10 +62,10 @@ git clone https://github.com/infiniflow/infinity.git
 
 ```shell
 git config --global --add safe.directory infinity
-cd infinity && mkdir build && cd build
+cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-17
 export CXX=/usr/bin/clang++-17
-cmake -G Ninja ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 ninja -j 12
 ```
 
@@ -101,11 +101,11 @@ git clone https://github.com/infiniflow/infinity.git
 
 ```shell
 git config --global --add safe.directory infinity
-cd infinity && mkdir build && cd build
+cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-17
 export CXX=/usr/bin/clang++-17
-cmake -G Ninja ..
-ninja -j 12
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+ninja
 ```
 
 ### Step4 Start up Infinity server
