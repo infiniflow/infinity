@@ -348,7 +348,6 @@ class TestImport:
         print(res)
 
     # import table with column value exceeding invalid value range
-    @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_exceeding_rows(self, get_infinity_db, check_data):

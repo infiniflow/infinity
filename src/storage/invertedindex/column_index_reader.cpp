@@ -50,7 +50,7 @@ void ColumnIndexReader::Open(const String &index_dir,
     }
 }
 
-PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
+UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, MemoryPool *session_pool) {
     SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
     for (u32 i = 0; i < segment_readers_.size(); ++i) {
         SegmentPosting seg_posting;
@@ -61,9 +61,10 @@ PostingIterator *ColumnIndexReader::Lookup(const String &term, MemoryPool *sessi
     }
     if (seg_postings->empty())
         return nullptr;
-    PostingIterator *iter = new PostingIterator(PostingFormatOption(flag_), session_pool);
+    auto iter = MakeUnique<PostingIterator>(PostingFormatOption(flag_), session_pool);
     u32 state_pool_size = 0; // TODO
     iter->Init(seg_postings, state_pool_size);
     return iter;
 }
+
 } // namespace infinity

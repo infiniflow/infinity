@@ -83,6 +83,10 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
     UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
+    if (!doc_iterator) {
+        RecoverableError(Status::SyntaxError("no available column with fulltext index found"));
+        return false;
+    }
 
     // 3 full text search
     u32 result_count = 0;
