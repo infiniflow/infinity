@@ -9,31 +9,31 @@ import skiplist_reader;
 import index_defines;
 import posting_field;
 
-module pair_value_skiplist_reader;
+module position_list_skiplist_reader;
 
 namespace infinity {
 
-PairValueSkipListReader::PairValueSkipListReader()
+PositionListSkipListReader::PositionListSkipListReader()
     : current_key_(0), current_value_(0), prev_key_(0), prev_value_(0), current_cursor_(0), num_in_buffer_(0), key_buffer_base_(key_buffer_),
       value_buffer_base_(value_buffer_) {}
 
-PairValueSkipListReader::PairValueSkipListReader(const PairValueSkipListReader &other) noexcept
+PositionListSkipListReader::PositionListSkipListReader(const PositionListSkipListReader &other) noexcept
     : current_key_(other.current_key_), current_value_(other.current_value_), prev_key_(other.prev_key_), prev_value_(other.prev_value_),
       current_cursor_(0), num_in_buffer_(0), key_buffer_base_(key_buffer_), value_buffer_base_(value_buffer_) {}
 
-PairValueSkipListReader::~PairValueSkipListReader() {}
+PositionListSkipListReader::~PositionListSkipListReader() {}
 
-void PairValueSkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count) {
+void PositionListSkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count) {
     SkipListReader::Load(byte_slice_list, start, end);
     Load_(start, end, item_count);
 }
 
-void PairValueSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count) {
+void PositionListSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count) {
     SkipListReader::Load(byte_slice, start, end);
     Load_(start, end, item_count);
 }
 
-void PairValueSkipListReader::Load_(u32, u32, const u32 &item_count) {
+void PositionListSkipListReader::Load_(u32, u32, const u32 &item_count) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -45,7 +45,7 @@ void PairValueSkipListReader::Load_(u32, u32, const u32 &item_count) {
     value_buffer_base_ = value_buffer_;
 }
 
-bool PairValueSkipListReader::SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &value, u32 &delta) {
+bool PositionListSkipListReader::SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32 &value, u32 &delta) {
     if (current_key_ > query_key) {
         UnrecoverableError("current_key_ > query_key.");
     }
@@ -99,7 +99,7 @@ bool PairValueSkipListReader::SkipTo(u32 query_key, u32 &key, u32 &prev_key, u32
     return false;
 }
 
-Pair<int, bool> PairValueSkipListReader::LoadBuffer() {
+Pair<int, bool> PositionListSkipListReader::LoadBuffer() {
     u32 end = byte_slice_reader_.Tell();
     if (end < end_) {
         key_buffer_base_ = key_buffer_;
@@ -121,7 +121,7 @@ Pair<int, bool> PairValueSkipListReader::LoadBuffer() {
     return MakePair(0, false);
 }
 
-u32 PairValueSkipListReader::GetLastValueInBuffer() const {
+u32 PositionListSkipListReader::GetLastValueInBuffer() const {
     u32 last_value_in_buffer = current_value_;
     u32 current_cursor = current_cursor_;
     while (current_cursor < num_in_buffer_) {
@@ -131,7 +131,7 @@ u32 PairValueSkipListReader::GetLastValueInBuffer() const {
     return last_value_in_buffer;
 }
 
-u32 PairValueSkipListReader::GetLastKeyInBuffer() const {
+u32 PositionListSkipListReader::GetLastKeyInBuffer() const {
     u32 last_key_in_buffer = current_key_;
     u32 current_cursor = current_cursor_;
     while (current_cursor < num_in_buffer_) {

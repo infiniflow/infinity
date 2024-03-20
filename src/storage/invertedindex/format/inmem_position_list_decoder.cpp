@@ -8,7 +8,7 @@ import buffered_byte_slice_reader;
 import in_doc_pos_state;
 import short_list_optimize_util;
 import position_list_format_option;
-import pair_value_skiplist_reader;
+import position_list_skiplist_reader;
 import index_defines;
 module inmem_position_list_decoder;
 
@@ -27,7 +27,7 @@ InMemPositionListDecoder::~InMemPositionListDecoder() {
     }
 }
 
-void InMemPositionListDecoder::Init(ttf_t total_tf, PairValueSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
+void InMemPositionListDecoder::Init(ttf_t total_tf, PositionListSkipListReader *skip_list_reader, BufferedByteSlice *pos_list_buffer) {
     total_tf_ = total_tf;
     pos_skiplist_reader_ = skip_list_reader;
     pos_list_buffer_ = pos_list_buffer;

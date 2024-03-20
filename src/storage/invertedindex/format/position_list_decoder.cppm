@@ -6,7 +6,7 @@ import stl;
 import byte_slice;
 import byte_slice_reader;
 import memory_pool;
-import pair_value_skiplist_reader;
+import position_list_skiplist_reader;
 import position_list_format_option;
 import posting_field;
 import index_defines;
@@ -56,7 +56,7 @@ private:
     void CalculateRecordOffsetByPosBitmap(const InDocPositionState *state, u32 &tf, u32 &record_offset, i32 &offset_in_record);
 
 protected:
-    PairValueSkipListReader *pos_skiplist_reader_;
+    PositionListSkipListReader *pos_skiplist_reader_;
     MemoryPool *session_pool_;
     const Int32Encoder *pos_encoder_;
     PositionBitmapReader *pos_bitmap_reader_;

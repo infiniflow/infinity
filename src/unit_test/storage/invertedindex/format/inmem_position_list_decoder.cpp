@@ -6,7 +6,7 @@ import index_defines;
 import buffered_byte_slice;
 import inmem_position_list_decoder;
 import doc_list_format_option;
-import pair_value_skiplist_reader;
+import position_list_skiplist_reader;
 import position_list_encoder;
 import in_doc_pos_state;
 import position_list_format_option;

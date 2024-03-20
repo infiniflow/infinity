@@ -13,7 +13,7 @@ import buffered_byte_slice;
 import buffered_skiplist_writer;
 import position_list_format_option;
 import inmem_position_list_decoder;
-import inmem_pair_value_skiplist_reader;
+import inmem_position_list_skiplist_reader;
 import short_list_optimize_util;
 import position_bitmap_reader;
 
@@ -142,12 +142,12 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder(Memor
     // doclist -> ttf -> pos skiplist -> poslist
     ttf_t ttf = total_pos_count_;
 
-    InMemPairValueSkipListReader *in_mem_skiplist_reader = nullptr;
+    InMemPositionListSkipListReader *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_) {
         // not support tf bitmap in realtime segment
-        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPairValueSkipListReader)))
-                                                    InMemPairValueSkipListReader(session_pool)
-                                              : new InMemPairValueSkipListReader(session_pool);
+        in_mem_skiplist_reader = session_pool ? new (session_pool->Allocate(sizeof(InMemPositionListSkipListReader)))
+                                                    InMemPositionListSkipListReader(session_pool)
+                                              : new InMemPositionListSkipListReader(session_pool);
         in_mem_skiplist_reader->Load(pos_skiplist_writer_);
     }
     BufferedByteSlice *posting_buffer = new (session_pool->Allocate(sizeof(BufferedByteSlice))) BufferedByteSlice(session_pool, session_pool);
