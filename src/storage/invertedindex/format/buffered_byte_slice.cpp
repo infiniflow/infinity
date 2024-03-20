@@ -3,7 +3,7 @@ module;
 module buffered_byte_slice;
 import stl;
 import memory_pool;
-import posting_value;
+import posting_field;
 import flush_info;
 import file_writer;
 import file_reader;
@@ -12,15 +12,15 @@ namespace infinity {
 
 BufferedByteSlice::BufferedByteSlice(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool) : buffer_(byte_slice_pool), posting_writer_(buffer_pool) {}
 
-void BufferedByteSlice::Init(const PostingValues *value) { buffer_.Init(value); }
+void BufferedByteSlice::Init(const PostingFields *value) { buffer_.Init(value); }
 
 SizeT BufferedByteSlice::DoFlush() {
     u32 flush_size = 0;
-    const PostingValues *posting_values = buffer_.GetPostingValues();
-    for (SizeT i = 0; i < posting_values->GetSize(); ++i) {
-        PostingValue *posting_value = posting_values->GetValue(i);
-        u8 *buffer = buffer_.GetRow(posting_value->location_);
-        flush_size += posting_value->Encode(posting_writer_, buffer, buffer_.Size() * posting_value->GetSize());
+    const PostingFields *posting_fields = buffer_.GetPostingValues();
+    for (SizeT i = 0; i < posting_fields->GetSize(); ++i) {
+        PostingField *posting_field = posting_fields->GetValue(i);
+        u8 *buffer = buffer_.GetRow(posting_field->location_);
+        flush_size += posting_field->Encode(posting_writer_, buffer, buffer_.Size() * posting_field->GetSize());
     }
     return flush_size;
 }

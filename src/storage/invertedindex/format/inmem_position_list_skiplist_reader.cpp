@@ -4,17 +4,17 @@ import stl;
 import memory_pool;
 import buffered_byte_slice;
 import buffered_byte_slice_reader;
-import pair_value_skiplist_reader;
+import position_list_skiplist_reader;
 import index_defines;
 import logger;
 import third_party;
 
-module inmem_pair_value_skiplist_reader;
+module inmem_position_list_skiplist_reader;
 
 namespace infinity {
-InMemPairValueSkipListReader::InMemPairValueSkipListReader(MemoryPool *session_pool) : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
+InMemPositionListSkipListReader::InMemPositionListSkipListReader(MemoryPool *session_pool) : session_pool_(session_pool), skiplist_buffer_(nullptr) {}
 
-InMemPairValueSkipListReader::~InMemPairValueSkipListReader() {
+InMemPositionListSkipListReader::~InMemPositionListSkipListReader() {
     if (session_pool_) {
         skiplist_buffer_->~BufferedByteSlice();
         session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(BufferedByteSlice));
@@ -24,7 +24,7 @@ InMemPairValueSkipListReader::~InMemPairValueSkipListReader() {
     }
 }
 
-void InMemPairValueSkipListReader::Load(BufferedByteSlice *posting_buffer) {
+void InMemPositionListSkipListReader::Load(BufferedByteSlice *posting_buffer) {
     skipped_item_count_ = -1;
     current_key_ = 0;
     current_value_ = 0;
@@ -42,7 +42,7 @@ void InMemPairValueSkipListReader::Load(BufferedByteSlice *posting_buffer) {
     skiplist_reader_.Open(skiplist_buffer_);
 }
 
-Pair<int, bool> InMemPairValueSkipListReader::LoadBuffer() {
+Pair<int, bool> InMemPositionListSkipListReader::LoadBuffer() {
     SizeT key_num = 0;
     SizeT decode_count = SKIP_LIST_BUFFER_SIZE;
     if (!skiplist_reader_.Decode(key_buffer_, decode_count, key_num)) {

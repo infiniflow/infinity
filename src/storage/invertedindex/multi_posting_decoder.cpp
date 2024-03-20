@@ -18,9 +18,9 @@ import posting_writer;
 import term_meta;
 import posting_list_format;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
-import pair_value_skiplist_reader;
-import tri_value_skiplist_reader;
+import inmem_position_list_decoder;
+import position_list_skiplist_reader;
+import doc_list_skiplist_reader;
 import internal_types;
 
 namespace infinity {
@@ -100,13 +100,13 @@ bool MultiPostingDecoder::DecodeDocBufferInOneSegment(RowID start_row_id,
 
 IndexDecoder *MultiPostingDecoder::CreateIndexDecoder(u32 doc_list_begin_pos) {
     if (cur_segment_format_option_.HasTfList()) {
-        return session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipIndexDecoder<TriValueSkipListReader>)))
-                                    SkipIndexDecoder<TriValueSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos))
-                             : new SkipIndexDecoder<TriValueSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos);
+        return session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipIndexDecoder<DocListSkipListReader>)))
+                                    SkipIndexDecoder<DocListSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos))
+                             : new SkipIndexDecoder<DocListSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos);
     } else {
-        return session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipIndexDecoder<TriValueSkipListReader>)))
-                                    SkipIndexDecoder<PairValueSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos))
-                             : new SkipIndexDecoder<PairValueSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos);
+        return session_pool_ ? (new ((session_pool_)->Allocate(sizeof(SkipIndexDecoder<DocListSkipListReader>)))
+                                    SkipIndexDecoder<PositionListSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos))
+                             : new SkipIndexDecoder<PositionListSkipListReader>(session_pool_, &doc_list_reader_, doc_list_begin_pos);
     }
 }
 

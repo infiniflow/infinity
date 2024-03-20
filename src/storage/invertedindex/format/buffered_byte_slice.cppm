@@ -7,7 +7,7 @@ import byte_slice_writer;
 import file_writer;
 import file_reader;
 import flush_info;
-import posting_value;
+import posting_field;
 import index_defines;
 import short_buffer;
 
@@ -21,7 +21,7 @@ public:
 
     virtual ~BufferedByteSlice() = default;
 
-    void Init(const PostingValues *value);
+    void Init(const PostingFields *value);
 
     template <typename T>
     void PushBack(u8 row, T value);
@@ -37,7 +37,7 @@ public:
 
     MemoryPool *GetBufferPool() const { return buffer_.GetPool(); }
 
-    const PostingValues *GetPostingValues() const { return buffer_.GetPostingValues(); }
+    const PostingFields *GetPostingValues() const { return buffer_.GetPostingValues(); }
 
     void SnapShot(BufferedByteSlice *buffer) const;
 
