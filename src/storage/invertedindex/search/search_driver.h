@@ -31,28 +31,23 @@ public:
     SearchDriver(std::map<std::string, std::string> &field2analyzer, std::string &default_field)
         : field2analyzer_{field2analyzer}, default_field_{default_field} {}
 
-    /**
-     * parse a single query
-     * @param query - a single query string
-     */
-    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query) const;
+    // used in PhysicalMatch
+    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingleWithFields(const std::string &fields_str, const std::string &query) const;
 
-    static std::unique_ptr<QueryNode> BuildQueryNodeByFieldAndTerms(const std::string &field, std::vector<std::string> &terms);
+    // used in ParseSingleWithFields and unit_test
+    [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query, const std::string *default_field_ptr = nullptr) const;
 
-    void Analyze(const std::string &field, const std::string &text, std::vector<std::string> &terms) const;
+    // used in SearchParser in ParseSingle
+    [[nodiscard]] std::unique_ptr<QueryNode> AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const;
 
-    using AnalyzeFunc = void (*)(const std::string &analyzer_name, const std::string &text, std::vector<std::string> &terms);
-
-    AnalyzeFunc analyze_func_{};
+    // will be set in PhysicalMatch
+    void (*analyze_func_)() = nullptr;
 
     /**
      * parsing options
      */
     const std::map<std::string, std::string> &field2analyzer_;
     const std::string &default_field_;
-
-private:
-    std::unique_ptr<QueryNode> ParseHelper(std::istream &stream) const;
 };
 
 } // namespace infinity

@@ -14,30 +14,21 @@
 
 module;
 
-export module multi_query_iterator;
+export module physical_match_homebrewed;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import index_defines;
-import doc_iterator;
+import query_context;
+import operator_state;
+import match_expression;
+import base_table_ref;
+import data_type;
 
 namespace infinity {
-export class MultiQueryDocIterator : public DocIterator {
-public:
-    MultiQueryDocIterator() = default;
 
-    virtual ~MultiQueryDocIterator() = default;
+export bool ExecuteInnerHomebrewed(QueryContext *query_context,
+                                   OperatorState *operator_state,
+                                   SharedPtr<BaseTableRef> &base_table_ref_,
+                                   SharedPtr<MatchExpression> &match_expr_,
+                                   Vector<SharedPtr<DataType>> OutputTypes);
 
-    virtual bool IsAnd() const { return false; }
-
-    virtual bool IsAndNot() const { return false; }
-
-    virtual bool IsOr() const { return false; }
-
-    const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
-
-protected:
-    Vector<UniquePtr<DocIterator>> children_;
-};
 } // namespace infinity

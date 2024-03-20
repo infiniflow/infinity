@@ -51,6 +51,13 @@ import search_options;
 import query_driver;
 import status;
 import index_defines;
+import search_driver;
+import query_node;
+import query_builder;
+import doc_iterator;
+import knn_result_handler;
+import logger;
+import physical_match_homebrewed;
 
 namespace infinity {
 
@@ -78,6 +85,13 @@ static void AnalyzeFunc(const std::string &analyzer_name, const std::string &tex
 }
 
 bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    if (!ExecuteInner(query_context, operator_state)) {
+        return ExecuteInnerHomebrewed(query_context, operator_state, base_table_ref_, match_expr_, std::move(*GetOutputTypes()));
+    }
+    return true;
+}
+
+bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *operator_state) {
     // 1 build irs::filter
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
@@ -85,6 +99,10 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
     SharedPtr<FulltextIndexEntry> fulltext_index_entry;
     Map<String, String> column2analyzer;
     base_table_ref_->table_entry_ptr_->GetFulltextAnalyzers(txn_id, begin_ts, fulltext_index_entry, column2analyzer);
+    if (fulltext_index_entry == nullptr) {
+        // switch to homebrewed
+        return false;
+    }
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
     String default_field = search_ops.options_["default_field"];
@@ -99,7 +117,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
 
     // 2 full text search
     ScoredIds result;
-    if(fulltext_index_entry == nullptr) {
+    if (fulltext_index_entry == nullptr) {
         RecoverableError(Status::FTSIndexNotExist(*base_table_ref_->table_entry_ptr_->GetTableName()));
     }
     UniquePtr<IRSDataStore> &dataStore = fulltext_index_entry->irs_index_;

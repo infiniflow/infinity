@@ -48,14 +48,16 @@
 #line 17 "search_parser.y"
 
     // unique_ptr<QueryNode> requires sizeof(QueryNode)
+    #ifndef QUERY_NODE_H
     #include "query_node.h"
+    #endif
 
     namespace infinity {
         class SearchDriver;
         class SearchScanner;
     }
 
-#line 59 "search_parser.h"
+#line 61 "search_parser.h"
 
 # include <cassert>
 # include <cstdlib> // std::abort
@@ -196,7 +198,7 @@
 
 #line 9 "search_parser.y"
 namespace infinity {
-#line 200 "search_parser.h"
+#line 202 "search_parser.h"
 
 
 
@@ -811,7 +813,7 @@ switch (yykind)
     };
 
     /// Build a parser object.
-    SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg);
+    SearchParser (SearchScanner &scanner_yyarg, const SearchDriver &driver_yyarg, const std::string &default_field_yyarg, std::unique_ptr<QueryNode> &parse_result_yyarg);
     virtual ~SearchParser ();
 
 #if 201103L <= YY_CPLUSPLUS
@@ -1360,6 +1362,7 @@ switch (yykind)
     // User arguments.
     SearchScanner &scanner;
     const SearchDriver &driver;
+    const std::string &default_field;
     std::unique_ptr<QueryNode> &parse_result;
 
   };
@@ -1367,7 +1370,7 @@ switch (yykind)
 
 #line 9 "search_parser.y"
 } // infinity
-#line 1371 "search_parser.h"
+#line 1374 "search_parser.h"
 
 
 

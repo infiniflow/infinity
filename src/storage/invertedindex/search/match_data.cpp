@@ -53,12 +53,13 @@ float Scorer::Score(RowID doc_id) {
     float score = 0.0F;
     for (u32 i = 0; i < column_counter_; i++) {
         BM25Ranker ranker(total_df_);
-        u32 column_len = column_length_reader_->GetColumnLength(i, doc_id);
+        float avg_column_length = avg_column_length_[i];
+        u32 column_len = column_length_reader_->GetColumnLength(i, doc_id.segment_offset_);
         Vector<TermDocIterator *> &column_iters = iterators_[i];
         TermColumnMatchData &column_match_data = match_data_.term_columns_[i];
         for (u32 j = 0; j < column_iters.size(); j++) {
             if (column_iters[j]->GetTermMatchData(column_match_data, doc_id)) {
-                ranker.AddTermParam(column_match_data.tf_, column_iters[j]->GetDF(), avg_column_length_[i], column_len, column_iters[j]->GetWeight());
+                ranker.AddTermParam(column_match_data.tf_, column_iters[j]->GetDF(), avg_column_length, column_len, column_iters[j]->GetWeight());
             }
         }
         score += ranker.GetScore();
