@@ -357,7 +357,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("database name");
+            Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -375,7 +375,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("storage directory");
+            Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -393,7 +393,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("table count");
+            Value value = Value::MakeVarchar("table_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -434,7 +434,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("database name");
+            Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -450,7 +450,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("table name");
+            Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -467,7 +467,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("storage directory");
+            Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -484,7 +484,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("column count");
+            Value value = Value::MakeVarchar("column_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -500,7 +500,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("segment count");
+            Value value = Value::MakeVarchar("segment_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -516,7 +516,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("row count");
+            Value value = Value::MakeVarchar("row_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -556,7 +556,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("database name");
+            Value value = Value::MakeVarchar("database_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -572,7 +572,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("table name");
+            Value value = Value::MakeVarchar("table_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -588,7 +588,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("index name");
+            Value value = Value::MakeVarchar("index_name");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -604,7 +604,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("index info");
+            Value value = Value::MakeVarchar("index_info");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -620,7 +620,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("storage directory");
+            Value value = Value::MakeVarchar("storage_directory");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -637,7 +637,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("segment index count");
+            Value value = Value::MakeVarchar("segment_index_count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
