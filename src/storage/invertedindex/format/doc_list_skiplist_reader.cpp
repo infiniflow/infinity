@@ -6,18 +6,18 @@ import byte_slice;
 import byte_slice_reader;
 import skiplist_reader;
 import index_defines;
-import posting_value;
-module tri_value_skiplist_reader;
+import posting_field;
+module doc_list_skiplist_reader;
 
 namespace infinity {
 
-TriValueSkipListReader::TriValueSkipListReader() { InitMember(); }
+DocListSkipListReader::DocListSkipListReader() { InitMember(); }
 
-TriValueSkipListReader::TriValueSkipListReader(const TriValueSkipListReader &other) noexcept
+DocListSkipListReader::DocListSkipListReader(const DocListSkipListReader &other) noexcept
     : current_doc_id_(other.current_doc_id_), current_offset_(other.current_offset_), current_ttf_(other.current_ttf_),
       prev_doc_id_(other.prev_doc_id_), prev_offset_(other.prev_offset_), prev_ttf_(other.prev_ttf_), current_cursor_(0), num_in_buffer_(0) {}
 
-void TriValueSkipListReader::InitMember() {
+void DocListSkipListReader::InitMember() {
     skipped_item_count_ = -1;
     current_doc_id_ = 0;
     current_offset_ = 0;
@@ -29,19 +29,19 @@ void TriValueSkipListReader::InitMember() {
     num_in_buffer_ = 0;
 }
 
-void TriValueSkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count) {
+void DocListSkipListReader::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count) {
     SkipListReader::Load(byte_slice_list, start, end);
     Load_(start, end, item_count);
 }
 
-void TriValueSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count) {
+void DocListSkipListReader::Load(ByteSlice *byte_slice, u32 start, u32 end, const u32 &item_count) {
     SkipListReader::Load(byte_slice, start, end);
     Load_(start, end, item_count);
 }
 
-void TriValueSkipListReader::Load_(u32, u32, const u32 &item_count) { InitMember(); }
+void DocListSkipListReader::Load_(u32, u32, const u32 &item_count) { InitMember(); }
 
-bool TriValueSkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32 &offset, u32 &delta) {
+bool DocListSkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32 &offset, u32 &delta) {
     u32 current_doc_id = current_doc_id_;
     u32 current_offset = current_offset_;
     u32 current_ttf = current_ttf_;
@@ -102,7 +102,7 @@ bool TriValueSkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc
     return false;
 }
 
-Pair<int, bool> TriValueSkipListReader::LoadBuffer() {
+Pair<int, bool> DocListSkipListReader::LoadBuffer() {
     u32 end = byte_slice_reader_.Tell();
     if (end < end_) {
         const Int32Encoder *doc_id_encoder = GetSkipListEncoder();

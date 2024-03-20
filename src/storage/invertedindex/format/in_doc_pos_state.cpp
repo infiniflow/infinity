@@ -1,10 +1,10 @@
 module;
 
 import stl;
-import pos_list_format_option;
+import position_list_format_option;
 import index_defines;
 import position_bitmap_reader;
-import pos_list_decoder;
+import position_list_decoder;
 module in_doc_pos_state;
 
 namespace infinity {

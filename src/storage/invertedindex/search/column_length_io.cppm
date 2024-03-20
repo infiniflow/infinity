@@ -37,8 +37,7 @@ export class ColumnLengthReader {
     u32 column_counter_{};
     // all available data in the table
     FlatHashMap<SegmentID, Vector<BufferHandle>, Hash> column_length_data_buffer_handles_;
-    mutable Vector<const u32 *> column_length_vector_;
-    mutable SegmentID segment_id_now = INVALID_SEGMENT_ID;
+    Vector<const u32 *> column_length_vector_;
 
 public:
     ColumnLengthReader() = default;
@@ -51,23 +50,22 @@ public:
                           TransactionID txn_id,
                           TxnTimeStamp begin_ts);
 
-    void UpdateAvgColumnLength(Vector<float> &avg_column_length);
+    void UpdateAvgColumnLength(Vector<float> &avg_column_length) const;
 
-    inline u32 GetColumnLength(u32 scorer_column_idx, RowID doc_id) const {
-        if (SegmentID segment_id = doc_id.segment_id_; segment_id != segment_id_now) [[unlikely]] {
-            segment_id_now = segment_id;
-            if (auto iter = column_length_data_buffer_handles_.find(segment_id); iter != column_length_data_buffer_handles_.end()) [[likely]] {
-                const Vector<BufferHandle> &buffer_handles = iter->second;
-                for (u32 i = 0; i < column_counter_; ++i) {
-                    const auto *column_length_data = static_cast<const FullTextColumnLengthData *>(buffer_handles[i].GetData());
-                    column_length_vector_[i] = column_length_data->column_length_.data();
-                }
-            } else {
-                UnrecoverableError(fmt::format("Segment {} is not found in column length data", segment_id));
-                return -1;
+    inline void UpdateTargetSegment(SegmentID segment_id) {
+        if (auto iter = column_length_data_buffer_handles_.find(segment_id); iter != column_length_data_buffer_handles_.end()) [[likely]] {
+            const Vector<BufferHandle> &buffer_handles = iter->second;
+            for (u32 i = 0; i < column_counter_; ++i) {
+                const auto *column_length_data = static_cast<const FullTextColumnLengthData *>(buffer_handles[i].GetData());
+                column_length_vector_[i] = column_length_data->column_length_.data();
             }
+        } else {
+            UnrecoverableError(fmt::format("Segment {} is not found in column length data", segment_id));
         }
-        return column_length_vector_[scorer_column_idx][doc_id.segment_offset_];
+    }
+
+    inline u32 GetColumnLength(u32 scorer_column_idx, SegmentOffset segment_offset) const {
+        return column_length_vector_[scorer_column_idx][segment_offset];
     }
 };
 

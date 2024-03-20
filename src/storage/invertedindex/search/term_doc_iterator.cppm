@@ -27,19 +27,17 @@ import match_data;
 import internal_types;
 
 namespace infinity {
-export class TermDocIterator : public DocIterator {
+export class TermDocIterator final : public DocIterator {
 public:
-    TermDocIterator(PostingIterator *iter, u64 column_id, float weight);
+    TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight);
 
     virtual ~TermDocIterator();
 
-    void AddIterator(DocIterator *iter) override {}
-
     void DoSeek(RowID doc_id) override;
 
-    u32 GetDF() const override { return iter_->GetTermMeta()->GetDocFreq(); }
+    u32 GetDF() const override { return doc_freq_; }
 
-    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) override {
+    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) {
         if (doc_id == doc_id_) {
             match_data.doc_id_ = doc_id_;
             iter_->GetTermMatchData(match_data);
@@ -52,7 +50,8 @@ public:
 
 private:
     u64 column_id_;
-    PostingIterator *iter_ = nullptr;
+    UniquePtr<PostingIterator> iter_;
+    u32 doc_freq_ = iter_->GetDocFreq();
     float weight_;
 };
 } // namespace infinity

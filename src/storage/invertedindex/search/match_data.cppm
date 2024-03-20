@@ -30,12 +30,6 @@ export struct TermColumnMatchData {
     docpayload_t doc_payload_;
 };
 
-export struct MatchData {
-    Vector<TermColumnMatchData> term_columns_;
-
-    TermColumnMatchData *ResolveTermColumn(u32 column_sequence) { return &term_columns_[column_sequence]; }
-};
-
 class TermDocIterator;
 export class Scorer {
 public:
@@ -46,6 +40,8 @@ public:
     void AddDocIterator(TermDocIterator *iter, u64 column_id);
 
     void LoadColumnLength(TableEntry *table_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    void UpdateTargetSegment(SegmentID segment_id) { column_length_reader_->UpdateTargetSegment(segment_id); }
 
     float Score(RowID doc_id);
 
@@ -63,7 +59,6 @@ private:
     Vector<Vector<TermDocIterator *>> iterators_;
     Vector<float> avg_column_length_;
     UniquePtr<ColumnLengthReader> column_length_reader_;
-    MatchData match_data_;
 
 public:
     using ColumnIndexMapType = decltype(column_index_map_);

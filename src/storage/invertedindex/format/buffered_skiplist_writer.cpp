@@ -8,7 +8,7 @@ import memory_pool;
 import file_writer;
 import file_reader;
 import index_defines;
-import posting_value;
+import posting_field;
 import buffered_byte_slice;
 import short_list_optimize_util;
 

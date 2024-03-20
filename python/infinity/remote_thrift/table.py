@@ -143,22 +143,43 @@ class RemoteTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def import_data(self, file_path: str, options=None):
+    def import_data(self, file_path: str, import_options: {} = None):
 
         options = ttypes.ImportOption()
+        options.has_header = False
+        options.delimiter = ','
+        options.copy_file_type = ttypes.CopyFileType.CSV
+        if import_options != None:
+            for k, v in import_options.items():
+                key = k.lower()
+                if key == 'file_type':
+                    file_type = v.lower()
+                    if file_type == 'csv':
+                        options.copy_file_type = ttypes.CopyFileType.CSV
+                    elif file_type == 'json':
+                        options.copy_file_type = ttypes.CopyFileType.JSON
+                    elif file_type == 'jsonl':
+                        options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
+                    else:
+                        raise Exception("Unrecognized import file type")
+                elif key == 'delimiter':
+                    delimiter = v.lower()
+                    if len(delimiter) != 1:
+                        raise Exception("Unrecognized import file delimiter")
+                    options.delimiter = delimiter[0]
+                elif key == 'header':
+                    if isinstance(v, bool):
+                        options.has_header = v
+                    else:
+                        raise Exception("Boolean value is expected in header field")
+                else:
+                    raise Exception("Unknown import parameter")
 
         total_size = os.path.getsize(file_path)
         chunk_size = 1024 * 1024 * 10  # 10MB
         file_name = os.path.basename(file_path)
-        if file_name.endswith('.csv'):
-            options.copy_file_type = ttypes.CopyFileType.CSV
-            options.delimiter = ","
-        elif file_name.endswith('.json'):
-            options.copy_file_type = ttypes.CopyFileType.JSON
-        elif file_name.endswith('.jsonl'):
-            options.copy_file_type = ttypes.CopyFileType.JSONL
-        elif file_name.endswith('.fvecs'):
-            options.copy_file_type = ttypes.CopyFileType.FVECS
 
         with open(file_path, 'rb') as f:
             file_data = f.read()

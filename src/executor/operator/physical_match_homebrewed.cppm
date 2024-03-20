@@ -14,25 +14,21 @@
 
 module;
 
-module term_doc_iterator;
+export module physical_match_homebrewed;
 
 import stl;
-import memory_pool;
-import posting_iterator;
-import bitmap;
-import index_defines;
-import term_meta;
-import doc_iterator;
-import internal_types;
+import query_context;
+import operator_state;
+import match_expression;
+import base_table_ref;
+import data_type;
 
 namespace infinity {
-TermDocIterator::TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight)
-    : column_id_(column_id), iter_(std::move(iter)), weight_(weight) {
-    DoSeek(0);
-}
 
-TermDocIterator::~TermDocIterator() {}
-
-void TermDocIterator::DoSeek(RowID doc_id) { doc_id_ = iter_->SeekDoc(doc_id); }
+export bool ExecuteInnerHomebrewed(QueryContext *query_context,
+                                   OperatorState *operator_state,
+                                   SharedPtr<BaseTableRef> &base_table_ref_,
+                                   SharedPtr<MatchExpression> &match_expr_,
+                                   Vector<SharedPtr<DataType>> OutputTypes);
 
 } // namespace infinity

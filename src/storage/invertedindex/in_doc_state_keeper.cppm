@@ -4,11 +4,11 @@ import stl;
 import memory_pool;
 import byte_slice;
 import in_doc_pos_state;
-import pos_list_decoder;
+import position_list_decoder;
 import posting_decoder;
 import inmem_posting_decoder;
-import inmem_pos_list_decoder;
-import pos_list_format_option;
+import inmem_position_list_decoder;
+import position_list_format_option;
 import index_defines;
 export module in_doc_state_keeper;
 

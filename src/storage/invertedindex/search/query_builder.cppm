@@ -21,25 +21,44 @@ import doc_iterator;
 import column_index_reader;
 import match_data;
 import table_entry;
+import internal_types;
+import default_values;
+import base_table_ref;
 
 namespace infinity {
 
 struct QueryNode;
-export struct QueryContext {
+export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_;
 };
 
 export class QueryBuilder {
 public:
-    QueryBuilder(TableEntry *table_entry);
+    QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<BaseTableRef> &base_table_ref);
 
     ~QueryBuilder();
 
-    UniquePtr<DocIterator> CreateSearch(QueryContext &context);
+    Map<String, String> &GetColumn2Analyzer() { return column2analyzer_; }
+
+    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
+
+    void LoadScorerColumnLength() { scorer_->LoadColumnLength(table_entry_, txn_id_, begin_ts_); }
+
+    float Score(RowID doc_id) {
+        if (SegmentID segment_id = doc_id.segment_id_; segment_id != target_segment_id_) {
+            target_segment_id_ = segment_id;
+            scorer_->UpdateTargetSegment(segment_id);
+        }
+        return scorer_->Score(doc_id);
+    }
 
 private:
+    TransactionID txn_id_{};
+    TxnTimeStamp begin_ts_{};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     UniquePtr<Scorer> scorer_;
+    SegmentID target_segment_id_ = INVALID_SEGMENT_ID;
+    Map<String, String> column2analyzer_;
 };
 } // namespace infinity

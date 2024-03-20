@@ -171,7 +171,7 @@ class TestCase:
 
             assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
 
-            res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file, None)
+            res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
             assert res.error_code == ErrorCode.OK
 
             # search

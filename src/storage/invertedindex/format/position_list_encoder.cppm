@@ -9,15 +9,15 @@ import file_reader;
 import index_defines;
 import buffered_byte_slice;
 import buffered_skiplist_writer;
-import pos_list_format_option;
-import inmem_pos_list_decoder;
-export module pos_list_encoder;
+import position_list_format_option;
+import inmem_position_list_decoder;
+export module position_list_encoder;
 
 namespace infinity {
 
 export class PositionListEncoder {
 public:
-    PositionListEncoder(const PositionListFormatOption &pos_list_format_option,
+    PositionListEncoder(const PositionListFormatOption &position_list_format_option,
                         MemoryPool *byte_slice_pool,
                         MemoryPool *buffer_pool,
                         const PositionListFormat *pos_list_format = nullptr);

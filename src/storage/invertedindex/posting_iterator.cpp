@@ -1,7 +1,7 @@
 module;
 
 #include "common/utility/builtin.h"
-
+#include <vector>
 import stl;
 import memory_pool;
 import byte_slice_reader;
@@ -42,6 +42,9 @@ PostingIterator::~PostingIterator() {
 
 bool PostingIterator::Init(const SharedPtr<Vector<SegmentPosting>> &seg_postings, const u32) {
     segment_postings_ = seg_postings;
+    for (auto &seg_posting : *segment_postings_) {
+        doc_freq_ += seg_posting.GetTermMeta().GetDocFreq();
+    }
     Reset();
     return true;
 }

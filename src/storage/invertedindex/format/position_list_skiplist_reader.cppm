@@ -1,6 +1,6 @@
 module;
 
-export module pair_value_skiplist_reader;
+export module position_list_skiplist_reader;
 
 import stl;
 import byte_slice;
@@ -9,13 +9,13 @@ import skiplist_reader;
 import index_defines;
 
 namespace infinity {
-export class PairValueSkipListReader : public SkipListReader {
+export class PositionListSkipListReader : public SkipListReader {
 public:
-    PairValueSkipListReader();
+    PositionListSkipListReader();
 
-    PairValueSkipListReader(const PairValueSkipListReader &other) noexcept;
+    PositionListSkipListReader(const PositionListSkipListReader &other) noexcept;
 
-    virtual ~PairValueSkipListReader();
+    virtual ~PositionListSkipListReader();
 
 public:
     void Load(const ByteSliceList *byte_slice_list, u32 start, u32 end, const u32 &item_count);

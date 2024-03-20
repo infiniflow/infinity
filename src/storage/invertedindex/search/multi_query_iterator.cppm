@@ -35,11 +35,6 @@ public:
 
     virtual bool IsOr() const { return false; }
 
-    void AddIterator(DocIterator *iter) override {
-        UniquePtr<DocIterator> it(iter);
-        children_.push_back(std::move(it));
-    }
-
     const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
 
 protected:
