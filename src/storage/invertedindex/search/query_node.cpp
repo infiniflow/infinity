@@ -318,10 +318,11 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader)
         return nullptr;
-    PostingIterator *posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
-    if (posting_iterator == nullptr)
+    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get());
+    if (!posting_iterator) {
         return nullptr;
-    auto search = MakeUnique<TermDocIterator>(posting_iterator, column_id, GetWeight());
+    }
+    auto search = MakeUnique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight());
     if (scorer) {
         // nodes under "not" will not be added to scorer
         scorer->AddDocIterator(search.get(), column_id);
