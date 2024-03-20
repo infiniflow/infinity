@@ -29,6 +29,6 @@ export bool ExecuteInnerHomebrewed(QueryContext *query_context,
                                    OperatorState *operator_state,
                                    SharedPtr<BaseTableRef> &base_table_ref_,
                                    SharedPtr<MatchExpression> &match_expr_,
-                                   SharedPtr<Vector<SharedPtr<DataType>>> (*GetOutputTypes)());
+                                   Vector<SharedPtr<DataType>> OutputTypes);
 
 } // namespace infinity

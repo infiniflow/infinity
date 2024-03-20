@@ -23,6 +23,7 @@ import match_data;
 import table_entry;
 import internal_types;
 import default_values;
+import base_table_ref;
 
 namespace infinity {
 
@@ -33,7 +34,7 @@ export struct FullTextQueryContext {
 
 export class QueryBuilder {
 public:
-    QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, TableEntry *table_entry);
+    QueryBuilder(TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<BaseTableRef> &base_table_ref);
 
     ~QueryBuilder();
 

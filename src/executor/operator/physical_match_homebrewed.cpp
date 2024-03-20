@@ -61,12 +61,12 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
                             OperatorState *operator_state,
                             SharedPtr<BaseTableRef> &base_table_ref_,
                             SharedPtr<MatchExpression> &match_expr_,
-                            SharedPtr<Vector<SharedPtr<DataType>>> (*GetOutputTypes)()) {
+                            Vector<SharedPtr<DataType>> OutputTypes) {
     // 1. build QueryNode tree
     // 1.1 populate column2analyzer
     TransactionID txn_id = query_context->GetTxn()->TxnID();
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
-    QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_->table_entry_ptr_);
+    QueryBuilder query_builder(txn_id, begin_ts, base_table_ref_);
     Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
@@ -123,7 +123,7 @@ bool ExecuteInnerHomebrewed(QueryContext *query_context,
     auto &output_data_blocks = operator_state->data_block_array_;
     auto append_data_block = [&]() {
         auto data_block = DataBlock::MakeUniquePtr();
-        data_block->Init(*GetOutputTypes());
+        data_block->Init(OutputTypes);
         output_data_blocks.emplace_back(std::move(data_block));
     };
     append_data_block();
