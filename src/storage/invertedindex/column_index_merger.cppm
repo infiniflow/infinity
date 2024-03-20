@@ -8,7 +8,6 @@ import file_writer;
 import posting_decoder;
 import posting_merger;
 import posting_list_format;
-import bitmap;
 import index_defines;
 import term_meta;
 import index_full_text;

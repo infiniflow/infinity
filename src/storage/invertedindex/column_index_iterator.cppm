@@ -9,7 +9,6 @@ import byte_slice_reader;
 import file_reader;
 import posting_decoder;
 import posting_list_format;
-import bitmap;
 import index_defines;
 import term_meta;
 import dict_reader;

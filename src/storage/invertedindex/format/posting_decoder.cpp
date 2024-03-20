@@ -3,7 +3,6 @@ module;
 import stl;
 import byte_slice_reader;
 import posting_list_format;
-import bitmap;
 import term_meta;
 import index_defines;
 import posting_field;
