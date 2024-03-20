@@ -486,7 +486,9 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     }
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse TinyInt error"); // TODO: throw error here
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse tiny integer error: {}", str));
+    }
     return value;
 }
 
@@ -497,7 +499,9 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     }
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse SmallInt error");
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse small integer error: {}", str));
+    }
     return value;
 }
 
@@ -508,7 +512,9 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     }
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Integer error");
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse integer error: {}", str));
+    }
     return value;
 }
 
@@ -519,7 +525,9 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     }
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse BigInt error");
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse big integer error: {}", str));
+    }
     return value;
 }
 
@@ -534,7 +542,9 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     ParserAssert(ret == str.size(), "Parse Float error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Float error");
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse float error: {}", str));
+    }
 #endif
     return value;
 }
@@ -550,7 +560,9 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     ParserAssert(ret == str.size(), "Parse Double error");
 #else
     auto res = std::from_chars(str.begin(), str.end(), value);
-    ParserAssert(res.ptr == str.data() + str.size(), "Parse Double error");
+    if(res.ptr != str.data() + str.size()) {
+        ParserError(fmt::format("Parse double error: {}", str));
+    }
 #endif
     return value;
 }
