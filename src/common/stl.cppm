@@ -118,6 +118,7 @@ export namespace std {
     using std::reverse;
     using std::sort;
     using std::unique;
+    using std::reduce;
     using std::sqrt;
     using std::transform;
 

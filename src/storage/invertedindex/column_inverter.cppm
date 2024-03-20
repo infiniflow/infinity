@@ -43,6 +43,8 @@ public:
 
     void InvertColumn(u32 doc_id, const String &val);
 
+    void SortForOfflineDump();
+
     void Merge(ColumnInverter &rhs);
 
     static void Merge(Vector<SharedPtr<ColumnInverter>> &inverters);
@@ -50,6 +52,8 @@ public:
     void Sort();
 
     void GeneratePosting();
+
+    void GetTermListLength(u32 *term_list_length_ptr) const;
 
     struct PosInfo {
         u32 term_num_{0};

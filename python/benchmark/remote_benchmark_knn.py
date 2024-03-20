@@ -137,7 +137,7 @@ def fvecs_read(filename):
                 break
 
 
-def process_pool(threads, rounds, query_path, tabel_name):
+def process_pool(threads, rounds, query_path, table_name):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -155,7 +155,7 @@ def process_pool(threads, rounds, query_path, tabel_name):
         p = multiprocessing.Pool(threads)
         start = time.time()
         for idx in range(threads):
-            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", tabel_name))
+            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", table_name))
         p.close()
         p.join()
         end = time.time()
@@ -201,7 +201,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
             # print(len(res_list))
 
             for j in range(len(res_list)):
-                query_results[idx].append(res_list[j][1])
+                query_results[idx].append(res_list[j][0])
 
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 

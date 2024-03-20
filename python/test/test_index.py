@@ -165,7 +165,6 @@ class TestIndex:
             table_obj.create_index("my_index", index_info, None)
 
 
-    # @pytest.mark.skip(reason="Core dumped.")
     @pytest.mark.parametrize("column_name", [
         (1, False),
         (2.2, False),
@@ -347,7 +346,6 @@ class TestIndex:
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
 
     # create index on all data are deleted table.
-    @pytest.mark.skip(reason="Core dumped")
     def test_create_index_on_deleted_table(self, get_infinity_db):
         db_obj = get_infinity_db
         db_obj.drop_table("test_create_index_on_deleted_table", if_exists=True)

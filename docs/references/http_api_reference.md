@@ -1,8 +1,13 @@
+---
+sidebar_position: 3
+slug: /html_api_reference
+---
+
 # HTTP API Reference
 
 ## Create database
 
-create a new database.
+Creates a new database.
 
 #### Request
 ```http request
@@ -33,11 +38,9 @@ curl --request POST \
 }
 ```
 
----
-
 ## Drop database
 
-Drop a database.
+Drops a database.
 
 #### Request
 ```http request
@@ -68,11 +71,9 @@ curl --request DELETE \
 }
 ```
 
----
-
 ## Retrieve a database
 
-Retrieve a database.
+Retrieves a database.
 
 #### Request
 ```http request
@@ -99,11 +100,9 @@ curl --request GET \
 }
 ```
 
----
-
 ## List databases
 
-Retrieve all databases of the system.
+Retrieves all databases of the system.
 
 #### Request
 ```http request
@@ -125,11 +124,9 @@ curl --request GET \
 }
 ```
 
----
-
 ## Create table
 
-create a new table.
+creates a new table.
 
 #### Request
 ```http request
@@ -187,11 +184,9 @@ curl --request POST \
 }
 ```
 
----
-
 ## Drop table
 
-drop a table.
+Drops a table.
 
 #### Request
 ```http request
@@ -222,11 +217,9 @@ curl --request DELETE \
 }
 ```
 
----
-
 ## List tables
 
-list tables of the database.
+Lists tables of the database.
 
 #### Request
 ```http request
@@ -265,11 +258,9 @@ curl --request GET \
 }
 ```
 
----
-
 ## Retrieve a table
 
-Retrieve a table from a database
+Retrieves a table from a database.
 
 #### Request
 ```http request
@@ -312,11 +303,9 @@ curl --request GET \
 }
 ```
 
----
-
 ## Create index
 
-create an index on the table.
+Creates an index on the table.
 
 #### Request
 ```http request
@@ -359,10 +348,9 @@ curl --request POST \
 }
 ```
 
----
 ## Drop index
 
-Drop index
+Drops an index.
 
 #### Request
 ```http request
@@ -388,11 +376,9 @@ curl --request DELETE \
 }
 ```
 
----
-
 ## Insert
 
-Insert data into table
+Inserts data into a specified table.
 
 #### Request
 ```http request
@@ -434,11 +420,9 @@ curl --request POST \
 }
 ```
 
----
-
 ## Delete
 
-delete data from table
+Deletes data from a specified table.
 
 #### Request
 ```http request
@@ -470,11 +454,9 @@ curl --request DELETE \
 }
 ```
 
----
-
 ## Update
 
-update data in table
+Updates data in a specified table.
 
 #### Request
 ```http request
@@ -510,11 +492,9 @@ curl --request PUT \
 }
 ```
 
----
-
 ## Select
 
-select data from table
+Selects data from a specified table.
 
 #### Request
 ```http request
@@ -589,11 +569,10 @@ curl --request GET \
 }
 ```
 
----
 
 ## Show variables
 
-Get variables
+Gets variables.
 
 #### Request
 ```http request
@@ -618,5 +597,3 @@ curl --request GET \
     "error_message": "No variable {variable_name}."
 }
 ```
-
----

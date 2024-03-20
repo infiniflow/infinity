@@ -37,6 +37,7 @@ import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
+import fulltext_file_worker;
 import embedding_info;
 
 namespace infinity {
@@ -245,7 +246,7 @@ Tuple<FulltextIndexEntry *, Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(TableEntry *table_entry, BlockIndex *block_index, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
     FulltextIndexEntry *fulltext_index_entry = this->fulltext_index_entry_.get();
     if (fulltext_index_entry != nullptr && !IsFulltextIndexHomebrewed()) {
-        auto *buffer_mgr = txn->GetBufferMgr();
+        auto *buffer_mgr = txn->buffer_manager();
         for (const auto *segment_entry : block_index->segments_) {
             fulltext_index_entry->irs_index_->BatchInsert(table_entry, index_base_.get(), segment_entry, buffer_mgr);
         }
@@ -291,10 +292,6 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
     // reference file_worker will be invalidated when vector_file_worker is resized
     const auto *index_base = param->index_base_;
     const auto *column_def = param->column_def_;
-    if (index_base->index_type_ == IndexType::kFullText) {
-        // fulltext doesn't use BufferManager
-        return vector_file_worker;
-    }
 
     auto file_name = MakeShared<String>(IndexFileName(segment_id));
     vector_file_worker.resize(1);
@@ -324,7 +321,7 @@ Vector<UniquePtr<IndexFileWorker>> TableIndexEntry::CreateFileWorker(CreateIndex
             break;
         }
         case IndexType::kFullText: {
-            // fulltext doesn't use BufferManager
+            file_worker = MakeUnique<FullTextColumnLengthFileWorker>(this->index_dir(), file_name, index_base, column_def);
             break;
         }
         case IndexType::kSecondary: {
@@ -372,7 +369,7 @@ UniquePtr<CreateIndexParam> TableIndexEntry::GetCreateIndexParam(const IndexBase
             return MakeUnique<CreateHnswParam>(index_base, column_def, max_element);
         }
         case IndexType::kFullText: {
-            return MakeUnique<CreateFullTextParam>(index_base, column_def);
+            return MakeUnique<CreateIndexParam>(index_base, column_def);
         }
         case IndexType::kSecondary: {
             u32 part_capacity = DEFAULT_BLOCK_CAPACITY;

@@ -742,10 +742,10 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     }
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
-    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
+    auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Delete(cmd.row_ids_);
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store.get(), fake_txn->CommitTS(), table_store->delete_state_);
+    Catalog::Delete(table_store->table_entry_, fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->delete_state_);
     Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
 }
 
@@ -777,15 +777,14 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     }
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id);
-
-    auto table_store = MakeShared<TxnTableStore>(table_entry, fake_txn.get());
+    auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Append(cmd.block_);
 
     auto append_state = MakeUnique<AppendState>(table_store->blocks_);
     table_store->append_state_ = std::move(append_state);
 
     fake_txn->FakeCommit(commit_ts);
-    Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store.get(), commit_ts, storage_->buffer_manager());
+    Catalog::Append(table_store->table_entry_, fake_txn->TxnID(), table_store, commit_ts, storage_->buffer_manager());
     Catalog::CommitWrite(table_store->table_entry_, fake_txn->TxnID(), commit_ts, table_store->txn_segments());
 }
 

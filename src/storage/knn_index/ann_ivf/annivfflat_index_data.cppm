@@ -224,13 +224,15 @@ struct AnnIVFFlatIndexData {
         file_handler.Write(&dimension_, sizeof(dimension_));
         file_handler.Write(&partition_num_, sizeof(partition_num_));
         file_handler.Write(&data_num_, sizeof(data_num_));
-        file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
-        u32 vector_element_num;
-        for (u32 i = 0; i < partition_num_; ++i) {
-            vector_element_num = ids_[i].size();
-            file_handler.Write(&vector_element_num, sizeof(vector_element_num));
-            file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
-            file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+        if (!centroids_.empty()) {
+            file_handler.Write(centroids_.data(), sizeof(CentroidsDataType) * dimension_ * partition_num_);
+            u32 vector_element_num;
+            for (u32 i = 0; i < partition_num_; ++i) {
+                vector_element_num = ids_[i].size();
+                file_handler.Write(&vector_element_num, sizeof(vector_element_num));
+                file_handler.Write(ids_[i].data(), sizeof(u32) * vector_element_num);
+                file_handler.Write(vectors_[i].data(), sizeof(VectorDataType) * dimension_ * vector_element_num);
+            }
         }
     }
 

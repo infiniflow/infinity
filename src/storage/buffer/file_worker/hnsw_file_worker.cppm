@@ -26,10 +26,6 @@ import column_def;
 
 namespace infinity {
 
-export struct CreateFullTextParam : public CreateIndexParam {
-    CreateFullTextParam(const IndexBase *index_base, const ColumnDef *column_def) : CreateIndexParam(index_base, column_def) {}
-};
-
 export struct CreateHnswLVQParam : public CreateIndexParam {
     const SizeT max_element_{};
 

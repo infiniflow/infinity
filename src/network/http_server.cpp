@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 
 module http_server;
@@ -21,6 +20,9 @@ import third_party;
 import defer_op;
 import data_block;
 import value;
+import query_options;
+import data_table;
+
 
 namespace {
 
@@ -63,6 +65,127 @@ public:
     }
 };
 
+class CreateDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String body_info = request->readBodyToString();
+        
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String database_name = body_info_json["database_name"];
+        CreateDatabaseOptions options;
+        auto result = infinity->CreateDatabase(database_name, options);
+        
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class DropDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+        
+        String body_info = request->readBodyToString();
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info);
+        String database_name = body_info_json["database_name"];
+        DropDatabaseOptions options;
+        auto result = infinity->DropDatabase(database_name,options);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+         if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class RetrieveDatabaseHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto db_name = request->getPathVariable("db_name");
+        auto result = infinity->GetDatabase(db_name);
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+         if(result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ListTableIndexesHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto db_name = request->getPathVariable("db_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto result = infinity->ListTableIndexes(db_name, table_name);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+        json_response["db_name"] = db_name;
+        json_response["table_name"] = table_name;
+
+        if(result.IsOk()) {
+            SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+            auto row_count = data_block->row_count();
+            auto column_cnt = result.result_table_->ColumnCount();
+
+            for (int row = 0; row < row_count; ++row) {
+                nlohmann::json json_index;
+                for (infinity::SizeT col = 0; col < column_cnt; ++col){
+                    const String &column_name = result.result_table_->GetColumnNameById(col);
+                    Value value = data_block->GetValue(col, row);
+                    const String &column_value = value.ToString();
+                    json_index[column_name] = column_value;
+                }
+                json_response["indexes"].push_back(json_index);
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 }
 
 namespace infinity {
@@ -74,6 +197,11 @@ void HTTPServer::Start(u16 port) {
     SharedPtr<HttpRouter> router = HttpRouter::createShared();
     router->route("GET", "/hello", MakeShared<HttpHandler>());
     router->route("GET", "/databases", MakeShared<ListDatabaseHandler>());
+    router->route("POST", "/databases", MakeShared<CreateDatabaseHandler>());
+    router->route("DELETE", "/databases", MakeShared<DropDatabaseHandler>());
+    router->route("GET", "/databases/{db_name}", MakeShared<RetrieveDatabaseHandler>());
+
+    router->route("GET", "/indexes/{db_name}/{table_name}", MakeShared<ListTableIndexesHandler>());
 
     SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({"localhost", port, WebAddress::IP_4});
     SharedPtr<HttpConnectionHandler> connection_handler =  HttpConnectionHandler::createShared(router);

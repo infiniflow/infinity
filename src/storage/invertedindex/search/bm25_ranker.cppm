@@ -24,7 +24,7 @@ public:
     BM25Ranker(u64 total_df);
     ~BM25Ranker() = default;
 
-    void AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len);
+    void AddTermParam(u64 tf, u64 df, double avg_column_len, u64 column_len, float weight);
 
     float GetScore() { return score_; }
 

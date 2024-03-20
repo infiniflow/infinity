@@ -85,6 +85,8 @@ public:
 
     QueryResult DescribeTable(const String &db_name, const String &table_name);
 
+    QueryResult ListTableIndexes(const String &db_name, const String &table_name);
+
     QueryResult ShowTables(const String &db_name);
 
     QueryResult GetTable(const String &db_name, const String &table_name);
